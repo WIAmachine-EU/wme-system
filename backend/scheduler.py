@@ -29,15 +29,28 @@ def process_periodic_eta_notifications():
         for order in active_orders:
             if order.vessel:
                 # fetch from hhla
-                new_eta = fetch_hhla_eta_sync(order.vessel)
-                if new_eta:
-                    # check if it actually changed to avoid spamming
-                    # standardizing datetime to naive UTC for comparison since DB is naive
-                    if not order.eta or order.eta.date() != new_eta.date() or order.eta.time() != new_eta.time():
+                hhla_data = fetch_hhla_eta_sync(order.vessel)
+                if hhla_data:
+                    new_eta = hhla_data.get("eta")
+                    new_actual = hhla_data.get("actual_date")
+                    
+                    changed = False
+                    # check if eta changed
+                    if new_eta and (not order.eta or order.eta.date() != new_eta.date() or order.eta.time() != new_eta.time()):
                         logger.info(f"Order {order.reference_no}: ETA updated from {order.eta} to {new_eta} via HHLA API")
                         order.eta = new_eta
+                        changed = True
+                        
+                    # check if actual_date changed
+                    if new_actual and (not order.actual_date or order.actual_date.date() != new_actual.date() or order.actual_date.time() != new_actual.time()):
+                        logger.info(f"Order {order.reference_no}: Actual Date updated from {order.actual_date} to {new_actual} via HHLA API")
+                        order.actual_date = new_actual
+                        changed = True
+                        
+                    if changed:
                         db.commit()
-                        send_eta_update_notification(order.reference_no, order.vessel, new_eta.strftime('%Y-%m-%d %H:%M'))
+                        if new_eta:
+                            send_eta_update_notification(order.reference_no, order.vessel, new_eta.strftime('%Y-%m-%d %H:%M'))
                     
         # 2. Check for interval since ETD from config
         config = db.query(models.EmailNotificationConfig).filter_by(stage="SHIPPING_INTERVAL").first()

@@ -106,6 +106,7 @@ class OrderBase(BaseModel):
     
     etd: Optional[datetime] = None
     eta: Optional[datetime] = None
+    actual_date: Optional[datetime] = None
 
     nc: Optional[str] = None
     detail_spec: Optional[str] = None
@@ -128,6 +129,7 @@ class OrderCreate(BaseModel):
     stock_type: Optional[str] = None
     etd: Optional[datetime] = None
     eta: Optional[datetime] = None
+    actual_date: Optional[datetime] = None
     nc: Optional[str] = None
     incoterms: Optional[str] = None
     destination_port: Optional[str] = None
@@ -166,6 +168,7 @@ class OrderStatusUpdate(BaseModel):
     changed_by_id: int
     eta: Optional[datetime] = None
     etd: Optional[datetime] = None
+    actual_date: Optional[datetime] = None
 
 class OrderAssignDealerUpdate(BaseModel):
     dealer_company_id: int

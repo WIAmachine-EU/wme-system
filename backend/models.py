@@ -129,6 +129,7 @@ class Order(Base):
     
     etd = Column(DateTime, nullable=True)
     eta = Column(DateTime, nullable=True)
+    actual_date = Column(DateTime, nullable=True)
     
     is_corporate_stock = Column(Boolean, default=False, nullable=False)
     is_timeline_completed = Column(Boolean, default=False, nullable=False)

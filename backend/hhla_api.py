@@ -25,12 +25,25 @@ async def fetch_hhla_eta(vessel_name_full: str):
     
     # MOCK implementation based on requirements
     if vessel_name.upper() == "ONE TRIBUTE":
-        # Returning mocked datetime
-        return datetime.fromisoformat("2026-08-31T09:00:00")
+        return {
+            "eta": datetime.fromisoformat("2026-08-31T09:00:00"),
+            "actual_date": None
+        }
     elif vessel_name.upper() == "ONE TRIUMPH":
-        return datetime.fromisoformat("2026-09-09T06:00:00")
+        return {
+            "eta": datetime.fromisoformat("2026-09-08T16:00:00"),
+            "actual_date": datetime.fromisoformat("2026-09-08T16:15:00")
+        }
     elif vessel_name.upper() == "ONE INTELLIGENCE":
-        return datetime.fromisoformat("2026-08-13T06:30:00")
+        return {
+            "eta": datetime.fromisoformat("2026-08-13T06:30:00"),
+            "actual_date": None
+        }
+    elif vessel_name.upper() == "ONE INTEGRITY":
+        return {
+            "eta": datetime.fromisoformat("2026-11-12T10:00:00"),
+            "actual_date": datetime.fromisoformat("2026-11-12T14:30:00")
+        }
         
     return None
 
@@ -43,10 +56,24 @@ def fetch_hhla_eta_sync(vessel_name_full: str):
     logger.info(f"[HHLA API] Querying vessel schedule for: '{vessel_name}' (Original: '{vessel_name_full}')")
     
     if vessel_name.upper() == "ONE TRIBUTE":
-        return datetime.fromisoformat("2026-08-31T09:00:00")
+        return {
+            "eta": datetime.fromisoformat("2026-08-31T09:00:00"),
+            "actual_date": None
+        }
     elif vessel_name.upper() == "ONE TRIUMPH":
-        return datetime.fromisoformat("2026-09-09T06:00:00")
+        return {
+            "eta": datetime.fromisoformat("2026-09-08T16:00:00"),
+            "actual_date": datetime.fromisoformat("2026-09-08T16:15:00")
+        }
     elif vessel_name.upper() == "ONE INTELLIGENCE":
-        return datetime.fromisoformat("2026-08-13T06:30:00")
+        return {
+            "eta": datetime.fromisoformat("2026-08-13T06:30:00"),
+            "actual_date": None
+        }
+    elif vessel_name.upper() == "ONE INTEGRITY":
+        return {
+            "eta": datetime.fromisoformat("2026-11-12T10:00:00"),
+            "actual_date": datetime.fromisoformat("2026-11-12T14:30:00")
+        }
         
     return None

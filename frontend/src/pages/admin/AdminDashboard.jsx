@@ -529,13 +529,13 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
                             {showSchedule && (
                               <>
                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                                  ETD: {order.etd ? new Date(order.etd).toLocaleDateString() : '2026.08.10'}
+                                  ETD: {order.etd ? new Date(order.etd).toLocaleDateString() : '-'}
                                 </div>
                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                                  ETA: {order.eta ? new Date(order.eta).toLocaleDateString() : '2026.09.15'}
+                                  ETA: {order.eta ? new Date(order.eta).toLocaleDateString() : '-'}
                                 </div>
                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                                  Actual: {order.actual_date || '2026.09.30'}
+                                  Actual: {order.actual_date ? new Date(order.actual_date).toLocaleDateString() : '-'}
                                 </div>
                               </>
                             )}

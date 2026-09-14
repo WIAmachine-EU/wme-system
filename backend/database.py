@@ -35,6 +35,11 @@ if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
             except sqlite3.OperationalError:
                 pass # Column exists
                 
+            try:
+                c.execute("ALTER TABLE orders ADD COLUMN actual_date DATETIME")
+            except sqlite3.OperationalError:
+                pass # Column exists
+                
             conn.commit()
             conn.close()
     except Exception as e:
