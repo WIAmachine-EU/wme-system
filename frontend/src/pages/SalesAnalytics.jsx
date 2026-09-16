@@ -1,8 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LabelList, ReferenceLine } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LabelList, ReferenceLine, Treemap } from 'recharts';
 import { Download, TrendingUp, Monitor, AlertTriangle, Settings, Anchor, Box, BarChart2 } from 'lucide-react';
 
-const COLORS = ['#0A1C8F', '#1F40E6', '#3B5FFF', '#CDAA7D', '#E60012', '#9D62FF', '#16C47F'];
+const COLORS = ['#0A1C8F', '#1F40E6', '#3B5FFF', '#CDAA7D', '#E60012', '#9D62FF', '#16C47F', '#00ACC1', '#FF9800', '#4CAF50'];
+
+const TREEMAP_COLORS = [
+  '#3498DB', '#4AA3DF', '#5DADE2', '#76B9E5', '#85C1E9', 
+  '#98CBEB', '#AED6F1', '#C0DFF4', '#D6EAF8', '#E5F2F9'
+];
+
+const CustomTreemapContent = (props) => {
+  const { x, y, width, height, index, name, value } = props;
+  if (width < 30 || height < 30) return null;
+  return (
+    <g>
+      <rect x={x} y={y} width={width} height={height} fill={TREEMAP_COLORS[index % TREEMAP_COLORS.length]} stroke="var(--bg-card)" strokeWidth={2} />
+      {width > 60 && height > 40 && (
+        <text x={x + width / 2} y={y + height / 2} textAnchor="middle" fill="#ffffff" fontSize={12} fontWeight={300} fontFamily="SUITE-Light, SUITE, sans-serif" stroke="none" style={{ WebkitFontSmoothing: 'antialiased' }}>
+          <tspan x={x + width / 2} dy="-0.2em">{name}</tspan>
+          <tspan x={x + width / 2} dy="1.4em" fontSize={11}>{value}대</tspan>
+        </text>
+      )}
+    </g>
+  );
+};
 
 const INITIAL_PLAN_DATA = [
   { month: '1월', plan_eur: 2000000, plan_krw: 31.88, plan_qty: 30, act_eur: 2000000, act_krw: 31.88, act_qty: 31 },
@@ -222,7 +243,7 @@ export default function SalesAnalytics({ isMobileView, isDesktopOptimized }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
             <div>
               <h3 style={{ fontSize: '1.2rem', marginBottom: '4px' }}>카드 6: 딜러/지역별 판매 비중</h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>좌측: 도넛 (전체 비중 색상), 우측: 발주 점유율 상위 10개 업체</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>전체 딜러별 판매 비중 분포 (트리맵)</p>
             </div>
             <select
               value={selectedYear2}
@@ -234,42 +255,23 @@ export default function SalesAnalytics({ isMobileView, isDesktopOptimized }) {
             </select>
           </div>
 
-          <div style={{ display: 'flex', height: '280px', gap: '16px' }}>
-            <div style={{ flex: '1', minWidth: 0 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={statsData.dealer_share}
-                    cx="50%" cy="50%"
-                    innerRadius={50} outerRadius={80}
-                    dataKey="value"
-                    stroke="none"
-                  >
-                    {statsData.dealer_share.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: 'var(--shadow-lg)' }} formatter={(value) => [`${value}대`, '판매량']} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div style={{ flex: '1.5', minWidth: 0 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart layout="vertical" data={statsData.dealer_share} margin={{ top: 5, right: 10, left: 50, bottom: 5 }}>
-                  <XAxis type="number" hide />
-                  <YAxis dataKey="name" type="category" width={160} tickLine={false} axisLine={false} interval={0} tick={{ fontSize: 11, fill: 'var(--text-secondary)', textAnchor: 'end' }} />
-                  <Tooltip cursor={false} contentStyle={{ borderRadius: '8px' }} />
-                  <Bar dataKey="value" radius={[10, 10, 10, 10]} barSize={20} name="판매 비중(대수)">
-                    {statsData.dealer_share.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={[
-                        '#B2F442', '#77C815', '#77C815', '#B2F442', '#77C815',
-                        '#488710', '#488710', '#488710', '#77C815', '#488710'
-                      ][index] || '#488710'} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+          <div style={{ height: '280px' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <Treemap
+                data={statsData.dealer_share}
+                dataKey="value"
+                nameKey="name"
+                aspectRatio={4 / 3}
+                stroke="var(--bg-card)"
+                isAnimationActive={false}
+                content={<CustomTreemapContent />}
+              >
+                <Tooltip 
+                  formatter={(value) => [`${value}대`, '판매량']}
+                  contentStyle={{ borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)' }} 
+                />
+              </Treemap>
+            </ResponsiveContainer>
           </div>
         </div>
       </div>

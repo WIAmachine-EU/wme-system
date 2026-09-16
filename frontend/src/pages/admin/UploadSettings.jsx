@@ -283,50 +283,33 @@ export default function UploadSettings() {
               {/* 1. MODEL */}
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('management.modal_label_model', '모델')} *</label>
-                <input
-                  type="text"
-                  list="model-list"
+                <select
                   required
-                  placeholder={t('management.modal_label_model', '모델')}
-                  value={newOrderForm.model_search_text || ''}
-                  onChange={e => {
-                    const text = e.target.value;
-                    const matchedModel = productModels.find(m => m.model_name === text);
-                    setNewOrderForm({
-                      ...newOrderForm,
-                      model_search_text: text,
-                      product_model_id: matchedModel ? matchedModel.id : ''
-                    });
-                  }}
+                  value={newOrderForm.product_model_id || ''}
+                  onChange={e => setNewOrderForm({ ...newOrderForm, product_model_id: e.target.value })}
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
-                />
-                <datalist id="model-list">
+                >
+                  <option value="">{t('management.modal_select_model', '-- 모델 선택 --')}</option>
                   {productModels.map(m => (
-                    <option key={m.id} value={m.model_name} />
+                    <option key={m.id} value={m.id}>{m.model_code || m.model_name}</option>
                   ))}
-                </datalist>
-                {!newOrderForm.product_model_id && newOrderForm.model_search_text && (
-                  <div style={{ color: 'var(--status-shipping)', fontSize: '0.8rem', marginTop: '4px' }}>유효한 모델을 목록에서 선택해주세요.</div>
-                )}
+                </select>
               </div>
 
               {/* 2. NC */}
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('management.modal_label_nc', 'NC')} *</label>
-                <input
-                  type="text"
-                  list="nc-list"
+                <select
                   required
-                  placeholder={t('management.modal_label_nc', 'NC')}
-                  value={newOrderForm.nc}
+                  value={newOrderForm.nc || ''}
                   onChange={e => setNewOrderForm({ ...newOrderForm, nc: e.target.value })}
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
-                />
-                <datalist id="nc-list">
+                >
+                  <option value="">{t('management.modal_select_nc', '-- NC 선택 --')}</option>
                   {ncCodes.map(nc => (
-                    <option key={nc.nc_code} value={nc.nc_code} />
+                    <option key={nc.nc_code} value={nc.nc_code}>{nc.nc_code}</option>
                   ))}
-                </datalist>
+                </select>
               </div>
 
               {/* 3. P/O */}
@@ -345,31 +328,17 @@ export default function UploadSettings() {
               {/* 4. DEALER */}
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('management.modal_label_dealer', '딜러')} *</label>
-                <input
-                  type="text"
-                  list="dealer-list"
+                <select
                   required
-                  placeholder={t('management.modal_label_dealer', '딜러')}
-                  value={newOrderForm.dealer_search_text || ''}
-                  onChange={e => {
-                    const text = e.target.value;
-                    const matchedDealer = dealers.find(d => d.name === text);
-                    setNewOrderForm({
-                      ...newOrderForm,
-                      dealer_search_text: text,
-                      dealer_company_id: matchedDealer ? matchedDealer.id : ''
-                    });
-                  }}
+                  value={newOrderForm.dealer_company_id || ''}
+                  onChange={e => setNewOrderForm({ ...newOrderForm, dealer_company_id: e.target.value })}
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
-                />
-                <datalist id="dealer-list">
+                >
+                  <option value="">{t('management.modal_select_dealer', '-- 딜러 선택 --')}</option>
                   {dealers.map(d => (
-                    <option key={d.id} value={d.name} />
+                    <option key={d.id} value={d.id}>{d.name}</option>
                   ))}
-                </datalist>
-                {!newOrderForm.dealer_company_id && newOrderForm.dealer_search_text && (
-                  <div style={{ color: 'var(--status-shipping)', fontSize: '0.8rem', marginTop: '4px' }}>유효한 딜러사를 목록에서 선택해주세요.</div>
-                )}
+                </select>
               </div>
 
               {/* 5. Dealer Order Date */}
@@ -397,39 +366,33 @@ export default function UploadSettings() {
               {/* 7. INCOTERMS */}
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('management.modal_label_incoterms', 'Incoterms')} *</label>
-                <input
-                  type="text"
-                  list="incoterm-list"
+                <select
                   required
-                  placeholder={t('management.modal_label_incoterms', 'Incoterms')}
-                  value={newOrderForm.incoterms}
+                  value={newOrderForm.incoterms || ''}
                   onChange={e => setNewOrderForm({ ...newOrderForm, incoterms: e.target.value })}
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
-                />
-                <datalist id="incoterm-list">
+                >
+                  <option value="">{t('management.modal_select_incoterms', '-- Incoterms 선택 --')}</option>
                   {incotermCodes.map(ic => (
-                    <option key={ic.incoterm_code} value={ic.incoterm_code} />
+                    <option key={ic.incoterm_code} value={ic.incoterm_code}>{ic.incoterm_code}</option>
                   ))}
-                </datalist>
+                </select>
               </div>
 
               {/* 8. PORT */}
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('management.modal_label_port', '항구')} *</label>
-                <input
-                  type="text"
-                  list="port-list"
+                <select
                   required
-                  placeholder={t('management.modal_label_port', '항구')}
-                  value={newOrderForm.destination_port}
+                  value={newOrderForm.destination_port || ''}
                   onChange={e => setNewOrderForm({ ...newOrderForm, destination_port: e.target.value })}
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
-                />
-                <datalist id="port-list">
+                >
+                  <option value="">{t('management.modal_select_port', '-- 항구 선택 --')}</option>
                   {portCodes.map(pc => (
-                    <option key={pc.port_code} value={pc.port_code} />
+                    <option key={pc.port_code} value={pc.port_code}>{pc.port_code}</option>
                   ))}
-                </datalist>
+                </select>
               </div>
 
               {/* 9. DETAIL SPEC */}
