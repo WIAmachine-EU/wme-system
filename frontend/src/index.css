@@ -161,7 +161,7 @@ h6 {
 }
 
 .page-body {
-  padding: 32px;
+  padding: 32px 10px;
   flex: 1;
   min-width: 0;
   max-width: 1600px;
@@ -401,7 +401,7 @@ h6 {
   align-items: flex-start;
   justify-content: space-between;
   position: relative;
-  padding: 22px 0;
+  padding: 10px 0;
   margin: 12px 0;
   --step-color: #F26B66;
   /* Coral Red matching user image */
@@ -758,7 +758,7 @@ h6 {
   }
 
   .page-body {
-    padding: 20px 16px;
+    padding: 20px 10px;
   }
 
   .role-switcher {

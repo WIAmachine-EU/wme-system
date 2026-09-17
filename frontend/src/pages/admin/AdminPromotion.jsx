@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Tag, CheckCircle, Clock, CheckCircle2 } from 'lucide-react';
+import { Tag, CheckCircle, Clock, CheckCircle2, Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 export default function AdminPromotion({ isMobileView }) {
@@ -7,6 +7,9 @@ export default function AdminPromotion({ isMobileView }) {
   const [promotions, setPromotions] = useState([]);
   const [dealers, setDealers] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
   const [reservingId, setReservingId] = useState(null);
   const [selectedDealerId, setSelectedDealerId] = useState('');
@@ -114,16 +117,72 @@ export default function AdminPromotion({ isMobileView }) {
       </div>
 
       <div className="glass-card" style={{ padding: '28px', marginBottom: '32px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-          <Tag color="var(--status-production)" size={24} />
-          <h2 style={{ fontSize: '1.3rem' }}>{t('menu3.list_title', '프로모션 리스트 및 실시간 예약 관리')}</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+          <div>
+            <h2 style={{ fontSize: '1.3rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Tag color="var(--status-production)" size={24} />
+              <span>{t('menu3.list_title', '프로모션 리스트 및 실시간 예약 관리')}</span>
+            </h2>
+          </div>
+
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative' }}>
+              <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+              <input 
+                type="text" 
+                placeholder="모델명, P/O, NC, 딜러 등 검색..." 
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                style={{
+                  background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)',
+                  padding: '8px 14px 8px 36px', borderRadius: '10px', fontSize: '0.85rem', width: '240px', outline: 'none'
+                }}
+              />
+            </div>
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              style={{
+                background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)',
+                padding: '8px 14px', borderRadius: '10px', fontSize: '0.85rem', cursor: 'pointer', outline: 'none'
+              }}
+            >
+              <option value="ALL">전체 상태 조회</option>
+              <option value="AVAILABLE">판매가능 (AVAILABLE)</option>
+              <option value="RESERVED">예약중 (RESERVED)</option>
+              <option value="SOLD">판매완료 (SOLD)</option>
+            </select>
+          </div>
         </div>
         
         {loading ? (
            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>로딩 중...</div>
         ) : isMobileView ? (
           <div className="mobile-cards-grid">
-            {promotions.map((promo, index) => (
+            {(() => {
+              const filteredPromotions = promotions.filter(promo => {
+                if (statusFilter !== 'ALL' && promo.status !== statusFilter) return false;
+                if (searchQuery) {
+                  const q = searchQuery.toLowerCase();
+                  const o = promo.order;
+                  if (
+                    (o?.product_model?.model_name && o.product_model.model_name.toLowerCase().includes(q)) ||
+                    (o?.reference_no && o.reference_no.toLowerCase().includes(q)) ||
+                    (o?.nc && o.nc.toLowerCase().includes(q)) ||
+                    (o?.serial_number && o.serial_number.toLowerCase().includes(q)) ||
+                    (promo.reserved_dealer?.name && promo.reserved_dealer.name.toLowerCase().includes(q)) ||
+                    (promo.final_buyer_dealer?.name && promo.final_buyer_dealer.name.toLowerCase().includes(q))
+                  ) return true;
+                  return false;
+                }
+                return true;
+              });
+
+              if (filteredPromotions.length === 0) {
+                return <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>조건에 맞는 데이터가 없습니다.</div>;
+              }
+
+              return filteredPromotions.map((promo, index) => (
               <div key={promo.id} className="mobile-order-card">
                 <div className="mobile-order-header">
                   <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--text-primary)' }}>
@@ -232,7 +291,8 @@ export default function AdminPromotion({ isMobileView }) {
                   )}
                 </div>
               </div>
-            ))}
+              ))
+            })()}
           </div>
         ) : (
           <div className="data-table-container full-bleed">
@@ -251,7 +311,30 @@ export default function AdminPromotion({ isMobileView }) {
                 </tr>
               </thead>
               <tbody>
-                {promotions.map((promo, index) => (
+                {(() => {
+                  const filteredPromotions = promotions.filter(promo => {
+                    if (statusFilter !== 'ALL' && promo.status !== statusFilter) return false;
+                    if (searchQuery) {
+                      const q = searchQuery.toLowerCase();
+                      const o = promo.order;
+                      if (
+                        (o?.product_model?.model_name && o.product_model.model_name.toLowerCase().includes(q)) ||
+                        (o?.reference_no && o.reference_no.toLowerCase().includes(q)) ||
+                        (o?.nc && o.nc.toLowerCase().includes(q)) ||
+                        (o?.serial_number && o.serial_number.toLowerCase().includes(q)) ||
+                        (promo.reserved_dealer?.name && promo.reserved_dealer.name.toLowerCase().includes(q)) ||
+                        (promo.final_buyer_dealer?.name && promo.final_buyer_dealer.name.toLowerCase().includes(q))
+                      ) return true;
+                      return false;
+                    }
+                    return true;
+                  });
+
+                  if (filteredPromotions.length === 0) {
+                    return <tr><td colSpan={9} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>조건에 맞는 데이터가 없습니다.</td></tr>;
+                  }
+
+                  return filteredPromotions.map((promo, index) => (
                   <tr key={promo.id}>
                     <td style={{ textAlign: 'center' }}>
                       <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 500 }}>{index + 1}</span>
@@ -368,7 +451,8 @@ export default function AdminPromotion({ isMobileView }) {
                       )}
                     </td>
                   </tr>
-                ))}
+                  ))
+                })()}
               </tbody>
             </table>
           </div>

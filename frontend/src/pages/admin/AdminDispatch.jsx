@@ -20,6 +20,25 @@ export default function AdminDispatch({ isMobileView }) {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
+  const [models, setModels] = useState([]);
+  const [dealers, setDealers] = useState([]);
+
+  const [editingOrder, setEditingOrder] = useState(null);
+  const [editForm, setEditForm] = useState({
+    product_model_id: '',
+    reference_no: '',
+    nc: '',
+    dealer_company_id: '',
+    serial_number: '',
+    so_no: '',
+    price: '',
+    destination_port: '',
+    detail_spec: '',
+    incoterms: '',
+    vessel: '',
+    remark: ''
+  });
+
   const [agingFilter, setAgingFilter] = useState('ALL');
   const [stockTypeFilter, setStockTypeFilter] = useState('ALL');
 
@@ -57,7 +76,62 @@ export default function AdminDispatch({ isMobileView }) {
 
   useEffect(() => {
     fetchDispatchOrders();
+    fetch('/api/models').then(res => res.json()).then(data => Array.isArray(data) && setModels(data)).catch(console.error);
+    fetch('/api/dealers').then(res => res.json()).then(data => Array.isArray(data) && setDealers(data)).catch(console.error);
   }, []);
+
+  const handleEditClick = (order) => {
+    setEditingOrder(order);
+    setEditForm({
+      product_model_id: order.product_model_id || '',
+      reference_no: order.reference_no || '',
+      nc: order.nc || '',
+      dealer_company_id: order.dealer_company_id || '',
+      serial_number: order.serial_number || '',
+      so_no: order.so_no || '',
+      price: order.price || '',
+      destination_port: order.destination_port || '',
+      detail_spec: order.detail_spec || '',
+      incoterms: order.incoterms || '',
+      vessel: order.vessel || '',
+      remark: order.remark || ''
+    });
+  };
+
+  const handleUpdateSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingOrder) return;
+    try {
+      const res = await fetch(`/api/orders/${editingOrder.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          product_model_id: parseInt(editForm.product_model_id) || null,
+          reference_no: editForm.reference_no,
+          nc: editForm.nc,
+          dealer_company_id: parseInt(editForm.dealer_company_id) || null,
+          serial_number: editForm.serial_number,
+          so_no: editForm.so_no,
+          price: editForm.price,
+          destination_port: editForm.destination_port,
+          detail_spec: editForm.detail_spec,
+          incoterms: editForm.incoterms,
+          vessel: editForm.vessel,
+          remark: editForm.remark
+        })
+      });
+      if (res.ok) {
+        alert("장비 정보가 성공적으로 업데이트되었습니다.");
+        setEditingOrder(null);
+        fetchDispatchOrders();
+      } else {
+        const errorData = await res.json();
+        alert(`업데이트 실패: ${errorData.detail || "알 수 없는 오류"}`);
+      }
+    } catch (err) {
+      alert("업데이트 중 오류가 발생했습니다.");
+    }
+  };
 
   const handleDispatchOrder = async (orderId) => {
     if (!window.confirm("이 장비를 출고 처리하시겠습니까? (출고 처리 시 창고 리스트에서 제외됩니다)")) return;
@@ -264,6 +338,13 @@ export default function AdminDispatch({ isMobileView }) {
                         <Clock size={14} /> 이력
                       </button>
                       <button
+                        onClick={() => handleEditClick(order)}
+                        className="btn btn-outline"
+                        style={{ flex: 1, padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                      >
+                        수정
+                      </button>
+                      <button
                         onClick={() => handleDispatchOrder(order.id)}
                         className="btn btn-primary"
                         style={{ flex: 2, padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
@@ -355,6 +436,13 @@ export default function AdminDispatch({ isMobileView }) {
                                 <Clock size={13} /> 이력
                               </button>
                               <button
+                                onClick={() => handleEditClick(order)}
+                                className="btn btn-outline"
+                                style={{ padding: '4px 8px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              >
+                                수정
+                              </button>
+                              <button
                                 onClick={() => handleDispatchOrder(order.id)}
                                 className="btn btn-primary"
                                 style={{ padding: '4px 12px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
@@ -442,6 +530,108 @@ export default function AdminDispatch({ isMobileView }) {
             </div>
             <div className="modal-footer" style={{ borderTop: '1px solid var(--border-color)', padding: '16px 20px', display: 'flex', justifyContent: 'flex-end' }}>
               <button onClick={closeHistory} className="btn btn-outline">닫기</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* 장비 정보 수정 모달 */}
+      {editingOrder && (
+        <div className="modal-overlay" onClick={() => setEditingOrder(null)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px', padding: 0 }}>
+            <div className="modal-header" style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0 }}>장비 정보 수정</h3>
+              <button onClick={() => setEditingOrder(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={20} /></button>
+            </div>
+            <div className="modal-body" style={{ padding: '24px', maxHeight: '70vh', overflowY: 'auto' }}>
+              <form onSubmit={handleUpdateSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>{t('menu1.edit_modal.model', '모델')}</label>
+                    <select
+                      value={editForm.product_model_id}
+                      onChange={e => setEditForm({ ...editForm, product_model_id: e.target.value })}
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                    >
+                      <option value="">모델 선택</option>
+                      {models.map(m => (
+                        <option key={m.id} value={m.id}>{m.model_name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>P/O 번호</label>
+                    <input type="text" value={editForm.reference_no} onChange={e => setEditForm({ ...editForm, reference_no: e.target.value })} placeholder="P/O 번호" style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>NC</label>
+                    <input type="text" value={editForm.nc} onChange={e => setEditForm({ ...editForm, nc: e.target.value })} placeholder="NC" style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>딜러사</label>
+                    <select
+                      value={editForm.dealer_company_id}
+                      onChange={e => setEditForm({ ...editForm, dealer_company_id: e.target.value })}
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                    >
+                      <option value="">딜러 선택</option>
+                      {dealers.map(d => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>{t('menu1.edit_modal.sn', 'S/N')}</label>
+                    <input type="text" value={editForm.serial_number} onChange={e => setEditForm({ ...editForm, serial_number: e.target.value })} placeholder={t('menu1.edit_modal.sn_placeholder', 'S/N 입력')} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>{t('menu1.edit_modal.so', 'S/O')}</label>
+                    <input type="text" value={editForm.so_no} onChange={e => setEditForm({ ...editForm, so_no: e.target.value })} placeholder={t('menu1.edit_modal.so_placeholder', 'S/O 입력')} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>구매가</label>
+                    <input type="text" value={editForm.price} onChange={e => setEditForm({ ...editForm, price: e.target.value })} placeholder="구매가(€)" style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>{t('menu1.edit_modal.port', '도착항')}</label>
+                    <input type="text" value={editForm.destination_port} onChange={e => setEditForm({ ...editForm, destination_port: e.target.value })} placeholder={t('menu1.edit_modal.port_placeholder', '도착항 입력')} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>{t('menu1.edit_modal.detail_spec', '상세 스펙')}</label>
+                  <input type="text" value={editForm.detail_spec} onChange={e => setEditForm({ ...editForm, detail_spec: e.target.value })} placeholder={t('menu1.edit_modal.detail_placeholder', '스펙 입력')} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>{t('menu1.edit_modal.incoterms', '인코텀즈')}</label>
+                    <input type="text" value={editForm.incoterms} onChange={e => setEditForm({ ...editForm, incoterms: e.target.value })} placeholder={t('menu1.edit_modal.incoterms_placeholder', '인코텀즈 입력')} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>{t('menu1.edit_modal.vessel', '선박명')}</label>
+                    <input type="text" value={editForm.vessel} onChange={e => setEditForm({ ...editForm, vessel: e.target.value })} placeholder={t('menu1.edit_modal.vessel_placeholder', '선박명 입력')} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>{t('menu1.edit_modal.remark', '비고')}</label>
+                  <textarea value={editForm.remark} onChange={e => setEditForm({ ...editForm, remark: e.target.value })} placeholder={t('menu1.edit_modal.remark_placeholder', '비고 입력')} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)', resize: 'vertical', minHeight: '80px' }} />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
+                  <button type="button" onClick={() => setEditingOrder(null)} className="btn btn-outline" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>{t('menu1.edit_modal.cancel', '취소')}</button>
+                  <button type="submit" className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>{t('menu1.edit_modal.save', '저장')}</button>
+                </div>
+              </form>
             </div>
           </div>
         </div>

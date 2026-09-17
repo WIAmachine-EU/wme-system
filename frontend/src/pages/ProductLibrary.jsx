@@ -86,7 +86,7 @@ export default function ProductLibrary({ currentRole, isMobileView }) {
     return specMap[key] || key;
   };
   return (
-    <div style={{ padding: isMobileView ? '16px' : '32px', animation: 'fadeIn 0.4s ease-out' }}>
+    <div className="page-body" style={{ animation: 'fadeIn 0.4s ease-out' }}>
 
       {/* Header */}
       <div style={{ display: 'flex', flexDirection: isMobileView ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobileView ? 'stretch' : 'center', gap: '16px', marginBottom: '24px' }}>

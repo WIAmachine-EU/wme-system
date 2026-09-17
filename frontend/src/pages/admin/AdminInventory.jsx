@@ -267,6 +267,7 @@ export default function AdminInventory({ isMobileView }) {
             ) : (
               filteredOrders.map((order, index) => {
                 const sType = pendingChanges[order.id]?.stockType || order.stock_type || 'AVAILABLE';
+                const showSchedule = ['SHIPPING', 'ARRIVED', 'IN_STOCK'].includes(order.current_status);
 
                 let typeBgColor = 'var(--bg-secondary)';
                 let typeColor = 'var(--text-primary)';
@@ -288,7 +289,7 @@ export default function AdminInventory({ isMobileView }) {
                     </div>
                     <div className="mobile-order-meta">
                       <span>NC: <strong style={{ color: 'var(--text-primary)' }}>{order.nc || 'F0iP'}</strong></span>
-                      <span>Buying: <strong style={{ color: 'var(--text-primary)' }}>{order.price || '-'}</strong></span>
+                      <span>Buying: <strong style={{ color: 'var(--text-primary)' }}>{order.price ? (!isNaN(order.price) ? Number(order.price).toLocaleString() : order.price) : '-'}</strong></span>
                       <span>ETA: <strong style={{ color: 'var(--text-primary)' }}>{order.eta ? new Date(order.eta).toLocaleDateString() : '-'}</strong></span>
                     </div>
 
@@ -428,7 +429,7 @@ export default function AdminInventory({ isMobileView }) {
                             <div style={{ fontSize: '12px' }}>{order.nc || 'F0iP'}</div>
                           </td>
                           <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px', textAlign: order.price ? 'right' : 'center', paddingRight: order.price ? '16px' : '0' }}>
-                            <div style={{ fontSize: '12px' }}>{order.price || '-'}</div>
+                            <div style={{ fontSize: '12px' }}>{order.price ? (!isNaN(order.price) ? Number(order.price).toLocaleString() : order.price) : '-'}</div>
                           </td>
                           <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px', textAlign: 'center' }}>
                             <div style={{ fontWeight: 700, color: 'var(--accent-cyan)', fontSize: '11px' }}>{order.reference_no}</div>
