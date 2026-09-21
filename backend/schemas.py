@@ -59,6 +59,39 @@ class CustomUserOut(CustomUserBase):
     dealer_company: Optional[DealerCompanyOut] = None
     model_config = ConfigDict(from_attributes=True)
 
+# Shipment Schemas
+class ShipmentBase(BaseModel):
+    mbl_no: str
+    carrier: Optional[str] = None
+    pol: Optional[str] = None
+    pod: Optional[str] = None
+    vessel: Optional[str] = None
+    voyage: Optional[str] = None
+    etd: Optional[datetime] = None
+    atd: Optional[datetime] = None
+    eta: Optional[datetime] = None
+    ata: Optional[datetime] = None
+    trackcargo_order_id: Optional[str] = None
+    trackcargo_status: Optional[str] = None
+    trackcargo_last_sync: Optional[datetime] = None
+    trackcargo_error: Optional[str] = None
+
+class ShipmentCreate(ShipmentBase):
+    pass
+
+class ShipmentOut(ShipmentBase):
+    id: int
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+class ShipmentUploadRow(BaseModel):
+    mbl_no: str
+    pol: Optional[str] = None
+    pod: Optional[str] = None
+    model_name: Optional[str] = None
+    serial_number: Optional[str] = None
+    reference_no: Optional[str] = None
+
 # ProductCategory Schemas
 class ProductCategoryBase(BaseModel):
     name: str
@@ -142,6 +175,7 @@ class OrderOut(OrderBase):
     product_model: Optional[ProductModelOut] = None
     dealer_company: Optional[DealerCompanyOut] = None
     rsm_user: Optional[CustomUserOut] = None
+    shipment: Optional[ShipmentOut] = None
     model_config = ConfigDict(from_attributes=True)
 
 class OrderUpdate(BaseModel):

@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
-import { LayoutDashboard, BarChart3, FileSpreadsheet, Tag, Package, Truck, ShieldAlert, X, FolderOpen, Smartphone, Monitor, RefreshCw, User, LogOut } from 'lucide-react';
+import { LayoutDashboard, BarChart3, FileSpreadsheet, Tag, Package, Truck, ShieldAlert, X, FolderOpen, Smartphone, Monitor, RefreshCw, User, LogOut, UploadCloud } from 'lucide-react';
 import WiaLogo from './WiaLogo';
 
 export default function Sidebar({ activeTab, setActiveTab, currentRole, currentUserId, isMobileOpen, onClose, isActualMobileView, simulateMobile, setSimulateMobile, onProfileClick, onLogout }) {
@@ -56,6 +56,11 @@ export default function Sidebar({ activeTab, setActiveTab, currentRole, currentU
       id: 'management',
       label: t('sidebar.admin_menu.management'),
       icon: <FileSpreadsheet size={20} />
+    },
+    {
+      id: 'admin-shipment-upload',
+      label: '선적정보 업로드',
+      icon: <UploadCloud size={20} />
     },
     {
       id: 'admin-dispatch',

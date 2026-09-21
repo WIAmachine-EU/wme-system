@@ -69,6 +69,13 @@ def on_startup():
             db.commit()
         except Exception:
             db.rollback()
+            
+        # Schema Migration for orders (add shipment_id)
+        try:
+            db.execute(text("ALTER TABLE orders ADD COLUMN shipment_id INTEGER REFERENCES shipments(id)"))
+            db.commit()
+        except Exception:
+            db.rollback()
         
         # 2. Update dealer emails to test emails
         dealers = db.query(models.CustomUser).filter(models.CustomUser.role == models.UserRole.DEALER).all()
@@ -222,6 +229,63 @@ def get_incoterm_codes(db: Session = Depends(get_db)):
 def get_port_codes(db: Session = Depends(get_db)):
     codes = db.query(models.PortCode).all()
     return [{"port_code": c.port_code, "country": c.country} for c in codes]
+
+from trackcargo_api import create_sea_tracking
+
+@app.post("/api/shipments/upload")
+async def upload_shipments(rows: List[schemas.ShipmentUploadRow], db: Session = Depends(get_db)):
+    try:
+        # 1. Group by MBL
+        mbl_groups = {}
+        for row in rows:
+            if row.mbl_no not in mbl_groups:
+                mbl_groups[row.mbl_no] = {
+                    "pol": row.pol,
+                    "pod": row.pod,
+                    "orders": []
+                }
+            mbl_groups[row.mbl_no]["orders"].append(row)
+            
+        # 2. Process each MBL
+        for mbl, data in mbl_groups.items():
+            shipment = db.query(models.Shipment).filter(models.Shipment.mbl_no == mbl).first()
+            
+            # If shipment doesn't exist, create it and register tracking
+            if not shipment:
+                shipment = models.Shipment(
+                    mbl_no=mbl,
+                    pol=data["pol"],
+                    pod=data["pod"]
+                )
+                db.add(shipment)
+                db.flush() # flush to get ID if needed
+                
+                # Register Tracking
+                trackcargo_order_id = await create_sea_tracking(mbl)
+                if trackcargo_order_id:
+                    shipment.trackcargo_order_id = trackcargo_order_id
+            
+            # Update orders
+            for order_row in data["orders"]:
+                # Match by reference_no (P/O) or serial_number (S/N)
+                order_query = db.query(models.Order)
+                if order_row.serial_number:
+                    order_query = order_query.filter(models.Order.serial_number == order_row.serial_number)
+                elif order_row.reference_no:
+                    order_query = order_query.filter(models.Order.reference_no == order_row.reference_no)
+                else:
+                    continue
+                    
+                matched_order = order_query.first()
+                if matched_order:
+                    matched_order.shipment_id = shipment.id
+                    
+        db.commit()
+        return {"status": "success", "message": f"{len(rows)}건의 선적 정보가 성공적으로 업로드되었습니다."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/orders", response_model=List[schemas.OrderOut])
 def get_orders(
     dealer_id: Optional[int] = Query(None, description="DEALER 권한인 경우 본인 회사 ID만 조회"),

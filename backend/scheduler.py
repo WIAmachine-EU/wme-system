@@ -15,10 +15,57 @@ def process_periodic_eta_notifications():
     1. Check HHLA API for vessel arrival schedules and update Order.eta.
     2. Send periodic 10-day interval notifications for orders in SHIPPING.
     """
-    logger.info("Starting periodic ETA notification and HHLA sync job...")
+    logger.info("Starting periodic ETA notification and API sync job...")
     db: Session = SessionLocal()
     try:
-        # Sync HHLA ETA for orders that are SHIPPING
+        from trackcargo_api import fetch_tracking_data_sync
+        
+        # Sync TrackCargo Shipments
+        active_shipments = db.query(models.Shipment).filter(
+            models.Shipment.trackcargo_order_id.isnot(None),
+            models.Shipment.trackcargo_status != "Completed" # Assuming Completed is a status
+        ).all()
+        
+        for shipment in active_shipments:
+            try:
+                tracking_data = fetch_tracking_data_sync(shipment.trackcargo_order_id)
+                if tracking_data and not tracking_data.get("error"):
+                    shipment.trackcargo_status = tracking_data.get("trackcargo_status")
+                    shipment.trackcargo_last_sync = datetime.utcnow()
+                    
+                    if tracking_data.get("vessel"):
+                        shipment.vessel = tracking_data.get("vessel")
+                    if tracking_data.get("voyage"):
+                        shipment.voyage = tracking_data.get("voyage")
+                        
+                    # Sync to orders
+                    new_eta = tracking_data.get("eta")
+                    new_etd = tracking_data.get("etd")
+                    
+                    for order in shipment.orders:
+                        changed = False
+                        if new_eta and order.eta != new_eta:
+                            order.eta = new_eta
+                            changed = True
+                        if new_etd and order.etd != new_etd:
+                            order.etd = new_etd
+                            changed = True
+                        if tracking_data.get("vessel") and order.vessel != tracking_data.get("vessel"):
+                            order.vessel = tracking_data.get("vessel")
+                            changed = True
+                            
+                        if changed:
+                            logger.info(f"Order {order.reference_no} updated from TrackCargo Shipment {shipment.mbl_no}")
+                            if new_eta:
+                                send_eta_update_notification(order.reference_no, order.vessel, new_eta.strftime('%Y-%m-%d %H:%M'))
+                                
+            except Exception as e:
+                shipment.trackcargo_error = str(e)
+                logger.error(f"Error syncing shipment {shipment.mbl_no}: {e}")
+                
+        db.commit()
+
+        # Sync HHLA ETA for orders that are SHIPPING (Fallback/legacy for those not in TrackCargo)
         active_orders = db.query(models.Order).filter(
             models.Order.current_status == models.OrderStatus.SHIPPING
         ).all()

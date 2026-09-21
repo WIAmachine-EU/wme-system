@@ -59,6 +59,31 @@ class CustomUser(Base):
     rsm_orders = relationship("Order", back_populates="rsm_user")
     status_changes = relationship("OrderStatusHistory", back_populates="changed_by")
 
+class Shipment(Base):
+    __tablename__ = "shipments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    mbl_no = Column(String, unique=True, index=True, nullable=False)
+    carrier = Column(String, nullable=True)
+    pol = Column(String, nullable=True)
+    pod = Column(String, nullable=True)
+    vessel = Column(String, nullable=True)
+    voyage = Column(String, nullable=True)
+    
+    etd = Column(DateTime, nullable=True)
+    atd = Column(DateTime, nullable=True)
+    eta = Column(DateTime, nullable=True)
+    ata = Column(DateTime, nullable=True)
+    
+    trackcargo_order_id = Column(String, nullable=True)
+    trackcargo_status = Column(String, nullable=True)
+    trackcargo_last_sync = Column(DateTime, nullable=True)
+    trackcargo_error = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    orders = relationship("Order", back_populates="shipment")
+
 class ProductCategory(Base):
     __tablename__ = "product_categories"
 
@@ -123,6 +148,7 @@ class Order(Base):
     product_model_id = Column(Integer, ForeignKey("product_models.id"), nullable=False)
     dealer_company_id = Column(Integer, ForeignKey("dealer_companies.id"), nullable=False)
     rsm_user_id = Column(Integer, ForeignKey("custom_users.id"), nullable=True)
+    shipment_id = Column(Integer, ForeignKey("shipments.id"), nullable=True)
 
     current_status = Column(Enum(OrderStatus), default=OrderStatus.CONFIRMED, nullable=False)
     current_status_changed_at = Column(DateTime, default=datetime.utcnow)
@@ -151,6 +177,7 @@ class Order(Base):
     product_model = relationship("ProductModel", back_populates="orders")
     dealer_company = relationship("DealerCompany", back_populates="orders")
     rsm_user = relationship("CustomUser", back_populates="rsm_orders")
+    shipment = relationship("Shipment", back_populates="orders")
     
     history = relationship("OrderStatusHistory", back_populates="order", cascade="all, delete-orphan")
     promotion = relationship("PromotionInventory", back_populates="order", uselist=False, cascade="all, delete-orphan")

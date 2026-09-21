@@ -15,6 +15,7 @@ import SalesAnalytics from './pages/SalesAnalytics';
 import AdminPromotion from './pages/admin/AdminPromotion';
 import UploadSettings from './pages/admin/UploadSettings';
 import AdminUsers from './pages/admin/AdminUsers';
+import AdminShipmentUpload from './pages/admin/AdminShipmentUpload';
 import ProductLibrary from './pages/ProductLibrary';
 
 // Dealer Pages
@@ -222,6 +223,7 @@ export default function App() {
           {activeTab === 'admin-users' && currentRole !== 'RSM' && <AdminUsers isMobileView={isMobileView} />}
           {activeTab === 'analytics' && currentRole !== 'RSM' && <SalesAnalytics isMobileView={isMobileView} isDesktopOptimized={isDesktopOptimized} />}
           {activeTab === 'admin-promotion' && (currentRole === 'SCM_ADMIN' || currentRole === 'RSM') && <AdminPromotion isMobileView={isMobileView} />}
+          {activeTab === 'admin-shipment-upload' && currentRole !== 'RSM' && <AdminShipmentUpload isMobileView={isMobileView} />}
           {activeTab === 'management' && currentRole !== 'RSM' && <UploadSettings />}
           {activeTab === 'admin-library' && (currentRole === 'SCM_ADMIN' || currentRole === 'RSM') && <ProductLibrary currentRole={currentRole} isMobileView={isMobileView} />}
 
