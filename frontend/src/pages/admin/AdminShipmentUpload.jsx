@@ -206,13 +206,14 @@ export default function AdminShipmentUpload({ isMobileView }) {
         onDragOver={handleDragOver}
         onDrop={handleDrop}
         style={{
+          maxWidth: '500px',
+          margin: '0 auto 32px',
           border: '2px dashed var(--border-color)',
           borderRadius: '12px',
-          padding: '48px',
+          padding: '20px',
           textAlign: 'center',
           backgroundColor: 'var(--bg-secondary)',
           cursor: 'pointer',
-          marginBottom: '32px',
           transition: 'all 0.2s ease'
         }}
         onClick={() => fileInputRef.current?.click()}

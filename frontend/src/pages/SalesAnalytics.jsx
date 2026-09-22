@@ -10,16 +10,40 @@ const TREEMAP_COLORS = [
 ];
 
 const CustomTreemapContent = (props) => {
-  const { x, y, width, height, index, name, value } = props;
+  const { x, y, width, height, index, name, value, total } = props;
   if (width < 30 || height < 30) return null;
+
+  const percent = total ? ((value / total) * 100).toFixed(1) : 0;
+  
+  // Stock heatmap colors (Updated to user requested slate blue)
+  const bgColor = 'rgb(42, 108, 141)'; // User requested blue background
+  const headerColor = 'rgb(52, 128, 161)'; // Slightly brighter/saturated blue for top header
+  const borderColor = '#121212'; // Dark border like typical stock heatmaps
+
+  const headerHeight = Math.min(22, height * 0.25); // Thin box at the top
+  
   return (
     <g>
-      <rect x={x} y={y} width={width} height={height} fill={TREEMAP_COLORS[index % TREEMAP_COLORS.length]} stroke="var(--bg-card)" strokeWidth={2} />
-      {width > 60 && height > 40 && (
-        <text x={x + width / 2} y={y + height / 2} textAnchor="middle" fill="#ffffff" fontSize={12} fontWeight={300} fontFamily="SUITE-Light, SUITE, sans-serif" stroke="none" style={{ WebkitFontSmoothing: 'antialiased' }}>
-          <tspan x={x + width / 2} dy="-0.2em">{name}</tspan>
-          <tspan x={x + width / 2} dy="1.4em" fontSize={11}>{value}대</tspan>
+      {/* Main Background */}
+      <rect x={x} y={y} width={width} height={height} fill={bgColor} stroke={borderColor} strokeWidth={2} />
+      
+      {/* Top Header Layer (Thin Box) */}
+      {height > 30 && width > 30 && (
+        <rect x={x} y={y} width={width} height={headerHeight} fill={headerColor} stroke={borderColor} strokeWidth={1} />
+      )}
+      
+      {width > 60 && height > 65 && (
+        <text x={x + 8} y={y + headerHeight + 20} textAnchor="start" fill="#ffffff" fontFamily="sans-serif" stroke="none" style={{ WebkitFontSmoothing: 'antialiased' }}>
+          <tspan x={x + 8} dy="0" fontSize={16} fontWeight="bold">{name}</tspan>
+          <tspan x={x + 8} dy="1.4em" fontSize={15} fontWeight="bold" fill="#ffffff">+{percent}%</tspan>
+          <tspan x={x + 8} dy="1.4em" fontSize={13} fill="rgba(255,255,255,0.85)">{value}대</tspan>
         </text>
+      )}
+      {/* For smaller boxes, only show name */}
+      {width > 40 && width <= 60 && height > 40 && (
+         <text x={x + width / 2} y={y + height / 2 + headerHeight/2} textAnchor="middle" fill="#ffffff" fontSize={11} fontWeight="bold">
+           <tspan x={x + width / 2} dy="0">{name.substring(0, 5)}</tspan>
+         </text>
       )}
     </g>
   );
@@ -262,9 +286,9 @@ export default function SalesAnalytics({ isMobileView, isDesktopOptimized }) {
                 dataKey="value"
                 nameKey="name"
                 aspectRatio={4 / 3}
-                stroke="var(--bg-card)"
+                stroke="#121212"
                 isAnimationActive={false}
-                content={<CustomTreemapContent />}
+                content={(props) => <CustomTreemapContent {...props} total={statsData.dealer_share.reduce((sum, d) => sum + d.value, 0)} />}
               >
                 <Tooltip 
                   formatter={(value) => [`${value}대`, '판매량']}

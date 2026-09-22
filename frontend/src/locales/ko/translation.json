@@ -30,6 +30,7 @@
       "inventory": "WIA 재고리스트",
       "promotion": "WIA 프로모션",
       "management": "업로드 / 설정관리",
+      "shipment_upload": "선적정보 업로드",
       "dispatch": "WIA 창고",
       "sales_archive": "판매 목록",
       "analytics": "영업통계 및 분석",

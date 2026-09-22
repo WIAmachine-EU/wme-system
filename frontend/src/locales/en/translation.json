@@ -30,6 +30,7 @@
       "inventory": "WIA Stock List",
       "promotion": "WIA Promotion",
       "management": "Upload / Setting",
+      "shipment_upload": "Shipment Management",
       "dispatch": "WIA Warehouse",
       "sales_archive": "Sales List",
       "analytics": "Sales Analytics",

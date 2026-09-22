@@ -97,17 +97,6 @@ export default function ProductLibrary({ currentRole, isMobileView }) {
           </h1>
         </div>
 
-        {/* Write Access for SCM_ADMIN */}
-        {currentRole === 'SCM_ADMIN' && (
-          <button style={{
-            background: 'var(--wia-blue)', color: 'white', border: 'none', padding: '10px 20px',
-            borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 600,
-            boxShadow: 'var(--glass-shadow)', alignSelf: isMobileView ? 'stretch' : 'auto', justifyContent: 'center'
-          }}>
-            <Upload size={18} />
-            <span>신규 자료 업로드</span>
-          </button>
-        )}
       </div>
 
       {/* Filter and Search Bar */}

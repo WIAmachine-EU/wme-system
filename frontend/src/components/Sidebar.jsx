@@ -59,7 +59,7 @@ export default function Sidebar({ activeTab, setActiveTab, currentRole, currentU
     },
     {
       id: 'admin-shipment-upload',
-      label: '선적정보 업로드',
+      label: t('sidebar.admin_menu.shipment_upload'),
       icon: <UploadCloud size={20} />
     },
     {
