@@ -232,6 +232,24 @@ def get_port_codes(db: Session = Depends(get_db)):
 
 from trackcargo_api import create_sea_tracking
 
+@app.get("/api/shipments", response_model=List[schemas.ShipmentWithOrdersOut])
+def get_shipments(db: Session = Depends(get_db)):
+    # 주문 상태가 SHIPPING인 주문들을 포함하는 선적만 필터링하거나 일단 전체를 내려주되 
+    # 프론트엔드에서 필터링할 수 있도록 전체 선적을 반환합니다.
+    # 단, 주문이 하나도 없는 선적은 제외합니다.
+    shipments = db.query(models.Shipment).filter(models.Shipment.orders.any()).all()
+    
+    # 운송 중(In-Transit) 필터링: 모든 주문이 도착(ARRIVED) 이후 상태인 경우는 제외
+    active_shipments = []
+    for s in shipments:
+        active_orders = [o for o in s.orders if o.current_status in [models.OrderStatus.SHIPPING, models.OrderStatus.CONFIRMED, models.OrderStatus.IN_PRODUCTION]]
+        if active_orders:
+            # 반환되는 orders 리스트는 운송 중인 것들만 표시할 수도 있지만, 
+            # B/L 단위로 보므로 해당 선적의 모든 주문을 반환
+            active_shipments.append(s)
+            
+    return active_shipments
+
 @app.post("/api/shipments/upload")
 async def upload_shipments(rows: List[schemas.ShipmentUploadRow], db: Session = Depends(get_db)):
     try:
@@ -353,7 +371,8 @@ def create_order(
         nc=payload.nc,
         incoterms=payload.incoterms,
         destination_port=payload.destination_port,
-        dealer_order_date=payload.dealer_order_date
+        dealer_order_date=payload.dealer_order_date,
+        delivery_request_date=payload.delivery_request_date
     )
     db.add(new_order)
     db.commit()
@@ -424,6 +443,8 @@ def update_order_info(
         order.remark = payload.remark
     if hasattr(payload, 'dealer_order_date') and payload.dealer_order_date is not None:
         order.dealer_order_date = payload.dealer_order_date
+    if hasattr(payload, 'delivery_request_date') and payload.delivery_request_date is not None:
+        order.delivery_request_date = payload.delivery_request_date
 
     db.commit()
     db.refresh(order)
@@ -966,3 +987,41 @@ def download_document(filename: str):
         
     raise HTTPException(status_code=404, detail="File not found")
 
+# ==========================================
+# 11. 화물 디테일 (Cargo Details) API
+# ==========================================
+@app.get("/api/cargo-details/{serial_number}", response_model=List[schemas.CargoDetailOut])
+def get_cargo_detail(serial_number: str, db: Session = Depends(get_db)):
+    cargo_details = db.query(models.CargoDetail).filter(models.CargoDetail.serial_number == serial_number).all()
+    if not cargo_details:
+        raise HTTPException(status_code=404, detail="Cargo detail not found for this S/N")
+    return cargo_details
+
+# ==========================================
+# 12. Cloudflare R2 Webhook (AI Data Extraction)
+# ==========================================
+from fastapi import BackgroundTasks, Request
+import ai_cargo_parser
+
+@app.post("/api/webhooks/r2-upload", status_code=202)
+async def r2_upload_webhook(request: Request, background_tasks: BackgroundTasks):
+    try:
+        payload = await request.json()
+        file_key = None
+        
+        if "Records" in payload and len(payload["Records"]) > 0:
+            file_key = payload["Records"][0].get("s3", {}).get("object", {}).get("key")
+        elif "key" in payload:
+            file_key = payload["key"]
+        elif "object_key" in payload:
+            file_key = payload["object_key"]
+            
+        if file_key:
+            background_tasks.add_task(ai_cargo_parser.process_file_event, file_key)
+            return {"status": "Accepted", "message": f"Processing {file_key} in background"}
+        else:
+            print("[Webhook] No file key found in payload:", payload)
+            return {"status": "Accepted", "message": "No file key found, but request accepted"}
+    except Exception as e:
+        print(f"[Webhook Error] {e}")
+        return {"status": "Accepted", "message": "Webhook received with error in payload parsing"}

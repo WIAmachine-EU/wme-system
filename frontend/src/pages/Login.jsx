@@ -43,7 +43,17 @@ export default function Login({ onLogin }) {
     <div style={{ display: 'flex', minHeight: '100vh', width: '100vw', backgroundColor: 'var(--bg-primary)' }}>
 
       {/* Left Area - Login Form */}
-      <div style={{ flex: '1', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '40px' }}>
+      <div style={{
+        flex: '1',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: '40px',
+        backgroundColor: 'var(--bg-primary)',
+        boxShadow: '15px 0 30px rgba(0, 0, 0, 0.08)',
+        zIndex: 10
+      }}>
         <div style={{ width: '100%', maxWidth: '400px' }}>
           <div style={{ marginBottom: '20px', textAlign: 'center' }}>
             <WiaLogo size="large" />

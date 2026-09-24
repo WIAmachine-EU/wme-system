@@ -1,0 +1,9 @@
+name = "r2-webhook-worker"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+# 1. 큐 소비자(Consumer) 설정 (워커가 이 큐의 메시지를 받음)
+[[queues.consumers]]
+queue = "r2-events-queue"
+max_batch_size = 10
+max_batch_timeout = 5

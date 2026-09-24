@@ -257,7 +257,9 @@ h6 {
 }
 
 .navbar-title {
-  font-size: 1.25rem;
+  font-family: 'SUITE', sans-serif;
+  font-size: 2.0rem;
+  font-weight: 300;
   color: var(--text-primary);
   display: flex;
   align-items: center;
@@ -817,7 +819,7 @@ h6 {
   }
 
   .navbar-title {
-    font-size: 1.05rem;
+    font-size: 2.0rem;
   }
 
   .kpi-grid {

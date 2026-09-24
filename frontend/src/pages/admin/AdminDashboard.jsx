@@ -3,6 +3,32 @@ import { ChevronsRight, Search, CheckCircle2, Smartphone, Monitor, MapPin, Clock
 import StepBar from '../../components/StepBar';
 import { useTranslation } from 'react-i18next';
 
+const renderTrafficLight = (reqDateStr) => {
+  if (!reqDateStr) return null;
+  const current = new Date();
+  const currentYear = current.getFullYear();
+  const currentMonth = current.getMonth() + 1;
+  const [reqYearStr, reqMonthStr] = reqDateStr.split('-');
+  if (!reqYearStr || !reqMonthStr) return null;
+  const reqYear = parseInt(reqYearStr, 10);
+  const reqMonth = parseInt(reqMonthStr, 10);
+  let status = 'GREEN';
+  if (currentYear > reqYear || (currentYear === reqYear && currentMonth > reqMonth)) {
+    status = 'RED';
+  } else if (currentYear === reqYear && currentMonth === reqMonth) {
+    status = 'YELLOW';
+  } else {
+    status = 'GREEN';
+  }
+  return (
+    <div style={{ display: 'inline-flex', gap: '6px', marginLeft: '8px', padding: '3px 6px', background: 'var(--bg-input, #f5f5f5)', border: '1px solid var(--border-color, #e0e0e0)', borderRadius: '12px', alignItems: 'center' }}>
+      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: status === 'RED' ? '#ff4d4f' : '#d9d9d9' }} title="경과" />
+      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: status === 'YELLOW' ? '#faad14' : '#d9d9d9' }} title="임박" />
+      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: status === 'GREEN' ? '#52c41a' : '#d9d9d9' }} title="정상" />
+    </div>
+  );
+};
+
 export default function AdminDashboard({ isMobileView, currentRole }) {
   const { t } = useTranslation();
   const [orders, setOrders] = useState([]);
@@ -104,7 +130,7 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
       destination_port: order.destination_port || '',
       detail_spec: order.detail_spec || '',
       incoterms: order.incoterms || '',
-      vessel: order.vessel || '',
+      delivery_request_date: order.delivery_request_date || '',
       remark: order.remark || ''
     });
   };
@@ -127,7 +153,7 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
           destination_port: editForm.destination_port,
           detail_spec: editForm.detail_spec,
           incoterms: editForm.incoterms,
-          vessel: editForm.vessel,
+          delivery_request_date: editForm.delivery_request_date,
           remark: editForm.remark
         })
       });
@@ -460,9 +486,9 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
                       <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '100px' }}>NC:</strong> <span>{order.nc || '-'}</span></div>
                       <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '100px' }}>DETAIL SPEC:</strong> <span>{order.detail_spec || 'T/F, CC(S-H)+B, 20BAR, B/I, P/C, Q(A)'}</span></div>
                       <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '100px' }}>Order date:</strong> <span>{order.dealer_order_date ? new Date(order.dealer_order_date).toLocaleDateString() : '-'}</span></div>
-                      <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '100px' }}>Date of Request:</strong> <span>{order.delivery_request_date || '-'}</span></div>
+                      <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '100px' }}>Date of Request:</strong> <span style={{ display: 'inline-flex', alignItems: 'center' }}>{order.delivery_request_date || '-'}{renderTrafficLight(order.delivery_request_date)}</span></div>
                       <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '100px' }}>{t('menu2.detail_etd_eta', 'ETD / ETA')}:</strong> <span>{order.etd ? new Date(order.etd).toLocaleDateString() : '-'} / {order.eta ? new Date(order.eta).toLocaleDateString() : '-'}</span></div>
-                      <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '100px' }}>{t('menu2.detail_vessel', 'VESSEL')}:</strong> <span>{order.vessel || '-'}</span></div>
+
                     </div>
                   )}
                 </div>
@@ -624,9 +650,9 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
                                   paddingLeft: '16px',
                                   borderLeft: '3px solid var(--wia-blue)',
                                 }}>
-                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>Date of Request:</span> {order.delivery_request_date || '-'}</div>
+                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>Date of Request:</span> <span style={{ display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle' }}>{order.delivery_request_date || '-'}{renderTrafficLight(order.delivery_request_date)}</span></div>
                                   <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>ETD / ETA:</span> {showSchedule ? `${order.etd ? new Date(order.etd).toLocaleDateString() : '-'} / ${order.eta ? new Date(order.eta).toLocaleDateString() : '-'}` : ' - '}</div>
-                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>VESSEL:</span> {order.vessel || '-'}</div>
+
                                   <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>REMARK:</span> {order.remark || '-'}</div>
                                 </div>
                               </div>
@@ -760,8 +786,8 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
                   </select>
                 </div>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>VESSEL</label>
-                  <input type="text" value={editForm.vessel} onChange={e => setEditForm({ ...editForm, vessel: e.target.value })} placeholder={t('menu1.edit_modal.vessel_placeholder')} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{t('management.modal_label_req_date', '배송요청일')}</label>
+                  <input type="month" value={editForm.delivery_request_date || ''} onChange={e => setEditForm({ ...editForm, delivery_request_date: e.target.value })} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
                 </div>
 
                 {/* Row 7 */}

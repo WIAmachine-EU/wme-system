@@ -192,20 +192,21 @@ export default function DealerOrders({ isMobileView }) {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th style={{ width: '15%' }}>{t('dealer_orders.header_model')}</th>
-                  <th style={{ width: '15%' }}>{t('dealer_orders.header_po_sn')}</th>
-                  <th style={{ width: '15%' }}>{t('dealer_orders.header_dealer')}</th>
-                  <th style={{ width: '40%', textAlign: 'center' }}>{t('dealer_orders.header_status')}</th>
-                  <th style={{ width: '15%' }}>{t('dealer_orders.header_port')}</th>
+                  <th style={{ width: '3%', textAlign: 'left', fontWeight: 'bold' }}>*</th>
+                  <th style={{ width: '12%', textAlign: 'left', fontWeight: 'bold' }}>{t('dealer_orders.header_model')}</th>
+                  <th style={{ width: '15%', textAlign: 'left', fontWeight: 'bold' }}>{t('dealer_orders.header_po_sn')}</th>
+                  <th style={{ width: '15%', textAlign: 'left', fontWeight: 'bold' }}>{t('dealer_orders.header_dealer')}</th>
+                  <th style={{ width: '40%', textAlign: 'center', fontWeight: 'bold' }}>{t('dealer_orders.header_status')}</th>
+                  <th style={{ width: '15%', textAlign: 'left', fontWeight: 'bold' }}>{t('dealer_orders.header_port')}</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={5} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('navbar.init_seed_loading')}</td></tr>
+                  <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('navbar.init_seed_loading')}</td></tr>
                 ) : filteredOrders.length === 0 ? (
-                  <tr><td colSpan={5} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dealer_orders.no_orders')}</td></tr>
+                  <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dealer_orders.no_orders')}</td></tr>
                 ) : (
-                  filteredOrders.map(order => {
+                  filteredOrders.map((order, index) => {
                     const showSchedule = !['CONFIRMED', 'IN_PRODUCTION'].includes(order.current_status);
                     return (
                       <React.Fragment key={order.id}>
@@ -215,6 +216,9 @@ export default function DealerOrders({ isMobileView }) {
                           onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-secondary)'}
                           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                         >
+                          <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '12px', paddingTop: '12px' }}>
+                            <div style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{index + 1}</div>
+                          </td>
                           <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '12px', paddingTop: '12px' }}>
                             <div style={{ fontWeight: 600 }}>{order.product_model ? order.product_model.model_name : 'Unknown Model'}</div>
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{order.product_model && order.product_model.category ? order.product_model.category.name : 'Machining Center'}</div>

@@ -171,6 +171,7 @@ class Order(Base):
     price = Column(String, nullable=True)
     remark = Column(Text, nullable=True)
     dealer_order_date = Column(DateTime, nullable=True)
+    delivery_request_date = Column(String, nullable=True)
     
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -241,3 +242,17 @@ class BusinessPlan(Base):
     
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class CargoDetail(Base):
+    __tablename__ = "cargo_details"
+
+    id = Column(Integer, primary_key=True, index=True)
+    serial_number = Column(String, index=True, nullable=False)
+    item = Column(String, nullable=True) # MACHINE or CC
+    qty = Column(Integer, default=1)
+    box_no = Column(String, nullable=True) # 1/2 or 2/2
+    dimensions = Column(String, nullable=True)
+    net_weight = Column(String, nullable=True)
+    gross_weight = Column(String, nullable=True)
+    cbm = Column(String, nullable=True)
+    packages_count = Column(Integer, nullable=True)

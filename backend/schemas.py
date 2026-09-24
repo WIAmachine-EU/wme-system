@@ -150,6 +150,7 @@ class OrderBase(BaseModel):
     price: Optional[str] = None
     remark: Optional[str] = None
     dealer_order_date: Optional[datetime] = None
+    delivery_request_date: Optional[str] = None
 
 class OrderCreate(BaseModel):
     reference_no: str
@@ -167,6 +168,7 @@ class OrderCreate(BaseModel):
     incoterms: Optional[str] = None
     destination_port: Optional[str] = None
     dealer_order_date: Optional[datetime] = None
+    delivery_request_date: Optional[str] = None
 
 class OrderOut(OrderBase):
     id: int
@@ -176,6 +178,10 @@ class OrderOut(OrderBase):
     dealer_company: Optional[DealerCompanyOut] = None
     rsm_user: Optional[CustomUserOut] = None
     shipment: Optional[ShipmentOut] = None
+    model_config = ConfigDict(from_attributes=True)
+
+class ShipmentWithOrdersOut(ShipmentOut):
+    orders: List[OrderOut] = []
     model_config = ConfigDict(from_attributes=True)
 
 class OrderUpdate(BaseModel):
@@ -194,6 +200,7 @@ class OrderUpdate(BaseModel):
     price: Optional[str] = None
     remark: Optional[str] = None
     dealer_order_date: Optional[datetime] = None
+    delivery_request_date: Optional[str] = None
 
 class OrderStatusUpdate(BaseModel):
     to_status: OrderStatus
@@ -285,3 +292,15 @@ class BusinessPlanOut(BusinessPlanBase):
     updated_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
+class CargoDetailOut(BaseModel):
+    id: int
+    serial_number: str
+    item: Optional[str] = None
+    qty: Optional[int] = None
+    box_no: Optional[str] = None
+    dimensions: Optional[str] = None
+    net_weight: Optional[str] = None
+    gross_weight: Optional[str] = None
+    cbm: Optional[str] = None
+    packages_count: Optional[int] = None
+    model_config = ConfigDict(from_attributes=True)

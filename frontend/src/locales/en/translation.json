@@ -277,7 +277,7 @@
     "current_location": "Current Location:",
     "eta": "Expected Arrival (ETA):",
     "header_model": "Model",
-    "header_po_sn": "P/O & / S/N",
+    "header_po_sn": "P/O & S/N",
     "header_dealer": "Dealer",
     "header_status": "Status",
     "header_port": "Port"

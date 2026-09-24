@@ -1,6 +1,6 @@
 {
   "navbar": {
-    "title": "WIA 공작기계 유럽 배송 & 재고관리 시스템",
+    "title": "WIA 공작기계 유럽 통합 네트워크 시스템",
     "version": "v6.0 Final (WIA CI)",
     "init_seed_btn": "시드 데이터 초기화",
     "init_seed_loading": "데이터 생성 중...",
@@ -277,7 +277,7 @@
     "current_location": "현재 위치:",
     "eta": "도착 예정(ETA):",
     "header_model": "Model",
-    "header_po_sn": "P/O & / S/N",
+    "header_po_sn": "P/O & S/N",
     "header_dealer": "Dealer",
     "header_status": "Status",
     "header_port": "Port"

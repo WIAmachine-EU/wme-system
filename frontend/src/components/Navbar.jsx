@@ -38,8 +38,8 @@ export default function Navbar({ currentRole, currentUserId, isMobileView, setCu
           <WiaLogo variant="compact" size="medium" onClick={onHomeClick} />
           <div>
             <h2 className="navbar-title">
-              <span style={{ fontFamily: 'SUITE, sans-serif', fontWeight: 800 }}>
-                {isMobileView ? 'WME' : t('navbar.title')}
+              <span>
+                {isMobileView ? 'WMEINS' : t('navbar.title')}
               </span>
             </h2>
           </div>
