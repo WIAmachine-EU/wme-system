@@ -291,6 +291,7 @@ export default function AdminInventory({ isMobileView }) {
                       <span>NC: <strong style={{ color: 'var(--text-primary)' }}>{order.nc || 'F0iP'}</strong></span>
                       <span>Buying: <strong style={{ color: 'var(--text-primary)' }}>{order.price ? (!isNaN(order.price) ? Number(order.price).toLocaleString() : order.price) : '-'}</strong></span>
                       <span>ETA: <strong style={{ color: 'var(--text-primary)' }}>{order.eta ? new Date(order.eta).toLocaleDateString() : '-'}</strong></span>
+                      <span>PORT: <strong style={{ color: 'var(--text-primary)' }}>{getStandardPort(order.destination_port)}</strong></span>
                     </div>
 
                     <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.4, padding: '10px', background: 'var(--bg-secondary)', borderRadius: '8px' }}>
@@ -373,17 +374,18 @@ export default function AdminInventory({ isMobileView }) {
                   <th style={{ width: '8%', textAlign: 'center', fontWeight: 'bold' }}>{t('menu2.header_nc')}</th>
                   <th style={{ width: '8%', textAlign: 'center', fontWeight: 'bold' }}>{t('menu2.header_buying')}</th>
                   <th style={{ width: '10%', textAlign: 'center', fontWeight: 'bold' }}>{t('menu2.header_po')}</th>
-                  <th style={{ width: '33%', textAlign: 'center', fontWeight: 'bold' }}>{t('menu2.header_detailspec')}</th>
+                  <th style={{ width: '25%', textAlign: 'center', fontWeight: 'bold' }}>{t('menu2.header_detailspec')}</th>
                   <th style={{ width: '8%', textAlign: 'center', fontWeight: 'bold' }}>{t('menu2.header_eta')}</th>
+                  <th style={{ width: '8%', textAlign: 'center', fontWeight: 'bold' }}>{t('menu2.header_port')}</th>
                   <th style={{ width: '8%', textAlign: 'center', fontWeight: 'bold' }}>{t('menu2.header_status_change')}</th>
                   <th style={{ width: '10%', textAlign: 'center', fontWeight: 'bold' }}>{t('menu2.header_dealer_order')}</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={9} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>데이터를 불러오는 중입니다...</td></tr>
+                  <tr><td colSpan={10} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>데이터를 불러오는 중입니다...</td></tr>
                 ) : filteredOrders.length === 0 ? (
-                  <tr><td colSpan={9} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>가용 재고 내역이 없습니다.</td></tr>
+                  <tr><td colSpan={10} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>가용 재고 내역이 없습니다.</td></tr>
                 ) : (
                   filteredOrders.map((order, index) => {
                     const sType = pendingChanges[order.id]?.stockType || order.stock_type || 'AVAILABLE';
@@ -440,6 +442,9 @@ export default function AdminInventory({ isMobileView }) {
                           <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px', textAlign: 'center' }}>
                             <div style={{ fontSize: '11px' }}>{showSchedule && order.eta ? new Date(order.eta).toLocaleDateString() : '-'}</div>
                           </td>
+                          <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '11px' }}>{getStandardPort(order.destination_port)}</div>
+                          </td>
                           <td onClick={e => e.stopPropagation()} style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px', textAlign: 'center' }}>
                             <select
                               value={sType}
@@ -486,7 +491,7 @@ export default function AdminInventory({ isMobileView }) {
                         </tr>
                         {expandedRows.has(order.id) && (
                           <tr>
-                            <td colSpan={9} style={{ backgroundColor: 'var(--bg-card)', paddingTop: '12px', borderTop: '1px dashed var(--border-color)', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
+                            <td colSpan={10} style={{ backgroundColor: 'var(--bg-card)', paddingTop: '12px', borderTop: '1px dashed var(--border-color)', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', paddingLeft: '8px' }}>
                                 <div style={{
                                   fontSize: '12px',

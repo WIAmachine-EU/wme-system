@@ -209,6 +209,7 @@ class PromotionInventory(Base):
     reserved_dealer_id = Column(Integer, ForeignKey("dealer_companies.id"), nullable=True)
     reservation_expiry = Column(DateTime, nullable=True)
     final_buyer_dealer_id = Column(Integer, ForeignKey("dealer_companies.id"), nullable=True)
+    promotion_price = Column(String, nullable=True)
     
     created_at = Column(DateTime, default=datetime.utcnow)
 

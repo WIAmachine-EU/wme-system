@@ -237,6 +237,7 @@ class PromotionBase(BaseModel):
     reserved_dealer_id: Optional[int] = None
     reservation_expiry: Optional[datetime] = None
     final_buyer_dealer_id: Optional[int] = None
+    promotion_price: Optional[str] = None
 
 class PromotionOut(PromotionBase):
     id: int
@@ -252,6 +253,9 @@ class PromotionReserveUpdate(BaseModel):
 
 class PromotionSoldUpdate(BaseModel):
     final_buyer_dealer_id: int
+
+class PromotionPriceUpdate(BaseModel):
+    promotion_price: Optional[str] = None
 
 # Email Notification Config Schemas
 class EmailConfigBase(BaseModel):

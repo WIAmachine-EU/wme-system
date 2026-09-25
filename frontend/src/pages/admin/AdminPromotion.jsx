@@ -1,12 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { Tag, CheckCircle, Clock, CheckCircle2, Search } from 'lucide-react';
+import { Tag, CheckCircle, Clock, CheckCircle2, Search, Edit2, Check, Upload } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 export default function AdminPromotion({ isMobileView }) {
   const { t } = useTranslation();
   const [promotions, setPromotions] = useState([]);
   const [dealers, setDealers] = useState([]);
+  const [portCodes, setPortCodes] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const getStandardPort = (rawPort) => {
+    if (!rawPort) return '-';
+    if (!portCodes || portCodes.length === 0) return rawPort;
+    const lowerRaw = rawPort.toLowerCase().trim();
+    const exactMatch = portCodes.find(p => p.port_code.toLowerCase() === lowerRaw);
+    if (exactMatch) return exactMatch.port_code;
+    const startsMatch = portCodes.find(p => p.port_code.toLowerCase().startsWith(lowerRaw));
+    if (startsMatch) return startsMatch.port_code;
+    return rawPort;
+  };
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -18,15 +30,72 @@ export default function AdminPromotion({ isMobileView }) {
   const [sellingId, setSellingId] = useState(null);
   const [finalBuyerDealerId, setFinalBuyerDealerId] = useState('');
 
+  const [editingPriceId, setEditingPriceId] = useState(null);
+  const [editPriceValue, setEditPriceValue] = useState('');
+  
+  const handleEditPrice = (promo) => {
+    setEditingPriceId(promo.id);
+    setEditPriceValue(promo.promotion_price || '');
+  };
+  
+  const handleSavePrice = async (promoId) => {
+    try {
+      const res = await fetch(`/api/promotions/${promoId}/price`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ promotion_price: editPriceValue })
+      });
+      if (res.ok) {
+        setEditingPriceId(null);
+        loadData();
+      } else {
+        alert("가격 수정 실패");
+      }
+    } catch (e) {
+      alert("서버 연결 실패");
+    }
+  };
+
+  const fileInputRef = React.useRef(null);
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const formData = new FormData();
+    formData.append("file", file);
+    
+    try {
+      setLoading(true);
+      const res = await fetch("/api/promotions/upload", {
+        method: "POST",
+        body: formData
+      });
+      const data = await res.json();
+      if (data.status === "success") {
+        alert(data.message);
+        loadData();
+      } else {
+        alert(data.message + "\n" + (data.errors ? data.errors.join("\n") : ""));
+        setLoading(false);
+      }
+    } catch (err) {
+      alert("업로드 중 오류 발생");
+      setLoading(false);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
-      const [promoRes, dealerRes] = await Promise.all([
+      const [promoRes, dealerRes, portsRes] = await Promise.all([
         fetch('/api/promotions'),
-        fetch('/api/dealers')
+        fetch('/api/dealers'),
+        fetch('/api/master-data/port-codes')
       ]);
       setPromotions(await promoRes.json());
       setDealers(await dealerRes.json());
+      setPortCodes(await portsRes.json());
     } catch (e) {
       console.error("Promotion data fetch error:", e);
     } finally {
@@ -117,43 +186,94 @@ export default function AdminPromotion({ isMobileView }) {
       </div>
 
       <div className="glass-card" style={{ padding: '28px', marginBottom: '32px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-          <div>
-            <h2 style={{ fontSize: '1.3rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Tag color="var(--status-production)" size={24} />
-              <span>{t('menu3.list_title', '프로모션 리스트 및 실시간 예약 관리')}</span>
-            </h2>
-          </div>
+        {isMobileView ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                <Tag color="var(--status-production)" size={20} />
+                <span>{t('menu3.list_title', '진행 중인 프로모션')}</span>
+              </h2>
+              <button onClick={() => fileInputRef.current && fileInputRef.current.click()} className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', padding: '6px 10px', background: 'var(--bg-secondary)' }}>
+                <Upload size={14} />
+                {t('menu3.btn_upload', '프로모션 업로드')}
+              </button>
+              <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".xlsx,.xls" style={{ display: 'none' }} />
+            </div>
 
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative' }}>
-              <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-              <input 
-                type="text" 
-                placeholder="모델명, P/O, NC, 딜러 등 검색..." 
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input 
+                  type="text" 
+                  placeholder={t('menu3.search_placeholder', '검색')}
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  style={{
+                    background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)',
+                    padding: '8px 14px 8px 36px', borderRadius: '10px', fontSize: '0.85rem', width: '100%', boxSizing: 'border-box', outline: 'none'
+                  }}
+                />
+              </div>
+              <select
+                value={statusFilter}
+                onChange={e => setStatusFilter(e.target.value)}
                 style={{
                   background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)',
-                  padding: '8px 14px 8px 36px', borderRadius: '10px', fontSize: '0.85rem', width: '240px', outline: 'none'
+                  padding: '8px 12px', borderRadius: '10px', fontSize: '0.85rem', cursor: 'pointer', outline: 'none'
                 }}
-              />
+              >
+                <option value="ALL">{t('menu3.filter_all', '전체 상태 조회')}</option>
+                <option value="AVAILABLE">{t('menu3.status_available', '판매가능')}</option>
+                <option value="RESERVED">{t('menu3.status_reserved', '예약중')}</option>
+                <option value="SOLD">{t('menu3.status_sold', '판매완료')}</option>
+              </select>
             </div>
-            <select
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-              style={{
-                background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)',
-                padding: '8px 14px', borderRadius: '10px', fontSize: '0.85rem', cursor: 'pointer', outline: 'none'
-              }}
-            >
-              <option value="ALL">전체 상태 조회</option>
-              <option value="AVAILABLE">판매가능 (AVAILABLE)</option>
-              <option value="RESERVED">예약중 (RESERVED)</option>
-              <option value="SOLD">판매완료 (SOLD)</option>
-            </select>
           </div>
-        </div>
+        ) : (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+            <div>
+              <h2 style={{ fontSize: '1.3rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Tag color="var(--status-production)" size={24} />
+                <span>{t('menu3.list_title', '진행 중인 프로모션')}</span>
+              </h2>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <button onClick={() => fileInputRef.current && fileInputRef.current.click()} className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', padding: '8px 14px', background: 'var(--bg-secondary)' }}>
+                <Upload size={16} />
+                {t('menu3.btn_upload', '프로모션 업로드')}
+              </button>
+              <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".xlsx,.xls" style={{ display: 'none' }} />
+              
+              <div style={{ position: 'relative' }}>
+                <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input 
+                  type="text" 
+                  placeholder={t('menu3.search_placeholder', '검색')}
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  style={{
+                    background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)',
+                    padding: '8px 14px 8px 36px', borderRadius: '10px', fontSize: '0.85rem', width: '240px', outline: 'none'
+                  }}
+                />
+              </div>
+              <select
+                value={statusFilter}
+                onChange={e => setStatusFilter(e.target.value)}
+                style={{
+                  background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)',
+                  padding: '8px 14px', borderRadius: '10px', fontSize: '0.85rem', cursor: 'pointer', outline: 'none'
+                }}
+              >
+                <option value="ALL">{t('menu3.filter_all', '전체 상태 조회')}</option>
+                <option value="AVAILABLE">{t('menu3.status_available', '판매가능')}</option>
+                <option value="RESERVED">{t('menu3.status_reserved', '예약중')}</option>
+                <option value="SOLD">{t('menu3.status_sold', '판매완료')}</option>
+              </select>
+            </div>
+          </div>
+        )}
         
         {loading ? (
            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>로딩 중...</div>
@@ -184,17 +304,23 @@ export default function AdminPromotion({ isMobileView }) {
 
               return filteredPromotions.map((promo, index) => (
               <div key={promo.id} className="mobile-order-card">
-                <div className="mobile-order-header">
-                  <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--text-primary)' }}>
-                    {promo.order && promo.order.product_model ? promo.order.product_model.model_name : 'Unknown Model'}
+                <div className="mobile-order-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--text-primary)' }}>
+                      {promo.order && promo.order.product_model ? promo.order.product_model.model_name : 'Unknown Model'}
+                    </div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', background: 'var(--bg-input)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                      {promo.order && promo.order.nc ? promo.order.nc : 'F0iP'}
+                    </div>
                   </div>
                   <div style={{ fontWeight: 700, color: 'var(--accent-cyan)', fontSize: '0.9rem' }}>
                     {(promo.order && promo.order.reference_no) || 'F26-88-30'}
                   </div>
                 </div>
                 <div className="mobile-order-meta">
-                  <span>NC: <strong style={{ color: 'var(--text-primary)' }}>{promo.order && promo.order.nc ? promo.order.nc : 'F0iP'}</strong></span>
+                  <span>PRICE: <strong style={{ color: 'var(--text-primary)' }}>{promo.promotion_price || '-'}</strong></span>
                   <span>ETA: <strong style={{ color: 'var(--text-primary)' }}>{promo.order && promo.order.eta ? new Date(promo.order.eta).toLocaleDateString() : '-'}</strong></span>
+                  <span>PORT: <strong style={{ color: 'var(--text-primary)' }}>{getStandardPort(promo.order?.destination_port)}</strong></span>
                 </div>
                 
                 <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.4, padding: '10px', background: 'var(--bg-secondary)', borderRadius: '8px', marginBottom: '12px' }}>
@@ -302,12 +428,14 @@ export default function AdminPromotion({ isMobileView }) {
                   <th style={{ width: '3%' }}>{t('menu3.header_no')}</th>
                   <th style={{ width: '10%' }}>{t('menu3.header_model')}</th>
                   <th style={{ width: '5%' }}>{t('menu3.header_nc')}</th>
+                  <th style={{ width: '7%' }}>{t('menu3.header_price', 'PRICE(€)')}</th>
                   <th style={{ width: '10%' }}>{t('menu3.header_po')}</th>
-                  <th style={{ width: '40%' }}>{t('menu3.header_detailspec')}</th>
+                  <th style={{ width: '21%' }}>{t('menu3.header_detailspec')}</th>
                   <th style={{ width: '8%', textAlign: 'center' }}>{t('menu3.header_eta')}</th>
+                  <th style={{ width: '8%', textAlign: 'center' }}>{t('menu2.header_port', 'PORT')}</th>
                   <th style={{ width: '10%', textAlign: 'center' }}>{t('menu3.header_promotion_status')}</th>
                   <th style={{ width: '10%', textAlign: 'center' }}>{t('menu3.header_reservation')}</th>
-                  <th style={{ width: '5%', textAlign: 'center' }}>{t('menu3.header_settings')}</th>
+                  <th style={{ width: '8%', textAlign: 'center' }}>{t('menu3.header_settings')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -331,7 +459,7 @@ export default function AdminPromotion({ isMobileView }) {
                   });
 
                   if (filteredPromotions.length === 0) {
-                    return <tr><td colSpan={9} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>조건에 맞는 데이터가 없습니다.</td></tr>;
+                    return <tr><td colSpan={11} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>조건에 맞는 데이터가 없습니다.</td></tr>;
                   }
 
                   return filteredPromotions.map((promo, index) => (
@@ -350,6 +478,26 @@ export default function AdminPromotion({ isMobileView }) {
                       </div>
                     </td>
                     <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {editingPriceId === promo.id ? (
+                          <>
+                            <input
+                              type="text"
+                              value={editPriceValue}
+                              onChange={(e) => setEditPriceValue(e.target.value)}
+                              style={{ width: '60px', padding: '2px 4px', fontSize: '11px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                            />
+                            <button onClick={() => handleSavePrice(promo.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--status-stock)' }}><Check size={14} /></button>
+                          </>
+                        ) : (
+                          <>
+                            <span style={{ fontSize: '12px', fontWeight: 600 }}>{promo.promotion_price || '-'}</span>
+                            <button onClick={() => handleEditPrice(promo)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><Edit2 size={12} /></button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                    <td>
                       <div style={{ fontWeight: 700, color: 'var(--accent-cyan)', fontSize: '11px' }}>
                         {(promo.order && promo.order.reference_no) || 'F26-88-30'}
                       </div>
@@ -362,6 +510,11 @@ export default function AdminPromotion({ isMobileView }) {
                     <td style={{ textAlign: 'center' }}>
                       <div style={{ fontSize: '11px' }}>
                         {promo.order && promo.order.eta ? new Date(promo.order.eta).toLocaleDateString() : '-'}
+                      </div>
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '11px' }}>
+                        {getStandardPort(promo.order?.destination_port)}
                       </div>
                     </td>
                     <td style={{ textAlign: 'center' }}>

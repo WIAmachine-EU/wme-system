@@ -127,6 +127,7 @@ export default function DealerInventory({ isMobileView }) {
                     <div className="mobile-order-meta">
                       <span>NC: <strong style={{ color: 'var(--text-primary)' }}>{order.nc || 'F0iP'}</strong></span>
                       <span>ETA: <strong style={{ color: 'var(--text-primary)' }}>{order.eta ? new Date(order.eta).toLocaleDateString() : '-'}</strong></span>
+                      <span>PORT: <strong style={{ color: 'var(--text-primary)' }}>{getStandardPort(order.destination_port)}</strong></span>
                     </div>
                     
                     <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.4, padding: '10px', background: 'var(--bg-secondary)', borderRadius: '8px' }}>
@@ -168,16 +169,17 @@ export default function DealerInventory({ isMobileView }) {
                 <th style={{ width: '15%' }}>{t('menu2.header_model')}</th>
                 <th style={{ width: '10%' }}>{t('menu2.header_nc')}</th>
                 <th style={{ width: '15%' }}>{t('menu2.header_po')}</th>
-                <th style={{ width: '25%' }}>{t('menu2.header_detailspec')}</th>
-                <th style={{ width: '15%' }}>{t('menu2.header_eta')}</th>
+                <th style={{ width: '20%' }}>{t('menu2.header_detailspec')}</th>
+                <th style={{ width: '10%' }}>{t('menu2.header_eta')}</th>
+                <th style={{ width: '10%' }}>{t('menu2.header_port')}</th>
                 <th style={{ width: '15%' }}>{t('menu2.type_available')}</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('navbar.init_seed_loading')}</td></tr>
+                <tr><td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('navbar.init_seed_loading')}</td></tr>
               ) : filteredOrders.length === 0 ? (
-                <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dealer_dashboard.no_atp')}</td></tr>
+                <tr><td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dealer_dashboard.no_atp')}</td></tr>
               ) : (
                 filteredOrders.map((order, index) => {
                   const sType = order.stock_type || 'AVAILABLE';
@@ -208,6 +210,9 @@ export default function DealerInventory({ isMobileView }) {
                           <div style={{ fontSize: '10px' }}>{order.eta ? new Date(order.eta).toLocaleDateString() : '-'}</div>
                         </td>
                         <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
+                          <div style={{ fontSize: '10px' }}>{getStandardPort(order.destination_port)}</div>
+                        </td>
+                        <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
                           {sType === 'AVAILABLE' && <span className="status-badge" style={{ background: 'hsla(142, 76%, 46%, 0.2)', color: 'var(--status-stock)', width: '72px', justifyContent: 'center', fontSize: '11px' }}>{t('menu2.type_available')}</span>}
                           {sType === 'DEALER_ORDER' && <span className="status-badge" style={{ background: 'hsla(200, 76%, 46%, 0.2)', color: 'var(--accent-cyan)', width: '72px', justifyContent: 'center', fontSize: '11px' }}>{t('menu2.type_dealer_order')}</span>}
                           {sType === 'RENTAL' && <span className="status-badge" style={{ background: 'hsla(45, 93%, 58%, 0.2)', color: 'var(--status-production)', width: '72px', justifyContent: 'center', fontSize: '11px' }}>{t('menu2.type_rental')}</span>}
@@ -217,7 +222,7 @@ export default function DealerInventory({ isMobileView }) {
                       </tr>
                       {expandedRows.has(order.id) && (
                         <tr>
-                          <td colSpan={7} style={{ backgroundColor: 'var(--bg-card)', paddingTop: '12px', borderTop: '1px dashed var(--border-color)', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
+                          <td colSpan={8} style={{ backgroundColor: 'var(--bg-card)', paddingTop: '12px', borderTop: '1px dashed var(--border-color)', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', paddingLeft: '8px' }}>
                               <div style={{
                                 fontSize: '12px',

@@ -702,6 +702,85 @@ def confirm_sold_promotion(
     db.refresh(promo)
     return promo
 
+@app.patch("/api/promotions/{promotion_id}/price", response_model=schemas.PromotionOut)
+def update_promotion_price(
+    promotion_id: int,
+    payload: schemas.PromotionPriceUpdate,
+    db: Session = Depends(get_db)
+):
+    promo = db.query(models.PromotionInventory).filter(models.PromotionInventory.id == promotion_id).first()
+    if not promo:
+        raise HTTPException(status_code=404, detail="프로모션 재고를 찾을 수 없습니다.")
+    
+    promo.promotion_price = payload.promotion_price
+    db.commit()
+    db.refresh(promo)
+    return promo
+
+@app.post("/api/promotions/upload")
+async def upload_promotion_prices(file: UploadFile = File(...), db: Session = Depends(get_db), current_role: Optional[str] = Depends(get_current_role)):
+    if current_role == "RSM":
+        raise HTTPException(status_code=403, detail="접근 권한이 없습니다.")
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="엑셀 파일(.xlsx, .xls)만 업로드 가능합니다.")
+    
+    content = await file.read()
+    try:
+        df = pd.read_excel(io.BytesIO(content))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"엑셀 파일 판독 오류: {str(e)}")
+
+    # Check for minimal columns for price update
+    required_cols = {'MODEL', 'P/O', 'SELLING PRICE'}
+    missing_cols = required_cols - set(df.columns)
+    if missing_cols:
+        return {
+            "status": "error",
+            "message": f"필수 컬럼이 누락되었습니다: {', '.join(missing_cols)}",
+            "errors": [f"엑셀 헤더에는 최소 {', '.join(required_cols)} 열이 포함되어야 합니다."]
+        }
+    
+    valid_count = 0
+    errors = []
+    
+    for index, row in df.iterrows():
+        m_name = str(row.get('MODEL', '')).strip()
+        ref_no = str(row.get('P/O', '')).strip()
+        price = str(row.get('SELLING PRICE', '')).strip()
+        if price.lower() == 'nan':
+            price = ''
+            
+        if not m_name or not ref_no or pd.isna(row.get('MODEL')):
+            continue
+            
+        order = db.query(models.Order).join(models.ProductModel).filter(
+            models.ProductModel.model_name == m_name,
+            models.Order.reference_no == ref_no
+        ).first()
+        
+        if not order:
+            errors.append(f"{index+2}행: MODEL({m_name}) 및 P/O({ref_no})에 해당하는 주문을 찾을 수 없습니다.")
+            continue
+            
+        if order.stock_type != "PROMOTION":
+            order.stock_type = "PROMOTION"
+            
+        promo = db.query(models.PromotionInventory).filter(models.PromotionInventory.order_id == order.id).first()
+        if not promo:
+            promo = models.PromotionInventory(
+                order_id=order.id, 
+                status=models.PromotionStatus.AVAILABLE,
+                promotion_price=price
+            )
+            db.add(promo)
+        else:
+            promo.promotion_price = price
+            
+        valid_count += 1
+        
+    db.commit()
+    return {"status": "success", "message": f"총 {valid_count}건의 프로모션 가격이 업데이트 되었습니다.", "errors": errors}
+
 # ==========================================
 # 5. Pandas 기반 엑셀 일괄 업로드 API
 # ==========================================

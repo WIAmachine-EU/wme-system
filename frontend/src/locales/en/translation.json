@@ -116,6 +116,7 @@
     "header_po": "P/O",
     "header_detailspec": "DETAIL SPEC",
     "header_eta": "ETA",
+    "header_port": "PORT",
     "header_status_change": "TYPE",
     "header_dealer_order": "ORDER",
     "filter_all": "All type",
@@ -141,10 +142,13 @@
   "menu3": {
     "page_title": "WIA Promotion",
     "page_desc": "Manages the reservation and sales status of promotional event models.",
-    "list_title": "Promotion List and Real-time Reservation Management",
+    "list_title": "Active Promotions",
+    "search_placeholder": "search",
+    "filter_all": "All type",
     "header_no": "*",
     "header_model": "MODEL",
     "header_nc": "NC",
+    "header_price": "PRICE(€)",
     "header_po": "P/O",
     "header_detailspec": "DETAIL SPEC",
     "header_eta": "ETA",
@@ -162,7 +166,10 @@
     "reservation_period": "Reservation:",
     "day": "day",
     "btn_confirm": "confirm",
-    "btn_cancel_popup": "cancell"
+    "btn_cancel_popup": "cancell",
+    "btn_upload": "Promotion Upload",
+    "upload_success": "Upload Success",
+    "upload_fail": "Upload Failed"
   },
   "management": {
     "page_title": "Upload / Setting",
