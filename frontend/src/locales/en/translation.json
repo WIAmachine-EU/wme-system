@@ -1,6 +1,6 @@
 {
   "navbar": {
-    "title": "WIA Machine Tools Europe Shipping & Stock Management",
+    "title": "WIA MachineTools Europe Integrated Network System",
     "version": "v6.0 Final (WIA CI)",
     "init_seed_btn": "Initialize Seed Data",
     "init_seed_loading": "Generating Data...",
@@ -46,7 +46,7 @@
     },
     "dealer_menu": {
       "dashboard": "Dashboard",
-      "orders": "Order & Shipping Status",
+      "orders": "Delivery Status",
       "sales_archive": "My Ordered",
       "inventory": "WIA Stock List",
       "promotion": "WIA Promotion",
@@ -273,7 +273,7 @@
     "header_request": "Request"
   },
   "dealer_orders": {
-    "title": "My Orders & Shipping Status",
+    "title": "Delivery Status",
     "subtitle": "Track your orders through a detailed timeline using P/O or S/N.",
     "search_placeholder": "Search",
     "pipeline_title": "Delivery Tracking Timeline",

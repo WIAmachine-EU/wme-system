@@ -12,10 +12,15 @@ import models
 from storage import default_storage
 
 try:
-    from openai import OpenAI
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    import google.generativeai as genai
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    if gemini_key:
+        genai.configure(api_key=gemini_key)
+        has_gemini = True
+    else:
+        has_gemini = False
 except Exception:
-    client = None
+    has_gemini = False
 
 def get_text_from_pdf(file_bytes: bytes) -> str:
     reader = PdfReader(io.BytesIO(file_bytes))
@@ -26,10 +31,10 @@ def get_text_from_pdf(file_bytes: bytes) -> str:
 
 def parse_with_llm(text: str) -> List[dict]:
     """
-    Extracts Cargo Details using LLM.
+    Extracts Cargo Details using LLM (Gemini API).
     Fallback to a mock if API key is not present.
     """
-    if client and os.getenv("OPENAI_API_KEY"):
+    if has_gemini:
         prompt = f"""
         Extract the cargo details from the following document text.
         The document contains shipping/cargo information (Einlagerungsmeldung).
@@ -48,22 +53,21 @@ def parse_with_llm(text: str) -> List[dict]:
         
         Output ONLY a valid JSON array. Do not include markdown code blocks.
         """
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0
-        )
-        content = response.choices[0].message.content.strip()
+        model = genai.GenerativeModel('gemini-1.5-flash', generation_config={"temperature": 0.0})
+        response = model.generate_content(prompt)
+        content = response.text.strip()
+        
         if content.startswith("```json"):
             content = content[7:]
         if content.startswith("```"):
             content = content[3:]
         if content.endswith("```"):
             content = content[:-3]
+            
         return json.loads(content)
     
     # --- FALLBACK MOCK FOR DEMO PURPOSES ---
-    print("WARNING: Using mock LLM parser since OPENAI_API_KEY is not configured.")
+    print("WARNING: Using mock LLM parser since GEMINI_API_KEY is not configured.")
     if "G1373-0046" in text or "L4000LMC" in text:
         return [
             {

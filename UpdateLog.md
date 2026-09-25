@@ -1,5 +1,21 @@
 # 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
+## [2026-09-26] 딜러 포털 UI 디테일 개선 및 화물 파싱 AI 엔진(Gemini) 전환
+
+### 1. 딜러 포털 '내 구매 내역' UI 및 타이포그래피 최적화
+* **상태 뱃지(Badge) 규격 통일**: 리스트의 STATUS 항목에 표시되는 뱃지 크기를 가장 긴 텍스트인 `In Warehouse` 너비(95px)를 기준으로 모두 고정폭으로 동일하게 맞춰 깔끔한 정렬을 구현했습니다.
+* **폰트 굵기(Weight) 기반 활성화 상태 표시**: 화물 디테일(`Details`) 버튼의 활성화 상태를 명확히 구분하기 위해, 단일 폰트(`SUITE`) 내에서 `fontWeight` 수치를 조절(활성화 시 600, 비활성화 시 100)하여 시각적 차이를 확실하게 적용했습니다.
+* **글꼴(Font-family) 및 텍스트 일관성 정리**: `S/N` 항목에 독립적으로 적용되어 있던 `monospace` 폰트를 제거하여 다른 텍스트 항목들과 폰트 디자인을 일치시켰습니다. 또한 검색창 안내 텍스트(placeholder)를 심플하게 `search`로 변경하고, 불필요한 페이지 설명글을 제거하여 화면을 더욱 미니멀하게 개선했습니다.
+
+### 2. 화물 제원(Cargo Detail) 모달(Modal) 사용성 및 안정성 강화
+* **모달 UI 텍스트 정비**: 화물 제원을 보여주는 모달창의 타이틀을 `화물 디테일 (Cargo Details)`에서 직관적인 **`Machine Details`**로 변경했습니다.
+* **표(Table) 데이터 중앙 정렬**: 모달 내부 데이터 표의 좌측에 치우쳐 있던 헤더 항목(`Model`, `S/N`, `ITEM`)에 중앙 정렬(`textAlign: 'center'`)을 추가 적용하여, 모든 데이터가 일관성 있게 가운데 정렬되도록 조정했습니다.
+* **API 호출 안정성 패치**: 백엔드로 `S/N`을 전달할 때 특수문자로 인한 API 호출 오류를 방지하기 위해 URL에 `encodeURIComponent` 처리를 보강했습니다.
+
+### 3. AI 입고증 자동 파이프라인 엔진 전환 (OpenAI -> Google Gemini API)
+* **초고속/가성비 Gemini 1.5 Flash 모델 도입**: 기존에 사용하던 OpenAI(ChatGPT) 파싱 로직을 제거하고, 구글의 최신 생성형 AI인 **Gemini API**(`google-generativeai`) 기반으로 백엔드 파싱 로직(`ai_cargo_parser.py`)을 완벽하게 재설계했습니다.
+* **환경 변수 및 의존성 업데이트**: 시스템 의존성 파일(`requirements.txt`)에서 `openai`를 제외하고 `google-generativeai` 패키지를 신규 등록했으며, 환경 변수를 `OPENAI_API_KEY`에서 `GEMINI_API_KEY`로 전면 교체하여 Render 서버 배포를 성공적으로 완료했습니다.
+
 ## [2026-09-25] WIA 프로모션 및 가용재고 UI/UX 개편 및 딜러 포털 동기화
 
 ### 1. WIA 가용재고 및 프로모션 리스트 신규 항목 추가

@@ -8,6 +8,7 @@ export default function DealerInventory({ isMobileView }) {
   const [portCodes, setPortCodes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [stockTypeFilter, setStockTypeFilter] = useState('ALL');
 
   const [expandedRows, setExpandedRows] = useState(new Set());
 
@@ -66,6 +67,11 @@ export default function DealerInventory({ isMobileView }) {
                          (o.product_model && o.product_model.model_name && o.product_model.model_name.toLowerCase().includes(query)) ||
                          (o.serial_number && o.serial_number.toLowerCase().includes(query));
     
+    if (stockTypeFilter !== 'ALL') {
+      const sType = o.stock_type || 'AVAILABLE';
+      if (sType !== stockTypeFilter) return false;
+    }
+
     return matchesQuery;
   });
 
@@ -92,7 +98,7 @@ export default function DealerInventory({ isMobileView }) {
               <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
               <input
                 type="text"
-                placeholder={t('menu2.search_placeholder')}
+                placeholder={t('menu2.search_placeholder', '검색')}
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 style={{
@@ -101,6 +107,21 @@ export default function DealerInventory({ isMobileView }) {
                 }}
               />
             </div>
+            <select
+              value={stockTypeFilter}
+              onChange={e => setStockTypeFilter(e.target.value)}
+              style={{
+                background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)',
+                padding: '8px 14px', borderRadius: '10px', fontSize: '0.85rem', cursor: 'pointer'
+              }}
+            >
+              <option value="ALL">{t('menu2.filter_all', '전체 상태 조회')}</option>
+              <option value="AVAILABLE">{t('menu2.type_available', '판매가능')}</option>
+              <option value="DEALER_ORDER">{t('menu2.type_dealer_order', '딜러주문')}</option>
+              <option value="RENTAL">{t('menu2.type_rental', '임대')}</option>
+              <option value="SHOWROOM">{t('menu2.type_showroom', '전시')}</option>
+              <option value="PROMOTION">{t('menu2.type_promotion', '프로모션')}</option>
+            </select>
           </div>
         </div>
 
@@ -116,16 +137,20 @@ export default function DealerInventory({ isMobileView }) {
                 
                 return (
                   <div key={order.id} className="mobile-order-card" onClick={() => toggleRow(order.id)} style={{ cursor: 'pointer' }}>
-                    <div className="mobile-order-header">
-                      <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--text-primary)' }}>
-                        {order.product_model ? order.product_model.model_name : 'Unknown Model'}
+                    <div className="mobile-order-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--text-primary)' }}>
+                          {order.product_model ? order.product_model.model_name : 'Unknown Model'}
+                        </div>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', background: 'var(--bg-input)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                          {order.nc || 'F0iP'}
+                        </div>
                       </div>
                       <div style={{ fontWeight: 700, color: 'var(--accent-cyan)', fontSize: '0.9rem' }}>
                         {order.reference_no}
                       </div>
                     </div>
                     <div className="mobile-order-meta">
-                      <span>NC: <strong style={{ color: 'var(--text-primary)' }}>{order.nc || 'F0iP'}</strong></span>
                       <span>ETA: <strong style={{ color: 'var(--text-primary)' }}>{order.eta ? new Date(order.eta).toLocaleDateString() : '-'}</strong></span>
                       <span>PORT: <strong style={{ color: 'var(--text-primary)' }}>{getStandardPort(order.destination_port)}</strong></span>
                     </div>
@@ -135,7 +160,7 @@ export default function DealerInventory({ isMobileView }) {
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>용도</span>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>S/N: {order.serial_number || '-'}</span>
                       {sType === 'AVAILABLE' && <span className="status-badge" style={{ background: 'hsla(142, 76%, 46%, 0.2)', color: 'var(--status-stock)', width: '80px', justifyContent: 'center', fontSize: '11px' }}>{t('menu2.type_available')}</span>}
                       {sType === 'DEALER_ORDER' && <span className="status-badge" style={{ background: 'hsla(200, 76%, 46%, 0.2)', color: 'var(--accent-cyan)', width: '80px', justifyContent: 'center', fontSize: '11px' }}>{t('menu2.type_dealer_order')}</span>}
                       {sType === 'RENTAL' && <span className="status-badge" style={{ background: 'hsla(45, 93%, 58%, 0.2)', color: 'var(--status-production)', width: '80px', justifyContent: 'center', fontSize: '11px' }}>{t('menu2.type_rental')}</span>}

@@ -46,7 +46,7 @@
     },
     "dealer_menu": {
       "dashboard": "포털 대시보드",
-      "orders": "발주 및 배송상태",
+      "orders": "배송상태",
       "sales_archive": "내 구매 내역",
       "inventory": "WIA 재고리스트",
       "promotion": "WIA 프로모션",
@@ -273,7 +273,7 @@
     "header_request": "요청"
   },
   "dealer_orders": {
-    "title": "내 발주 및 배송상태",
+    "title": "배송상태",
     "subtitle": "PO 번호, S/N 정보로 내 발주 건의 배송상태를 조회합니다.",
     "search_placeholder": "검색..",
     "pipeline_title": "배송 추적 타임라인",

@@ -279,16 +279,20 @@ export default function AdminInventory({ isMobileView }) {
 
                 return (
                   <div key={order.id} className="mobile-order-card" onClick={() => toggleRow(order.id)} style={{ cursor: 'pointer' }}>
-                    <div className="mobile-order-header">
-                      <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--text-primary)' }}>
-                        {order.product_model ? order.product_model.model_name : 'Unknown Model'}
+                    <div className="mobile-order-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--text-primary)' }}>
+                          {order.product_model ? order.product_model.model_name : 'Unknown Model'}
+                        </div>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', background: 'var(--bg-input)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                          {order.nc || 'F0iP'}
+                        </div>
                       </div>
                       <div style={{ fontWeight: 700, color: 'var(--accent-cyan)', fontSize: '0.9rem' }}>
                         {order.reference_no}
                       </div>
                     </div>
                     <div className="mobile-order-meta">
-                      <span>NC: <strong style={{ color: 'var(--text-primary)' }}>{order.nc || 'F0iP'}</strong></span>
                       <span>Buying: <strong style={{ color: 'var(--text-primary)' }}>{order.price ? (!isNaN(order.price) ? Number(order.price).toLocaleString() : order.price) : '-'}</strong></span>
                       <span>ETA: <strong style={{ color: 'var(--text-primary)' }}>{order.eta ? new Date(order.eta).toLocaleDateString() : '-'}</strong></span>
                       <span>PORT: <strong style={{ color: 'var(--text-primary)' }}>{getStandardPort(order.destination_port)}</strong></span>
@@ -300,7 +304,7 @@ export default function AdminInventory({ isMobileView }) {
 
                     <div style={{ display: 'flex', gap: '12px', flexDirection: 'column', marginTop: '4px' }} onClick={e => e.stopPropagation()}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>TYPE</span>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>S/N: {order.serial_number || '-'}</span>
                         <select
                           value={sType}
                           onChange={(e) => handlePendingChange(order.id, 'stockType', e.target.value)}
