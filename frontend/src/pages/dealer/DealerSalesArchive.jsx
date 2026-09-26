@@ -249,6 +249,76 @@ export default function DealerSalesArchive({ isMobileView }) {
         <div className="data-table-container full-bleed">
           {loading ? (
             <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>{t('navbar.init_seed_loading', '데이터를 불러오는 중입니다...')}</div>
+          ) : isMobileView ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {filteredOrders.length > 0 ? (
+                filteredOrders.map((order, index) => {
+                  const statusColor = getStatusColor(order.current_status);
+                  const isPickedUp = order.current_status === 'SOLD';
+                  return (
+                    <div key={order.id} style={{ 
+                      background: 'var(--bg-card, #ffffff)', 
+                      border: '1px solid var(--border-color)', 
+                      borderRadius: '12px', 
+                      padding: '16px',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'flex-start' }}>
+                        <div>
+                          <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>No. {index + 1}</span>
+                          <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '1.1rem' }}>
+                            {order.product_model ? order.product_model.model_name : '-'}
+                          </span>
+                        </div>
+                        <span style={{
+                          display: 'inline-block', padding: '4px 10px', borderRadius: '6px',
+                          fontWeight: 600, fontSize: '12px',
+                          backgroundColor: `${statusColor}20`, color: statusColor, border: `1px solid ${statusColor}40`
+                        }}>
+                          {getStatusLabel(order.current_status)}
+                        </span>
+                      </div>
+                      
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                        <div><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Order Date</span>{new Date(order.dealer_order_date || order.created_at).toLocaleDateString()}</div>
+                        <div><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>P/O</span><span style={{ fontWeight: 500 }}>{order.reference_no || '-'}</span></div>
+                        <div><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>S/N</span><span style={{ fontWeight: 600 }}>{order.serial_number || '-'}</span></div>
+                        <div><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>N/C</span>{order.nc || '-'}</div>
+                        <div style={{ gridColumn: 'span 2' }}>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Pickup</span>
+                          {isPickedUp ? <span style={{ color: 'var(--success-color)', fontWeight: 600 }}>Picked Up</span> : <span>-</span>}
+                        </div>
+                      </div>
+                      
+                      <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+                        <button
+                          onClick={() => openCargoModal(order.serial_number, order.product_model ? order.product_model.model_name : '')}
+                          disabled={!order.serial_number}
+                          style={{
+                            background: 'transparent', border: '1px solid var(--border-color)',
+                            color: order.serial_number ? 'var(--text-primary)' : 'var(--text-muted)',
+                            fontFamily: 'SUITE, sans-serif',
+                            fontWeight: order.serial_number ? 600 : 100,
+                            padding: '10px', borderRadius: '8px', fontSize: '14px',
+                            cursor: order.serial_number ? 'pointer' : 'not-allowed',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                            width: '100%',
+                            transition: 'all 0.2s'
+                          }}
+                          className={order.serial_number ? "hover-bg-subtle" : ""}
+                        >
+                          <ExternalLink size={16} /> Details
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })
+              ) : (
+                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                  내역이 존재하지 않습니다.
+                </div>
+              )}
+            </div>
           ) : (
             <table className="data-table">
               <thead>
