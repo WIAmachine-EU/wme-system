@@ -53,7 +53,7 @@ def parse_with_llm(text: str) -> List[dict]:
         
         Output ONLY a valid JSON array. Do not include markdown code blocks.
         """
-        model = genai.GenerativeModel('gemini-2.5-flash', generation_config={"temperature": 0.0})
+        model = genai.GenerativeModel('gemini-3.8-flash', generation_config={"temperature": 0.0})
         response = model.generate_content(prompt)
         content = response.text.strip()
         
