@@ -20,6 +20,11 @@ class StorageProvider(ABC):
         """For S3-like providers, return signed URL. Local providers may return None."""
         pass
 
+    @abstractmethod
+    def read_file(self, filename: str) -> Optional[bytes]:
+        """Read file contents as bytes"""
+        pass
+
 
 class LocalStorageProvider(StorageProvider):
     def __init__(self, base_path: str):
@@ -37,6 +42,13 @@ class LocalStorageProvider(StorageProvider):
     def get_download_url(self, filename: str) -> Optional[str]:
         # Local storage doesn't provide a direct external URL here; 
         # it will be streamed via FastAPI FileResponse.
+        return None
+
+    def read_file(self, filename: str) -> Optional[bytes]:
+        file_path = self.get_file_path(filename)
+        if file_path:
+            with open(file_path, 'rb') as f:
+                return f.read()
         return None
 
 
@@ -76,6 +88,16 @@ class S3StorageProvider(StorageProvider):
             return url
         except Exception as e:
             logging.error(f"Error generating presigned URL for {filename}: {e}")
+            return None
+
+    def read_file(self, filename: str) -> Optional[bytes]:
+        try:
+            # We assume filename could be the full key, or just filename.
+            # In AI parser, file_key is passed which is the full path.
+            response = self.s3_client.get_object(Bucket=self.bucket_name, Key=filename)
+            return response['Body'].read()
+        except Exception as e:
+            logging.error(f"Error reading file {filename} from S3: {e}")
             return None
 
 # Initialize the default provider
