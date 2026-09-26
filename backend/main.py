@@ -1090,6 +1090,8 @@ async def r2_upload_webhook(request: Request, background_tasks: BackgroundTasks)
         
         if "Records" in payload and len(payload["Records"]) > 0:
             file_key = payload["Records"][0].get("s3", {}).get("object", {}).get("key")
+        elif "object" in payload and "key" in payload["object"]:
+            file_key = payload["object"]["key"]
         elif "key" in payload:
             file_key = payload["key"]
         elif "object_key" in payload:
