@@ -9,11 +9,18 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 # 환경 변수에서 SMTP 설정을 가져오거나 기본값 사용
-# 테스트를 위해 아래 변수에 직접 본인의 이메일과 앱 비밀번호를 입력하셔도 됩니다.
+# Resend 사용 시 .env 파일에 아래와 같이 설정하세요:
+# SMTP_SERVER=smtp.resend.com
+# SMTP_PORT=587
+# SMTP_USER=resend
+# SMTP_PASSWORD=re_... (Resend에서 발급받은 API Key)
+# FROM_EMAIL=onboarding@resend.dev (또는 인증된 본인 도메인 이메일)
+
 SMTP_SERVER = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))
-SMTP_USER = os.environ.get("SMTP_USER", "freelogin3975@gmail.com") # 발송에 사용할 구글 이메일
-SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "shdbwjbikvgborll") # 띄어쓰기 없는 16자리 알파벳
+SMTP_USER = os.environ.get("SMTP_USER", "freelogin3975@gmail.com")
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "shdbwjbikvgborll")
+FROM_EMAIL = os.environ.get("FROM_EMAIL", SMTP_USER)
 
 def send_email_notification(to_email: str, subject: str, content: str):
     """
@@ -31,7 +38,7 @@ def send_email_notification(to_email: str, subject: str, content: str):
 
     try:
         msg = MIMEMultipart()
-        msg['From'] = SMTP_USER
+        msg['From'] = FROM_EMAIL
         msg['To'] = to_email
         msg['Subject'] = subject
 
