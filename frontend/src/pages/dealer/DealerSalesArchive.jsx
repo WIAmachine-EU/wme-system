@@ -46,51 +46,46 @@ function CargoDetailModal({ isOpen, onClose, serialNumber, modelName }) {
         {loading ? (
           <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>데이터를 불러오는 중입니다...</div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="data-table" style={{ minWidth: '700px', margin: 0 }}>
-              <thead>
-                <tr>
-                  <th style={{ backgroundColor: '#fcd34d', color: '#000', padding: '10px', textAlign: 'center' }}>Model</th>
-                  <th style={{ backgroundColor: '#fcd34d', color: '#000', padding: '10px', textAlign: 'center' }}>S/N</th>
-                  <th style={{ backgroundColor: '#fcd34d', color: '#000', padding: '10px', textAlign: 'center' }}>ITEM</th>
-                  <th style={{ backgroundColor: '#fcd34d', color: '#000', padding: '10px', textAlign: 'center' }}>QTY</th>
-                  <th style={{ backgroundColor: '#fcd34d', color: '#000', padding: '10px', textAlign: 'center' }}>BOX NO</th>
-                  <th style={{ backgroundColor: '#fcd34d', color: '#000', padding: '10px', textAlign: 'center' }}>DIMENSION (L/W/H) cm</th>
-                  <th style={{ backgroundColor: '#fcd34d', color: '#000', padding: '10px', textAlign: 'center' }}>N*W(kg)</th>
-                  <th style={{ backgroundColor: '#fcd34d', color: '#000', padding: '10px', textAlign: 'center' }}>G*W(kg)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayData.map((item, idx) => (
-                  <tr key={idx} style={{ backgroundColor: '#fff' }}>
-                    <td style={{ padding: '10px', fontWeight: 600, border: '1px solid #e5e7eb', color: '#000', textAlign: 'center' }}>
-                      {item.serial_number ? (modelName || '-') : '-'}
-                    </td>
-                    <td style={{ padding: '10px', fontWeight: 600, border: '1px solid #e5e7eb', color: '#000', textAlign: 'center' }}>
-                      {item.serial_number ? item.serial_number : '-'}
-                    </td>
-                    <td style={{ padding: '10px', border: '1px solid #e5e7eb', color: '#374151', textAlign: 'center' }}>
-                      {item.item || '-'}
-                    </td>
-                    <td style={{ padding: '10px', textAlign: 'center', border: '1px solid #e5e7eb', color: '#374151' }}>
-                      {item.qty || '-'}
-                    </td>
-                    <td style={{ padding: '10px', textAlign: 'center', border: '1px solid #e5e7eb', color: '#374151' }}>
-                      {item.box_no || '-'}
-                    </td>
-                    <td style={{ padding: '10px', textAlign: 'center', border: '1px solid #e5e7eb', color: '#374151' }}>
-                      {item.dimensions || '-'}
-                    </td>
-                    <td style={{ padding: '10px', textAlign: 'center', border: '1px solid #e5e7eb', color: '#374151' }}>
-                      {item.net_weight || '-'}
-                    </td>
-                    <td style={{ padding: '10px', textAlign: 'center', border: '1px solid #e5e7eb', color: '#374151' }}>
-                      {item.gross_weight || '-'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', borderBottom: '2px solid var(--border-color)', paddingBottom: '12px' }}>
+              {modelName || '-'} &nbsp;&nbsp; {serialNumber || '-'}
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              {(data && data.length > 0 ? data : [{}]).map((item, idx) => (
+                <React.Fragment key={idx}>
+                  {idx > 0 && <hr style={{ border: 'none', borderTop: '1px dashed var(--border-color)', margin: '0' }} />}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.95rem', color: 'var(--text-secondary)' }}>
+                    <div>
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>• Item:</span> {item.item === 'CC' ? 'C/C' : (item.item || '-')}
+                    </div>
+                    
+                    <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+                      <div>
+                        <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>• Box:</span> {item.qty || '-'}
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>• Box No:</span> {item.box_no || '-'}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>• Dimension (L/W/H cm):</div>
+                      <div style={{ marginTop: '4px' }}>{item.dimensions || '-'}</div>
+                    </div>
+                    
+                    <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+                      <div>
+                        <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>• N.W(KG):</span> {item.net_weight || '-'}
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>• G.W(KG):</span> {item.gross_weight || '-'}
+                      </div>
+                    </div>
+                  </div>
+                </React.Fragment>
+              ))}
+            </div>
           </div>
         )}
       </div>

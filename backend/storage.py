@@ -67,7 +67,8 @@ class S3StorageProvider(StorageProvider):
             aws_access_key_id=aws_access_key_id,
             aws_secret_access_key=aws_secret_access_key,
             config=my_config,
-            region_name='auto' # Cloudflare R2 usually uses 'auto' or 'us-east-1'
+            region_name='auto', # Cloudflare R2 usually uses 'auto' or 'us-east-1'
+            verify=False
         )
 
     def get_file_path(self, filename: str) -> Optional[str]:
