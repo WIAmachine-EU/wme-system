@@ -30,6 +30,11 @@ export default function UploadSettings() {
   const [uploadResult, setUploadResult] = useState(null);
   const [uploading, setUploading] = useState(false);
 
+  // PDF 업로드 상태
+  const [selectedPdfFile, setSelectedPdfFile] = useState(null);
+  const [pdfUploadResult, setPdfUploadResult] = useState(null);
+  const [pdfUploading, setPdfUploading] = useState(false);
+
   const loadConfigs = async () => {
     try {
       const [emailRes, modelsRes, dealersRes, ncRes, incotermRes, portRes] = await Promise.all([
@@ -117,6 +122,29 @@ export default function UploadSettings() {
     }
   };
 
+  const handlePdfUpload = async (e) => {
+    e.preventDefault();
+    if (!selectedPdfFile) return alert("업로드할 입고증 PDF 파일을 선택해주세요.");
+
+    setPdfUploading(true);
+    setPdfUploadResult(null);
+    const formData = new FormData();
+    formData.append('file', selectedPdfFile);
+
+    try {
+      const res = await fetch('/api/upload/pdf-cargo', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      setPdfUploadResult(data);
+    } catch (err) {
+      setPdfUploadResult({ status: 'error', message: '서버 통신 중 오류가 발생했습니다.' });
+    } finally {
+      setPdfUploading(false);
+    }
+  };
+
   const handleToggleEmailRule = async (configId, currentActive) => {
     try {
       await fetch(`/api/email-configs/${configId}?is_active=${!currentActive}`, {
@@ -197,6 +225,46 @@ export default function UploadSettings() {
             {uploadResult.errors && uploadResult.errors.length > 0 && (
               <ul style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', paddingLeft: '20px', maxHeight: '120px', overflowY: 'auto' }}>
                 {uploadResult.errors.map((err, i) => <li key={i}>{err}</li>)}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="glass-card" style={{ padding: '28px', marginBottom: '32px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+          <Upload color="var(--accent-green)" size={24} />
+          <h2 style={{ fontSize: '1.3rem' }}>입고증 PDF 업로드 (Cargo Details)</h2>
+        </div>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '20px' }}>
+          입고증(Einlagerungsmeldung) PDF 파일을 업로드하면 AI가 내용을 분석하여 화물 상세 정보(Cargo Details)를 자동으로 데이터베이스에 업데이트합니다.
+        </p>
+
+        <form onSubmit={handlePdfUpload} style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', background: 'var(--bg-secondary)', padding: '20px', borderRadius: '12px', border: '1px dashed var(--border-color)' }}>
+          <input
+            type="file"
+            accept=".pdf"
+            onChange={e => setSelectedPdfFile(e.target.files[0])}
+            style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}
+          />
+          <button type="submit" disabled={pdfUploading || !selectedPdfFile} className="btn btn-primary upload-hover-btn">
+            <Upload size={16} />
+            <span>{pdfUploading ? 'PDF 분석 및 업로드 중...' : '입고증 PDF 업로드'}</span>
+          </button>
+        </form>
+
+        {pdfUploadResult && (
+          <div style={{
+            marginTop: '16px', padding: '16px', borderRadius: '10px',
+            background: pdfUploadResult.status === 'success' ? 'hsla(142, 76%, 46%, 0.15)' : 'hsla(24, 95%, 53%, 0.15)',
+            border: `1px solid ${pdfUploadResult.status === 'success' ? 'var(--status-stock)' : 'var(--status-shipping)'}`
+          }}>
+            <div style={{ fontWeight: 700, marginBottom: '6px', color: pdfUploadResult.status === 'success' ? 'var(--status-stock)' : 'var(--status-shipping)' }}>
+              {pdfUploadResult.message}
+            </div>
+            {pdfUploadResult.errors && pdfUploadResult.errors.length > 0 && (
+              <ul style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', paddingLeft: '20px', maxHeight: '120px', overflowY: 'auto' }}>
+                {pdfUploadResult.errors.map((err, i) => <li key={i}>{err}</li>)}
               </ul>
             )}
           </div>

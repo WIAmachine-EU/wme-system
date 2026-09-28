@@ -1082,6 +1082,47 @@ def get_cargo_detail(serial_number: str, db: Session = Depends(get_db)):
 from fastapi import BackgroundTasks, Request
 import ai_cargo_parser
 
+@app.post("/api/upload/pdf-cargo")
+async def upload_pdf_cargo(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_role: Optional[str] = Depends(get_current_role)
+):
+    if current_role == "RSM":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="접근 권한이 없습니다.")
+        
+    if not file.filename.lower().endswith('.pdf'):
+        return {"status": "error", "message": "PDF 파일만 업로드 가능합니다."}
+    
+    content = await file.read()
+    file_key = f"Einlagerung-TCO/{file.filename}"
+    
+    try:
+        from storage import default_storage
+        import os
+        if hasattr(default_storage, 's3_client'):
+            default_storage.s3_client.put_object(
+                Bucket=default_storage.bucket_name,
+                Key=file_key,
+                Body=content,
+                ContentType="application/pdf"
+            )
+        else:
+            file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "documents", file.filename)
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            with open(file_path, "wb") as f:
+                f.write(content)
+            file_key = file.filename
+            
+        import ai_cargo_parser
+        background_tasks.add_task(ai_cargo_parser.process_file_event, file_key)
+
+        return {"status": "success", "message": f"[{file.filename}] 파일 업로드 및 AI 자동 분석 지시가 완료되었습니다."}
+    except Exception as e:
+        return {"status": "error", "message": f"업로드 실패: {str(e)}"}
+
 @app.post("/api/webhooks/r2-upload", status_code=202)
 async def r2_upload_webhook(request: Request, background_tasks: BackgroundTasks):
     try:
