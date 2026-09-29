@@ -524,17 +524,6 @@ h6 {
     font-size: 0.65rem;
     letter-spacing: -0.02em;
   }
-
-  .step-dot {
-    width: 32px;
-    height: 32px;
-  }
-
-  .step-connector {
-    top: 16px;
-    left: calc(50% + 16px);
-    width: calc(100% - 32px);
-  }
 }
 
 /* Table Styles */
