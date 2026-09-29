@@ -39,8 +39,8 @@ function CargoDetailModal({ isOpen, onClose, serialNumber, modelName }) {
         <button onClick={onClose} style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)' }}>
           <X size={20} />
         </button>
-        <h2 style={{ fontSize: '1.2rem', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Package size={20} color="var(--accent-color)" /> ◎ Machine Details
+        <h2 style={{ margin: '0 0 20px 0', fontSize: '1.2rem', color: 'var(--text-primary)' }}>
+          ◎ Machine Details
         </h2>
 
         {loading ? (
@@ -48,7 +48,8 @@ function CargoDetailModal({ isOpen, onClose, serialNumber, modelName }) {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', borderBottom: '2px solid var(--border-color)', paddingBottom: '12px' }}>
-              {modelName || '-'} &nbsp;&nbsp; {serialNumber || '-'}
+              <span style={{ marginRight: '28px' }}>• {modelName || '-'}</span>
+              <span>• S/N : <span style={{ color: 'rgb(10, 28, 143)' }}>{serialNumber || '-'}</span></span>
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -70,8 +71,7 @@ function CargoDetailModal({ isOpen, onClose, serialNumber, modelName }) {
                     </div>
                     
                     <div>
-                      <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>• Dimension (L/W/H cm):</div>
-                      <div style={{ marginTop: '4px' }}>{item.dimensions || '-'}</div>
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>• Dimension (L/W/H cm):</span> <span style={{ fontFamily: 'SUITE', fontWeight: 750, color: 'rgb(255, 87, 51)' }}>{item.dimensions || '-'}</span>
                     </div>
                     
                     <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
@@ -79,7 +79,7 @@ function CargoDetailModal({ isOpen, onClose, serialNumber, modelName }) {
                         <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>• N.W(KG):</span> {item.net_weight || '-'}
                       </div>
                       <div>
-                        <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>• G.W(KG):</span> {item.gross_weight || '-'}
+                        <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>• G.W(KG):</span> <span style={{ color: 'rgb(255, 87, 51)' }}>{item.gross_weight || '-'}</span>
                       </div>
                     </div>
                   </div>

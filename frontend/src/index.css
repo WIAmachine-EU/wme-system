@@ -478,10 +478,12 @@ h6 {
     font-size: 0.65rem;
     letter-spacing: -0.02em;
   }
+
   .step-dot {
     width: 32px;
     height: 32px;
   }
+
   .step-connector {
     top: 16px;
     left: calc(50% + 16px);
@@ -679,7 +681,7 @@ h6 {
   min-width: 0;
 }
 
-.mobile-order-card > * {
+.mobile-order-card>* {
   min-width: 0;
 }
 
@@ -909,6 +911,7 @@ h6 {
     opacity: 0;
     transform: translateY(20px) scale(0.95);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -942,12 +945,12 @@ h6 {
     border-radius: 0 !important;
     margin: 0 !important;
   }
-  
+
   .modal-body {
     flex: 1;
     max-height: calc(100vh - 140px) !important;
   }
-  
+
   .modal-footer {
     border-radius: 0 !important;
     padding-bottom: max(16px, env(safe-area-inset-bottom)) !important;
