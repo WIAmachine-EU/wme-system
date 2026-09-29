@@ -430,15 +430,14 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
                         <>
                           <button
                             onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleFinishTimeline(order.id); }}
-                            className="btn btn-outline btn-in-stock-complete"
-                            style={{ padding: '3px 4px', fontSize: '10px', justifyContent: 'center' }}
+                            className="btn btn-outline btn-in-stock-complete action-btn"
                           >
                             {t('menu1.btn_in_stock_complete', '입고완료')}
                           </button>
                           <button
                             onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleRollbackStatus(order.id, order.current_status); }}
-                            className="btn btn-outline"
-                            style={{ padding: '3px 4px', fontSize: '10px', justifyContent: 'center', borderColor: 'var(--text-muted)', color: 'var(--text-muted)' }}
+                            className="btn btn-outline action-btn"
+                            style={{ borderColor: 'var(--text-muted)', color: 'var(--text-muted)' }}
                           >
                             {t('menu1.btn_prev_mobile', 'Prev')}
                           </button>
@@ -447,16 +446,16 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
                         <>
                           <button
                             onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleNextStatus(order.id, order.current_status); }}
-                            className="btn btn-outline"
-                            style={{ padding: '3px 4px', fontSize: '10px', justifyContent: 'center', borderColor: 'var(--accent-blue)', color: 'var(--accent-blue)' }}
+                            className="btn btn-outline action-btn"
+                            style={{ borderColor: 'var(--accent-blue)', color: 'var(--accent-blue)' }}
                           >
                             {t('menu1.btn_next_mobile', 'Next')}
                           </button>
                           {order.current_status !== 'CONFIRMED' && (
                             <button
                               onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleRollbackStatus(order.id, order.current_status); }}
-                              className="btn btn-outline"
-                              style={{ padding: '3px 4px', fontSize: '10px', justifyContent: 'center', borderColor: 'var(--text-muted)', color: 'var(--text-muted)' }}
+                              className="btn btn-outline action-btn"
+                              style={{ borderColor: 'var(--text-muted)', color: 'var(--text-muted)' }}
                             >
                               {t('menu1.btn_prev_mobile', 'Prev')}
                             </button>
@@ -465,15 +464,15 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
                       )}
                       <button
                         onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleEditClick(order); }}
-                        className="btn btn-outline"
-                        style={{ padding: '3px 4px', fontSize: '10px', justifyContent: 'center', borderColor: 'var(--accent-cyan)', color: 'var(--accent-cyan)' }}
+                        className="btn btn-outline action-btn"
+                        style={{ borderColor: 'var(--accent-cyan)', color: 'var(--accent-cyan)' }}
                       >
                         {t('menu1.btn_edit', 'Edit')}
                       </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleDeleteOrder(order.id); }}
-                        className="btn btn-outline"
-                        style={{ padding: '3px 4px', fontSize: '10px', justifyContent: 'center', borderColor: 'var(--accent-red, #ef4444)', color: 'var(--accent-red, #ef4444)' }}
+                        className="btn btn-outline action-btn"
+                        style={{ borderColor: 'var(--accent-red, #ef4444)', color: 'var(--accent-red, #ef4444)' }}
                       >
                         {t('menu1.btn_delete', 'Delete')}
                       </button>
@@ -573,15 +572,14 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
                                   <>
                                     <button
                                       onClick={() => handleFinishTimeline(order.id)}
-                                      className="btn btn-outline btn-in-stock-complete"
-                                      style={{ padding: '3px 4px', fontSize: '10px', justifyContent: 'center' }}
+                                      className="btn btn-outline btn-in-stock-complete action-btn"
                                     >
                                       {t('menu1.btn_in_stock_complete', '입고완료')}
                                     </button>
                                     <button
                                       onClick={() => handleRollbackStatus(order.id, order.current_status)}
-                                      className="btn btn-outline"
-                                      style={{ padding: '3px 4px', fontSize: '10px', justifyContent: 'center', borderColor: 'var(--text-muted)', color: 'var(--text-muted)' }}
+                                      className="btn btn-outline action-btn"
+                                      style={{ borderColor: 'var(--text-muted)', color: 'var(--text-muted)' }}
                                     >
                                       {t('menu1.btn_prev')}
                                     </button>
@@ -590,16 +588,16 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
                                   <>
                                     <button
                                       onClick={() => handleNextStatus(order.id, order.current_status)}
-                                      className="btn btn-outline"
-                                      style={{ padding: '3px 4px', fontSize: '10px', justifyContent: 'center', borderColor: 'var(--accent-blue)', color: 'var(--accent-blue)' }}
+                                      className="btn btn-outline action-btn"
+                                      style={{ borderColor: 'var(--accent-blue)', color: 'var(--accent-blue)' }}
                                     >
                                       {t('menu1.btn_next')}
                                     </button>
                                     {order.current_status !== 'CONFIRMED' && (
                                       <button
                                         onClick={() => handleRollbackStatus(order.id, order.current_status)}
-                                        className="btn btn-outline"
-                                        style={{ padding: '3px 4px', fontSize: '10px', justifyContent: 'center', borderColor: 'var(--text-muted)', color: 'var(--text-muted)' }}
+                                        className="btn btn-outline action-btn"
+                                        style={{ borderColor: 'var(--text-muted)', color: 'var(--text-muted)' }}
                                       >
                                         {t('menu1.btn_prev')}
                                       </button>
@@ -608,15 +606,15 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
                                 )}
                                 <button
                                   onClick={() => handleEditClick(order)}
-                                  className="btn btn-outline"
-                                  style={{ padding: '3px 4px', fontSize: '10px', justifyContent: 'center', borderColor: 'var(--accent-cyan)', color: 'var(--accent-cyan)' }}
+                                  className="btn btn-outline action-btn"
+                                  style={{ borderColor: 'var(--accent-cyan)', color: 'var(--accent-cyan)' }}
                                 >
                                   {t('menu1.btn_edit')}
                                 </button>
                                 <button
                                   onClick={() => handleDeleteOrder(order.id)}
-                                  className="btn btn-outline"
-                                  style={{ padding: '3px 4px', fontSize: '10px', justifyContent: 'center', borderColor: 'var(--accent-red, #ef4444)', color: 'var(--accent-red, #ef4444)' }}
+                                  className="btn btn-outline action-btn"
+                                  style={{ borderColor: 'var(--accent-red, #ef4444)', color: 'var(--accent-red, #ef4444)' }}
                                 >
                                   {t('menu1.btn_delete')}
                                 </button>
