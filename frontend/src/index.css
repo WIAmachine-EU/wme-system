@@ -481,13 +481,13 @@ h6 {
     display: none !important;
   }
   .step-dot {
-    width: 50px;
-    height: 50px;
+    width: 45px;
+    height: 45px;
   }
   .step-connector {
-    top: 25px;
-    left: calc(50% + 25px);
-    width: calc(100% - 50px);
+    top: 22.5px;
+    left: calc(50% + 22.5px);
+    width: calc(100% - 45px);
     height: 4px;
     display: block !important;
   }
