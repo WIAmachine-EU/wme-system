@@ -40,7 +40,7 @@ export default function Login({ onLogin }) {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', width: '100vw', backgroundColor: 'var(--bg-primary)' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', width: '100%', backgroundColor: 'var(--bg-primary)' }}>
 
       {/* Left Area - Login Form */}
       <div style={{
@@ -58,7 +58,7 @@ export default function Login({ onLogin }) {
           <div style={{ marginBottom: '20px', textAlign: 'center' }}>
             <WiaLogo size="large" />
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '20px', gap: '30px' }}>
-              <h1 style={{ fontSize: '1.5rem', color: 'var(--text-primary)', margin: 0, fontWeight: '300', whiteSpace: 'nowrap' }}>
+              <h1 style={{ fontSize: '1.4rem', color: 'var(--text-primary)', margin: 0, fontWeight: '300', textAlign: 'center', wordBreak: 'keep-all' }}>
                 Europe Integrated Network System
               </h1>
               <img src="/A-machine.ico" alt="Machine" style={{ width: '70px', height: '70px', objectFit: 'contain' }} />
