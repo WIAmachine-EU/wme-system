@@ -49,7 +49,7 @@ function CargoDetailModal({ isOpen, onClose, serialNumber, modelName }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', borderBottom: '2px solid var(--border-color)', paddingBottom: '12px' }}>
               <span style={{ marginRight: '28px' }}>• {modelName || '-'}</span>
-              <span>• S/N : <span style={{ color: 'rgb(10, 28, 143)' }}>{serialNumber || '-'}</span></span>
+              <span>• S/N : <span style={{ color: 'var(--accent-cyan)' }}>{serialNumber || '-'}</span></span>
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
