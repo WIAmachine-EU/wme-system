@@ -19,13 +19,13 @@ export default function WiaLogo({ variant = 'main', size = 'medium', className =
   return (
     <div 
       className={`wia-logo ${variant} ${className}`} 
-      style={{ display: 'inline-flex', alignItems: 'center', minWidth: 0, cursor: onClick ? 'pointer' : 'default', ...style }}
+      style={{ display: 'inline-flex', justifyContent: 'center', alignItems: 'center', minWidth: 0, cursor: onClick ? 'pointer' : 'default', ...style }}
       onClick={onClick}
     >
       <img 
         src={imgSrc} 
         alt="WIA MACHINE TOOLS" 
-        style={{ height: currentSize.height, width: 'auto', maxWidth: '100%', objectFit: 'contain' }} 
+        style={{ height: currentSize.height, width: 'auto', maxWidth: '85%', objectFit: 'contain', margin: '0 auto' }} 
         onError={(e) => {
           // 로고 이미지를 로드할 수 없을 때 대비용
           e.target.style.display = 'none';
