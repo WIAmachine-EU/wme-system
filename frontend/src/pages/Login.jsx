@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, User, ArrowRight } from 'lucide-react';
 import WiaLogo from '../components/WiaLogo';
+import { supabase } from '../utils/supabaseClient';
 
 import { addAuditLog } from '../utils/auditLogger';
 
@@ -8,6 +9,47 @@ export default function Login({ onLogin }) {
   const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handlePasskeyLogin = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const { data, error } = await supabase.auth.signInWithWebAuthn();
+      if (error) throw error;
+      
+      if (data?.session) {
+        // TODO: Passkey verification with backend to fetch role and user details
+        // For now, we simulate a login or alert
+        alert("패스키 인증 성공! 백엔드 연동을 진행해 주세요.");
+        // const jwtToken = data.session.access_token;
+      }
+    } catch (error) {
+      console.error("패스키 로그인 실패:", error.message);
+      setError("패스키 로그인을 실패했거나 취소했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+ // 👇 여기에 이 함수를 추가해 주세요 👇
+  const handleRegisterPasskey = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      // signIn(로그인) 대신 signUp(가입/등록) 함수를 호출합니다!
+      const { data, error } = await supabase.auth.signUpWithWebAuthn();
+      if (error) throw error;
+      
+      alert("🎉 기기에 패스키가 성공적으로 등록되었습니다! 이제 로그인 버튼을 눌러보세요.");
+    } catch (error) {
+      console.error("패스키 등록 실패:", error.message);
+      setError("패스키 등록에 실패했습니다. (지원하지 않거나 취소됨)");
+    } finally {
+      setLoading(false);
+    }
+  };
+  // 👆 여기까지 👆
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -112,11 +154,39 @@ export default function Login({ onLogin }) {
             }}>
               Sign In <ArrowRight size={20} />
             </button>
+
+            {/* 패스키 로그인 버튼 */}
+            <button 
+              type="button"
+              onClick={handlePasskeyLogin} 
+              disabled={loading}
+              style={{
+                width: '60%', padding: '12px 16px', borderRadius: '12px', border: '1px solid var(--border-color)',
+                backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '1.05rem',
+                fontWeight: '600', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
+                margin: '8px auto 0', transition: 'background-color 0.2s'
+              }}
+            >
+              {loading ? "인증 중..." : "🚀 패스키로 1초 만에 로그인"}
+            </button>
           </form>
 
           <div style={{ marginTop: '12px', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
             Forgot your password?
           </div>
+
+          {/* 👇 패스키 등록용 테스트 링크 추가 👇 */}
+          <div style={{ marginTop: '20px', textAlign: 'center', fontSize: '0.85rem' }}>
+            <span style={{ color: 'var(--text-muted)' }}>아직 패스키를 설정하지 않으셨나요? </span>
+            <span 
+              onClick={handleRegisterPasskey}
+              style={{ color: 'var(--wia-blue)', fontWeight: 'bold', cursor: 'pointer', textDecoration: 'underline' }}
+            >
+              내 기기(패스키) 등록하기
+            </span>
+          </div>
+          {/* 👆 여기까지 👆 */}
+
         </div>
       </div>
 
