@@ -11,6 +11,10 @@ from database import SessionLocal
 import models
 from storage import default_storage
 
+import asyncio
+from aiolimiter import AsyncLimiter
+from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_exception_type
+
 try:
     import google.generativeai as genai
     gemini_key = os.getenv("GEMINI_API_KEY")
@@ -29,9 +33,21 @@ def get_text_from_pdf(file_bytes: bytes) -> str:
         text += page.extract_text() + "\n"
     return text
 
-def parse_with_llm(text: str) -> List[dict]:
+gemini_limiter = AsyncLimiter(12, 60)
+
+@retry(
+    wait=wait_exponential(multiplier=2, min=2, max=20),
+    stop=stop_after_attempt(5)
+)
+async def generate_with_gemini(prompt: str) -> str:
+    async with gemini_limiter:
+        model = genai.GenerativeModel('gemini-3.5-flash-lite', generation_config={"temperature": 0.0})
+        response = await model.generate_content_async(prompt)
+        return response.text.strip()
+
+async def parse_with_llm_async(text: str) -> List[dict]:
     """
-    Extracts Cargo Details using LLM (Gemini API).
+    Extracts Cargo Details using LLM (Gemini API) asynchronously.
     Fallback to a mock if API key is not present.
     """
     if has_gemini:
@@ -53,9 +69,7 @@ def parse_with_llm(text: str) -> List[dict]:
         
         Output ONLY a valid JSON array. Do not include markdown code blocks.
         """
-        model = genai.GenerativeModel('gemini-3.5-flash-lite', generation_config={"temperature": 0.0})
-        response = model.generate_content(prompt)
-        content = response.text.strip()
+        content = await generate_with_gemini(prompt)
         
         if content.startswith("```json"):
             content = content[7:]
@@ -91,65 +105,39 @@ def parse_with_llm(text: str) -> List[dict]:
         ]
     return []
 
-def process_file_event(file_key: str):
-    """
-    Downloads the file from R2, parses it, and updates DB.
-    """
-    print(f"[AI Cargo Parser] Processing file: {file_key}")
+def _extract_excel(file_bytes: bytes) -> List[dict]:
+    extracted = []
+    df = pd.read_excel(io.BytesIO(file_bytes), sheet_name=0)
+    header_idx = -1
+    for i, row in df.iterrows():
+        if any('호기' in str(val) or 'S/O' in str(val) for val in row.values):
+            header_idx = i
+            break
     
-    file_bytes = default_storage.read_file(file_key)
-    if not file_bytes:
-        print(f"[AI Cargo Parser] Could not read file: {file_key}")
-        return
+    if header_idx != -1:
+        df.columns = df.iloc[header_idx]
+        df = df.iloc[header_idx+1:].reset_index(drop=True)
         
-    extracted_data = []
-    
-    if file_key.lower().endswith('.pdf'):
-        text = get_text_from_pdf(file_bytes)
-        try:
-            extracted_data = parse_with_llm(text)
-        except Exception as e:
-            print(f"[AI Cargo Parser] LLM extraction failed: {e}")
-            return
-    elif file_key.lower().endswith('.xlsx') or file_key.lower().endswith('.xls'):
-        try:
-            df = pd.read_excel(io.BytesIO(file_bytes), sheet_name=0)
-            header_idx = -1
-            for i, row in df.iterrows():
-                if any('호기' in str(val) or 'S/O' in str(val) for val in row.values):
-                    header_idx = i
-                    break
-            
-            if header_idx != -1:
-                df.columns = df.iloc[header_idx]
-                df = df.iloc[header_idx+1:].reset_index(drop=True)
+        for _, row in df.iterrows():
+            sn = str(row.get('호기', '')).strip()
+            if pd.isna(sn) or not sn or sn == '//':
+                continue
                 
-                for _, row in df.iterrows():
-                    sn = str(row.get('호기', '')).strip()
-                    if pd.isna(sn) or not sn or sn == '//':
-                        continue
-                        
-                    item_type = str(row.get('구성품', '')).strip()
-                    item_mapped = "MACHINE" if "본기" in item_type or "Machine" in item_type else "CC"
-                    
-                    extracted_data.append({
-                        "serial_number": sn,
-                        "item": item_mapped,
-                        "qty": 1,
-                        "box_no": str(row.get('BOX NO', '')).strip(),
-                        "dimensions": str(row.get('DIMENSION', '')).strip(),
-                        "net_weight": str(row.get('N*W', '')).strip(),
-                        "gross_weight": str(row.get('G*W', '')).strip()
-                    })
-        except Exception as e:
-            print(f"[AI Cargo Parser] Excel extraction failed: {e}")
-            return
-    else:
-        print(f"[AI Cargo Parser] Unsupported file type for AI processing: {file_key}")
-        return
+            item_type = str(row.get('구성품', '')).strip()
+            item_mapped = "MACHINE" if "본기" in item_type or "Machine" in item_type else "CC"
+            
+            extracted.append({
+                "serial_number": sn,
+                "item": item_mapped,
+                "qty": 1,
+                "box_no": str(row.get('BOX NO', '')).strip(),
+                "dimensions": str(row.get('DIMENSION', '')).strip(),
+                "net_weight": str(row.get('N*W', '')).strip(),
+                "gross_weight": str(row.get('G*W', '')).strip()
+            })
+    return extracted
 
-    print(f"[AI Cargo Parser] Extracted {len(extracted_data)} items.")
-    
+def _update_db(extracted_data: List[dict]):
     db = SessionLocal()
     try:
         updated_sns = set()
@@ -189,3 +177,37 @@ def process_file_event(file_key: str):
         print(f"[AI Cargo Parser] DB Update error: {e}")
     finally:
         db.close()
+
+async def process_file_event(file_key: str):
+    """
+    Downloads the file from R2, parses it, and updates DB asynchronously.
+    """
+    print(f"[AI Cargo Parser] Processing file: {file_key}")
+    
+    file_bytes = await asyncio.to_thread(default_storage.read_file, file_key)
+    if not file_bytes:
+        print(f"[AI Cargo Parser] Could not read file: {file_key}")
+        return
+        
+    extracted_data = []
+    
+    if file_key.lower().endswith('.pdf'):
+        text = await asyncio.to_thread(get_text_from_pdf, file_bytes)
+        try:
+            extracted_data = await parse_with_llm_async(text)
+        except Exception as e:
+            print(f"[AI Cargo Parser] LLM extraction failed: {e}")
+            return
+    elif file_key.lower().endswith('.xlsx') or file_key.lower().endswith('.xls'):
+        try:
+            extracted_data = await asyncio.to_thread(_extract_excel, file_bytes)
+        except Exception as e:
+            print(f"[AI Cargo Parser] Excel extraction failed: {e}")
+            return
+    else:
+        print(f"[AI Cargo Parser] Unsupported file type for AI processing: {file_key}")
+        return
+
+    print(f"[AI Cargo Parser] Extracted {len(extracted_data)} items.")
+    await asyncio.to_thread(_update_db, extracted_data)
+
