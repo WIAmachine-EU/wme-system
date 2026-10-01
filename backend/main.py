@@ -58,7 +58,7 @@ def on_startup():
             db.rollback()
             
         try:
-            db.execute(text("ALTER TABLE custom_users ADD COLUMN supabase_uid VARCHAR UNIQUE"))
+            db.execute(text("ALTER TABLE custom_users ADD COLUMN supabase_uid VARCHAR"))
             db.commit()
         except Exception:
             db.rollback()
