@@ -37,9 +37,10 @@ export default function Login({ onLogin }) {
     setError('');
     try {
       // 1. 패스키를 등록하기 위해 임시 테스트 계정으로 먼저 Supabase에 가입(로그인)합니다.
-      await supabase.auth.signUp({
-        email: 'test_passkey@wmeins.eu',
-        password: 'Password123!'
+      // 대시보드에서 방금 만든 100% 승인된 실제 계정으로 로그인합니다.
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: 'webmaster@wmeins.eu', // 👈 방금 만드신 실제 이메일
+        password: 'Userpw1234!'                // 👈 방금 만드신 실제 비밀번호
       });
       // 2. 로그인된 상태에서 패스키 팝업 호출! (함수 이름이 registerPasskey 로 변경됨)
       const { data, error } = await supabase.auth.registerPasskey();
