@@ -11,7 +11,7 @@ import pandas as pd
 from database import get_db, engine, Base, SessionLocal
 import models
 import schemas
-from supabase_auth import get_current_user_from_supabase # 👈 이 줄 추가
+from auth_supabase import get_current_user_from_supabase # 👈 이 줄 추가
 from seed import init_seed
 from scheduler import start_scheduler, stop_scheduler
 from email_service import send_etd_notification, send_warehouse_arrival_notification, send_port_arrival_notification
