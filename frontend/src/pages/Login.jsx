@@ -11,18 +11,17 @@ export default function Login({ onLogin }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+ // 👇 로그인용 함수 교체 👇
   const handlePasskeyLogin = async () => {
     setLoading(true);
     setError('');
     try {
-      const { data, error } = await supabase.auth.signInWithWebAuthn();
+      // 함수 이름이 signInWithPasskey 로 변경됨!
+      const { data, error } = await supabase.auth.signInWithPasskey();
       if (error) throw error;
       
       if (data?.session) {
-        // TODO: Passkey verification with backend to fetch role and user details
-        // For now, we simulate a login or alert
         alert("패스키 인증 성공! 백엔드 연동을 진행해 주세요.");
-        // const jwtToken = data.session.access_token;
       }
     } catch (error) {
       console.error("패스키 로그인 실패:", error.message);
@@ -32,13 +31,18 @@ export default function Login({ onLogin }) {
     }
   };
 
- // 👇 여기에 이 함수를 추가해 주세요 👇
+  // 👇 기기 등록용 함수 교체 👇
   const handleRegisterPasskey = async () => {
     setLoading(true);
     setError('');
     try {
-      // signIn(로그인) 대신 signUp(가입/등록) 함수를 호출합니다!
-      const { data, error } = await supabase.auth.signUpWithWebAuthn();
+      // 1. 패스키를 등록하기 위해 임시 테스트 계정으로 먼저 Supabase에 가입(로그인)합니다.
+      await supabase.auth.signUp({
+        email: 'test_passkey@wmeins.eu',
+        password: 'Password123!'
+      });
+      // 2. 로그인된 상태에서 패스키 팝업 호출! (함수 이름이 registerPasskey 로 변경됨)
+      const { data, error } = await supabase.auth.registerPasskey();
       if (error) throw error;
       
       alert("🎉 기기에 패스키가 성공적으로 등록되었습니다! 이제 로그인 버튼을 눌러보세요.");
