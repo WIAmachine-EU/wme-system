@@ -1,43 +1,52 @@
 import os
-from typing import Optional
-from fastapi import Request, HTTPException, Security
+from fastapi import HTTPException, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 from database import SessionLocal
 import models
 
+# 공식 라이브러리 사용
+from supabase import create_client, Client
+
 security = HTTPBearer()
 
-# Supabase JWT Secret should be set in Render environment variables
-SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "your-supabase-jwt-secret")
-# Supabase uses HS256 for their JWTs
-ALGORITHM = "HS256"
+# Render 환경변수에서 URL과 KEY를 가져옵니다.
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 
 def get_current_user_from_supabase(credentials: HTTPAuthorizationCredentials = Security(security)):
-    """
-    Supabase가 발급한 JWT를 검증(Verify)하고, DB에서 매핑된 사용자(User)를 반환합니다.
-    """
     token = credentials.credentials
+    if not SUPABASE_URL or not SUPABASE_ANON_KEY:
+        raise HTTPException(status_code=500, detail="백엔드에 Supabase 환경변수가 설정되지 않았습니다.")
+        
+    # Supabase 서버와 직접 통신하여 토큰의 진위 여부를 완벽하게 확인합니다.
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+    
     try:
-        # 1. JWT 서명 및 유효성 검증 (Secret Key 사용)
-        payload = jwt.decode(token, SUPABASE_JWT_SECRET, algorithms=[ALGORITHM], audience="authenticated")
-        
-        # 2. JWT에서 사용자 식별자(UUID) 추출
-        supabase_uid = payload.get("sub")
-        if supabase_uid is None:
-            raise HTTPException(status_code=401, detail="Invalid authentication credentials (no sub in token)")
+        response = supabase.auth.get_user(token)
+        if not response or not response.user:
+            raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다.")
             
-    except JWTError as e:
-        raise HTTPException(status_code=401, detail=f"Could not validate credentials: {str(e)}")
+        supabase_uid = response.user.id
+        email = response.user.email
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"토큰 검증 실패: {str(e)}")
         
-    # 3. Render DB에서 supabase_uid 로 사용자 조회
     db: Session = SessionLocal()
     try:
         user = db.query(models.CustomUser).filter(models.CustomUser.supabase_uid == supabase_uid).first()
+        
+        # [자동 연동] uid로 못 찾았다면, 이메일로 기존 ERP 사용자를 찾아서 uid를 덮어씌움
+        if user is None and email:
+            user = db.query(models.CustomUser).filter(models.CustomUser.email == email).first()
+            if user:
+                user.supabase_uid = supabase_uid
+                db.commit()
+                db.refresh(user)
+
         if user is None:
-            # Phase 2 (마이그레이션) 중이거나, 연동이 안 된 계정인 경우
-            raise HTTPException(status_code=401, detail="User not found in Render Database (Not linked)")
+            raise HTTPException(status_code=401, detail="ERP 시스템에 등록되지 않은 이메일(계정)입니다.")
+            
         return user
     finally:
         db.close()

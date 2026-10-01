@@ -16,20 +16,37 @@ export default function Login({ onLogin }) {
     setLoading(true);
     setError('');
     try {
-      // 함수 이름이 signInWithPasskey 로 변경됨!
+      // 1. Supabase 패스키 팝업 호출 및 로그인 성공
       const { data, error } = await supabase.auth.signInWithPasskey();
       if (error) throw error;
       
       if (data?.session) {
-        alert("패스키 인증 성공! 백엔드 연동을 진행해 주세요.");
+        // 2. 얻어낸 인증서(access_token)를 백엔드로 전송해서 ERP 권한 요청
+        const res = await fetch('/api/v1/auth/supabase-login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${data.session.access_token}`
+          }
+        });
+        
+        const backendData = await res.json();
+        if (!res.ok) {
+          throw new Error(backendData.detail || "백엔드 연동 실패");
+        }
+        
+        // 3. 백엔드에서 내려준 권한(Role)으로 ERP 화면 진입!
+        addAuditLog('Passkey Login', backendData.username, 'Success');
+        onLogin(backendData.role, backendData.username);
       }
     } catch (error) {
       console.error("패스키 로그인 실패:", error.message);
-      setError("패스키 로그인을 실패했거나 취소했습니다.");
+      setError(`패스키 로그인 실패: ${error.message}`);
     } finally {
       setLoading(false);
     }
   };
+
 
   // 👇 기기 등록용 함수 교체 👇
   const handleRegisterPasskey = async () => {
