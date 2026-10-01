@@ -58,6 +58,12 @@ def on_startup():
             db.rollback()
             
         try:
+            db.execute(text("ALTER TABLE custom_users ADD COLUMN supabase_uid VARCHAR UNIQUE"))
+            db.commit()
+        except Exception:
+            db.rollback()
+            
+        try:
             db.execute(text("UPDATE custom_users SET password_hash = '1234' WHERE password_hash IS NULL"))
             db.commit()
         except Exception:

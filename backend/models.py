@@ -53,6 +53,7 @@ class CustomUser(Base):
     region = Column(String, nullable=True) # assigned region for RSM
     department = Column(String, nullable=True)
     password_hash = Column(String, nullable=True)
+    supabase_uid = Column(String, unique=True, index=True, nullable=True) # 매핑을 위한 컬럼 추가
     created_at = Column(DateTime, default=datetime.utcnow)
 
     dealer_company = relationship("DealerCompany", back_populates="users")

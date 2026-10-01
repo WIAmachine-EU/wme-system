@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, User, ArrowRight } from 'lucide-react';
 import WiaLogo from '../components/WiaLogo';
+import { supabase } from '../utils/supabaseClient';
 
 import { addAuditLog } from '../utils/auditLogger';
 
@@ -8,6 +9,28 @@ export default function Login({ onLogin }) {
   const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handlePasskeyLogin = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const { data, error } = await supabase.auth.signInWithWebAuthn();
+      if (error) throw error;
+      
+      if (data?.session) {
+        // TODO: Passkey verification with backend to fetch role and user details
+        // For now, we simulate a login or alert
+        alert("패스키 인증 성공! 백엔드 연동을 진행해 주세요.");
+        // const jwtToken = data.session.access_token;
+      }
+    } catch (error) {
+      console.error("패스키 로그인 실패:", error.message);
+      setError("패스키 로그인을 실패했거나 취소했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -111,6 +134,21 @@ export default function Login({ onLogin }) {
               margin: '16px auto 0', transition: 'background-color 0.2s'
             }}>
               Sign In <ArrowRight size={20} />
+            </button>
+
+            {/* 패스키 로그인 버튼 */}
+            <button 
+              type="button"
+              onClick={handlePasskeyLogin} 
+              disabled={loading}
+              style={{
+                width: '60%', padding: '12px 16px', borderRadius: '12px', border: '1px solid var(--border-color)',
+                backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '1.05rem',
+                fontWeight: '600', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
+                margin: '8px auto 0', transition: 'background-color 0.2s'
+              }}
+            >
+              {loading ? "인증 중..." : "🚀 패스키로 1초 만에 로그인"}
             </button>
           </form>
 

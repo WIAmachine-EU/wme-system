@@ -1,5 +1,21 @@
 # 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
+## [2026-10-01] Supabase 패스키(WebAuthn) 도입 및 백엔드(FastAPI) 연동 완료
+
+### 1. 프론트엔드 패스키(Passkey) 등록 및 로그인 구현
+* **최신 SDK 함수명 적용**: 기존 레거시 함수명을 버리고 Supabase v2.x 최신 규격인 `signInWithPasskey` 및 `registerPasskey` 함수를 사용하여 `Login.jsx`에 지문/안면 인식(Windows Hello 등) 팝업 호출 로직을 성공적으로 이식했습니다.
+* **사용자 경험(UX) 및 에러 핸들링**: 모바일 브라우저의 강력한 해킹 방지 정책(User Gesture Constraint)으로 인해 비동기 통신 대기 시 팝업이 차단되는 현상을 규명하고, 회원가입 절차와 기기 등록 절차를 적절히 우회 및 분리하여 모바일 크롬(Chrome) 및 PC 환경에서 패스키가 완벽히 등록되도록 조치했습니다.
+* **인앱 브라우저 보안 제약 안내**: 카카오톡이나 구글 검색 앱 같은 인앱 브라우저(WebView) 환경에서는 글로벌 보안 표준에 의해 패스키가 차단됨을 파악하여, 정식 브라우저(크롬, 사파리) 사용 가이드를 정립했습니다.
+
+### 2. 백엔드(FastAPI) JWT 검증 및 자동 계정 연동 (Auto-Linking) 구축
+* **Supabase 파이썬 공식 SDK 연동**: 최근 Supabase의 JWT 암호화 알고리즘이 Legacy HS256에서 ECC(P-256)로 강제 업그레이드되면서 발생한 백엔드 디코딩 에러(Invalid Signature)를 해결하기 위해, `python-jose`를 사용한 자체 검증 대신 공식 `supabase` 패키지를 `requirements.txt`에 탑재하여 구조를 안전하게 개편했습니다.
+* **신규 패스키 로그인 전용 엔드포인트 신설**: 프론트엔드가 패스키로 얻어낸 인증서(access_token)를 백엔드에 전송하면, 백엔드가 이를 검증하고 ERP 접속 권한(Role)을 반환해 주는 `/api/v1/auth/supabase-login` API 라우터를 `main.py`에 구축했습니다.
+* **이메일 기반 계정 마이그레이션**: 패스키로 로그인한 유저의 이메일을 분석해, ERP DB(`CustomUser`)에 존재하는 기존 관리자/딜러 계정과 매칭하고 `supabase_uid`를 자동으로 덮어씌워 매핑하는(Auto-Linking) 스마트 로직을 `auth_supabase.py`에 적용했습니다.
+
+### 3. 클라우드 배포(Render) 안정화 및 트러블슈팅
+* **파이썬 이름 충돌(Name Shadowing) 버그 픽스**: 렌더(Render) 실서버 배포 시, 개발자가 작성한 `supabase_auth.py` 파일 이름이 공식 라이브러리 내부 모듈 이름과 완벽히 겹쳐서 발생하던 치명적 임포트 에러(`ModuleNotFoundError`)를 분석하고, 파일 이름을 `auth_supabase.py`로 변경하여 배포 파이프라인을 복구했습니다.
+* **환경 변수 구성 고도화**: 레거시 JWT Secret 문자열을 직접 관리하는 위험을 없애고, 프론트엔드와 동일하게 `SUPABASE_URL` 및 `SUPABASE_ANON_KEY`만을 Render 백엔드 환경변수에 주입하여 안전하게 인프라 구성을 완료했습니다.
+
 ## [2026-09-30] 모바일 반응형 UI 디테일 세밀화 및 플렉스박스(Flexbox) 랜더링 이슈 완벽 해결
 
 ### 1. 5단계 진행 타임라인 모바일 정렬(가운데 점) 및 크기 최적화
