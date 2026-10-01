@@ -11,26 +11,67 @@ export default function Login({ onLogin }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+ // 👇 로그인용 함수 교체 👇
   const handlePasskeyLogin = async () => {
     setLoading(true);
     setError('');
     try {
-      const { data, error } = await supabase.auth.signInWithWebAuthn();
+      // 1. Supabase 패스키 팝업 호출 및 로그인 성공
+      const { data, error } = await supabase.auth.signInWithPasskey();
       if (error) throw error;
       
       if (data?.session) {
-        // TODO: Passkey verification with backend to fetch role and user details
-        // For now, we simulate a login or alert
-        alert("패스키 인증 성공! 백엔드 연동을 진행해 주세요.");
-        // const jwtToken = data.session.access_token;
+        // 2. 얻어낸 인증서(access_token)를 백엔드로 전송해서 ERP 권한 요청
+        const res = await fetch('/api/v1/auth/supabase-login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${data.session.access_token}`
+          }
+        });
+        
+        const backendData = await res.json();
+        if (!res.ok) {
+          throw new Error(backendData.detail || "백엔드 연동 실패");
+        }
+        
+        // 3. 백엔드에서 내려준 권한(Role)으로 ERP 화면 진입!
+        addAuditLog('Passkey Login', backendData.username, 'Success');
+        onLogin(backendData.role, backendData.username);
       }
     } catch (error) {
       console.error("패스키 로그인 실패:", error.message);
-      setError("패스키 로그인을 실패했거나 취소했습니다.");
+      setError(`패스키 로그인 실패: ${error.message}`);
     } finally {
       setLoading(false);
     }
   };
+
+
+  // 👇 기기 등록용 함수 교체 👇
+  const handleRegisterPasskey = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      // 1. 패스키를 등록하기 위해 임시 테스트 계정으로 먼저 Supabase에 가입(로그인)합니다.
+      // 대시보드에서 방금 만든 100% 승인된 실제 계정으로 로그인합니다.
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: 'webmaster@wmeins.eu', // 👈 방금 만드신 실제 이메일
+        password: 'Userpw1234!'                // 👈 방금 만드신 실제 비밀번호
+      });
+      // 2. 로그인된 상태에서 패스키 팝업 호출! (함수 이름이 registerPasskey 로 변경됨)
+      const { data, error } = await supabase.auth.registerPasskey();
+      if (error) throw error;
+      
+      alert("🎉 기기에 패스키가 성공적으로 등록되었습니다! 이제 로그인 버튼을 눌러보세요.");
+    } catch (error) {
+      console.error("패스키 등록 실패:", error.message);
+      setError("패스키 등록에 실패했습니다. (지원하지 않거나 취소됨)");
+    } finally {
+      setLoading(false);
+    }
+  };
+  // 👆 여기까지 👆
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -155,6 +196,19 @@ export default function Login({ onLogin }) {
           <div style={{ marginTop: '12px', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
             Forgot your password?
           </div>
+
+          {/* 👇 패스키 등록용 테스트 링크 추가 👇 */}
+          <div style={{ marginTop: '20px', textAlign: 'center', fontSize: '0.85rem' }}>
+            <span style={{ color: 'var(--text-muted)' }}>아직 패스키를 설정하지 않으셨나요? </span>
+            <span 
+              onClick={handleRegisterPasskey}
+              style={{ color: 'var(--wia-blue)', fontWeight: 'bold', cursor: 'pointer', textDecoration: 'underline' }}
+            >
+              내 기기(패스키) 등록하기
+            </span>
+          </div>
+          {/* 👆 여기까지 👆 */}
+
         </div>
       </div>
 

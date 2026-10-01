@@ -11,6 +11,7 @@ import pandas as pd
 from database import get_db, engine, Base, SessionLocal
 import models
 import schemas
+from auth_supabase import get_current_user_from_supabase # 👈 이 줄 추가
 from seed import init_seed
 from scheduler import start_scheduler, stop_scheduler
 from email_service import send_etd_notification, send_warehouse_arrival_notification, send_port_arrival_notification
@@ -58,7 +59,7 @@ def on_startup():
             db.rollback()
             
         try:
-            db.execute(text("ALTER TABLE custom_users ADD COLUMN supabase_uid VARCHAR UNIQUE"))
+            db.execute(text("ALTER TABLE custom_users ADD COLUMN supabase_uid VARCHAR"))
             db.commit()
         except Exception:
             db.rollback()
@@ -1042,6 +1043,15 @@ def change_password(payload: schemas.PasswordChange, username: str = Query(..., 
 # ==========================================
 # 9. 로그인 인증 (Auth) API
 # ==========================================
+@app.post("/api/v1/auth/supabase-login")
+def supabase_login(user: models.CustomUser = Depends(get_current_user_from_supabase)):
+    # JWT가 검증되고 사용자 매핑이 완료되면 ERP 접속 권한을 내려줍니다.
+    return {
+        "status": "success",
+        "username": user.username,
+        "role": user.role.value
+    }
+
 @app.post("/api/v1/auth/login")
 def login(payload: schemas.UserLogin, db: Session = Depends(get_db)):
     user = db.query(models.CustomUser).filter(models.CustomUser.username == payload.username).first()

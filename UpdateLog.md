@@ -16,6 +16,19 @@
 * **파이썬 이름 충돌(Name Shadowing) 버그 픽스**: 렌더(Render) 실서버 배포 시, 개발자가 작성한 `supabase_auth.py` 파일 이름이 공식 라이브러리 내부 모듈 이름과 완벽히 겹쳐서 발생하던 치명적 임포트 에러(`ModuleNotFoundError`)를 분석하고, 파일 이름을 `auth_supabase.py`로 변경하여 배포 파이프라인을 복구했습니다.
 * **환경 변수 구성 고도화**: 레거시 JWT Secret 문자열을 직접 관리하는 위험을 없애고, 프론트엔드와 동일하게 `SUPABASE_URL` 및 `SUPABASE_ANON_KEY`만을 Render 백엔드 환경변수에 주입하여 안전하게 인프라 구성을 완료했습니다.
 
+## [2026-09-30] Supabase 하이브리드 아키텍처 기반 패스키(WebAuthn) 2차 인증 인프라 구축
+### 1. 백엔드(FastAPI) JWT 검증 및 DB 스키마 연동 (Phase 1)
+* **Supabase UID 매핑 컬럼 추가**: `models.CustomUser` 테이블에 Supabase가 발급하는 고유 식별자와 기존 회원을 논리적으로 연결할 수 있는 `supabase_uid` 컬럼을 신규 추가했습니다.
+* **DB 스키마 마이그레이션**: 서버 시작(`on_startup`) 스크립트(`main.py`) 내에 `supabase_uid` 컬럼을 자동으로 생성하는 마이그레이션 로직을 추가하여 실서버 운영 중 발생할 수 있는 데이터베이스 충돌을 원천 차단했습니다.
+* **JWT 검증 미들웨어 구축**: `python-jose[cryptography]` 라이브러리를 추가하고, 클라이언트가 보내는 Supabase JWT 토큰의 유효성을 검사하는 전용 의존성 모듈(`supabase_auth.py`)을 설계했습니다.
+### 2. 프론트엔드(React) 환경 구축 및 로그인 UI 통합
+* **Supabase Client 및 패키지 도입**: `@supabase/supabase-js` 라이브러리를 프로젝트에 성공적으로 연동하고, 전역에서 호출 가능한 `supabaseClient.js` 유틸리티 스크립트를 작성했습니다. (구글 드라이브 파일 락(Lock) 이슈를 해결하기 위해 로컬 드라이브 분리 적용)
+* **환경 변수(Env) 런타임 바인딩 해결**: Render 빌드 서버의 캐시(Cache)로 인해 발생한 렌더링 충돌(빈 화면) 오류를 분석하고, 실서버 환경 변수에 `VITE_SUPABASE_URL` 및 `VITE_SUPABASE_ANON_KEY`를 주입한 뒤 캐시를 초기화(`Clear build cache`)하여 해결했습니다.
+* **생체 인증 버튼/로직 이식**: 기존 `Login.jsx` 화면에 `signInWithWebAuthn` API를 호출하는 "패스키로 1초 만에 로그인" 버튼과, 기기 등록용 `signUpWithWebAuthn` 텍스트 링크 및 관련 State 비동기 처리 함수들을 추가했습니다.
+### 3. Supabase Auth 보안 정책 및 인프라 최적화
+* **WebAuthn 활성화 및 RP ID 바인딩**: Supabase Authentication 대시보드 내에서 Email Provider와 Passkeys(WebAuthn) BETA 기능을 활성화했습니다. 
+* **운영 도메인(Origin) 보안 강화**: 패스키의 보안성을 높이기 위해 Relying Party ID를 실 운영 도메인(`www.wmeins.eu`)으로 엄격하게 고정시키고, URL Configuration에 Site URL 및 개발용 Redirect URL을 맞춤 설정했습니다.
+
 ## [2026-09-30] 모바일 반응형 UI 디테일 세밀화 및 플렉스박스(Flexbox) 랜더링 이슈 완벽 해결
 
 ### 1. 5단계 진행 타임라인 모바일 정렬(가운데 점) 및 크기 최적화
