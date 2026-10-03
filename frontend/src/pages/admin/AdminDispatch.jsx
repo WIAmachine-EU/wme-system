@@ -1,6 +1,95 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Package, CheckCircle, Clock, X } from 'lucide-react';
+import { Search, Package, CheckCircle, Clock, X, ExternalLink } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+
+function CargoDetailModal({ isOpen, onClose, serialNumber, modelName }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (isOpen && serialNumber) {
+      setLoading(true);
+      fetch(`/api/cargo-details/${encodeURIComponent(serialNumber)}`)
+        .then(res => {
+          if (!res.ok) throw new Error('Not found');
+          return res.json();
+        })
+        .then(data => {
+          setData(Array.isArray(data) ? data : [data]);
+          setLoading(false);
+        })
+        .catch(err => {
+          setData([]);
+          setLoading(false);
+        });
+    }
+  }, [isOpen, serialNumber]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
+    }}>
+      <div className="glass-card" style={{ width: '90%', maxWidth: '850px', padding: '24px', position: 'relative', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+        <button onClick={onClose} style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)' }}>
+          <X size={20} />
+        </button>
+        <h2 style={{ margin: '0 0 20px 0', fontSize: '1.2rem', color: 'var(--text-primary)' }}>
+          ◎ Machine Details
+        </h2>
+
+        {loading ? (
+          <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>데이터를 불러오는 중입니다...</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', borderBottom: '2px solid var(--border-color)', paddingBottom: '12px' }}>
+              <span style={{ marginRight: '28px' }}>• {modelName || '-'}</span>
+              <span>• S/N : <span style={{ color: 'var(--accent-cyan)' }}>{serialNumber || '-'}</span></span>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              {(data && data.length > 0 ? data : [{}]).map((item, idx) => (
+                <React.Fragment key={idx}>
+                  {idx > 0 && <hr style={{ border: 'none', borderTop: '1px dashed var(--border-color)', margin: '0' }} />}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.95rem', color: 'var(--text-secondary)' }}>
+                    <div>
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>• Item:</span> {item.item === 'CC' ? 'C/C' : (item.item || '-')}
+                    </div>
+                    
+                    <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+                      <div>
+                        <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>• Box:</span> {item.qty || '-'}
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>• Box No:</span> {item.box_no || '-'}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>• Dimension (L/W/H cm):</span> <span style={{ fontFamily: 'SUITE', fontWeight: 750, color: 'rgb(255, 87, 51)' }}>{item.dimensions || '-'}</span>
+                    </div>
+                    
+                    <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+                      <div>
+                        <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>• N.W(KG):</span> {item.net_weight || '-'}
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>• G.W(KG):</span> <span style={{ color: 'rgb(255, 87, 51)' }}>{item.gross_weight || '-'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 const getAgingStatus = (etd) => {
   if (!etd) return { status: '일반', days: 0, color: 'var(--status-stock)', bg: 'rgba(16, 185, 129, 0.1)' };
@@ -46,6 +135,17 @@ export default function AdminDispatch({ isMobileView }) {
   const [orderHistory, setOrderHistory] = useState([]);
 
   const [expandedRows, setExpandedRows] = useState(new Set());
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedSN, setSelectedSN] = useState(null);
+  const [selectedModel, setSelectedModel] = useState(null);
+
+  const openCargoModal = (sn, model) => {
+    if (!sn) return;
+    setSelectedSN(sn);
+    setSelectedModel(model);
+    setModalOpen(true);
+  };
 
   const toggleRow = (orderId) => {
     setExpandedRows(prev => {
@@ -200,6 +300,12 @@ export default function AdminDispatch({ isMobileView }) {
 
   return (
     <div className="page-body">
+      <CargoDetailModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        serialNumber={selectedSN}
+        modelName={selectedModel}
+      />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', paddingTop: '4px', paddingLeft: '28px' }}>
         <div>
           <h1 style={{ fontSize: '1.8rem', marginBottom: '4px' }}>WIA 창고</h1>
@@ -331,6 +437,14 @@ export default function AdminDispatch({ isMobileView }) {
 
                     <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }} onClick={e => e.stopPropagation()}>
                       <button
+                        onClick={() => openCargoModal(order.serial_number, order.product_model ? order.product_model.model_name : '')}
+                        disabled={!order.serial_number}
+                        className="btn btn-outline"
+                        style={{ flex: 1, padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', opacity: order.serial_number ? 1 : 0.5 }}
+                      >
+                        <ExternalLink size={14} /> 화물
+                      </button>
+                      <button
                         onClick={() => handleViewHistory(order)}
                         className="btn btn-outline"
                         style={{ flex: 1, padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
@@ -373,20 +487,21 @@ export default function AdminDispatch({ isMobileView }) {
               <thead>
                 <tr>
                   <th style={{ width: '4%', textAlign: 'center', fontWeight: 'bold' }}>No.</th>
-                  <th style={{ width: '15%', textAlign: 'center', fontWeight: 'bold' }}>모델</th>
+                  <th style={{ width: '13%', textAlign: 'center', fontWeight: 'bold' }}>모델</th>
                   <th style={{ width: '10%', textAlign: 'center', fontWeight: 'bold' }}>NC</th>
-                  <th style={{ width: '12%', textAlign: 'center', fontWeight: 'bold' }}>P/O</th>
+                  <th style={{ width: '11%', textAlign: 'center', fontWeight: 'bold' }}>P/O</th>
                   <th style={{ width: '12%', textAlign: 'center', fontWeight: 'bold' }}>S/N</th>
                   <th style={{ width: '12%', textAlign: 'center', fontWeight: 'bold' }}>재고상태(에이징)</th>
                   <th style={{ width: '10%', textAlign: 'center', fontWeight: 'bold' }}>재고타입</th>
-                  <th style={{ width: '25%', textAlign: 'center', fontWeight: 'bold' }}>진행</th>
+                  <th style={{ width: '8%', textAlign: 'center', fontWeight: 'bold' }}>화물</th>
+                  <th style={{ width: '20%', textAlign: 'center', fontWeight: 'bold' }}>진행</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>데이터를 불러오는 중입니다...</td></tr>
+                  <tr><td colSpan={9} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>데이터를 불러오는 중입니다...</td></tr>
                 ) : filteredOrders.length === 0 ? (
-                  <tr><td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>조건에 맞는 입고 장비가 없습니다.</td></tr>
+                  <tr><td colSpan={9} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>조건에 맞는 입고 장비가 없습니다.</td></tr>
                 ) : (
                   filteredOrders.map((order, index) => {
                     const aging = getAgingStatus(order.etd);
@@ -427,6 +542,25 @@ export default function AdminDispatch({ isMobileView }) {
                             <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{displayType}</span>
                           </td>
                           <td onClick={e => e.stopPropagation()} style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px', textAlign: 'center' }}>
+                            <button
+                              onClick={() => openCargoModal(order.serial_number, order.product_model ? order.product_model.model_name : '')}
+                              disabled={!order.serial_number}
+                              style={{
+                                background: 'transparent', border: '1px solid var(--border-color)',
+                                color: order.serial_number ? 'var(--text-primary)' : 'var(--text-muted)',
+                                fontFamily: 'SUITE, sans-serif',
+                                fontWeight: order.serial_number ? 600 : 100,
+                                padding: '4px 8px', borderRadius: '6px', fontSize: '11px',
+                                cursor: order.serial_number ? 'pointer' : 'not-allowed',
+                                display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                transition: 'all 0.2s'
+                              }}
+                              className={order.serial_number ? "hover-bg-subtle" : ""}
+                            >
+                              <ExternalLink size={13} /> Details
+                            </button>
+                          </td>
+                          <td onClick={e => e.stopPropagation()} style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px', textAlign: 'center' }}>
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'center' }}>
                               <button
                                 onClick={() => handleViewHistory(order)}
@@ -454,7 +588,7 @@ export default function AdminDispatch({ isMobileView }) {
                         </tr>
                         {expandedRows.has(order.id) && (
                           <tr>
-                            <td colSpan={8} style={{ backgroundColor: 'var(--bg-card)', paddingTop: '12px', borderTop: '1px dashed var(--border-color)', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
+                            <td colSpan={9} style={{ backgroundColor: 'var(--bg-card)', paddingTop: '12px', borderTop: '1px dashed var(--border-color)', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', paddingLeft: '8px' }}>
                                 <div style={{
                                   fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.8', textAlign: 'left',
