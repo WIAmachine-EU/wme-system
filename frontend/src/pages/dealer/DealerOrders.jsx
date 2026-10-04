@@ -135,20 +135,21 @@ export default function DealerOrders({ isMobileView }) {
             ) : (
               filteredOrders.map(order => (
                 <div key={order.id} className="mobile-order-card" onClick={() => toggleRow(order.id)} style={{ cursor: 'pointer' }}>
-                  <div className="mobile-order-header">
-                    <div>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>REFERENCE NO.</span>
-                      <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--accent-cyan)' }}>{order.reference_no}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>S/N: {order.serial_number || 'S/N 미발급'}</div>
+                  <div className="mobile-order-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                    <div style={{ flex: 1, textAlign: 'left' }}>
+                      <div style={{ fontSize: '1.0rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {order.product_model ? order.product_model.model_name : 'Unknown Model'}
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--accent-blue)' }}>
+                        {order.product_model && order.product_model.category ? order.product_model.category.name : ''}
+                      </div>
                     </div>
-                  </div>
-
-                  <div style={{ marginBottom: '12px' }}>
-                    <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                      {order.product_model ? order.product_model.model_name : 'Unknown Model'}
+                    <div style={{ flex: 1, textAlign: 'center' }}>
+                      <div style={{ fontWeight: 700, fontSize: '1.0rem', color: 'var(--accent-cyan)' }}>{order.reference_no}</div>
+                      <div style={{ fontSize: '1.0rem', color: 'var(--text-secondary)' }}>{order.serial_number || '미발급'}</div>
                     </div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--accent-blue)' }}>
-                      {order.product_model && order.product_model.category ? order.product_model.category.name : ''}
+                    <div style={{ flex: 1, textAlign: 'right' }}>
+                      <span style={{ fontSize: '1.0rem', color: '#000000', fontWeight: 600 }}>REFERENCE NO.</span>
                     </div>
                   </div>
 

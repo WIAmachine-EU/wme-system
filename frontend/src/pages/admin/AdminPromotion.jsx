@@ -330,7 +330,7 @@ export default function AdminPromotion({ isMobileView }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                   <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>STATUS</span>
                   {promo.status === 'AVAILABLE' && <span className="status-badge" style={{ background: 'hsla(190, 95%, 49%, 0.2)', color: 'var(--accent-cyan)', width: '80px', justifyContent: 'center', fontSize: '11px' }}>{t('menu3.status_available', '판매가능')}</span>}
-                  {promo.status === 'RESERVED' && <span className="status-badge" style={{ background: 'hsla(45, 93%, 58%, 0.2)', color: 'var(--status-production)', width: '80px', justifyContent: 'center', fontSize: '11px' }}>{t('menu3.status_reserved', '예약중')}</span>}
+                  {promo.status === 'RESERVED' && <span className="status-badge" style={{ background: 'hsla(45, 93%, 58%, 0.2)', color: 'rgb(115, 60, 13)', width: '80px', justifyContent: 'center', fontSize: '11px' }}>{t('menu3.status_reserved', '예약중')}</span>}
                   {promo.status === 'SOLD' && <span className="status-badge" style={{ background: 'hsla(142, 76%, 46%, 0.2)', color: 'var(--status-stock)', width: '80px', justifyContent: 'center', fontSize: '11px' }}>{t('menu3.status_sold', '판매완료')}</span>}
                 </div>
 
@@ -519,7 +519,7 @@ export default function AdminPromotion({ isMobileView }) {
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       {promo.status === 'AVAILABLE' && <span className="status-badge" style={{ background: 'hsla(190, 95%, 49%, 0.2)', color: 'var(--accent-cyan)', width: '85px', justifyContent: 'center', fontSize: '11px' }}>{t('menu3.status_available', '판매가능')}</span>}
-                      {promo.status === 'RESERVED' && <span className="status-badge" style={{ background: 'hsla(45, 93%, 58%, 0.2)', color: 'var(--status-production)', width: '85px', justifyContent: 'center', fontSize: '11px' }}>{t('menu3.status_reserved', '예약중')}</span>}
+                      {promo.status === 'RESERVED' && <span className="status-badge" style={{ background: 'hsla(45, 93%, 58%, 0.2)', color: 'rgb(115, 60, 13)', width: '85px', justifyContent: 'center', fontSize: '11px' }}>{t('menu3.status_reserved', '예약중')}</span>}
                       {promo.status === 'SOLD' && <span className="status-badge" style={{ background: 'hsla(142, 76%, 46%, 0.2)', color: 'var(--status-stock)', width: '85px', justifyContent: 'center', fontSize: '11px' }}>{t('menu3.status_sold', '판매완료')}</span>}
                     </td>
                     <td style={{ fontSize: '11px', textAlign: 'center' }}>

@@ -330,7 +330,7 @@ export default function AdminManagement({ isMobileView, isDesktopOptimized }) {
                   </td>
                   <td>
                     {promo.status === 'AVAILABLE' && <span className="status-badge" style={{ background: 'hsla(190, 95%, 49%, 0.2)', color: 'var(--accent-cyan)' }}><CheckCircle size={14} /> 판매가능 (AVAILABLE)</span>}
-                    {promo.status === 'RESERVED' && <span className="status-badge" style={{ background: 'hsla(45, 93%, 58%, 0.2)', color: 'var(--status-production)' }}><Clock size={14} /> 예약중 (RESERVED)</span>}
+                    {promo.status === 'RESERVED' && <span className="status-badge" style={{ background: 'hsla(45, 93%, 58%, 0.2)', color: 'rgb(115, 60, 13)' }}><Clock size={14} /> 예약중 (RESERVED)</span>}
                     {promo.status === 'SOLD' && <span className="status-badge" style={{ background: 'hsla(142, 76%, 46%, 0.2)', color: 'var(--status-stock)' }}><CheckCircle2 size={14} /> 판매완료 (SOLD)</span>}
                   </td>
                   <td style={{ fontSize: '0.8rem' }}>

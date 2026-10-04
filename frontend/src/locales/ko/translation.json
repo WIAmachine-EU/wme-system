@@ -118,7 +118,7 @@
     "header_eta": "도착일정",
     "header_port": "도착지",
     "header_status_change": "상태",
-    "header_dealer_order": "딜러발주",
+    "header_dealer_order": "주문선택",
     "filter_all": "전체 상태 조회",
     "stat_all": "전체",
     "type_available": "판매가능",
@@ -126,7 +126,7 @@
     "type_rental": "임대",
     "type_showroom": "전시",
     "type_promotion": "프로모션",
-    "convert_to_order": "발주로 전환",
+    "convert_to_order": "딜러선택",
     "btn_confirm": "확정",
     "search_placeholder": "검색",
     "inventory_list_title": "WIA 가용재고 목록",
@@ -137,7 +137,8 @@
     "detail_etd_eta": "ETD / ETA",
     "detail_port": "도착지",
     "detail_incoterms": "인코텀즈",
-    "detail_vessel": "선박정보"
+    "detail_vessel": "선박정보",
+    "detail_rental_dealer": "임대 딜러"
   },
   "menu3": {
     "page_title": "WIA 프로모션",

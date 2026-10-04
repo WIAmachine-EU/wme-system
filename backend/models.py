@@ -34,6 +34,7 @@ class DealerCompany(Base):
     name = Column(String, unique=True, index=True, nullable=False)
     country = Column(String, nullable=False)
     region = Column(String, nullable=False)
+    sap_code = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     users = relationship("CustomUser", back_populates="dealer_company")

@@ -137,7 +137,8 @@
     "detail_etd_eta": "ETD / ETA",
     "detail_port": "PORT",
     "detail_incoterms": "INCOTERMS",
-    "detail_vessel": "VESSEL"
+    "detail_vessel": "VESSEL",
+    "detail_rental_dealer": "Rental to"
   },
   "menu3": {
     "page_title": "WIA Promotion",

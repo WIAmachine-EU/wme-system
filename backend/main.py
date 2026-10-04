@@ -418,6 +418,11 @@ def update_order_info(
 
     if payload.stock_type is not None:
         order.stock_type = payload.stock_type
+        if payload.stock_type in ["AVAILABLE", "RENTAL", "SHOWROOM", "PROMOTION"]:
+            order.is_corporate_stock = True
+        elif payload.stock_type == "DEALER_ORDER":
+            order.is_corporate_stock = False
+
         if payload.stock_type == "PROMOTION":
             existing_promo = db.query(models.PromotionInventory).filter(models.PromotionInventory.order_id == order.id).first()
             if not existing_promo:
@@ -555,8 +560,13 @@ def assign_order_to_dealer(
         raise HTTPException(status_code=404, detail="유효하지 않은 딜러입니다.")
 
     order.dealer_company_id = dealer.id
-    order.is_corporate_stock = False
-    order.stock_type = None
+    
+    if dealer.name.upper() == 'WME':
+        order.is_corporate_stock = True
+        order.stock_type = 'AVAILABLE'
+    else:
+        order.is_corporate_stock = False
+        order.stock_type = None
 
     db.commit()
     db.refresh(order)

@@ -8,30 +8,33 @@ from database import SessionLocal, engine, Base
 from models import DealerCompany, CustomUser, Order
 
 dealers_data = [
-    {"name": "WME", "country": "WIA"},
-    {"name": "AK MAKINA", "country": "Turkiye"},
-    {"name": "ARO-TEC", "country": "Germany"},
-    {"name": "ATON", "country": "Bulgaria"},
-    {"name": "BREMBO", "country": "Poland"},
-    {"name": "CNC MECHANICS", "country": "Unknown"},
-    {"name": "CNC RESITVE", "country": "Unknown"},
-    {"name": "DEMTEK", "country": "Serbia"},
-    {"name": "FEDAROM", "country": "Romania"},
-    {"name": "GMP", "country": "Spain"},
-    {"name": "LICHRON", "country": "Sweden"},
-    {"name": "M+E", "country": "Hungary"},
-    {"name": "MACHINEMATCH", "country": "Netherlands"},
-    {"name": "MACHINERY", "country": "Finland"},
-    {"name": "MTI", "country": "Poland"},
-    {"name": "MUGGLER", "country": "Denmark"},
-    {"name": "NAGEL", "country": "Germany"},
-    {"name": "NEWEMAG", "country": "Switzerland"},
-    {"name": "PABACHKE", "country": "Norway"},
-    {"name": "PROFIKA", "country": "Czechia"},
-    {"name": "REPMO", "country": "France"},
-    {"name": "VENTEN", "country": "Estonia"},
-    {"name": "VIMACCHINE", "country": "Italy"},
-    {"name": "WECO", "country": "Germany"}
+    {"name": "WME", "country": "WIA", "sap_code": "1111111"},
+    {"name": "AK MAKINA", "country": "Turkey", "sap_code": "6001019"},
+    {"name": "ARO-TEC", "country": "Germany", "sap_code": "6001275"},
+    {"name": "ATON", "country": "Bulgaria", "sap_code": "6001216"},
+    {"name": "BREMBO", "country": "Poland", "sap_code": None},
+    {"name": "CNC MECHANICS", "country": "Greece", "sap_code": "6001256"},
+    {"name": "CNC RESITVE", "country": "Slovenia", "sap_code": "6001027"},
+    {"name": "DEMTEK", "country": "Serbia", "sap_code": "6001382"},
+    {"name": "FEDAROM", "country": "Romania", "sap_code": "6001026"},
+    {"name": "GMP", "country": "Spain", "sap_code": "6001438"},
+    {"name": "LICHRON", "country": "Sweden", "sap_code": "6001010"},
+    {"name": "M+E", "country": "Hungary", "sap_code": "6001444"},
+    {"name": "MACHINEMATCH", "country": "Netherlands", "sap_code": "6001456"},
+    {"name": "MACHINERY", "country": "Finland", "sap_code": None},
+    {"name": "MTI", "country": "Poland", "sap_code": "6001022"},
+    {"name": "MUGGLER", "country": "Denmark", "sap_code": "6001018"},
+    {"name": "NAGEL", "country": "Germany", "sap_code": "6001002"},
+    {"name": "NEWEMAG", "country": "Switzerland", "sap_code": "6001009"},
+    {"name": "PA BACHKE", "country": "Norway", "sap_code": "6001477"},
+    {"name": "PLANCHE", "country": "Finland", "sap_code": "6001008"},
+    {"name": "PROFIKA", "country": "Czech & Slovakia", "sap_code": "6001021"},
+    {"name": "REPMO", "country": "France", "sap_code": "6001447"},
+    {"name": "TECNIMPOR", "country": "Portugal", "sap_code": "6001476"},
+    {"name": "TW WARD", "country": "United Kingdom", "sap_code": "6001012"},
+    {"name": "VENTEN", "country": "Estonia", "sap_code": "6001351"},
+    {"name": "VIMACCHINE", "country": "Italy", "sap_code": "6001006"},
+    {"name": "WECO", "country": "Germany", "sap_code": "6001437"}
 ]
 
 dealers_to_delete = [
@@ -78,12 +81,14 @@ def main():
             new_dealer = DealerCompany(
                 name=d["name"],
                 country=d["country"],
-                region="Europe" # Default region
+                region="Europe", # Default region
+                sap_code=d.get("sap_code")
             )
             db.add(new_dealer)
             added_count += 1
         else:
             existing.country = d["country"]
+            existing.sap_code = d.get("sap_code")
             updated_count += 1
             
     db.commit()

@@ -49,7 +49,7 @@ export default function AdminInventory({ isMobileView }) {
       ]);
       const data = await dealersRes.json();
       if (Array.isArray(data)) {
-        setDealers(data.filter(d => d.name !== 'WME'));
+        setDealers(data);
       }
       setPortCodes(await portsRes.json());
     } catch (err) {
@@ -308,10 +308,11 @@ export default function AdminInventory({ isMobileView }) {
                         <select
                           value={sType}
                           onChange={(e) => handlePendingChange(order.id, 'stockType', e.target.value)}
+                          disabled={order.stock_type === 'RENTAL'}
                           style={{
                             background: typeBgColor, border: `1px solid ${typeBgColor}`, color: typeColor,
-                            padding: '6px 10px', borderRadius: '8px', fontSize: '0.85rem', cursor: 'pointer', width: '130px',
-                            fontWeight: 600, textAlign: 'center'
+                            padding: '6px 10px', borderRadius: '8px', fontSize: '0.85rem', cursor: order.stock_type === 'RENTAL' ? 'not-allowed' : 'pointer', width: '130px',
+                            fontWeight: 600, textAlign: 'center', opacity: order.stock_type === 'RENTAL' ? 0.7 : 1
                           }}
                         >
                           <option value="AVAILABLE" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>{t('menu2.type_available', '판매가능')}</option>
@@ -334,9 +335,10 @@ export default function AdminInventory({ isMobileView }) {
                             }}
                           >
                             <option value="" disabled>{t('menu2.convert_to_order', '딜러사 선택')}</option>
-                            {dealers.map(d => (
-                              <option key={d.id} value={d.id}>{d.name}</option>
-                            ))}
+                            {dealers.map(d => {
+                              if (order.stock_type === 'RENTAL' && d.name !== 'WME') return null;
+                              return <option key={d.id} value={d.id}>{d.name}</option>;
+                            })}
                           </select>
                           {pendingChanges[order.id] && (Object.keys(pendingChanges[order.id]).length > 0) && (
                             <button
@@ -361,6 +363,9 @@ export default function AdminInventory({ isMobileView }) {
                         <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>{t('menu2.detail_port', 'PORT')}:</strong> <span>{getStandardPort(order.destination_port)}</span></div>
                         <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>{t('menu2.detail_incoterms', 'INCOTERMS')}:</strong> <span>{order.incoterms || '-'}</span></div>
                         <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>{t('menu2.detail_vessel', 'VESSEL')}:</strong> <span>{order.vessel || '-'}</span></div>
+                        {order.stock_type === 'RENTAL' && order.dealer_company && order.dealer_company.name !== 'WME' && (
+                          <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>{t('menu2.detail_rental_dealer', '임대 딜러')}:</strong> <span>({order.dealer_company.name})</span></div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -453,10 +458,11 @@ export default function AdminInventory({ isMobileView }) {
                             <select
                               value={sType}
                               onChange={(e) => handlePendingChange(order.id, 'stockType', e.target.value)}
+                              disabled={order.stock_type === 'RENTAL'}
                               style={{
                                 background: typeBgColor, border: `1px solid ${typeBgColor}`, color: typeColor,
-                                padding: '4px 8px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', width: '85px',
-                                fontWeight: 600, textAlign: 'center'
+                                padding: '4px 8px', borderRadius: '6px', fontSize: '11px', cursor: order.stock_type === 'RENTAL' ? 'not-allowed' : 'pointer', width: '85px',
+                                fontWeight: 600, textAlign: 'center', opacity: order.stock_type === 'RENTAL' ? 0.7 : 1
                               }}
                             >
                               <option value="AVAILABLE" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>{t('menu2.type_available', '판매가능')}</option>
@@ -476,10 +482,11 @@ export default function AdminInventory({ isMobileView }) {
                                   padding: '4px 8px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', flex: 1, textAlign: 'center'
                                 }}
                               >
-                                <option value="" disabled>{t('menu2.convert_to_order', '발주로 전환')}</option>
-                                {dealers.map(d => (
-                                  <option key={d.id} value={d.id}>{d.name}</option>
-                                ))}
+                                <option value="" disabled>{t('menu2.convert_to_order', '딜러선택')}</option>
+                                {dealers.map(d => {
+                                  if (order.stock_type === 'RENTAL' && d.name !== 'WME') return null;
+                                  return <option key={d.id} value={d.id}>{d.name}</option>;
+                                })}
                               </select>
                               {pendingChanges[order.id] && (Object.keys(pendingChanges[order.id]).length > 0) && (
                                 <button
@@ -496,7 +503,7 @@ export default function AdminInventory({ isMobileView }) {
                         {expandedRows.has(order.id) && (
                           <tr>
                             <td colSpan={10} style={{ backgroundColor: 'var(--bg-card)', paddingTop: '12px', borderTop: '1px dashed var(--border-color)', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', paddingLeft: '8px' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '24px', paddingLeft: '8px' }}>
                                 <div style={{
                                   fontSize: '12px',
                                   color: 'var(--text-secondary)',
@@ -523,6 +530,18 @@ export default function AdminInventory({ isMobileView }) {
                                   <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu2.detail_port', 'PORT')}:</span> {getStandardPort(order.destination_port)}</div>
                                   <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu2.detail_incoterms', 'INCOTERMS')}:</span> {order.incoterms || '-'}</div>
                                   <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu2.detail_vessel', 'VESSEL')}:</span> {order.vessel || '-'}</div>
+                                </div>
+                                
+                                <div style={{
+                                  fontSize: '12px',
+                                  color: 'var(--text-secondary)',
+                                  lineHeight: '1.8',
+                                  textAlign: 'left',
+                                  paddingLeft: '16px',
+                                }}>
+                                  {order.stock_type === 'RENTAL' && order.dealer_company && order.dealer_company.name !== 'WME' && (
+                                    <div><span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{t('menu2.detail_rental_dealer', '임대 딜러')}: </span> ({order.dealer_company.name})</div>
+                                  )}
                                 </div>
                               </div>
                             </td>
