@@ -134,8 +134,12 @@ scheduler = BackgroundScheduler()
 def start_scheduler():
     # 하루 3번 (06:00, 14:00, 22:00) Tracking 데이터 동기화
     scheduler.add_job(process_periodic_eta_notifications, 'cron', hour='6,14,22', minute=0, id='eta_notification_job', replace_existing=True)
+    
+    # 서버 재시작 시 즉시 1회 강제 동기화 실행 (확인용)
+    scheduler.add_job(process_periodic_eta_notifications, 'date', run_date=datetime.utcnow(), id='immediate_sync_job', replace_existing=True)
+    
     scheduler.start()
-    logger.info("Scheduler started. (Cron: 06:00, 14:00, 22:00)")
+    logger.info("Scheduler started. (Cron: 06:00, 14:00, 22:00 + Immediate Sync)")
 
 def stop_scheduler():
     scheduler.shutdown()

@@ -84,11 +84,7 @@ def on_startup():
         except Exception:
             db.rollback()
         
-        # 2. Update dealer emails to test emails
-        dealers = db.query(models.CustomUser).filter(models.CustomUser.role == models.UserRole.DEALER).all()
-        test_emails = ["jypark@hyundai-wia.de", "freelogin3975@gmail.com"]
-        for i, dealer in enumerate(dealers):
-            dealer.email = test_emails[i % len(test_emails)]
+        # 2. Update dealer emails to test emails (REMOVED due to UNIQUE constraint in production)
             
         db.commit()
     except Exception as e:
@@ -1203,6 +1199,10 @@ async def trackcargo_webhook(request: Request, db: Session = Depends(get_db)):
         shipment = shipment_query.first()
         if not shipment:
             return {"status": "error", "message": "Shipment not found in DB"}
+            
+        # 연동된 order ID 저장
+        if trackcargo_order_id and shipment.trackcargo_order_id != trackcargo_order_id:
+            shipment.trackcargo_order_id = trackcargo_order_id
             
         data_source = payload.get("data", payload)
         
