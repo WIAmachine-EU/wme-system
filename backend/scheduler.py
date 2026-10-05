@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 from database import SessionLocal
 import models
 from email_service import send_shipping_interval_notification, send_eta_update_notification
-from hhla_api import fetch_hhla_eta_sync
 
 logger = logging.getLogger(__name__)
 
@@ -76,41 +75,13 @@ def process_periodic_eta_notifications():
                 
         db.commit()
 
-        # Sync HHLA ETA for orders that are SHIPPING (Fallback/legacy for those not in TrackCargo)
         active_orders = db.query(models.Order).filter(
             models.Order.current_status == models.OrderStatus.SHIPPING
         ).all()
         
         now = datetime.utcnow()
         
-        # 1. Sync ETA from HHLA
-        for order in active_orders:
-            if order.vessel:
-                # fetch from hhla
-                hhla_data = fetch_hhla_eta_sync(order.vessel)
-                if hhla_data:
-                    new_eta = hhla_data.get("eta")
-                    new_actual = hhla_data.get("actual_date")
-                    
-                    changed = False
-                    # check if eta changed
-                    if new_eta and (not order.eta or order.eta.date() != new_eta.date() or order.eta.time() != new_eta.time()):
-                        logger.info(f"Order {order.reference_no}: ETA updated from {order.eta} to {new_eta} via HHLA API")
-                        order.eta = new_eta
-                        changed = True
-                        
-                    # check if actual_date changed
-                    if new_actual and (not order.actual_date or order.actual_date.date() != new_actual.date() or order.actual_date.time() != new_actual.time()):
-                        logger.info(f"Order {order.reference_no}: Actual Date updated from {order.actual_date} to {new_actual} via HHLA API")
-                        order.actual_date = new_actual
-                        changed = True
-                        
-                    if changed:
-                        db.commit()
-                        if new_eta:
-                            send_eta_update_notification(order.reference_no, order.vessel, new_eta.strftime('%Y-%m-%d %H:%M'))
-                    
-        # 2. Check for interval since ETD from config
+        # Check for interval since ETD from config
         config = db.query(models.EmailNotificationConfig).filter_by(stage="SHIPPING_INTERVAL").first()
         interval = config.interval_days if config and config.interval_days else 10
         
