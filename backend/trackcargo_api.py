@@ -126,3 +126,12 @@ def fetch_tracking_data_sync(order_id: str) -> Optional[Dict[str, Any]]:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
     return loop.run_until_complete(fetch_tracking_data(order_id))
+
+def create_sea_tracking_sync(mbl_no: str) -> Optional[str]:
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop.run_until_complete(create_sea_tracking(mbl_no))

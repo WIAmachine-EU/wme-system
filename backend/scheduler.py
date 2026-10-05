@@ -18,16 +18,27 @@ def process_periodic_eta_notifications():
     logger.info("Starting periodic ETA notification and API sync job...")
     db: Session = SessionLocal()
     try:
-        from trackcargo_api import fetch_tracking_data_sync
+        from trackcargo_api import fetch_tracking_data_sync, create_sea_tracking_sync
         
-        # Sync TrackCargo Shipments
+        # Sync TrackCargo Shipments: Find shipments with either trackcargo_order_id or mbl_no
         active_shipments = db.query(models.Shipment).filter(
-            models.Shipment.trackcargo_order_id.isnot(None),
+            models.Shipment.mbl_no.isnot(None),
             models.Shipment.trackcargo_status != "Completed" # Assuming Completed is a status
         ).all()
         
         for shipment in active_shipments:
             try:
+                # If it doesn't have an order_id yet, try to register it first
+                if not shipment.trackcargo_order_id:
+                    new_order_id = create_sea_tracking_sync(shipment.mbl_no)
+                    if new_order_id:
+                        shipment.trackcargo_order_id = new_order_id
+                        db.commit()
+                        logger.info(f"Registered shipment {shipment.mbl_no} to TrackCargo with ID {new_order_id}")
+                    else:
+                        logger.error(f"Failed to register shipment {shipment.mbl_no} to TrackCargo")
+                        continue
+                        
                 tracking_data = fetch_tracking_data_sync(shipment.trackcargo_order_id)
                 if tracking_data and not tracking_data.get("error"):
                     shipment.trackcargo_status = tracking_data.get("trackcargo_status")
