@@ -25,16 +25,37 @@ export default function ShipmentTracking() {
 
   const activeShipment = shipments?.find(s => s.mbl_no === selectedMbl);
 
-  // Mock Route generation for the map
+  // Common port coordinates for dynamic map rendering
+  const PORT_COORDS = {
+    'KRBUS': [129.0756, 35.1796], // Busan
+    'Busan': [129.0756, 35.1796],
+    'DEHAM': [9.9937, 53.5511],   // Hamburg
+    'Hamburg': [9.9937, 53.5511],
+    'DEBRV': [8.5724, 53.5396],   // Bremerhaven
+  };
+
+  const getCoord = (port, defaultCoord) => PORT_COORDS[port] || defaultCoord;
+
+  const polCoord = activeShipment ? getCoord(activeShipment.pol, [129.0756, 35.1796]) : [129.0756, 35.1796];
+  const podCoord = activeShipment ? getCoord(activeShipment.pod, [9.9937, 53.5511]) : [9.9937, 53.5511];
+  
+  // Calculate a simple midpoint for the vessel location (mocking current progress)
+  // In a real scenario, TrackCargo API would provide current coordinates
+  const currentCoord = [
+    (polCoord[0] + podCoord[0]) / 2 + 5, // add offset for curve
+    (polCoord[1] + podCoord[1]) / 2 - 5
+  ];
+
+  // Dynamic Route generation for the map
   const routeData = {
     type: 'Feature',
     properties: {},
     geometry: {
       type: 'LineString',
       coordinates: [
-        [129.0756, 35.1796], // Busan
-        [65, 15],            // Midpoint mock
-        [9.9937, 53.5511]   // Hamburg
+        polCoord,
+        currentCoord,
+        podCoord
       ]
     }
   };
@@ -66,22 +87,23 @@ export default function ShipmentTracking() {
                 />
               </Source>
 
-              <Marker longitude={129.0756} latitude={35.1796} anchor="center">
+              <Marker longitude={polCoord[0]} latitude={polCoord[1]} anchor="center">
                 <div style={{ width: '12px', height: '12px', backgroundColor: '#1f2937', borderRadius: '50%', border: '2px solid white', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }} />
               </Marker>
-              <Marker longitude={9.9937} latitude={53.5511} anchor="center">
+              <Marker longitude={podCoord[0]} latitude={podCoord[1]} anchor="center">
                 <div style={{ width: '12px', height: '12px', backgroundColor: '#1f2937', borderRadius: '50%', border: '2px solid white', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }} />
               </Marker>
-              <Marker longitude={65} latitude={15} anchor="center">
+              <Marker longitude={currentCoord[0]} latitude={currentCoord[1]} anchor="center">
                 <div style={{ backgroundColor: '#2563eb', color: 'white', padding: '6px', borderRadius: '50%', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', border: '2px solid white' }}>
                   <Navigation size={16} style={{ transform: 'rotate(180deg)' }} />
                 </div>
               </Marker>
               
-              <Popup longitude={65} latitude={15} anchor="top" closeButton={false} style={{ marginTop: '8px', maxWidth: '250px' }}>
+              <Popup longitude={currentCoord[0]} latitude={currentCoord[1]} anchor="top" closeButton={false} style={{ marginTop: '8px', maxWidth: '250px' }}>
                 <div style={{ fontSize: '0.875rem', padding: '2px 4px' }}>
                   <p style={{ fontWeight: 'bold', color: '#1f2937', margin: 0 }}>{activeShipment.mbl_no}</p>
                   <p style={{ color: '#6b7280', fontSize: '0.75rem', marginTop: '2px', marginBottom: 0 }}>{activeShipment.pol} &gt; {activeShipment.pod}</p>
+                  <p style={{ color: '#2563eb', fontSize: '0.75rem', marginTop: '4px', marginBottom: 0, fontWeight: 500 }}>{activeShipment.trackcargo_status || 'In transit'}</p>
                 </div>
               </Popup>
             </>
@@ -166,7 +188,7 @@ export default function ShipmentTracking() {
                   <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <Ship size={12}/> {activeShipment.orders?.length || 0}
                   </span>
-                  <span style={{ backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #dbeafe', fontSize: '0.75rem', fontWeight: 600, padding: '4px 8px', borderRadius: '4px' }}>In transit</span>
+                  <span style={{ backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #dbeafe', fontSize: '0.75rem', fontWeight: 600, padding: '4px 8px', borderRadius: '4px' }}>{activeShipment.trackcargo_status || 'In transit'}</span>
                 </div>
               </div>
 
@@ -230,25 +252,19 @@ export default function ShipmentTracking() {
                     <div style={{ position: 'absolute', top: '4px', left: '-21px', width: '12px', height: '12px', backgroundColor: 'white', border: '2px solid #1f2937', borderRadius: '50%' }}></div>
                     <h4 style={{ fontWeight: 'bold', color: '#111827', fontSize: '0.875rem', margin: '0 0 8px 0' }}>{activeShipment.pol || 'Busan, KR'}</h4>
                     <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <li style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
-                        <span style={{ color: '#4b5563' }}>Export Empty Container Released</span>
-                        <span style={{ color: '#6b7280' }}>25 Aug 2026 11:26</span>
-                      </li>
-                      <li style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
-                        <span style={{ color: '#4b5563' }}>Export Truck Gate In to Terminal</span>
-                        <span style={{ color: '#6b7280' }}>28 Aug 2026 23:37</span>
-                      </li>
-                      <li style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
-                        <span style={{ color: '#4b5563' }}>Vessel Loading at POL</span>
-                        <span style={{ color: '#6b7280' }}>30 Aug 2026 19:07</span>
-                      </li>
                       <li style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 500, color: '#111827', position: 'relative' }}>
                         <div style={{ position: 'absolute', top: '2px', left: '-22px', width: '14px', height: '14px', backgroundColor: 'white', border: '2px solid #3b82f6', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                            <div style={{ width: '6px', height: '6px', backgroundColor: '#3b82f6', borderRadius: '50%' }}></div>
                         </div>
-                        <span>Vessel Departure from POL</span>
-                        <span>1 Sep 2026 06:29</span>
+                        <span>Vessel Departure from POL (ETD)</span>
+                        <span>{activeShipment.etd ? new Date(activeShipment.etd).toLocaleString() : '-'}</span>
                       </li>
+                      {activeShipment.trackcargo_status && (
+                        <li style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+                          <span style={{ color: '#4b5563' }}>Current Status Updates</span>
+                          <span style={{ color: '#2563eb', fontWeight: 500 }}>{activeShipment.trackcargo_status}</span>
+                        </li>
+                      )}
                     </ul>
                   </div>
 
@@ -257,12 +273,8 @@ export default function ShipmentTracking() {
                     <h4 style={{ fontWeight: 'bold', color: '#111827', fontSize: '0.875rem', margin: '0 0 8px 0' }}>{activeShipment.pod || 'Hamburg, DE'}</h4>
                     <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       <li style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', opacity: 0.5 }}>
-                        <span style={{ color: '#4b5563' }}>Vessel arrival at final POD</span>
-                        <span style={{ color: '#6b7280' }}>13 Oct 2026 06:00</span>
-                      </li>
-                      <li style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', opacity: 0.5 }}>
-                        <span style={{ color: '#4b5563' }}>Arrived at delivery location</span>
-                        <span style={{ color: '#6b7280' }}>13 Oct 2026 21:55</span>
+                        <span style={{ color: '#4b5563' }}>Estimated Arrival (ETA)</span>
+                        <span style={{ color: '#6b7280' }}>{activeShipment.eta ? new Date(activeShipment.eta).toLocaleString() : '-'}</span>
                       </li>
                     </ul>
                   </div>
@@ -289,7 +301,21 @@ export default function ShipmentTracking() {
                 </div>
               )}
               
-              {(activeTab === 'Vessel' || activeTab === 'Exceptions') && (
+              {(activeTab === 'Vessel') && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '128px', color: '#9ca3af', fontSize: '0.875rem' }}>
+                  <Ship size={32} style={{ marginBottom: '12px', opacity: 0.5 }} />
+                  {activeShipment.vessel ? (
+                    <div style={{ textAlign: 'center' }}>
+                      <span style={{ display: 'block', fontWeight: 'bold', color: '#1f2937', fontSize: '1rem' }}>{activeShipment.vessel}</span>
+                      <span style={{ display: 'block', color: '#6b7280', marginTop: '4px' }}>Voyage: {activeShipment.voyage || '-'}</span>
+                    </div>
+                  ) : (
+                    <span>Vessel 정보가 없습니다.</span>
+                  )}
+                </div>
+              )}
+
+              {(activeTab === 'Exceptions') && (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '128px', color: '#9ca3af', fontSize: '0.875rem' }}>
                   {activeTab} 정보는 준비 중입니다.
                 </div>

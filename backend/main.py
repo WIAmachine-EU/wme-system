@@ -1173,3 +1173,87 @@ async def r2_upload_webhook(request: Request, background_tasks: BackgroundTasks)
     except Exception as e:
         print(f"[Webhook Error] {e}")
         return {"status": "Accepted", "message": "Webhook received with error in payload parsing"}
+
+# ==========================================
+# 13. TrackCargo Webhook 엔드포인트
+# ==========================================
+@app.post("/api/webhooks/trackcargo")
+async def trackcargo_webhook(request: Request, db: Session = Depends(get_db)):
+    try:
+        payload = await request.json()
+        print(f"[TrackCargo Webhook] Received payload: {payload}")
+        
+        mbl_no = payload.get("mbl_no") or payload.get("mblNo")
+        trackcargo_order_id = payload.get("orderId") or payload.get("trackcargo_order_id")
+        
+        # data 필드 내부에 있을 경우
+        if "data" in payload and isinstance(payload["data"], dict):
+            data = payload["data"]
+            mbl_no = mbl_no or data.get("mbl_no") or data.get("mblNo")
+            trackcargo_order_id = trackcargo_order_id or data.get("orderId")
+        
+        shipment_query = db.query(models.Shipment)
+        if trackcargo_order_id:
+            shipment_query = shipment_query.filter(models.Shipment.trackcargo_order_id == trackcargo_order_id)
+        elif mbl_no:
+            shipment_query = shipment_query.filter(models.Shipment.mbl_no == mbl_no)
+        else:
+            return {"status": "ignored", "message": "No identifiers found (mbl_no or orderId)"}
+            
+        shipment = shipment_query.first()
+        if not shipment:
+            return {"status": "error", "message": "Shipment not found in DB"}
+            
+        data_source = payload.get("data", payload)
+        
+        # 업데이트할 필드 파싱 및 할당
+        status_val = data_source.get("status")
+        if status_val:
+            shipment.trackcargo_status = status_val
+            
+        vessel = data_source.get("vessel")
+        if vessel:
+            shipment.vessel = vessel
+            
+        pol = data_source.get("pol")
+        if pol:
+            shipment.pol = pol
+            
+        pod = data_source.get("pod")
+        if pod:
+            shipment.pod = pod
+            
+        etd_str = data_source.get("estimatedDeparture") or data_source.get("etd")
+        if etd_str:
+            try:
+                # 'Z' 처리 등 ISO 포맷 파싱
+                dt = datetime.fromisoformat(etd_str.replace('Z', '+00:00'))
+                shipment.etd = dt.replace(tzinfo=None)
+            except Exception as e:
+                print(f"[TrackCargo Webhook] ETD parsing error: {e}")
+                
+        eta_str = data_source.get("estimatedArrival") or data_source.get("eta")
+        if eta_str:
+            try:
+                dt = datetime.fromisoformat(eta_str.replace('Z', '+00:00'))
+                shipment.eta = dt.replace(tzinfo=None)
+            except Exception as e:
+                print(f"[TrackCargo Webhook] ETA parsing error: {e}")
+                
+        shipment.trackcargo_last_sync = datetime.utcnow()
+        
+        # 연관된 Order 들의 ETD/ETA 동기화 업데이트
+        for order in shipment.orders:
+            if shipment.etd:
+                order.etd = shipment.etd
+            if shipment.eta:
+                order.eta = shipment.eta
+                
+        db.commit()
+        return {"status": "success", "message": f"Shipment {shipment.mbl_no} successfully updated"}
+        
+    except Exception as e:
+        print(f"[TrackCargo Webhook Error] {e}")
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
