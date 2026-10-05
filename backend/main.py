@@ -1223,7 +1223,7 @@ async def trackcargo_webhook(request: Request, db: Session = Depends(get_db)):
         if pod:
             shipment.pod = pod
             
-        etd_str = data_source.get("estimatedDeparture") or data_source.get("etd")
+        etd_str = data_source.get("estimatedDeparture") or data_source.get("etd") or data_source.get("polDeparture")
         if etd_str:
             try:
                 # 'Z' 처리 등 ISO 포맷 파싱
@@ -1232,7 +1232,7 @@ async def trackcargo_webhook(request: Request, db: Session = Depends(get_db)):
             except Exception as e:
                 print(f"[TrackCargo Webhook] ETD parsing error: {e}")
                 
-        eta_str = data_source.get("estimatedArrival") or data_source.get("eta")
+        eta_str = data_source.get("estimatedArrival") or data_source.get("eta") or data_source.get("finalPortArrival") or data_source.get("podArrival")
         if eta_str:
             try:
                 dt = datetime.fromisoformat(eta_str.replace('Z', '+00:00'))

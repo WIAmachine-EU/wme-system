@@ -86,15 +86,18 @@ async def fetch_tracking_data(order_id: str) -> Optional[Dict[str, Any]]:
                 
                 etd = None
                 eta = None
-                if data.get("estimatedDeparture"):
+                etd_raw = data.get("estimatedDeparture") or data.get("etd") or data.get("polDeparture")
+                eta_raw = data.get("estimatedArrival") or data.get("eta") or data.get("finalPortArrival") or data.get("podArrival")
+                
+                if etd_raw:
                     try:
-                        etd = datetime.fromisoformat(data.get("estimatedDeparture").replace('Z', '+00:00'))
+                        etd = datetime.fromisoformat(etd_raw.replace('Z', '+00:00'))
                     except ValueError:
                         pass
                         
-                if data.get("estimatedArrival"):
+                if eta_raw:
                     try:
-                        eta = datetime.fromisoformat(data.get("estimatedArrival").replace('Z', '+00:00'))
+                        eta = datetime.fromisoformat(eta_raw.replace('Z', '+00:00'))
                     except ValueError:
                         pass
                 

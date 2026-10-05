@@ -132,11 +132,10 @@ def process_periodic_eta_notifications():
 scheduler = BackgroundScheduler()
 
 def start_scheduler():
-    # For demonstration/testing, we'll run it every 5 minutes instead of daily
-    # In production: scheduler.add_job(process_periodic_eta_notifications, 'cron', hour=0, minute=0)
-    scheduler.add_job(process_periodic_eta_notifications, 'interval', minutes=5, id='eta_notification_job', replace_existing=True)
+    # 하루 3번 (06:00, 14:00, 22:00) Tracking 데이터 동기화
+    scheduler.add_job(process_periodic_eta_notifications, 'cron', hour='6,14,22', minute=0, id='eta_notification_job', replace_existing=True)
     scheduler.start()
-    logger.info("Scheduler started.")
+    logger.info("Scheduler started. (Cron: 06:00, 14:00, 22:00)")
 
 def stop_scheduler():
     scheduler.shutdown()
