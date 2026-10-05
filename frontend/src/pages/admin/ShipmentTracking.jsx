@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 const MAPBOX_TOKEN = 'pk.eyJ1IjoiZHVtbXkiLCJhIjoiY2x6ZHNhZHNhZHNhZHNhZHNhZHNhZHNhIn0.DummyTokenForMapboxGLJS123';
 
 const fetchShipments = async () => {
-  const response = await fetch('http://localhost:8000/api/shipments');
+  const response = await fetch('/api/shipments');
   if (!response.ok) throw new Error('Network error');
   return response.json();
 };
