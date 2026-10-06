@@ -285,6 +285,21 @@ async def upload_shipments(rows: List[schemas.ShipmentUploadRow], db: Session = 
                 trackcargo_order_id = await create_sea_tracking(mbl)
                 if trackcargo_order_id:
                     shipment.trackcargo_order_id = trackcargo_order_id
+                    
+                    # Fetch initial tracking data immediately
+                    from trackcargo_api import fetch_tracking_data
+                    tracking_data = await fetch_tracking_data(trackcargo_order_id)
+                    if tracking_data and not tracking_data.get("error"):
+                        shipment.trackcargo_status = tracking_data.get("trackcargo_status")
+                        shipment.trackcargo_last_sync = datetime.utcnow()
+                        if tracking_data.get("vessel"):
+                            shipment.vessel = tracking_data.get("vessel")
+                        if tracking_data.get("voyage"):
+                            shipment.voyage = tracking_data.get("voyage")
+                        if tracking_data.get("etd"):
+                            shipment.etd = tracking_data.get("etd")
+                        if tracking_data.get("eta"):
+                            shipment.eta = tracking_data.get("eta")
             
             # Update orders
             for order_row in data["orders"]:
@@ -300,6 +315,8 @@ async def upload_shipments(rows: List[schemas.ShipmentUploadRow], db: Session = 
                 matched_order = order_query.first()
                 if matched_order:
                     matched_order.shipment_id = shipment.id
+                    if shipment.eta:
+                        matched_order.actual_date = shipment.eta
                     
         db.commit()
         return {"status": "success", "message": f"{len(rows)}건의 선적 정보가 성공적으로 업로드되었습니다."}
