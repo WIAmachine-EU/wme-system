@@ -304,15 +304,13 @@ async def upload_shipments(rows: List[schemas.ShipmentUploadRow], db: Session = 
             # Update orders
             for order_row in data["orders"]:
                 # Match by reference_no (P/O) or serial_number (S/N)
-                order_query = db.query(models.Order)
+                matched_order = None
                 if order_row.serial_number:
-                    order_query = order_query.filter(models.Order.serial_number == order_row.serial_number)
-                elif order_row.reference_no:
-                    order_query = order_query.filter(models.Order.reference_no == order_row.reference_no)
-                else:
-                    continue
+                    matched_order = db.query(models.Order).filter(models.Order.serial_number == order_row.serial_number).first()
+                
+                if not matched_order and order_row.reference_no:
+                    matched_order = db.query(models.Order).filter(models.Order.reference_no == order_row.reference_no).first()
                     
-                matched_order = order_query.first()
                 if matched_order:
                     matched_order.shipment_id = shipment.id
                     if shipment.eta:

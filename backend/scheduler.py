@@ -20,9 +20,10 @@ def process_periodic_eta_notifications():
         from trackcargo_api import fetch_tracking_data_sync, create_sea_tracking_sync
         
         # Sync TrackCargo Shipments: Find shipments with either trackcargo_order_id or mbl_no
+        from sqlalchemy import or_
         active_shipments = db.query(models.Shipment).filter(
             models.Shipment.mbl_no.isnot(None),
-            models.Shipment.trackcargo_status != "Completed" # Assuming Completed is a status
+            or_(models.Shipment.trackcargo_status == None, models.Shipment.trackcargo_status != "Completed")
         ).all()
         
         for shipment in active_shipments:
