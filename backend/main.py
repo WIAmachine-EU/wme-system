@@ -1242,12 +1242,10 @@ async def trackcargo_webhook(request: Request, db: Session = Depends(get_db)):
                 
         shipment.trackcargo_last_sync = datetime.utcnow()
         
-        # 연관된 Order 들의 ETD/ETA 동기화 업데이트
+        # 연관된 Order 들의 ETD/ETA 동기화 업데이트 (실제 도착일로 매핑)
         for order in shipment.orders:
-            if shipment.etd:
-                order.etd = shipment.etd
             if shipment.eta:
-                order.eta = shipment.eta
+                order.actual_date = shipment.eta
                 
         db.commit()
         return {"status": "success", "message": f"Shipment {shipment.mbl_no} successfully updated"}

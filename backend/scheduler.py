@@ -50,15 +50,13 @@ def process_periodic_eta_notifications():
                         
                     # Sync to orders
                     new_eta = tracking_data.get("eta")
-                    new_etd = tracking_data.get("etd")
                     
                     for order in shipment.orders:
                         changed = False
-                        if new_eta and order.eta != new_eta:
-                            order.eta = new_eta
-                            changed = True
-                        if new_etd and order.etd != new_etd:
-                            order.etd = new_etd
+                        # ETA and ETD are now managed manually by users. 
+                        # TrackCargo API data goes to actual_date.
+                        if new_eta and order.actual_date != new_eta:
+                            order.actual_date = new_eta
                             changed = True
                         if tracking_data.get("vessel") and order.vessel != tracking_data.get("vessel"):
                             order.vessel = tracking_data.get("vessel")
