@@ -152,7 +152,8 @@ def create_user(payload: schemas.CustomUserCreate, db: Session = Depends(get_db)
         email=payload.email,
         role=payload.role,
         dealer_company_id=payload.dealer_company_id,
-        department=payload.department
+        department=payload.department,
+        password_hash="1234"  # 신규 계정 생성 시 기본 비밀번호 1234 할당
     )
     db.add(new_user)
     db.commit()

@@ -135,18 +135,19 @@ export default function ProductLibrary({ currentRole, isMobileView }) {
             onClick={() => setSelectedModel(model)}
           >
             <div style={{ height: '190px', background: 'transparent', position: 'relative' }}>
-              {model.image ? (
-                <img 
-                  src={import.meta.env.VITE_R2_CUSTOM_DOMAIN ? `${import.meta.env.VITE_R2_CUSTOM_DOMAIN}/thumbnail/${model.id}.webp` : model.image} 
-                  alt={model.name} 
-                  style={{ width: '100%', height: '100%', paddingTop: '5px', objectFit: 'contain' }}
-                  loading="lazy"
-                />
-              ) : (
-                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontWeight: 700, fontSize: '1.2rem', background: 'transparent' }}>
-                  {model.id} 썸네일
-                </div>
-              )}
+              <img 
+                src={`${import.meta.env.VITE_R2_CUSTOM_DOMAIN || ''}/thumbnail/${model.id}.webp`} 
+                alt={model.name} 
+                style={{ width: '100%', height: '100%', paddingTop: '5px', objectFit: 'contain' }}
+                loading="lazy"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  if (e.target.nextElementSibling) e.target.nextElementSibling.style.display = 'flex';
+                }}
+              />
+              <div style={{ display: 'none', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontWeight: 700, fontSize: '1.2rem', background: 'transparent' }}>
+                {model.id} 썸네일 없음
+              </div>
               <span style={{ position: 'absolute', top: '12px', right: '12px', background: 'rgba(0,0,0,0.6)', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>
                 {model.category}
               </span>
