@@ -26,7 +26,7 @@
     "data_isolation_title": "WIA Europe Data Isolation",
     "data_isolation_desc": "Data is securely isolated based on your current <1>{{role}}</1> access. (V7 Isolation Mode Active)",
     "admin_menu": {
-      "dashboard": "Order/Delivery Status",
+      "dashboard": "Order / Delivery Status",
       "inventory": "WIA Stock List",
       "promotion": "WIA Promotion",
       "management": "Upload / Setting",
@@ -38,14 +38,14 @@
       "users": "Security Mgmt"
     },
     "rsm_menu": {
-      "admin_dashboard": "Order/Delivery Status",
+      "admin_dashboard": "Order / Delivery Status",
       "inventory": "WIA Stock List",
       "promotion": "WIA Promotion",
       "library": "Product Library",
       "dashboard": "RSM Sales Stats"
     },
     "dealer_menu": {
-      "dashboard": "Order/Delivery Status",
+      "dashboard": "Order / Delivery Status",
       "orders": "Delivery Status",
       "sales_archive": "My Ordered",
       "inventory": "WIA Stock List",
@@ -54,7 +54,7 @@
     }
   },
   "dashboard": {
-    "title": "Order/Delivery Status",
+    "title": "Order / Delivery Status",
     "subtitle": "On this page, you can monitor and manage the progress and shipping status of all machine ordered",
     "timeline_title": "Order and Delivery Timeline",
     "timeline_desc": "5-Step Progress Timeline: You can advance the status to the next stage or\nroll it back to a previous stage for modifications",
