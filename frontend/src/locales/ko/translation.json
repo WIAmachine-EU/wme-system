@@ -26,7 +26,7 @@
     "data_isolation_title": "WIA 유럽 법인 데이터 분리",
     "data_isolation_desc": "현재 접속하신 <1>{{role}}</1> 권한에 맞춰 데이터가 안전하게 격리 조회됩니다. (V7 격리 모드 활성화)",
     "admin_menu": {
-      "dashboard": "포털 대시보드",
+      "dashboard": "주문 / 배송현황",
       "inventory": "WIA 재고리스트",
       "promotion": "WIA 프로모션",
       "management": "업로드 / 설정관리",
@@ -38,14 +38,14 @@
       "users": "유저 및 보안관리"
     },
     "rsm_menu": {
-      "admin_dashboard": "포털 대시보드",
+      "admin_dashboard": "주문 / 배송현황",
       "inventory": "WIA 재고리스트",
       "promotion": "WIA 프로모션",
       "library": "제품 라이브러리",
       "dashboard": "RSM 영업통계"
     },
     "dealer_menu": {
-      "dashboard": "포털 대시보드",
+      "dashboard": "주문 / 배송현황",
       "orders": "배송상태",
       "sales_archive": "내 구매 내역",
       "inventory": "WIA 재고리스트",
@@ -54,7 +54,7 @@
     }
   },
   "dashboard": {
-    "title": "WME 포털 대시보드",
+    "title": "주문 / 배송현황",
     "subtitle": "모든 주문장비의 진행 및 운송상태를 모니터링하고 관리합니다.",
     "timeline_title": "주문 배송 타임라인",
     "timeline_desc": "5단계 진행 타임라인: 진행상태를 다음 단계로 변경하거나, 수정을 위해 이전 단계로 롤백할 수 있습니다.",
