@@ -26,10 +26,7 @@ async def create_sea_tracking(mbl_no: str) -> Optional[str]:
     
     logger.info(f"[TrackCargo API] Requesting create tracking for MBL: {mbl_no}")
     
-    # Mocking the actual API call for safety and testability
-    if TRACKCARGO_API_KEY == "mock_api_key_for_testing":
-        logger.info("[TrackCargo API] Using Mock API for create_sea_tracking")
-        return f"ord_mock_{mbl_no}"
+    
         
     try:
         async with httpx.AsyncClient() as client:
@@ -56,22 +53,7 @@ async def fetch_tracking_data(order_id: str) -> Optional[Dict[str, Any]]:
     
     logger.info(f"[TrackCargo API] Requesting tracking data for Order ID: {order_id}")
     
-    # Mocking the actual API call for safety and testability
-    if TRACKCARGO_API_KEY == "mock_api_key_for_testing":
-        logger.info("[TrackCargo API] Using Mock API for fetch_tracking_data")
-        # Generate some mock dates based on current time
-        now = datetime.utcnow()
-        # Mocking an arrival in 30 days
-        return {
-            "trackcargo_status": "Active",
-            "vessel": "MOCK VESSEL",
-            "voyage": "MOCK_VOY",
-            "pol": "KRBUS",
-            "pod": "DEHAM",
-            "etd": now,
-            "eta": datetime.fromtimestamp(now.timestamp() + 30*24*3600),
-            "error": None
-        }
+    
         
     try:
         async with httpx.AsyncClient() as client:
