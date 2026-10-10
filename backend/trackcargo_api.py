@@ -115,15 +115,28 @@ async def fetch_tracking_data(order_id: str) -> Optional[Dict[str, Any]]:
                 data = response.json()
                 logger.info(f"[TrackCargo API] Fetch Tracking Response: {data}")
                 
-                # Parse the response data according to the design plan
-                # ETD = POL Estimated Departure
-                # ETA = Final POD Estimated Arrival
-                # This is a simplified extraction
+                # Parse the response data according to the actual TrackCargo response structure
+                # The data is inside data["data"]["trackingData"]
+                tracking_data = data.get("data", {}).get("trackingData") or {}
                 
                 etd = None
                 eta = None
-                etd_raw = data.get("estimatedDeparture") or data.get("etd") or data.get("polDeparture")
-                eta_raw = data.get("estimatedArrival") or data.get("eta") or data.get("finalPortArrival") or data.get("podArrival")
+                etd_raw = None
+                eta_raw = None
+
+                # Try to get ETD from pol_etd_iso
+                if "pol_etd_iso" in tracking_data and "date" in tracking_data["pol_etd_iso"]:
+                    etd_raw = tracking_data["pol_etd_iso"]["date"]
+                elif "last_pol_etd_iso" in tracking_data and "date" in tracking_data["last_pol_etd_iso"]:
+                    etd_raw = tracking_data["last_pol_etd_iso"]["date"]
+                    
+                # Try to get ETA from pod_eta_iso
+                if "pod_eta_iso" in tracking_data and "date" in tracking_data["pod_eta_iso"]:
+                    eta_raw = tracking_data["pod_eta_iso"]["date"]
+                elif "last_pod_eta_iso" in tracking_data and "date" in tracking_data["last_pod_eta_iso"]:
+                    eta_raw = tracking_data["last_pod_eta_iso"]["date"]
+                elif "fnd_eta_iso" in tracking_data and "date" in tracking_data["fnd_eta_iso"]:
+                    eta_raw = tracking_data["fnd_eta_iso"]["date"]
                 
                 if etd_raw:
                     try:
