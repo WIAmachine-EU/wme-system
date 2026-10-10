@@ -113,6 +113,7 @@ async def fetch_tracking_data(order_id: str) -> Optional[Dict[str, Any]]:
             response = await client.get(url, headers=headers, timeout=10.0)
             if response.status_code == 200:
                 data = response.json()
+                logger.info(f"[TrackCargo API] Fetch Tracking Response: {data}")
                 
                 # Parse the response data according to the design plan
                 # ETD = POL Estimated Departure
