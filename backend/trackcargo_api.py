@@ -10,8 +10,6 @@ logger = logging.getLogger(__name__)
 TRACKCARGO_API_KEY = os.environ.get("TRACKCARGO_API_KEY", "mock_api_key_for_testing")
 BASE_URL = "https://api.trackcargo.co/api/v1"
 
-logger.info(f"Loaded TrackCargo API Key starting with: {TRACKCARGO_API_KEY[:5]}*** (Length: {len(TRACKCARGO_API_KEY)})")
-
 SCAC_MAPPING = {
     "MAEU": "Maersk Line", "MSKU": "Maersk Line", "SEAU": "Maersk Line",
     "ZIMU": "ZIM",
@@ -61,6 +59,8 @@ async def create_sea_tracking(mbl_no: str) -> Optional[str]:
         "Content-Type": "application/json"
     }
     scac_code = get_scac_code(mbl_no)
+
+    logger.info(f"[TrackCargo API Key Debug] Key length: {len(TRACKCARGO_API_KEY)}, starts with: {TRACKCARGO_API_KEY[:5]}***")
 
     payload = {
         "trackingId": mbl_no,
