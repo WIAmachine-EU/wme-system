@@ -125,6 +125,8 @@ class ProductModel(Base):
     base_spec = Column(Text, nullable=True)
     safety_stock_qty = Column(Integer, default=5)
     is_active = Column(Boolean, default=True)
+    catalog_file = Column(String, nullable=True)
+    thumbnail_file = Column(String, nullable=True)
 
     category = relationship("ProductCategory", back_populates="models")
     options = relationship("ProductOption", back_populates="product_model")

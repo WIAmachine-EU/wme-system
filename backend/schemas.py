@@ -108,6 +108,8 @@ class ProductModelBase(BaseModel):
     base_spec: Optional[str] = None
     safety_stock_qty: int = 5
     is_active: bool = True
+    catalog_file: Optional[str] = None
+    thumbnail_file: Optional[str] = None
 
 class ProductModelOut(ProductModelBase):
     id: int
