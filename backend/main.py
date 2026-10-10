@@ -280,10 +280,12 @@ async def upload_shipments(rows: List[schemas.ShipmentUploadRow], db: Session = 
             
             # If shipment doesn't exist, create it and register tracking
             if not shipment:
+                from trackcargo_api import get_carrier_name
                 shipment = models.Shipment(
                     mbl_no=mbl,
                     pol=data["pol"],
-                    pod=data["pod"]
+                    pod=data["pod"],
+                    carrier=get_carrier_name(mbl)
                 )
                 db.add(shipment)
                 db.flush() # flush to get ID if needed
