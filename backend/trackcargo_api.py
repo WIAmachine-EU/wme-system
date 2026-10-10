@@ -20,8 +20,14 @@ async def create_sea_tracking(mbl_no: str) -> Optional[str]:
         "x-api-key": TRACKCARGO_API_KEY,
         "Content-Type": "application/json"
     }
+    import re
+    scac_match = re.match(r'^[A-Za-z]{4}', mbl_no)
+    scac_code = scac_match.group(0).upper() if scac_match else ""
+
     payload = {
-        "mbl_no": mbl_no
+        "trackingId": mbl_no,
+        "seaShipmentTrackingType": "bill_of_lading",
+        "scacCode": scac_code
     }
     
     logger.info(f"[TrackCargo API] Requesting create tracking for MBL: {mbl_no}")
