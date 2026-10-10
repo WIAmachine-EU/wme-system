@@ -28,6 +28,13 @@ def process_periodic_eta_notifications():
         
         for shipment in active_shipments:
             try:
+                # Auto-heal old mock tracking IDs
+                if shipment.trackcargo_order_id and shipment.trackcargo_order_id.startswith("ord_mock_"):
+                    logger.info(f"Auto-healing mock shipment {shipment.mbl_no} (was {shipment.trackcargo_order_id})")
+                    shipment.trackcargo_order_id = None
+                    shipment.eta = None
+                    shipment.etd = None
+                    
                 # If it doesn't have an order_id yet, try to register it first
                 if not shipment.trackcargo_order_id:
                     new_order_id = create_sea_tracking_sync(shipment.mbl_no)

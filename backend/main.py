@@ -272,6 +272,12 @@ async def upload_shipments(rows: List[schemas.ShipmentUploadRow], db: Session = 
         for mbl, data in mbl_groups.items():
             shipment = db.query(models.Shipment).filter(models.Shipment.mbl_no == mbl).first()
             
+            # Auto-heal mock shipments
+            if shipment and shipment.trackcargo_order_id and shipment.trackcargo_order_id.startswith("ord_mock_"):
+                shipment.trackcargo_order_id = None
+                shipment.eta = None
+                shipment.etd = None
+            
             # If shipment doesn't exist, create it and register tracking
             if not shipment:
                 shipment = models.Shipment(
@@ -282,7 +288,8 @@ async def upload_shipments(rows: List[schemas.ShipmentUploadRow], db: Session = 
                 db.add(shipment)
                 db.flush() # flush to get ID if needed
                 
-                # Register Tracking
+            # Register Tracking if not present (newly created or just healed)
+            if not shipment.trackcargo_order_id:
                 trackcargo_order_id = await create_sea_tracking(mbl)
                 if trackcargo_order_id:
                     shipment.trackcargo_order_id = trackcargo_order_id
