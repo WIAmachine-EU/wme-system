@@ -272,11 +272,16 @@ async def upload_shipments(rows: List[schemas.ShipmentUploadRow], db: Session = 
         for mbl, data in mbl_groups.items():
             shipment = db.query(models.Shipment).filter(models.Shipment.mbl_no == mbl).first()
             
-            # Auto-heal mock shipments
-            if shipment and shipment.trackcargo_order_id and shipment.trackcargo_order_id.startswith("ord_mock_"):
-                shipment.trackcargo_order_id = None
-                shipment.eta = None
-                shipment.etd = None
+            # Auto-heal mock shipments and sticky mock dates
+            if shipment:
+                if shipment.trackcargo_order_id and shipment.trackcargo_order_id.startswith("ord_mock_"):
+                    shipment.trackcargo_order_id = None
+                    shipment.eta = None
+                    shipment.etd = None
+                # Force wipe the known mock date (Nov 8, 2026) that got stuck
+                if shipment.eta and shipment.eta.year == 2026 and shipment.eta.month == 11 and shipment.eta.day == 8:
+                    shipment.eta = None
+                    shipment.etd = None
             
             # If shipment doesn't exist, create it and register tracking
             if not shipment:
@@ -306,10 +311,8 @@ async def upload_shipments(rows: List[schemas.ShipmentUploadRow], db: Session = 
                             shipment.vessel = tracking_data.get("vessel")
                         if tracking_data.get("voyage"):
                             shipment.voyage = tracking_data.get("voyage")
-                        if tracking_data.get("etd"):
-                            shipment.etd = tracking_data.get("etd")
-                        if tracking_data.get("eta"):
-                            shipment.eta = tracking_data.get("eta")
+                        shipment.etd = tracking_data.get("etd")
+                        shipment.eta = tracking_data.get("eta")
             
             # Update orders
             for order_row in data["orders"]:
@@ -323,8 +326,7 @@ async def upload_shipments(rows: List[schemas.ShipmentUploadRow], db: Session = 
                     
                 if matched_order:
                     matched_order.shipment_id = shipment.id
-                    if shipment.eta:
-                        matched_order.actual_date = shipment.eta
+                    matched_order.actual_date = shipment.eta  # Force sync, even if None
                     
         db.commit()
         return {"status": "success", "message": f"{len(rows)}건의 선적 정보가 성공적으로 업로드되었습니다."}
