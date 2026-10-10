@@ -77,7 +77,9 @@ async def create_sea_tracking(mbl_no: str) -> Optional[str]:
             response = await client.post(url, headers=headers, json=payload, timeout=10.0)
             if response.status_code == 200 or response.status_code == 201:
                 data = response.json()
-                return data.get("orderId")
+                logger.info(f"[TrackCargo API] Success Response: {data}")
+                # check various possible keys for the order ID
+                return data.get("orderId") or data.get("trackingId") or data.get("id") or (data.get("data") and data["data"].get("orderId")) or None
             else:
                 logger.error(f"[TrackCargo API] Create tracking failed: {response.status_code} - {response.text}")
                 return None
