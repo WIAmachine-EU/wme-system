@@ -78,6 +78,13 @@ async def create_sea_tracking(mbl_no: str) -> Optional[str]:
             if response.status_code == 200 or response.status_code == 201:
                 data = response.json()
                 logger.info(f"[TrackCargo API] Success Response: {data}")
+                
+                # Check for ORDER_ALREADY_EXISTS case where orderId is inside error.data
+                if not data.get("success") and data.get("error"):
+                    error_data = data["error"].get("data", {})
+                    if error_data and error_data.get("orderId"):
+                        return error_data.get("orderId")
+
                 # check various possible keys for the order ID
                 return data.get("orderId") or data.get("trackingId") or data.get("id") or (data.get("data") and data["data"].get("orderId")) or None
             else:
