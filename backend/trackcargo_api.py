@@ -10,6 +10,8 @@ logger = logging.getLogger(__name__)
 TRACKCARGO_API_KEY = os.environ.get("TRACKCARGO_API_KEY", "mock_api_key_for_testing")
 BASE_URL = "https://api.trackcargo.co/api/v1"
 
+logger.info(f"Loaded TrackCargo API Key starting with: {TRACKCARGO_API_KEY[:5]}*** (Length: {len(TRACKCARGO_API_KEY)})")
+
 SCAC_MAPPING = {
     "MAEU": "Maersk Line", "MSKU": "Maersk Line", "SEAU": "Maersk Line",
     "ZIMU": "ZIM",
