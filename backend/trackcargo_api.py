@@ -94,6 +94,66 @@ async def create_sea_tracking(mbl_no: str) -> Optional[str]:
         logger.error(f"[TrackCargo API] Exception in create_sea_tracking: {str(e)}")
         return None
 
+async def create_bulk_sea_tracking(mbl_nos: list) -> dict:
+    """
+    Bulk creates tracking orders for multiple MBLs in TrackCargo.
+    Returns a dictionary mapping mbl_no to its trackcargo_order_id.
+    """
+    if not mbl_nos:
+        return {}
+        
+    # Bulk API limit is 100 per request.
+    mbl_nos = mbl_nos[:100]
+        
+    url = f"{BASE_URL}/client-orders/create/bulk/tracking/sea"
+    headers = {
+        "x-api-key": TRACKCARGO_API_KEY,
+        "Content-Type": "application/json"
+    }
+    
+    payload = []
+    for mbl in mbl_nos:
+        payload.append({
+            "trackingId": mbl,
+            "seaShipmentTrackingType": "bill_of_lading",
+            "scacCode": get_scac_code(mbl)
+        })
+        
+    logger.info(f"[TrackCargo API] Requesting bulk create tracking for {len(mbl_nos)} MBLs")
+    
+    result_map = {}
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, headers=headers, json=payload, timeout=20.0)
+            if response.status_code in [200, 201]:
+                data = response.json()
+                logger.info(f"[TrackCargo API] Bulk Success Response: {data}")
+                
+                # Assume response is a list of results or dict with results
+                # We will just parse it robustly. If it's a list:
+                results = data if isinstance(data, list) else data.get("results", data.get("data", []))
+                
+                for item in results:
+                    tracking_id = item.get("trackingId")
+                    
+                    if not item.get("success") and item.get("error"):
+                        error_data = item["error"].get("data", {})
+                        if error_data and error_data.get("orderId"):
+                            result_map[tracking_id] = error_data.get("orderId")
+                            continue
+                    
+                    order_id = item.get("orderId") or item.get("id") or (item.get("data") and item["data"].get("orderId"))
+                    if order_id and tracking_id:
+                        result_map[tracking_id] = order_id
+                        
+            else:
+                logger.error(f"[TrackCargo API] Bulk create tracking failed: {response.status_code} - {response.text}")
+                
+    except Exception as e:
+        logger.error(f"[TrackCargo API] Exception in create_bulk_sea_tracking: {str(e)}")
+        
+    return result_map
+
 async def fetch_tracking_data(order_id: str) -> Optional[Dict[str, Any]]:
     """
     Fetches the latest tracking data from TrackCargo for a given Order ID.

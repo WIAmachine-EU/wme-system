@@ -64,11 +64,17 @@ def process_periodic_eta_notifications():
                     
                     for order in shipment.orders:
                         changed = False
-                        # ETA and ETD are now managed manually by users. 
-                        # TrackCargo API data goes to actual_date.
+                        # Update actual_date, etd, and eta from CargoTrack API
                         if order.actual_date != new_eta:
                             order.actual_date = new_eta
                             changed = True
+                        if tracking_data.get("eta") and order.eta != tracking_data.get("eta"):
+                            order.eta = tracking_data.get("eta")
+                            changed = True
+                        if tracking_data.get("etd") and order.etd != tracking_data.get("etd"):
+                            order.etd = tracking_data.get("etd")
+                            changed = True
+                            
                         if tracking_data.get("vessel") and order.vessel != tracking_data.get("vessel"):
                             order.vessel = tracking_data.get("vessel")
                             changed = True

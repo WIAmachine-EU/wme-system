@@ -257,6 +257,8 @@ def get_shipments(db: Session = Depends(get_db)):
 @app.post("/api/shipments/upload")
 async def upload_shipments(rows: List[schemas.ShipmentUploadRow], db: Session = Depends(get_db)):
     try:
+        from trackcargo_api import create_bulk_sea_tracking, fetch_tracking_data, get_carrier_name
+        
         # 1. Group by MBL
         mbl_groups = {}
         for row in rows:
@@ -268,7 +270,10 @@ async def upload_shipments(rows: List[schemas.ShipmentUploadRow], db: Session = 
                 }
             mbl_groups[row.mbl_no]["orders"].append(row)
             
-        # 2. Process each MBL
+        mbls_to_register = []
+        shipments_dict = {}
+            
+        # 2. Process each MBL and find which need registration
         for mbl, data in mbl_groups.items():
             shipment = db.query(models.Shipment).filter(models.Shipment.mbl_no == mbl).first()
             
@@ -283,9 +288,8 @@ async def upload_shipments(rows: List[schemas.ShipmentUploadRow], db: Session = 
                     shipment.eta = None
                     shipment.etd = None
             
-            # If shipment doesn't exist, create it and register tracking
+            # If shipment doesn't exist, create it
             if not shipment:
-                from trackcargo_api import get_carrier_name
                 shipment = models.Shipment(
                     mbl_no=mbl,
                     pol=data["pol"],
@@ -295,26 +299,33 @@ async def upload_shipments(rows: List[schemas.ShipmentUploadRow], db: Session = 
                 db.add(shipment)
                 db.flush() # flush to get ID if needed
                 
-            # Register Tracking if not present (newly created or just healed)
+            shipments_dict[mbl] = shipment
+            
             if not shipment.trackcargo_order_id:
-                trackcargo_order_id = await create_sea_tracking(mbl)
-                if trackcargo_order_id:
-                    shipment.trackcargo_order_id = trackcargo_order_id
+                mbls_to_register.append(mbl)
+                
+        # 3. Bulk Register to CargoTrack
+        if mbls_to_register:
+            bulk_results = await create_bulk_sea_tracking(mbls_to_register)
+            for mbl in mbls_to_register:
+                if mbl in bulk_results:
+                    shipments_dict[mbl].trackcargo_order_id = bulk_results[mbl]
                     
                     # Fetch initial tracking data immediately
-                    from trackcargo_api import fetch_tracking_data
-                    tracking_data = await fetch_tracking_data(trackcargo_order_id)
+                    tracking_data = await fetch_tracking_data(bulk_results[mbl])
                     if tracking_data and not tracking_data.get("error"):
-                        shipment.trackcargo_status = tracking_data.get("trackcargo_status")
-                        shipment.trackcargo_last_sync = datetime.utcnow()
+                        shipments_dict[mbl].trackcargo_status = tracking_data.get("trackcargo_status")
+                        shipments_dict[mbl].trackcargo_last_sync = datetime.utcnow()
                         if tracking_data.get("vessel"):
-                            shipment.vessel = tracking_data.get("vessel")
+                            shipments_dict[mbl].vessel = tracking_data.get("vessel")
                         if tracking_data.get("voyage"):
-                            shipment.voyage = tracking_data.get("voyage")
-                        shipment.etd = tracking_data.get("etd")
-                        shipment.eta = tracking_data.get("eta")
+                            shipments_dict[mbl].voyage = tracking_data.get("voyage")
+                        shipments_dict[mbl].etd = tracking_data.get("etd")
+                        shipments_dict[mbl].eta = tracking_data.get("eta")
             
-            # Update orders
+        # 4. Update orders
+        for mbl, data in mbl_groups.items():
+            shipment = shipments_dict[mbl]
             for order_row in data["orders"]:
                 # Match by reference_no (P/O) or serial_number (S/N)
                 matched_order = None
@@ -326,7 +337,9 @@ async def upload_shipments(rows: List[schemas.ShipmentUploadRow], db: Session = 
                     
                 if matched_order:
                     matched_order.shipment_id = shipment.id
-                    matched_order.actual_date = shipment.eta  # Force sync, even if None
+                    matched_order.actual_date = shipment.eta
+                    matched_order.etd = shipment.etd
+                    matched_order.eta = shipment.eta
                     
         db.commit()
         return {"status": "success", "message": f"{len(rows)}건의 선적 정보가 성공적으로 업로드되었습니다."}
