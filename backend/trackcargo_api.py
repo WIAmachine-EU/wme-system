@@ -10,6 +10,44 @@ logger = logging.getLogger(__name__)
 TRACKCARGO_API_KEY = os.environ.get("TRACKCARGO_API_KEY", "mock_api_key_for_testing")
 BASE_URL = "https://api.trackcargo.co/api/v1"
 
+SCAC_MAPPING = {
+    "MAEU": "Maersk Line", "MSKU": "Maersk Line", "SEAU": "Maersk Line",
+    "ZIMU": "ZIM",
+    "CMDU": "CMA-CGM", "CMDA": "CMA-CGM", "CACM": "CMA-CGM", "CMAU": "CMA-CGM", "ANNU": "CMA-CGM",
+    "MEDU": "MSC", "MSDU": "MSC", "MSMU": "MSC", "MSCU": "MSC",
+    "YMLU": "Yang Ming", "YMPR": "Yang Ming", "YMJA": "Yang Ming",
+    "22AA": "Wan Hai", "WHLC": "Wan Hai", "WHLU": "Wan Hai",
+    "TSTU": "T. S. Lines",
+    "SMLM": "SM Line", "SMCU": "SM Line",
+    "ONEY": "ONE",
+    "12PD": "SITC",
+    "PCIU": "PIL", "MEPE": "PIL",
+    "OOCU": "OOCL", "OOLU": "OOCL",
+    "MATS": "Matson",
+    "KMTC": "KMTC", "KMTU": "KMTC",
+    "12AT": "Interasia",
+    "HDMU": "Hyundai Merchant Marine (HMM)",
+    "SUDU": "Hamburg Sud",
+    "GSLU": "Gold Star", "GOSU": "Gold Star",
+    "EGLV": "Evergreen", "EVRG": "Evergreen",
+    "ECUW": "ECU Worldwide", "ECUI": "ECU Worldwide",
+    "COSU": "COSCO", "COAU": "COSCO", "COEU": "COSCO",
+    "HLCU": "Hapag Lloyd",
+    "WWSU": "Emirates Shipping Lines",
+    "ESPU": "ESPU",
+    "SCIU": "The Shipping Corporation of India",
+    "TRKU": "Turkon Line"
+}
+
+def get_scac_code(mbl_no: str) -> str:
+    import re
+    scac_match = re.match(r'^[A-Za-z0-9]{4}', mbl_no)
+    return scac_match.group(0).upper() if scac_match else ""
+
+def get_carrier_name(mbl_no: str) -> str:
+    scac = get_scac_code(mbl_no)
+    return SCAC_MAPPING.get(scac, "")
+
 async def create_sea_tracking(mbl_no: str) -> Optional[str]:
     """
     Creates a new tracking order in TrackCargo for a given MBL.
@@ -20,9 +58,7 @@ async def create_sea_tracking(mbl_no: str) -> Optional[str]:
         "x-api-key": TRACKCARGO_API_KEY,
         "Content-Type": "application/json"
     }
-    import re
-    scac_match = re.match(r'^[A-Za-z]{4}', mbl_no)
-    scac_code = scac_match.group(0).upper() if scac_match else ""
+    scac_code = get_scac_code(mbl_no)
 
     payload = {
         "trackingId": mbl_no,
