@@ -83,6 +83,14 @@ def on_startup():
             db.commit()
         except Exception:
             db.rollback()
+            
+        # Run catalog and thumbnail migrations
+        from update_thumbnails import run_migration
+        try:
+            run_migration(db)
+        except Exception as e:
+            print("Error running thumbnail migration:", e)
+            db.rollback()
         
         # 2. Update dealer emails to test emails (REMOVED due to UNIQUE constraint in production)
             
