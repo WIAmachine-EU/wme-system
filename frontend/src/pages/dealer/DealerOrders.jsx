@@ -75,6 +75,100 @@ export default function DealerOrders({ isMobileView }) {
     return matchesQuery && matchesStatus;
   });
 
+  // 정렬 (Sorting) 상태 및 핸들러
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+
+  const handleSort = (key) => {
+    setSortConfig(prev => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, direction: 'asc' };
+    });
+  };
+
+  const sortedOrders = [...filteredOrders].sort((a, b) => {
+    if (!sortConfig.key) return 0;
+    let valA = '';
+    let valB = '';
+
+    switch (sortConfig.key) {
+      case 'model':
+        valA = a.product_model?.model_name || '';
+        valB = b.product_model?.model_name || '';
+        break;
+      case 'po':
+        valA = a.reference_no || '';
+        valB = b.reference_no || '';
+        break;
+      case 'sn':
+        valA = a.serial_number || '';
+        valB = b.serial_number || '';
+        break;
+      case 'dealer':
+        valA = a.dealer_company?.name || '';
+        valB = b.dealer_company?.name || '';
+        break;
+      case 'status': {
+        const statusMap = { 'CONFIRMED': 1, 'IN_PRODUCTION': 2, 'SHIPPING': 3, 'ARRIVED': 4, 'IN_STOCK': 5 };
+        const rankA = statusMap[a.current_status] || 0;
+        const rankB = statusMap[b.current_status] || 0;
+        return sortConfig.direction === 'asc' ? rankA - rankB : rankB - rankA;
+      }
+      case 'port':
+        valA = a.destination_port || '';
+        valB = b.destination_port || '';
+        break;
+      case 'eta': {
+        const timeA = a.eta ? new Date(a.eta).getTime() : 0;
+        const timeB = b.eta ? new Date(b.eta).getTime() : 0;
+        return sortConfig.direction === 'asc' ? timeA - timeB : timeB - timeA;
+      }
+      default:
+        return 0;
+    }
+    const cmp = String(valA).localeCompare(String(valB), undefined, { numeric: true, sensitivity: 'base' });
+    return sortConfig.direction === 'asc' ? cmp : -cmp;
+  });
+
+  const renderSortHeader = (key, label, width = '12%', align = 'left') => {
+    const isSorted = sortConfig.key === key;
+    return (
+      <th
+        style={{
+          width,
+          textAlign: align,
+          fontWeight: 'bold',
+          cursor: 'pointer',
+          userSelect: 'none',
+          transition: 'all 0.2s',
+          whiteSpace: 'nowrap'
+        }}
+        onClick={() => handleSort(key)}
+        className="sortable-th"
+        title={`${label} ${isSorted ? (sortConfig.direction === 'asc' ? '내림차순 정렬' : '오름차순 정렬') : '정렬'}`}
+      >
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: align === 'left' ? 'flex-start' : (align === 'right' ? 'flex-end' : 'center'),
+          gap: '5px'
+        }}>
+          <span>{label}</span>
+          <span style={{
+            fontSize: '11px',
+            fontWeight: isSorted ? 'bold' : 'normal',
+            color: isSorted ? 'var(--wia-blue)' : 'var(--text-muted)',
+            opacity: isSorted ? 1 : 0.35,
+            transition: 'all 0.15s ease'
+          }}>
+            {isSorted ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '⇅'}
+          </span>
+        </div>
+      </th>
+    );
+  };
+
   return (
     <div className="page-body">
 
@@ -123,6 +217,37 @@ export default function DealerOrders({ isMobileView }) {
               <option value="ARRIVED">{t('dashboard.status_arrived')}</option>
               <option value="IN_STOCK">{t('dashboard.status_in_stock')}</option>
             </select>
+            <select
+              value={sortConfig.key ? `${sortConfig.key}_${sortConfig.direction}` : ""}
+              onChange={e => {
+                if (!e.target.value) {
+                  setSortConfig({ key: null, direction: 'asc' });
+                } else {
+                  const [key, direction] = e.target.value.split('_');
+                  setSortConfig({ key, direction });
+                }
+              }}
+              style={{
+                background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)',
+                padding: '8px 14px', borderRadius: '10px', fontSize: '0.85rem', cursor: 'pointer', outline: 'none',
+                flex: isMobileView ? 1 : 'none'
+              }}
+              title="정렬 기준"
+            >
+              <option value="">기본 정렬</option>
+              <option value="model_asc">{t('dealer_orders.header_model')} ▲ (오름차순)</option>
+              <option value="model_desc">{t('dealer_orders.header_model')} ▼ (내림차순)</option>
+              <option value="po_asc">{t('dealer_orders.header_po_sn')} ▲</option>
+              <option value="po_desc">{t('dealer_orders.header_po_sn')} ▼</option>
+              <option value="dealer_asc">{t('dealer_orders.header_dealer')} ▲</option>
+              <option value="dealer_desc">{t('dealer_orders.header_dealer')} ▼</option>
+              <option value="status_asc">{t('dealer_orders.header_status')} ▲ (초기단계순)</option>
+              <option value="status_desc">{t('dealer_orders.header_status')} ▼ (완료단계순)</option>
+              <option value="port_asc">{t('dealer_orders.header_port')} ▲</option>
+              <option value="port_desc">{t('dealer_orders.header_port')} ▼</option>
+              <option value="eta_asc">ETA ▲ (빠른순)</option>
+              <option value="eta_desc">ETA ▼ (늦은순)</option>
+            </select>
           </div>
         </div>
 
@@ -130,10 +255,10 @@ export default function DealerOrders({ isMobileView }) {
           <div className="mobile-cards-grid">
             {loading ? (
               <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('navbar.init_seed_loading')}</div>
-            ) : filteredOrders.length === 0 ? (
+            ) : sortedOrders.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dealer_orders.no_orders')}</div>
             ) : (
-              filteredOrders.map(order => (
+              sortedOrders.map(order => (
                 <div key={order.id} className="mobile-order-card" onClick={() => toggleRow(order.id)} style={{ cursor: 'pointer' }}>
                   <div className="mobile-order-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                     <div style={{ flex: 1, textAlign: 'left' }}>
@@ -193,21 +318,27 @@ export default function DealerOrders({ isMobileView }) {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th style={{ width: '3%', textAlign: 'left', fontWeight: 'bold' }}>*</th>
-                  <th style={{ width: '12%', textAlign: 'left', fontWeight: 'bold' }}>{t('dealer_orders.header_model')}</th>
-                  <th style={{ width: '15%', textAlign: 'left', fontWeight: 'bold' }}>{t('dealer_orders.header_po_sn')}</th>
-                  <th style={{ width: '15%', textAlign: 'left', fontWeight: 'bold' }}>{t('dealer_orders.header_dealer')}</th>
-                  <th style={{ width: '40%', textAlign: 'center', fontWeight: 'bold' }}>{t('dealer_orders.header_status')}</th>
-                  <th style={{ width: '15%', textAlign: 'left', fontWeight: 'bold' }}>{t('dealer_orders.header_port')}</th>
+                  <th
+                    style={{ width: '3%', textAlign: 'left', fontWeight: 'bold', cursor: 'pointer', userSelect: 'none' }}
+                    onClick={() => setSortConfig({ key: null, direction: 'asc' })}
+                    title="기본 순서로 리셋"
+                  >
+                    *
+                  </th>
+                  {renderSortHeader('model', t('dealer_orders.header_model'), '12%', 'left')}
+                  {renderSortHeader('po', t('dealer_orders.header_po_sn'), '15%', 'left')}
+                  {renderSortHeader('dealer', t('dealer_orders.header_dealer'), '15%', 'left')}
+                  {renderSortHeader('status', t('dealer_orders.header_status'), '40%', 'center')}
+                  {renderSortHeader('port', t('dealer_orders.header_port'), '15%', 'left')}
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('navbar.init_seed_loading')}</td></tr>
-                ) : filteredOrders.length === 0 ? (
+                ) : sortedOrders.length === 0 ? (
                   <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dealer_orders.no_orders')}</td></tr>
                 ) : (
-                  filteredOrders.map((order, index) => {
+                  sortedOrders.map((order, index) => {
                     const showSchedule = !['CONFIRMED', 'IN_PRODUCTION'].includes(order.current_status);
                     return (
                       <React.Fragment key={order.id}>
@@ -259,7 +390,7 @@ export default function DealerOrders({ isMobileView }) {
                         </tr>
                         {expandedRows.has(order.id) && (
                           <tr>
-                            <td colSpan={5} style={{ backgroundColor: 'var(--bg-card)', paddingTop: '8px', borderTop: '1px dashed var(--border-color)', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
+                            <td colSpan={6} style={{ backgroundColor: 'var(--bg-card)', paddingTop: '8px', borderTop: '1px dashed var(--border-color)', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', paddingLeft: '8px' }}>
                                 <div style={{
                                   fontSize: '0.8rem',
