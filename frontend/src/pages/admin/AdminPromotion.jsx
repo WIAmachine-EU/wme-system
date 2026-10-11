@@ -176,6 +176,125 @@ export default function AdminPromotion({ isMobileView }) {
     }
   };
 
+  // 정렬 (Sorting) 상태 및 처리
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+
+  const handleSort = (key) => {
+    setSortConfig(prev => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, direction: 'asc' };
+    });
+  };
+
+  const filteredPromotions = promotions.filter(promo => {
+    if (statusFilter !== 'ALL' && promo.status !== statusFilter) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const o = promo.order;
+      if (
+        (o?.product_model?.model_name && o.product_model.model_name.toLowerCase().includes(q)) ||
+        (o?.reference_no && o.reference_no.toLowerCase().includes(q)) ||
+        (o?.nc && o.nc.toLowerCase().includes(q)) ||
+        (o?.serial_number && o.serial_number.toLowerCase().includes(q)) ||
+        (promo.reserved_dealer?.name && promo.reserved_dealer.name.toLowerCase().includes(q)) ||
+        (promo.final_buyer_dealer?.name && promo.final_buyer_dealer.name.toLowerCase().includes(q))
+      ) return true;
+      return false;
+    }
+    return true;
+  });
+
+  const sortedPromotions = [...filteredPromotions].sort((a, b) => {
+    if (!sortConfig.key) return 0;
+    let valA = '';
+    let valB = '';
+
+    switch (sortConfig.key) {
+      case 'model':
+        valA = a.order?.product_model?.model_name || '';
+        valB = b.order?.product_model?.model_name || '';
+        break;
+      case 'nc':
+        valA = a.order?.nc || '';
+        valB = b.order?.nc || '';
+        break;
+      case 'price': {
+        const numA = Number(a.promotion_price || a.order?.price) || 0;
+        const numB = Number(b.promotion_price || b.order?.price) || 0;
+        return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
+      }
+      case 'po':
+        valA = a.order?.reference_no || '';
+        valB = b.order?.reference_no || '';
+        break;
+      case 'detail_spec':
+        valA = a.order?.detail_spec || '';
+        valB = b.order?.detail_spec || '';
+        break;
+      case 'eta': {
+        const timeA = a.order?.eta ? new Date(a.order.eta).getTime() : 0;
+        const timeB = b.order?.eta ? new Date(b.order.eta).getTime() : 0;
+        return sortConfig.direction === 'asc' ? timeA - timeB : timeB - timeA;
+      }
+      case 'port':
+        valA = a.order?.destination_port || '';
+        valB = b.order?.destination_port || '';
+        break;
+      case 'status':
+        valA = a.status || '';
+        valB = b.status || '';
+        break;
+      case 'dealer':
+        valA = a.final_buyer_dealer?.name || a.reserved_dealer?.name || '';
+        valB = b.final_buyer_dealer?.name || b.reserved_dealer?.name || '';
+        break;
+      default:
+        return 0;
+    }
+    const cmp = String(valA).localeCompare(String(valB), undefined, { numeric: true, sensitivity: 'base' });
+    return sortConfig.direction === 'asc' ? cmp : -cmp;
+  });
+
+  const renderSortHeader = (key, label, width = '10%', align = 'center') => {
+    const isSorted = sortConfig.key === key;
+    return (
+      <th
+        style={{
+          width,
+          textAlign: align,
+          fontWeight: 'bold',
+          cursor: 'pointer',
+          userSelect: 'none',
+          transition: 'all 0.2s',
+          whiteSpace: 'nowrap'
+        }}
+        onClick={() => handleSort(key)}
+        className="sortable-th"
+        title={`${label} ${isSorted ? (sortConfig.direction === 'asc' ? '내림차순 정렬' : '오름차순 정렬') : '정렬'}`}
+      >
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: align === 'left' ? 'flex-start' : (align === 'right' ? 'flex-end' : 'center'),
+          gap: '5px'
+        }}>
+          <span>{label}</span>
+          <span style={{
+            fontSize: '11px',
+            fontWeight: isSorted ? 'bold' : 'normal',
+            color: isSorted ? 'var(--wia-blue)' : 'var(--text-muted)',
+            opacity: isSorted ? 1 : 0.35,
+            transition: 'all 0.15s ease'
+          }}>
+            {isSorted ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '⇅'}
+          </span>
+        </div>
+      </th>
+    );
+  };
+
   return (
     <div className="page-body">
       <div style={{ marginBottom: '24px', paddingTop: '4px', paddingLeft: '28px' }}>
@@ -227,6 +346,38 @@ export default function AdminPromotion({ isMobileView }) {
                 <option value="RESERVED">{t('menu3.status_reserved', '예약중')}</option>
                 <option value="SOLD">{t('menu3.status_sold', '판매완료')}</option>
               </select>
+              <select
+                value={sortConfig.key ? `${sortConfig.key}_${sortConfig.direction}` : ""}
+                onChange={e => {
+                  if (!e.target.value) {
+                    setSortConfig({ key: null, direction: 'asc' });
+                  } else {
+                    const [key, direction] = e.target.value.split('_');
+                    setSortConfig({ key, direction });
+                  }
+                }}
+                style={{
+                  background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)',
+                  padding: '8px 12px', borderRadius: '10px', fontSize: '0.85rem', cursor: 'pointer', outline: 'none'
+                }}
+                title="정렬 기준"
+              >
+                <option value="">기본 정렬</option>
+                <option value="model_asc">{t('menu3.header_model', '모델')} ▲ (오름차순)</option>
+                <option value="model_desc">{t('menu3.header_model', '모델')} ▼ (내림차순)</option>
+                <option value="price_asc">{t('menu3.header_price', 'PRICE')} ▲ (낮은순)</option>
+                <option value="price_desc">{t('menu3.header_price', 'PRICE')} ▼ (높은순)</option>
+                <option value="eta_asc">{t('menu3.header_eta', 'ETA')} ▲ (빠른순)</option>
+                <option value="eta_desc">{t('menu3.header_eta', 'ETA')} ▼ (늦은순)</option>
+                <option value="po_asc">{t('menu3.header_po', '발주번호')} ▲</option>
+                <option value="po_desc">{t('menu3.header_po', '발주번호')} ▼</option>
+                <option value="nc_asc">{t('menu3.header_nc', 'NC')} ▲</option>
+                <option value="nc_desc">{t('menu3.header_nc', 'NC')} ▼</option>
+                <option value="port_asc">{t('menu2.header_port', 'PORT')} ▲</option>
+                <option value="port_desc">{t('menu2.header_port', 'PORT')} ▼</option>
+                <option value="status_asc">{t('menu3.header_promotion_status', '상태')} ▲</option>
+                <option value="status_desc">{t('menu3.header_promotion_status', '상태')} ▼</option>
+              </select>
             </div>
           </div>
         ) : (
@@ -271,6 +422,38 @@ export default function AdminPromotion({ isMobileView }) {
                 <option value="RESERVED">{t('menu3.status_reserved', '예약중')}</option>
                 <option value="SOLD">{t('menu3.status_sold', '판매완료')}</option>
               </select>
+              <select
+                value={sortConfig.key ? `${sortConfig.key}_${sortConfig.direction}` : ""}
+                onChange={e => {
+                  if (!e.target.value) {
+                    setSortConfig({ key: null, direction: 'asc' });
+                  } else {
+                    const [key, direction] = e.target.value.split('_');
+                    setSortConfig({ key, direction });
+                  }
+                }}
+                style={{
+                  background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)',
+                  padding: '8px 14px', borderRadius: '10px', fontSize: '0.85rem', cursor: 'pointer', outline: 'none'
+                }}
+                title="정렬 기준"
+              >
+                <option value="">기본 정렬</option>
+                <option value="model_asc">{t('menu3.header_model', '모델')} ▲ (오름차순)</option>
+                <option value="model_desc">{t('menu3.header_model', '모델')} ▼ (내림차순)</option>
+                <option value="price_asc">{t('menu3.header_price', 'PRICE')} ▲ (낮은순)</option>
+                <option value="price_desc">{t('menu3.header_price', 'PRICE')} ▼ (높은순)</option>
+                <option value="eta_asc">{t('menu3.header_eta', 'ETA')} ▲ (빠른순)</option>
+                <option value="eta_desc">{t('menu3.header_eta', 'ETA')} ▼ (늦은순)</option>
+                <option value="po_asc">{t('menu3.header_po', '발주번호')} ▲</option>
+                <option value="po_desc">{t('menu3.header_po', '발주번호')} ▼</option>
+                <option value="nc_asc">{t('menu3.header_nc', 'NC')} ▲</option>
+                <option value="nc_desc">{t('menu3.header_nc', 'NC')} ▼</option>
+                <option value="port_asc">{t('menu2.header_port', 'PORT')} ▲</option>
+                <option value="port_desc">{t('menu2.header_port', 'PORT')} ▼</option>
+                <option value="status_asc">{t('menu3.header_promotion_status', '상태')} ▲</option>
+                <option value="status_desc">{t('menu3.header_promotion_status', '상태')} ▼</option>
+              </select>
             </div>
           </div>
         )}
@@ -279,30 +462,10 @@ export default function AdminPromotion({ isMobileView }) {
            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>로딩 중...</div>
         ) : isMobileView ? (
           <div className="mobile-cards-grid">
-            {(() => {
-              const filteredPromotions = promotions.filter(promo => {
-                if (statusFilter !== 'ALL' && promo.status !== statusFilter) return false;
-                if (searchQuery) {
-                  const q = searchQuery.toLowerCase();
-                  const o = promo.order;
-                  if (
-                    (o?.product_model?.model_name && o.product_model.model_name.toLowerCase().includes(q)) ||
-                    (o?.reference_no && o.reference_no.toLowerCase().includes(q)) ||
-                    (o?.nc && o.nc.toLowerCase().includes(q)) ||
-                    (o?.serial_number && o.serial_number.toLowerCase().includes(q)) ||
-                    (promo.reserved_dealer?.name && promo.reserved_dealer.name.toLowerCase().includes(q)) ||
-                    (promo.final_buyer_dealer?.name && promo.final_buyer_dealer.name.toLowerCase().includes(q))
-                  ) return true;
-                  return false;
-                }
-                return true;
-              });
-
-              if (filteredPromotions.length === 0) {
-                return <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>조건에 맞는 데이터가 없습니다.</div>;
-              }
-
-              return filteredPromotions.map((promo, index) => (
+            {sortedPromotions.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>조건에 맞는 데이터가 없습니다.</div>
+            ) : (
+              sortedPromotions.map((promo, index) => (
               <div key={promo.id} className="mobile-order-card">
                 <div className="mobile-order-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -418,51 +581,37 @@ export default function AdminPromotion({ isMobileView }) {
                 </div>
               </div>
               ))
-            })()}
+            )}
           </div>
         ) : (
           <div className="data-table-container full-bleed">
             <table className="data-table promotion-table">
               <thead>
                 <tr>
-                  <th style={{ width: '3%' }}>{t('menu3.header_no')}</th>
-                  <th style={{ width: '10%' }}>{t('menu3.header_model')}</th>
-                  <th style={{ width: '5%' }}>{t('menu3.header_nc')}</th>
-                  <th style={{ width: '7%' }}>{t('menu3.header_price', 'PRICE(€)')}</th>
-                  <th style={{ width: '10%' }}>{t('menu3.header_po')}</th>
-                  <th style={{ width: '21%' }}>{t('menu3.header_detailspec')}</th>
-                  <th style={{ width: '8%', textAlign: 'center' }}>{t('menu3.header_eta')}</th>
-                  <th style={{ width: '8%', textAlign: 'center' }}>{t('menu2.header_port', 'PORT')}</th>
-                  <th style={{ width: '10%', textAlign: 'center' }}>{t('menu3.header_promotion_status')}</th>
-                  <th style={{ width: '10%', textAlign: 'center' }}>{t('menu3.header_reservation')}</th>
+                  <th 
+                    style={{ width: '3%', textAlign: 'center', fontWeight: 'bold', cursor: 'pointer', userSelect: 'none' }}
+                    onClick={() => setSortConfig({ key: null, direction: 'asc' })}
+                    title="기본 순서로 리셋"
+                  >
+                    {t('menu3.header_no')}
+                  </th>
+                  {renderSortHeader('model', t('menu3.header_model'), '10%')}
+                  {renderSortHeader('nc', t('menu3.header_nc'), '5%')}
+                  {renderSortHeader('price', t('menu3.header_price', 'PRICE(€)'), '7%', 'right')}
+                  {renderSortHeader('po', t('menu3.header_po'), '10%')}
+                  {renderSortHeader('detail_spec', t('menu3.header_detailspec'), '21%', 'left')}
+                  {renderSortHeader('eta', t('menu3.header_eta'), '8%')}
+                  {renderSortHeader('port', t('menu2.header_port', 'PORT'), '8%')}
+                  {renderSortHeader('status', t('menu3.header_promotion_status'), '10%')}
+                  {renderSortHeader('dealer', t('menu3.header_reservation'), '10%')}
                   <th style={{ width: '8%', textAlign: 'center' }}>{t('menu3.header_settings')}</th>
                 </tr>
               </thead>
               <tbody>
-                {(() => {
-                  const filteredPromotions = promotions.filter(promo => {
-                    if (statusFilter !== 'ALL' && promo.status !== statusFilter) return false;
-                    if (searchQuery) {
-                      const q = searchQuery.toLowerCase();
-                      const o = promo.order;
-                      if (
-                        (o?.product_model?.model_name && o.product_model.model_name.toLowerCase().includes(q)) ||
-                        (o?.reference_no && o.reference_no.toLowerCase().includes(q)) ||
-                        (o?.nc && o.nc.toLowerCase().includes(q)) ||
-                        (o?.serial_number && o.serial_number.toLowerCase().includes(q)) ||
-                        (promo.reserved_dealer?.name && promo.reserved_dealer.name.toLowerCase().includes(q)) ||
-                        (promo.final_buyer_dealer?.name && promo.final_buyer_dealer.name.toLowerCase().includes(q))
-                      ) return true;
-                      return false;
-                    }
-                    return true;
-                  });
-
-                  if (filteredPromotions.length === 0) {
-                    return <tr><td colSpan={11} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>조건에 맞는 데이터가 없습니다.</td></tr>;
-                  }
-
-                  return filteredPromotions.map((promo, index) => (
+                {sortedPromotions.length === 0 ? (
+                  <tr><td colSpan={11} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>조건에 맞는 데이터가 없습니다.</td></tr>
+                ) : (
+                  sortedPromotions.map((promo, index) => (
                   <tr key={promo.id}>
                     <td style={{ textAlign: 'center' }}>
                       <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 500 }}>{index + 1}</span>
@@ -605,12 +754,18 @@ export default function AdminPromotion({ isMobileView }) {
                     </td>
                   </tr>
                   ))
-                })()}
+                )}
               </tbody>
             </table>
           </div>
         )}
       </div>
+      <style>{`
+        .sortable-th:hover {
+          background-color: var(--bg-secondary) !important;
+          color: var(--wia-blue) !important;
+        }
+      `}</style>
     </div>
   );
 }

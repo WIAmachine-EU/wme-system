@@ -193,6 +193,98 @@ export default function DealerSalesArchive({ isMobileView }) {
     return sn.includes(s) || mn.includes(s) || po.includes(s);
   });
 
+  // 정렬 (Sorting) 상태 및 핸들러
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+
+  const handleSort = (key) => {
+    setSortConfig(prev => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, direction: 'asc' };
+    });
+  };
+
+  const sortedOrders = [...filteredOrders].sort((a, b) => {
+    if (!sortConfig.key) return 0;
+    let valA = '';
+    let valB = '';
+
+    switch (sortConfig.key) {
+      case 'order_date': {
+        const timeA = new Date(a.dealer_order_date || a.created_at || 0).getTime();
+        const timeB = new Date(b.dealer_order_date || b.created_at || 0).getTime();
+        return sortConfig.direction === 'asc' ? timeA - timeB : timeB - timeA;
+      }
+      case 'model':
+        valA = a.product_model?.model_name || '';
+        valB = b.product_model?.model_name || '';
+        break;
+      case 'sn':
+        valA = a.serial_number || '';
+        valB = b.serial_number || '';
+        break;
+      case 'nc':
+        valA = a.nc || '';
+        valB = b.nc || '';
+        break;
+      case 'po':
+        valA = a.reference_no || '';
+        valB = b.reference_no || '';
+        break;
+      case 'status':
+        valA = getStatusLabel(a.current_status) || '';
+        valB = getStatusLabel(b.current_status) || '';
+        break;
+      case 'pickup':
+        valA = a.current_status === 'SOLD' ? 'Picked Up' : '';
+        valB = b.current_status === 'SOLD' ? 'Picked Up' : '';
+        break;
+      default:
+        return 0;
+    }
+    const cmp = String(valA).localeCompare(String(valB), undefined, { numeric: true, sensitivity: 'base' });
+    return sortConfig.direction === 'asc' ? cmp : -cmp;
+  });
+
+  const renderSortHeader = (key, label, width = '12%', align = 'left') => {
+    const isSorted = sortConfig.key === key;
+    return (
+      <th
+        style={{
+          width,
+          textAlign: align,
+          fontWeight: 'bold',
+          cursor: 'pointer',
+          userSelect: 'none',
+          transition: 'all 0.2s',
+          whiteSpace: 'nowrap'
+        }}
+        onClick={() => handleSort(key)}
+        className="sortable-th"
+        title={`${label} ${isSorted ? (sortConfig.direction === 'asc' ? '내림차순 정렬' : '오름차순 정렬') : '정렬'}`}
+      >
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: align === 'left' ? 'flex-start' : (align === 'right' ? 'flex-end' : 'center'),
+          gap: '5px'
+        }}>
+          <span>{label}</span>
+          <span style={{
+            fontSize: '11px',
+            fontWeight: isSorted ? 'bold' : 'normal',
+            color: isSorted ? 'var(--wia-blue)' : 'var(--text-muted)',
+            opacity: isSorted ? 1 : 0.35,
+            transition: 'all 0.15s ease'
+          }}>
+            {isSorted ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '⇅'}
+          </span>
+        </div>
+      </th>
+    );
+  };
+
   const openCargoModal = (sn, model) => {
     if (!sn) return;
     setSelectedSN(sn);
@@ -235,6 +327,36 @@ export default function DealerSalesArchive({ isMobileView }) {
                 }}
               />
             </div>
+            <select
+              value={sortConfig.key ? `${sortConfig.key}_${sortConfig.direction}` : ""}
+              onChange={e => {
+                if (!e.target.value) {
+                  setSortConfig({ key: null, direction: 'asc' });
+                } else {
+                  const [key, direction] = e.target.value.split('_');
+                  setSortConfig({ key, direction });
+                }
+              }}
+              style={{
+                background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)',
+                padding: '8px 14px', borderRadius: '10px', fontSize: '0.85rem', cursor: 'pointer', outline: 'none'
+              }}
+              title="정렬 기준"
+            >
+              <option value="">기본 정렬</option>
+              <option value="order_date_asc">Order Date ▲ (과거순)</option>
+              <option value="order_date_desc">Order Date ▼ (최신순)</option>
+              <option value="model_asc">Model ▲ (오름차순)</option>
+              <option value="model_desc">Model ▼ (내림차순)</option>
+              <option value="sn_asc">S/N ▲</option>
+              <option value="sn_desc">S/N ▼</option>
+              <option value="nc_asc">N/C ▲</option>
+              <option value="nc_desc">N/C ▼</option>
+              <option value="po_asc">P/O ▲</option>
+              <option value="po_desc">P/O ▼</option>
+              <option value="status_asc">Status ▲</option>
+              <option value="status_desc">Status ▼</option>
+            </select>
             <button onClick={handleExportCSV} className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', fontSize: '0.85rem' }}>
               <Download size={16} /> Export
             </button>
@@ -246,8 +368,8 @@ export default function DealerSalesArchive({ isMobileView }) {
             <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>{t('navbar.init_seed_loading', '데이터를 불러오는 중입니다...')}</div>
           ) : isMobileView ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {filteredOrders.length > 0 ? (
-                filteredOrders.map((order, index) => {
+              {sortedOrders.length > 0 ? (
+                sortedOrders.map((order, index) => {
                   const statusColor = getStatusColor(order.current_status);
                   const isPickedUp = order.current_status === 'SOLD';
                   return (
@@ -318,20 +440,26 @@ export default function DealerSalesArchive({ isMobileView }) {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th style={{ width: '5%', textAlign: 'center' }}>*</th>
-                  <th style={{ width: '10%' }}>Order Date</th>
-                  <th style={{ width: '15%' }}>Model</th>
-                  <th style={{ width: '12%' }}>S/N</th>
-                  <th style={{ width: '10%' }}>N/C</th>
-                  <th style={{ width: '12%' }}>P/O</th>
-                  <th style={{ width: '10%', textAlign: 'center' }}>Status</th>
+                  <th 
+                    style={{ width: '5%', textAlign: 'center', fontWeight: 'bold', cursor: 'pointer', userSelect: 'none' }}
+                    onClick={() => setSortConfig({ key: null, direction: 'asc' })}
+                    title="기본 순서로 리셋"
+                  >
+                    *
+                  </th>
+                  {renderSortHeader('order_date', 'Order Date', '10%')}
+                  {renderSortHeader('model', 'Model', '15%')}
+                  {renderSortHeader('sn', 'S/N', '12%')}
+                  {renderSortHeader('nc', 'N/C', '10%')}
+                  {renderSortHeader('po', 'P/O', '12%')}
+                  {renderSortHeader('status', 'Status', '10%', 'center')}
                   <th style={{ width: '14%', textAlign: 'center' }}>Cargo detail</th>
-                  <th style={{ width: '12%', textAlign: 'center' }}>Pickup</th>
+                  {renderSortHeader('pickup', 'Pickup', '12%', 'center')}
                 </tr>
               </thead>
               <tbody>
-                {filteredOrders.length > 0 ? (
-                  filteredOrders.map((order, index) => {
+                {sortedOrders.length > 0 ? (
+                  sortedOrders.map((order, index) => {
                     const statusColor = getStatusColor(order.current_status);
                     const isPickedUp = order.current_status === 'SOLD';
 

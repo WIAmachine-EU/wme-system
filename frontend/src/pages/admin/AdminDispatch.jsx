@@ -298,6 +298,94 @@ export default function AdminDispatch({ isMobileView }) {
     return true;
   });
 
+  // 정렬 (Sorting) 상태 및 핸들러
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+
+  const handleSort = (key) => {
+    setSortConfig(prev => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, direction: 'asc' };
+    });
+  };
+
+  const sortedOrders = [...filteredOrders].sort((a, b) => {
+    if (!sortConfig.key) return 0;
+    let valA = '';
+    let valB = '';
+
+    switch (sortConfig.key) {
+      case 'model':
+        valA = a.product_model?.model_name || '';
+        valB = b.product_model?.model_name || '';
+        break;
+      case 'nc':
+        valA = a.nc || '';
+        valB = b.nc || '';
+        break;
+      case 'po':
+        valA = a.reference_no || '';
+        valB = b.reference_no || '';
+        break;
+      case 'sn':
+        valA = a.serial_number || '';
+        valB = b.serial_number || '';
+        break;
+      case 'aging': {
+        const daysA = getAgingStatus(a.etd).days;
+        const daysB = getAgingStatus(b.etd).days;
+        return sortConfig.direction === 'asc' ? daysA - daysB : daysB - daysA;
+      }
+      case 'stock_type':
+        valA = a.stock_type || 'AVAILABLE';
+        valB = b.stock_type || 'AVAILABLE';
+        break;
+      default:
+        return 0;
+    }
+    const cmp = String(valA).localeCompare(String(valB), undefined, { numeric: true, sensitivity: 'base' });
+    return sortConfig.direction === 'asc' ? cmp : -cmp;
+  });
+
+  const renderSortHeader = (key, label, width = '10%', align = 'center') => {
+    const isSorted = sortConfig.key === key;
+    return (
+      <th
+        style={{
+          width,
+          textAlign: align,
+          fontWeight: 'bold',
+          cursor: 'pointer',
+          userSelect: 'none',
+          transition: 'all 0.2s',
+          whiteSpace: 'nowrap'
+        }}
+        onClick={() => handleSort(key)}
+        className="sortable-th"
+        title={`${label} ${isSorted ? (sortConfig.direction === 'asc' ? '내림차순 정렬' : '오름차순 정렬') : '정렬'}`}
+      >
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: align === 'left' ? 'flex-start' : (align === 'right' ? 'flex-end' : 'center'),
+          gap: '5px'
+        }}>
+          <span>{label}</span>
+          <span style={{
+            fontSize: '11px',
+            fontWeight: isSorted ? 'bold' : 'normal',
+            color: isSorted ? 'var(--wia-blue)' : 'var(--text-muted)',
+            opacity: isSorted ? 1 : 0.35,
+            transition: 'all 0.15s ease'
+          }}>
+            {isSorted ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '⇅'}
+          </span>
+        </div>
+      </th>
+    );
+  };
+
   return (
     <div className="page-body">
       <CargoDetailModal
@@ -363,6 +451,36 @@ export default function AdminDispatch({ isMobileView }) {
               <option value="SHOWROOM">전시 (SHOWROOM)</option>
               <option value="PROMOTION">프로모션 (PROMOTION)</option>
             </select>
+            <select
+              value={sortConfig.key ? `${sortConfig.key}_${sortConfig.direction}` : ""}
+              onChange={e => {
+                if (!e.target.value) {
+                  setSortConfig({ key: null, direction: 'asc' });
+                } else {
+                  const [key, direction] = e.target.value.split('_');
+                  setSortConfig({ key, direction });
+                }
+              }}
+              style={{
+                background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)',
+                padding: '8px 14px', borderRadius: '10px', fontSize: '0.85rem', cursor: 'pointer', outline: 'none'
+              }}
+              title="정렬 기준"
+            >
+              <option value="">기본 정렬</option>
+              <option value="model_asc">모델 ▲ (오름차순)</option>
+              <option value="model_desc">모델 ▼ (내림차순)</option>
+              <option value="nc_asc">NC ▲</option>
+              <option value="nc_desc">NC ▼</option>
+              <option value="po_asc">P/O ▲</option>
+              <option value="po_desc">P/O ▼</option>
+              <option value="sn_asc">S/N ▲</option>
+              <option value="sn_desc">S/N ▼</option>
+              <option value="aging_asc">재고상태(에이징) ▲ (일반순)</option>
+              <option value="aging_desc">재고상태(에이징) ▼ (장기순)</option>
+              <option value="stock_type_asc">재고타입 ▲</option>
+              <option value="stock_type_desc">재고타입 ▼</option>
+            </select>
           </div>
         </div>
 
@@ -402,10 +520,10 @@ export default function AdminDispatch({ isMobileView }) {
           <div className="mobile-cards-grid">
             {loading ? (
               <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>데이터를 불러오는 중입니다...</div>
-            ) : filteredOrders.length === 0 ? (
+            ) : sortedOrders.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>조건에 맞는 입고 장비가 없습니다.</div>
             ) : (
-              filteredOrders.map((order) => {
+              sortedOrders.map((order) => {
                 const aging = getAgingStatus(order.etd);
                 const displayType = order.stock_type || 'AVAILABLE';
 
@@ -486,13 +604,19 @@ export default function AdminDispatch({ isMobileView }) {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th style={{ width: '4%', textAlign: 'center', fontWeight: 'bold' }}>No.</th>
-                  <th style={{ width: '13%', textAlign: 'center', fontWeight: 'bold' }}>모델</th>
-                  <th style={{ width: '10%', textAlign: 'center', fontWeight: 'bold' }}>NC</th>
-                  <th style={{ width: '11%', textAlign: 'center', fontWeight: 'bold' }}>P/O</th>
-                  <th style={{ width: '12%', textAlign: 'center', fontWeight: 'bold' }}>S/N</th>
-                  <th style={{ width: '12%', textAlign: 'center', fontWeight: 'bold' }}>재고상태(에이징)</th>
-                  <th style={{ width: '10%', textAlign: 'center', fontWeight: 'bold' }}>재고타입</th>
+                  <th 
+                    style={{ width: '4%', textAlign: 'center', fontWeight: 'bold', cursor: 'pointer', userSelect: 'none' }}
+                    onClick={() => setSortConfig({ key: null, direction: 'asc' })}
+                    title="기본 순서로 리셋"
+                  >
+                    No.
+                  </th>
+                  {renderSortHeader('model', '모델', '13%')}
+                  {renderSortHeader('nc', 'NC', '10%')}
+                  {renderSortHeader('po', 'P/O', '11%')}
+                  {renderSortHeader('sn', 'S/N', '12%')}
+                  {renderSortHeader('aging', '재고상태(에이징)', '12%')}
+                  {renderSortHeader('stock_type', '재고타입', '10%')}
                   <th style={{ width: '8%', textAlign: 'center', fontWeight: 'bold' }}>화물</th>
                   <th style={{ width: '20%', textAlign: 'center', fontWeight: 'bold' }}>진행</th>
                 </tr>
@@ -500,10 +624,10 @@ export default function AdminDispatch({ isMobileView }) {
               <tbody>
                 {loading ? (
                   <tr><td colSpan={9} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>데이터를 불러오는 중입니다...</td></tr>
-                ) : filteredOrders.length === 0 ? (
+                ) : sortedOrders.length === 0 ? (
                   <tr><td colSpan={9} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>조건에 맞는 입고 장비가 없습니다.</td></tr>
                 ) : (
-                  filteredOrders.map((order, index) => {
+                  sortedOrders.map((order, index) => {
                     const aging = getAgingStatus(order.etd);
                     const displayType = order.stock_type || 'AVAILABLE';
 
