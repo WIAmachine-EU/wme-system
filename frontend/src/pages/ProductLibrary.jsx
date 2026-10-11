@@ -135,8 +135,9 @@ export default function ProductLibrary({ currentRole, isMobileView }) {
             onClick={() => setSelectedModel(model)}
           >
             <div style={{ height: '190px', background: 'transparent', position: 'relative' }}>
+              {/* Cloudflare R2 버킷 기본 도메인 폴백 지정 (Render 배포 환경변수 누락 대비) */}
               <img 
-                src={`${import.meta.env.VITE_R2_CUSTOM_DOMAIN || ''}/thumbnail/${model.id}.webp`} 
+                src={`${import.meta.env.VITE_R2_CUSTOM_DOMAIN || 'https://pub-83904521416547dabb69bfc1d46438a8.r2.dev'}/thumbnail/${model.id}.webp`} 
                 alt={model.name} 
                 style={{ width: '100%', height: '100%', paddingTop: '5px', objectFit: 'contain' }}
                 loading="lazy"
