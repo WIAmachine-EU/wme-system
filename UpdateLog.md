@@ -1,6 +1,6 @@
 # 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
-## [2026-10-11] TrackCargo 대량 화물 연동(Bulk API), ETD/ETA 주문 동기화 및 제품 라이브러리 카탈로그·썸네일 자동 마이그레이션
+## [2026-10-11] TrackCargo 대량 연동, R2 썸네일 자동화, 전 페이지 테이블 컬럼별 차순 정렬(Sorting)·토글 UI 및 이메일 자동 알림 실계정 안정화
 
 ### 1. TrackCargo 대량 화물 추적(Bulk API) 연동 및 엑셀 업로드 최적화
 * **대량 해상 트래킹 등록 API 구축 (`create_bulk_sea_tracking`)**: TrackCargo의 `/v1/tracking/sea/bulk` 엔드포인트를 연동하여, 선적 B/L(MBL)을 최대 100건까지 한 번의 요청으로 일괄 등록할 수 있는 대량 API 연동 모듈을 백엔드(`trackcargo_api.py`)에 구현했습니다.
