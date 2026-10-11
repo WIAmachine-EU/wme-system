@@ -75,6 +75,100 @@ export default function DealerInventory({ isMobileView }) {
     return matchesQuery;
   });
 
+  // 정렬 (Sorting) 상태 및 처리
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+
+  const handleSort = (key) => {
+    setSortConfig(prev => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, direction: 'asc' };
+    });
+  };
+
+  const sortedOrders = [...filteredOrders].sort((a, b) => {
+    if (!sortConfig.key) return 0;
+
+    let valA = '';
+    let valB = '';
+
+    switch (sortConfig.key) {
+      case 'model':
+        valA = a.product_model?.model_name || '';
+        valB = b.product_model?.model_name || '';
+        break;
+      case 'nc':
+        valA = a.nc || '';
+        valB = b.nc || '';
+        break;
+      case 'po':
+        valA = a.reference_no || '';
+        valB = b.reference_no || '';
+        break;
+      case 'detail_spec':
+        valA = a.detail_spec || '';
+        valB = b.detail_spec || '';
+        break;
+      case 'eta': {
+        const timeA = a.eta ? new Date(a.eta).getTime() : 0;
+        const timeB = b.eta ? new Date(b.eta).getTime() : 0;
+        return sortConfig.direction === 'asc' ? timeA - timeB : timeB - timeA;
+      }
+      case 'port':
+        valA = getStandardPort(a.destination_port) || '';
+        valB = getStandardPort(b.destination_port) || '';
+        break;
+      case 'stock_type':
+        valA = a.stock_type || 'AVAILABLE';
+        valB = b.stock_type || 'AVAILABLE';
+        break;
+      default:
+        return 0;
+    }
+
+    const cmp = String(valA).localeCompare(String(valB), undefined, { numeric: true, sensitivity: 'base' });
+    return sortConfig.direction === 'asc' ? cmp : -cmp;
+  });
+
+  const renderSortHeader = (key, label, width = '10%', align = 'center') => {
+    const isSorted = sortConfig.key === key;
+    return (
+      <th
+        style={{
+          width,
+          textAlign: align,
+          fontWeight: 'bold',
+          cursor: 'pointer',
+          userSelect: 'none',
+          transition: 'all 0.2s',
+          whiteSpace: 'nowrap'
+        }}
+        onClick={() => handleSort(key)}
+        className="sortable-th"
+        title={`${label} ${isSorted ? (sortConfig.direction === 'asc' ? '내림차순 정렬' : '오름차순 정렬') : '정렬'}`}
+      >
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: align === 'left' ? 'flex-start' : (align === 'right' ? 'flex-end' : 'center'),
+          gap: '5px'
+        }}>
+          <span>{label}</span>
+          <span style={{
+            fontSize: '11px',
+            fontWeight: isSorted ? 'bold' : 'normal',
+            color: isSorted ? 'var(--wia-blue)' : 'var(--text-muted)',
+            opacity: isSorted ? 1 : 0.35,
+            transition: 'all 0.15s ease'
+          }}>
+            {isSorted ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '⇅'}
+          </span>
+        </div>
+      </th>
+    );
+  };
+
   return (
     <div className="page-body">
       <div style={{ marginBottom: '24px', paddingTop: '4px', paddingLeft: '28px' }}>
@@ -122,6 +216,34 @@ export default function DealerInventory({ isMobileView }) {
               <option value="SHOWROOM">{t('menu2.type_showroom', '전시')}</option>
               <option value="PROMOTION">{t('menu2.type_promotion', '프로모션')}</option>
             </select>
+            <select
+              value={sortConfig.key ? `${sortConfig.key}_${sortConfig.direction}` : ""}
+              onChange={e => {
+                if (!e.target.value) {
+                  setSortConfig({ key: null, direction: 'asc' });
+                } else {
+                  const [key, direction] = e.target.value.split('_');
+                  setSortConfig({ key, direction });
+                }
+              }}
+              style={{
+                background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)',
+                padding: '8px 14px', borderRadius: '10px', fontSize: '0.85rem', cursor: 'pointer'
+              }}
+              title="정렬 기준"
+            >
+              <option value="">기본 정렬</option>
+              <option value="model_asc">{t('menu2.header_model', '모델')} ▲ (오름차순)</option>
+              <option value="model_desc">{t('menu2.header_model', '모델')} ▼ (내림차순)</option>
+              <option value="eta_asc">{t('menu2.header_eta', '도착일정')} ▲ (빠른순)</option>
+              <option value="eta_desc">{t('menu2.header_eta', '도착일정')} ▼ (늦은순)</option>
+              <option value="po_asc">{t('menu2.header_po', '발주번호')} ▲</option>
+              <option value="po_desc">{t('menu2.header_po', '발주번호')} ▼</option>
+              <option value="nc_asc">{t('menu2.header_nc', 'NC')} ▲</option>
+              <option value="nc_desc">{t('menu2.header_nc', 'NC')} ▼</option>
+              <option value="port_asc">{t('menu2.header_port', '도착지')} ▲</option>
+              <option value="port_desc">{t('menu2.header_port', '도착지')} ▼</option>
+            </select>
           </div>
         </div>
 
@@ -129,10 +251,10 @@ export default function DealerInventory({ isMobileView }) {
           <div className="mobile-cards-grid">
             {loading ? (
               <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('navbar.init_seed_loading')}</div>
-            ) : filteredOrders.length === 0 ? (
+            ) : sortedOrders.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dealer_dashboard.no_atp')}</div>
             ) : (
-              filteredOrders.map((order, index) => {
+              sortedOrders.map((order, index) => {
                 const sType = order.stock_type || 'AVAILABLE';
                 
                 return (
@@ -188,25 +310,31 @@ export default function DealerInventory({ isMobileView }) {
         ) : (
           <div className="data-table-container full-bleed">
           <table className="data-table">
-            <thead>
-              <tr>
-                <th style={{ width: '5%' }}>{t('menu2.header_no')}</th>
-                <th style={{ width: '15%' }}>{t('menu2.header_model')}</th>
-                <th style={{ width: '10%' }}>{t('menu2.header_nc')}</th>
-                <th style={{ width: '15%' }}>{t('menu2.header_po')}</th>
-                <th style={{ width: '20%' }}>{t('menu2.header_detailspec')}</th>
-                <th style={{ width: '10%' }}>{t('menu2.header_eta')}</th>
-                <th style={{ width: '10%' }}>{t('menu2.header_port')}</th>
-                <th style={{ width: '15%' }}>{t('menu2.type_available')}</th>
-              </tr>
-            </thead>
+              <thead>
+                <tr>
+                  <th 
+                    style={{ width: '5%', textAlign: 'center', fontWeight: 'bold', cursor: 'pointer', userSelect: 'none' }}
+                    onClick={() => setSortConfig({ key: null, direction: 'asc' })}
+                    title="기본 순서로 리셋"
+                  >
+                    {t('menu2.header_no')}
+                  </th>
+                  {renderSortHeader('model', t('menu2.header_model'), '15%')}
+                  {renderSortHeader('nc', t('menu2.header_nc'), '10%')}
+                  {renderSortHeader('po', t('menu2.header_po'), '15%')}
+                  {renderSortHeader('detail_spec', t('menu2.header_detailspec'), '20%', 'left')}
+                  {renderSortHeader('eta', t('menu2.header_eta'), '10%')}
+                  {renderSortHeader('port', t('menu2.header_port'), '10%')}
+                  {renderSortHeader('stock_type', t('menu2.type_available'), '15%')}
+                </tr>
+              </thead>
             <tbody>
               {loading ? (
                 <tr><td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('navbar.init_seed_loading')}</td></tr>
-              ) : filteredOrders.length === 0 ? (
+              ) : sortedOrders.length === 0 ? (
                 <tr><td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dealer_dashboard.no_atp')}</td></tr>
               ) : (
-                filteredOrders.map((order, index) => {
+                sortedOrders.map((order, index) => {
                   const sType = order.stock_type || 'AVAILABLE';
                   return (
                     <React.Fragment key={order.id}>
@@ -289,6 +417,12 @@ export default function DealerInventory({ isMobileView }) {
         </div>
         )}
       </div>
+      <style>{`
+        .sortable-th:hover {
+          background-color: var(--bg-secondary) !important;
+          color: var(--wia-blue) !important;
+        }
+      `}</style>
     </div>
   );
 }

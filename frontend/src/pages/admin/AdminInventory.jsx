@@ -168,6 +168,109 @@ export default function AdminInventory({ isMobileView }) {
     return matchesQuery && matchesType;
   });
 
+  // 정렬 (Sorting) 상태 및 처리
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+
+  const handleSort = (key) => {
+    setSortConfig(prev => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, direction: 'asc' };
+    });
+  };
+
+  const sortedOrders = [...filteredOrders].sort((a, b) => {
+    if (!sortConfig.key) return 0;
+
+    let valA = '';
+    let valB = '';
+
+    switch (sortConfig.key) {
+      case 'model':
+        valA = a.product_model?.model_name || '';
+        valB = b.product_model?.model_name || '';
+        break;
+      case 'nc':
+        valA = a.nc || '';
+        valB = b.nc || '';
+        break;
+      case 'price': {
+        const numA = Number(a.price) || 0;
+        const numB = Number(b.price) || 0;
+        return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
+      }
+      case 'po':
+        valA = a.reference_no || '';
+        valB = b.reference_no || '';
+        break;
+      case 'detail_spec':
+        valA = a.detail_spec || '';
+        valB = b.detail_spec || '';
+        break;
+      case 'eta': {
+        const timeA = a.eta ? new Date(a.eta).getTime() : 0;
+        const timeB = b.eta ? new Date(b.eta).getTime() : 0;
+        return sortConfig.direction === 'asc' ? timeA - timeB : timeB - timeA;
+      }
+      case 'port':
+        valA = getStandardPort(a.destination_port) || '';
+        valB = getStandardPort(b.destination_port) || '';
+        break;
+      case 'stock_type':
+        valA = pendingChanges[a.id]?.stockType || a.stock_type || 'AVAILABLE';
+        valB = pendingChanges[b.id]?.stockType || b.stock_type || 'AVAILABLE';
+        break;
+      case 'dealer':
+        valA = a.dealer_company?.name || '';
+        valB = b.dealer_company?.name || '';
+        break;
+      default:
+        return 0;
+    }
+
+    const cmp = String(valA).localeCompare(String(valB), undefined, { numeric: true, sensitivity: 'base' });
+    return sortConfig.direction === 'asc' ? cmp : -cmp;
+  });
+
+  const renderSortHeader = (key, label, width = '10%', align = 'center') => {
+    const isSorted = sortConfig.key === key;
+    return (
+      <th
+        style={{
+          width,
+          textAlign: align,
+          fontWeight: 'bold',
+          cursor: 'pointer',
+          userSelect: 'none',
+          transition: 'all 0.2s',
+          whiteSpace: 'nowrap'
+        }}
+        onClick={() => handleSort(key)}
+        className="sortable-th"
+        title={`${label} ${isSorted ? (sortConfig.direction === 'asc' ? '내림차순 정렬' : '오름차순 정렬') : '정렬'}`}
+      >
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: align === 'left' ? 'flex-start' : (align === 'right' ? 'flex-end' : 'center'),
+          gap: '5px'
+        }}>
+          <span>{label}</span>
+          <span style={{
+            fontSize: '11px',
+            fontWeight: isSorted ? 'bold' : 'normal',
+            color: isSorted ? 'var(--wia-blue)' : 'var(--text-muted)',
+            opacity: isSorted ? 1 : 0.35,
+            transition: 'all 0.15s ease'
+          }}>
+            {isSorted ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '⇅'}
+          </span>
+        </div>
+      </th>
+    );
+  };
+
   return (
     <div className="page-body">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', paddingTop: '4px', paddingLeft: '28px' }}>
@@ -217,6 +320,36 @@ export default function AdminInventory({ isMobileView }) {
               <option value="SHOWROOM">{t('menu2.type_showroom', '전시')}</option>
               <option value="PROMOTION">{t('menu2.type_promotion', '프로모션')}</option>
             </select>
+            <select
+              value={sortConfig.key ? `${sortConfig.key}_${sortConfig.direction}` : ""}
+              onChange={e => {
+                if (!e.target.value) {
+                  setSortConfig({ key: null, direction: 'asc' });
+                } else {
+                  const [key, direction] = e.target.value.split('_');
+                  setSortConfig({ key, direction });
+                }
+              }}
+              style={{
+                background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)',
+                padding: '8px 14px', borderRadius: '10px', fontSize: '0.85rem', cursor: 'pointer'
+              }}
+              title="정렬 기준"
+            >
+              <option value="">기본 정렬</option>
+              <option value="model_asc">{t('menu2.header_model', '모델')} ▲ (오름차순)</option>
+              <option value="model_desc">{t('menu2.header_model', '모델')} ▼ (내림차순)</option>
+              <option value="price_asc">{t('menu2.header_buying', '구매가')} ▲ (낮은순)</option>
+              <option value="price_desc">{t('menu2.header_buying', '구매가')} ▼ (높은순)</option>
+              <option value="eta_asc">{t('menu2.header_eta', '도착일정')} ▲ (빠른순)</option>
+              <option value="eta_desc">{t('menu2.header_eta', '도착일정')} ▼ (늦은순)</option>
+              <option value="po_asc">{t('menu2.header_po', '발주번호')} ▲</option>
+              <option value="po_desc">{t('menu2.header_po', '발주번호')} ▼</option>
+              <option value="nc_asc">{t('menu2.header_nc', 'NC')} ▲</option>
+              <option value="nc_desc">{t('menu2.header_nc', 'NC')} ▼</option>
+              <option value="port_asc">{t('menu2.header_port', '도착지')} ▲</option>
+              <option value="port_desc">{t('menu2.header_port', '도착지')} ▼</option>
+            </select>
           </div>
         </div>
 
@@ -262,10 +395,10 @@ export default function AdminInventory({ isMobileView }) {
           <div className="mobile-cards-grid">
             {loading ? (
               <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>데이터를 불러오는 중입니다...</div>
-            ) : filteredOrders.length === 0 ? (
+            ) : sortedOrders.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>가용 재고 내역이 없습니다.</div>
             ) : (
-              filteredOrders.map((order, index) => {
+              sortedOrders.map((order, index) => {
                 const sType = pendingChanges[order.id]?.stockType || order.stock_type || 'AVAILABLE';
                 const showSchedule = ['SHIPPING', 'ARRIVED', 'IN_STOCK'].includes(order.current_status);
 
@@ -378,25 +511,31 @@ export default function AdminInventory({ isMobileView }) {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th style={{ width: '4%', textAlign: 'center', fontWeight: 'bold' }}>{t('menu2.header_no')}</th>
-                  <th style={{ width: '11%', textAlign: 'center', fontWeight: 'bold' }}>{t('menu2.header_model')}</th>
-                  <th style={{ width: '8%', textAlign: 'center', fontWeight: 'bold' }}>{t('menu2.header_nc')}</th>
-                  <th style={{ width: '8%', textAlign: 'center', fontWeight: 'bold' }}>{t('menu2.header_buying')}</th>
-                  <th style={{ width: '10%', textAlign: 'center', fontWeight: 'bold' }}>{t('menu2.header_po')}</th>
-                  <th style={{ width: '25%', textAlign: 'center', fontWeight: 'bold' }}>{t('menu2.header_detailspec')}</th>
-                  <th style={{ width: '8%', textAlign: 'center', fontWeight: 'bold' }}>{t('menu2.header_eta')}</th>
-                  <th style={{ width: '8%', textAlign: 'center', fontWeight: 'bold' }}>{t('menu2.header_port')}</th>
-                  <th style={{ width: '8%', textAlign: 'center', fontWeight: 'bold' }}>{t('menu2.header_status_change')}</th>
-                  <th style={{ width: '10%', textAlign: 'center', fontWeight: 'bold' }}>{t('menu2.header_dealer_order')}</th>
+                  <th
+                    style={{ width: '4%', textAlign: 'center', fontWeight: 'bold', cursor: 'pointer', userSelect: 'none' }}
+                    onClick={() => setSortConfig({ key: null, direction: 'asc' })}
+                    title="기본 순서로 리셋"
+                  >
+                    {t('menu2.header_no')}
+                  </th>
+                  {renderSortHeader('model', t('menu2.header_model'), '11%')}
+                  {renderSortHeader('nc', t('menu2.header_nc'), '8%')}
+                  {renderSortHeader('price', t('menu2.header_buying'), '8%', 'right')}
+                  {renderSortHeader('po', t('menu2.header_po'), '10%')}
+                  {renderSortHeader('detail_spec', t('menu2.header_detailspec'), '25%', 'left')}
+                  {renderSortHeader('eta', t('menu2.header_eta'), '8%')}
+                  {renderSortHeader('port', t('menu2.header_port'), '8%')}
+                  {renderSortHeader('stock_type', t('menu2.header_status_change'), '8%')}
+                  {renderSortHeader('dealer', t('menu2.header_dealer_order'), '10%')}
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr><td colSpan={10} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>데이터를 불러오는 중입니다...</td></tr>
-                ) : filteredOrders.length === 0 ? (
+                ) : sortedOrders.length === 0 ? (
                   <tr><td colSpan={10} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>가용 재고 내역이 없습니다.</td></tr>
                 ) : (
-                  filteredOrders.map((order, index) => {
+                  sortedOrders.map((order, index) => {
                     const sType = pendingChanges[order.id]?.stockType || order.stock_type || 'AVAILABLE';
                     const showSchedule = ['SHIPPING', 'ARRIVED', 'IN_STOCK'].includes(order.current_status);
 
@@ -556,6 +695,12 @@ export default function AdminInventory({ isMobileView }) {
           </div>
         )}
       </div>
+      <style>{`
+        .sortable-th:hover {
+          background-color: var(--bg-secondary) !important;
+          color: var(--wia-blue) !important;
+        }
+      `}</style>
     </div>
   );
 }
