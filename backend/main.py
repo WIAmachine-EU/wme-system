@@ -538,20 +538,18 @@ def update_order_status(
             etd_str = order.etd.strftime('%Y-%m-%d') if order.etd else "미정"
             eta_str = order.eta.strftime('%Y-%m-%d') if order.eta else "미정"
             
-            # 발송 테스트용 고정 이메일 주소
-            to_email = "freelogin3975@gmail.com; jypark@hyundai-wia.de;"
+            # 관리자 알림 수신 이메일 주소
+            to_email = "jypark@hyundai-wia.de; freelogin3975@gmail.com"
             send_etd_notification(to_email, order.reference_no, etd_str, eta_str)
             
         elif payload.to_status == models.OrderStatus.ARRIVED:
             # Port arrival notification
-            # 발송 테스트용 고정 이메일 주소
-            to_email = "freelogin3975@gmail.com; jypark@hyundai-wia.de;"
+            to_email = "jypark@hyundai-wia.de; freelogin3975@gmail.com"
             send_port_arrival_notification(to_email, order.reference_no)
             
         elif payload.to_status == models.OrderStatus.IN_STOCK:
             # Warehouse arrival notification
-            # 발송 테스트용 고정 이메일 주소
-            to_email = "freelogin3975@gmail.com; jypark@hyundai-wia.de;"
+            to_email = "jypark@hyundai-wia.de; freelogin3975@gmail.com"
             send_warehouse_arrival_notification(to_email, order.reference_no, order.stock_type)
 
     # 2. 역방향(BACKWARD) 부작용(Side Effect) 처리

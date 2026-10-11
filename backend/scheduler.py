@@ -82,7 +82,18 @@ def process_periodic_eta_notifications():
                         if changed:
                             logger.info(f"Order {order.reference_no} updated from TrackCargo Shipment {shipment.mbl_no}")
                             if new_eta:
-                                send_eta_update_notification(order.reference_no, order.vessel, new_eta.strftime('%Y-%m-%d %H:%M'))
+                                dealer_emails = []
+                                if order.dealer_company_id:
+                                    dealers = db.query(models.CustomUser).filter(
+                                        models.CustomUser.dealer_company_id == order.dealer_company_id,
+                                        models.CustomUser.role == models.UserRole.DEALER
+                                    ).all()
+                                    dealer_emails = [d.email for d in dealers if d.email and "@example.com" not in d.email]
+                                
+                                recipients = "jypark@hyundai-wia.de; freelogin3975@gmail.com"
+                                if dealer_emails:
+                                    recipients = f"{recipients}; {'; '.join(dealer_emails)}"
+                                send_eta_update_notification(order.reference_no, order.vessel, new_eta.strftime('%Y-%m-%d %H:%M'), to_email=recipients)
                                 
             except Exception as e:
                 shipment.trackcargo_error = str(e)
@@ -110,14 +121,15 @@ def process_periodic_eta_notifications():
                     current_eta = order.eta.strftime('%Y-%m-%d %H:%M') if order.eta else "미정"
                     logger.info(f"Order {order.reference_no}: Sending {days}-day interval notification.")
                     
-                    to_email = "dealer@example.com"
+                    to_email = "jypark@hyundai-wia.de; freelogin3975@gmail.com"
                     if order.dealer_company_id:
                         dealers = db.query(models.CustomUser).filter(
                             models.CustomUser.dealer_company_id == order.dealer_company_id,
                             models.CustomUser.role == models.UserRole.DEALER
                         ).all()
-                        if dealers:
-                            to_email = "; ".join([d.email for d in dealers])
+                        valid_dealer_emails = [d.email for d in dealers if d.email and "@example.com" not in d.email]
+                        if valid_dealer_emails:
+                            to_email = f"{to_email}; {'; '.join(valid_dealer_emails)}"
                             
                     send_shipping_interval_notification(to_email, order.reference_no, days, current_eta)
 
