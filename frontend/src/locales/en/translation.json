@@ -165,6 +165,8 @@
     "label_expire": "Expire",
     "select_dealer": "-- Dealer --",
     "reservation_period": "Reservation:",
+    "days_7": "7 Days",
+    "days_14": "14 Days",
     "day": "day",
     "btn_confirm": "confirm",
     "btn_cancel_popup": "cancell",

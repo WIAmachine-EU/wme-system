@@ -153,6 +153,7 @@ class OrderBase(BaseModel):
     remark: Optional[str] = None
     dealer_order_date: Optional[datetime] = None
     delivery_request_date: Optional[str] = None
+    rental_expiry_date: Optional[datetime] = None
 
 class OrderCreate(BaseModel):
     reference_no: str
@@ -171,6 +172,7 @@ class OrderCreate(BaseModel):
     destination_port: Optional[str] = None
     dealer_order_date: Optional[datetime] = None
     delivery_request_date: Optional[str] = None
+    rental_expiry_date: Optional[datetime] = None
 
 class OrderOut(OrderBase):
     id: int
@@ -203,6 +205,7 @@ class OrderUpdate(BaseModel):
     remark: Optional[str] = None
     dealer_order_date: Optional[datetime] = None
     delivery_request_date: Optional[str] = None
+    rental_expiry_date: Optional[datetime] = None
 
 class OrderStatusUpdate(BaseModel):
     to_status: OrderStatus
@@ -240,6 +243,7 @@ class PromotionBase(BaseModel):
     reservation_expiry: Optional[datetime] = None
     final_buyer_dealer_id: Optional[int] = None
     promotion_price: Optional[str] = None
+    expiry_alert_sent: bool = False
 
 class PromotionOut(PromotionBase):
     id: int

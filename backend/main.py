@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import io
+import logging
 from typing import List, Optional
 from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Query, Header
 from fastapi.responses import FileResponse, RedirectResponse
@@ -22,6 +23,8 @@ app = FastAPI(
     description="유럽 현지 법인 및 딜러 협업을 위한 실시간 SCM 재고/배송 추적 및 영업 분석 API",
     version="5.0.0"
 )
+
+logger = logging.getLogger(__name__)
 
 app.add_middleware(
     CORSMiddleware,
@@ -91,8 +94,41 @@ def on_startup():
         except Exception as e:
             print("Error running thumbnail migration:", e)
             db.rollback()
-        
-        # 2. Update dealer emails to test emails (REMOVED due to UNIQUE constraint in production)
+
+        # Schema Migrations for alerts & rental
+        is_pg = "postgres" in str(engine.url)
+        timestamp_type = "TIMESTAMP" if is_pg else "DATETIME"
+        if_not_exists = "IF NOT EXISTS " if is_pg else ""
+
+        for col_def in [
+            f"ALTER TABLE orders ADD COLUMN {if_not_exists}rental_expiry_date {timestamp_type}",
+            f"ALTER TABLE orders ADD COLUMN {if_not_exists}last_delivery_alert_month VARCHAR",
+            f"ALTER TABLE orders ADD COLUMN {if_not_exists}rental_alert_sent BOOLEAN DEFAULT FALSE",
+            f"ALTER TABLE promotion_inventory ADD COLUMN {if_not_exists}expiry_alert_sent BOOLEAN DEFAULT FALSE",
+        ]:
+            try:
+                db.execute(text(col_def))
+                db.commit()
+            except Exception:
+                db.rollback()
+
+        # Seed new EmailNotificationConfigs
+        new_configs = [
+            ("DELIVERY_DUE_ALERT", None, "배송요청일 당월 마지막 주차 지연 방지 안내 (관리자)"),
+            ("PROMOTION_EXPIRY_ALERT", 1, "프로모션 예약 만료 1일 전(D-1) 사전 통지 및 자동 취소 안내"),
+            ("RENTAL_EXPIRY_ALERT", 7, "임대 만료 7일 전(D-7) 연장/반납 사전 공지 (관리자)")
+        ]
+        for stage_name, interval_d, tmpl in new_configs:
+            cfg = db.query(models.EmailNotificationConfig).filter_by(stage=stage_name).first()
+            if not cfg:
+                db.add(models.EmailNotificationConfig(stage=stage_name, interval_days=interval_d, is_active=True, email_template=tmpl))
+        db.commit()
+
+        # Initial test rental expiry for sample data if unset
+        corp_rental = db.query(models.Order).filter(models.Order.stock_type == "RENTAL").first()
+        if corp_rental and not corp_rental.rental_expiry_date:
+            corp_rental.rental_expiry_date = datetime.utcnow() + timedelta(days=6)
+            db.commit()
             
         db.commit()
     except Exception as e:
@@ -501,6 +537,9 @@ def update_order_info(
         order.dealer_order_date = payload.dealer_order_date
     if hasattr(payload, 'delivery_request_date') and payload.delivery_request_date is not None:
         order.delivery_request_date = payload.delivery_request_date
+    if hasattr(payload, 'rental_expiry_date') and payload.rental_expiry_date is not None:
+        order.rental_expiry_date = payload.rental_expiry_date
+        order.rental_alert_sent = False
 
     db.commit()
     db.refresh(order)
@@ -533,24 +572,45 @@ def update_order_status(
         
     # Trigger Notifications based on status change
     if payload.direction == models.OrderDirection.FORWARD:
+        def get_notification_recipients(order_obj):
+            recipients = ["jypark@hyundai-wia.de", "freelogin3975@gmail.com"]
+            if order_obj.dealer_company_id:
+                dealers = db.query(models.CustomUser).filter(
+                    models.CustomUser.dealer_company_id == order_obj.dealer_company_id,
+                    models.CustomUser.role == models.UserRole.DEALER
+                ).all()
+                dealer_emails = [d.email for d in dealers if d.email and "@example.com" not in d.email]
+                recipients.extend(dealer_emails)
+            return "; ".join(dict.fromkeys(recipients))
+
         if payload.to_status == models.OrderStatus.SHIPPING:
-            # ETD notification
-            etd_str = order.etd.strftime('%Y-%m-%d') if order.etd else "미정"
-            eta_str = order.eta.strftime('%Y-%m-%d') if order.eta else "미정"
-            
-            # 관리자 알림 수신 이메일 주소
-            to_email = "jypark@hyundai-wia.de; freelogin3975@gmail.com"
-            send_etd_notification(to_email, order.reference_no, etd_str, eta_str)
+            # ETD notification (ETD_IMMEDIATE 엔진 활성화 확인)
+            etd_cfg = db.query(models.EmailNotificationConfig).filter_by(stage="ETD_IMMEDIATE").first()
+            if etd_cfg and not etd_cfg.is_active:
+                logger.info(f"[알림 건너뜀] ETD_IMMEDIATE 알림 엔진이 비활성화(OFF) 상태입니다. (Order {order.reference_no})")
+            else:
+                etd_str = order.etd.strftime('%Y-%m-%d') if order.etd else "미정"
+                eta_str = order.eta.strftime('%Y-%m-%d') if order.eta else "미정"
+                to_email = get_notification_recipients(order)
+                send_etd_notification(to_email, order.reference_no, etd_str, eta_str)
             
         elif payload.to_status == models.OrderStatus.ARRIVED:
-            # Port arrival notification
-            to_email = "jypark@hyundai-wia.de; freelogin3975@gmail.com"
-            send_port_arrival_notification(to_email, order.reference_no)
+            # Port arrival notification (HAMBURG_ARRIVAL 엔진 활성화 확인)
+            arrival_cfg = db.query(models.EmailNotificationConfig).filter_by(stage="HAMBURG_ARRIVAL").first()
+            if arrival_cfg and not arrival_cfg.is_active:
+                logger.info(f"[알림 건너뜀] HAMBURG_ARRIVAL 알림 엔진이 비활성화(OFF) 상태입니다. (Order {order.reference_no})")
+            else:
+                to_email = get_notification_recipients(order)
+                send_port_arrival_notification(to_email, order.reference_no)
             
         elif payload.to_status == models.OrderStatus.IN_STOCK:
-            # Warehouse arrival notification
-            to_email = "jypark@hyundai-wia.de; freelogin3975@gmail.com"
-            send_warehouse_arrival_notification(to_email, order.reference_no, order.stock_type)
+            # Warehouse arrival notification (HAMBURG_WAREHOUSE_COMPLETE 엔진 활성화 확인)
+            wh_cfg = db.query(models.EmailNotificationConfig).filter_by(stage="HAMBURG_WAREHOUSE_COMPLETE").first()
+            if wh_cfg and not wh_cfg.is_active:
+                logger.info(f"[알림 건너뜀] HAMBURG_WAREHOUSE_COMPLETE 알림 엔진이 비활성화(OFF) 상태입니다. (Order {order.reference_no})")
+            else:
+                to_email = get_notification_recipients(order)
+                send_warehouse_arrival_notification(to_email, order.reference_no, order.stock_type)
 
     # 2. 역방향(BACKWARD) 부작용(Side Effect) 처리
     if payload.direction == models.OrderDirection.BACKWARD:
@@ -696,11 +756,32 @@ def get_sales_analytics(db: Session = Depends(get_db), current_role: Optional[st
 # ==========================================
 # 4. 프로모션 및 장기 재고 관리 API
 # ==========================================
+def auto_release_expired_promotions(db: Session):
+    """
+    예약 기간이 만료된 프로모션 장비를 확인하여 자동으로 AVAILABLE(판매가능) 상태로 롤백
+    """
+    now = datetime.utcnow()
+    expired = db.query(models.PromotionInventory).filter(
+        models.PromotionInventory.status == models.PromotionStatus.RESERVED,
+        models.PromotionInventory.reservation_expiry.isnot(None),
+        models.PromotionInventory.reservation_expiry <= now
+    ).all()
+    if expired:
+        for p in expired:
+            order_ref = p.order.reference_no if p.order else f"ID {p.order_id}"
+            dealer_name = p.reserved_dealer.name if p.reserved_dealer else "Unknown"
+            logger.info(f"[프로모션 예약 자동 해제] 발주 {order_ref} (딜러: {dealer_name}) 만료일({p.reservation_expiry}) 도래 -> AVAILABLE 자동 복구")
+            p.status = models.PromotionStatus.AVAILABLE
+            p.reserved_dealer_id = None
+            p.reservation_expiry = None
+        db.commit()
+
 @app.get("/api/promotions", response_model=List[schemas.PromotionOut])
 def get_promotions(
     status_filter: Optional[models.PromotionStatus] = Query(None),
     db: Session = Depends(get_db)
 ):
+    auto_release_expired_promotions(db)
     query = db.query(models.PromotionInventory)
     if status_filter:
         query = query.filter(models.PromotionInventory.status == status_filter)
@@ -712,6 +793,7 @@ def reserve_promotion(
     payload: schemas.PromotionReserveUpdate,
     db: Session = Depends(get_db)
 ):
+    auto_release_expired_promotions(db)
     promo = db.query(models.PromotionInventory).filter(models.PromotionInventory.id == promotion_id).first()
     if not promo:
         raise HTTPException(status_code=404, detail="프로모션 재고를 찾을 수 없습니다.")
@@ -721,6 +803,7 @@ def reserve_promotion(
     promo.status = models.PromotionStatus.RESERVED
     promo.reserved_dealer_id = payload.reserved_dealer_id
     promo.reservation_expiry = payload.reservation_expiry
+    promo.expiry_alert_sent = False
     db.commit()
     db.refresh(promo)
     return promo

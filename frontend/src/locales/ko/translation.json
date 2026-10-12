@@ -165,6 +165,8 @@
     "label_expire": "만료",
     "select_dealer": "-- 예약 딜러사 선택 --",
     "reservation_period": "예약 기간:",
+    "days_7": "7일 (1주)",
+    "days_14": "14일 (2주)",
     "day": "일",
     "btn_confirm": "확정",
     "btn_cancel_popup": "취소",

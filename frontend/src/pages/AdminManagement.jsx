@@ -1,6 +1,68 @@
 import React, { useState, useEffect } from 'react';
 import { FileSpreadsheet, Tag, Mail, Upload, CheckCircle, Clock, CheckCircle2, AlertCircle, RefreshCw, Monitor, AlertTriangle, Plus, X, ShoppingCart } from 'lucide-react';
 
+const STAGE_ORDER = [
+  'ETD_IMMEDIATE',
+  'SHIPPING_INTERVAL',
+  'HAMBURG_ARRIVAL',
+  'HAMBURG_WAREHOUSE_COMPLETE',
+  'DELIVERY_DUE_ALERT',
+  'PROMOTION_EXPIRY_ALERT',
+  'RENTAL_EXPIRY_ALERT'
+];
+
+const STAGE_INFO = {
+  ETD_IMMEDIATE: {
+    name: '1. 출항(ETD) 직후 일정 안내',
+    target: '발주 딜러 및 관리자',
+    badge: () => '즉시 통지',
+    badgeColor: 'hsla(217, 91%, 60%, 0.15)',
+    textColor: 'var(--accent-blue)'
+  },
+  SHIPPING_INTERVAL: {
+    name: '2. 해상 운송 중 정기 통지',
+    target: '발주 딜러 및 관리자',
+    badge: (days) => `매 ${days || 10}일 주기`,
+    badgeColor: 'hsla(190, 95%, 49%, 0.15)',
+    textColor: 'var(--accent-cyan)'
+  },
+  HAMBURG_ARRIVAL: {
+    name: '3. 유럽 항구 도착',
+    target: '발주 딜러 및 관리자',
+    badge: () => '즉시 통지 (HHLA 연동)',
+    badgeColor: 'hsla(217, 91%, 60%, 0.15)',
+    textColor: 'var(--accent-blue)'
+  },
+  HAMBURG_WAREHOUSE_COMPLETE: {
+    name: '4. 함부르크 창고 입고',
+    target: '발주 딜러 및 관리자',
+    badge: () => '즉시 통지 (입고완료)',
+    badgeColor: 'hsla(142, 76%, 46%, 0.15)',
+    textColor: 'var(--status-stock)'
+  },
+  DELIVERY_DUE_ALERT: {
+    name: '5. 배송요청일(D-Day) 지연 방지 알림',
+    target: '관리자 (Admin)',
+    badge: () => '월 마지막 주차 진입 시',
+    badgeColor: 'hsla(38, 92%, 50%, 0.15)',
+    textColor: 'var(--accent-amber, #f59e0b)'
+  },
+  PROMOTION_EXPIRY_ALERT: {
+    name: '6. 프로모션 예약 만료 사전 알림',
+    target: '관리자 및 해당 예약 딜러',
+    badge: () => '만료 1일 전 (D-1)',
+    badgeColor: 'hsla(0, 84%, 60%, 0.15)',
+    textColor: 'var(--status-shipping, #ef4444)'
+  },
+  RENTAL_EXPIRY_ALERT: {
+    name: '7. 임대(Rental) 만료 연장/반납 사전 공지',
+    target: '관리자 (Admin)',
+    badge: () => '만료 7일 전 (D-7)',
+    badgeColor: 'hsla(260, 84%, 65%, 0.15)',
+    textColor: 'var(--accent-purple, #a855f7)'
+  }
+};
+
 export default function AdminManagement({ isMobileView, isDesktopOptimized }) {
   const [promotions, setPromotions] = useState([]);
   const [dealers, setDealers] = useState([]);
@@ -359,13 +421,24 @@ export default function AdminManagement({ isMobileView, isDesktopOptimized }) {
                             <option value="">-- 예약 딜러사 선택 --</option>
                             {dealers.map(d => <option key={d.id} value={d.id}>{d.name} ({d.country})</option>)}
                           </select>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>예약 기간:</span>
+                            <select
+                              value={reservedUntilDays}
+                              onChange={e => setReservedUntilDays(Number(e.target.value))}
+                              style={{ flex: 1, padding: '4px 6px', borderRadius: '6px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', fontSize: '0.75rem', fontWeight: 600 }}
+                            >
+                              <option value={7}>7일 (1주)</option>
+                              <option value={14}>14일 (2주)</option>
+                            </select>
+                          </div>
                           <div style={{ display: 'flex', gap: '6px' }}>
                             <button onClick={() => handleConfirmReserve(promo.id)} className="btn btn-primary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}>예약 확정</button>
                             <button onClick={() => setReservingId(null)} className="btn btn-outline" style={{ padding: '4px 8px', fontSize: '0.75rem' }}>취소</button>
                           </div>
                         </div>
                       ) : (
-                        <button onClick={() => { setReservingId(promo.id); setSelectedDealerId(''); }} className="btn btn-outline" style={{ padding: '6px 12px', fontSize: '0.75rem', borderColor: 'var(--accent-cyan)', color: 'var(--accent-cyan)' }}>
+                        <button onClick={() => { setReservingId(promo.id); setSelectedDealerId(''); setReservedUntilDays(7); }} className="btn btn-outline" style={{ padding: '6px 12px', fontSize: '0.75rem', borderColor: 'var(--accent-cyan)', color: 'var(--accent-cyan)' }}>
                           딜러사 전용 예약
                         </button>
                       )
@@ -405,50 +478,93 @@ export default function AdminManagement({ isMobileView, isDesktopOptimized }) {
         </div>
       </div>
 
-      {/* 섹션 3: 주기 조절형 자동 ETA 알림 엔진 스케줄러 (Auto-ETA Email Engine) */}
+      {/* 섹션 3: 자동 일정 알림 및 빈도 설정 엔진 (Automated Schedule Notification Engine) */}
       <div className="glass-card" style={{ padding: '28px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
           <Mail color="var(--accent-purple)" size={24} />
-          <h2 style={{ fontSize: '1.3rem' }}>주기 조절형 자동 ETA 알림 엔진 (Auto-ETA Email Engine Configuration)</h2>
+          <h2 style={{ fontSize: '1.3rem' }}>자동 일정 알림 및 빈도 설정 엔진 (Automated Schedule Notification Engine)</h2>
         </div>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '20px' }}>
-          기계의 해상 운송(SHIPPING) 시점 및 항구 도착을 기준으로 주기적인 이메일 통지 규칙(예: 출항 2일 후, 15일 후 정기 보고)을 세팅하고 온/오프 제어합니다.
+          운송 현황(출항/항해/도착/입고) 통지 및 배송요청일 지연 방지, 프로모션 만료 경고(D-1), 임대 만료 안내(D-7) 등의 자동화 알림 규칙을 개별 온/오프 제어합니다.
         </p>
 
         <div className="data-table-container full-bleed">
           <table className="data-table">
             <thead>
               <tr>
-                <th>통지 단계 (Stage)</th>
-                <th>반복 주기 (Interval Days)</th>
-                <th>이메일 템플릿 요약</th>
-                <th>엔진 스위치 (On/Off)</th>
+                <th style={{ width: '28%' }}>통지 단계 (Stage)</th>
+                <th style={{ width: '15%' }}>수신 대상</th>
+                <th style={{ width: '18%' }}>통지 / 반복 주기</th>
+                <th>이메일 내용 요약</th>
+                <th style={{ width: '16%', textAlign: 'center' }}>엔진 스위치 (On/Off)</th>
               </tr>
             </thead>
             <tbody>
-              {emailConfigs.map(config => (
-                <tr key={config.id}>
-                  <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{config.stage}</td>
-                  <td>
-                    <span style={{ background: 'hsla(217, 91%, 60%, 0.15)', color: 'var(--accent-blue)', padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600 }}>
-                      {config.interval_days ? `매 ${config.interval_days}일` : '즉시 통지'}
-                    </span>
-                  </td>
-                  <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{config.email_template}</td>
-                  <td>
-                    <button
-                      onClick={() => handleToggleEmailRule(config.id, config.is_active)}
-                      style={{
-                        background: config.is_active ? 'var(--status-stock)' : 'var(--bg-secondary)',
-                        color: config.is_active ? 'hsl(222, 47%, 10%)' : 'var(--text-muted)',
-                        padding: '6px 16px', borderRadius: '9999px', fontWeight: 700, fontSize: '0.75rem', border: 'none', cursor: 'pointer', transition: 'all 0.2s ease'
-                      }}
-                    >
-                      {config.is_active ? '● 엔진 활성 (Running)' : '○ 비활성화 됨 (Paused)'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {[...emailConfigs]
+                .sort((a, b) => {
+                  const idxA = STAGE_ORDER.indexOf(a.stage);
+                  const idxB = STAGE_ORDER.indexOf(b.stage);
+                  return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
+                })
+                .map(config => {
+                  const info = STAGE_INFO[config.stage] || {
+                    name: config.stage,
+                    target: '담당자',
+                    badge: (days) => (days ? `매 ${days}일` : '즉시 통지'),
+                    badgeColor: 'hsla(217, 91%, 60%, 0.15)',
+                    textColor: 'var(--accent-blue)'
+                  };
+                  return (
+                    <tr key={config.id}>
+                      <td>
+                        <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '2px' }}>
+                          {info.name}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                          [{config.stage}]
+                        </div>
+                      </td>
+                      <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                        {info.target}
+                      </td>
+                      <td>
+                        <span style={{
+                          background: info.badgeColor,
+                          color: info.textColor,
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          display: 'inline-block'
+                        }}>
+                          {info.badge(config.interval_days)}
+                        </span>
+                      </td>
+                      <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                        {config.email_template}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <button
+                          onClick={() => handleToggleEmailRule(config.id, config.is_active)}
+                          style={{
+                            background: config.is_active ? 'var(--status-stock)' : 'var(--bg-secondary)',
+                            color: config.is_active ? 'hsl(222, 47%, 10%)' : 'var(--text-muted)',
+                            padding: '6px 14px',
+                            borderRadius: '9999px',
+                            fontWeight: 700,
+                            fontSize: '0.75rem',
+                            border: config.is_active ? 'none' : '1px solid var(--border-color)',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {config.is_active ? '● 엔진 활성 (Running)' : '○ 비활성화 됨 (Paused)'}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
             </tbody>
           </table>
         </div>

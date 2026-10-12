@@ -153,6 +153,9 @@ def init_seed():
             EmailNotificationConfig(stage="SHIPPING_INTERVAL", interval_days=10, is_active=True, email_template="운송 중 정기 보고: {{ eta }}"),
             EmailNotificationConfig(stage="HAMBURG_ARRIVAL", is_active=True, email_template="항구 도착 통지"),
             EmailNotificationConfig(stage="HAMBURG_WAREHOUSE_COMPLETE", is_active=True, email_template="창고 입고 완료 (ATP 가용)"),
+            EmailNotificationConfig(stage="DELIVERY_DUE_ALERT", is_active=True, email_template="배송요청일 당월 마지막 주차 지연 방지 안내 (관리자)"),
+            EmailNotificationConfig(stage="PROMOTION_EXPIRY_ALERT", interval_days=1, is_active=True, email_template="프로모션 예약 만료 1일 전(D-1) 사전 통지 및 자동 취소 안내"),
+            EmailNotificationConfig(stage="RENTAL_EXPIRY_ALERT", interval_days=7, is_active=True, email_template="임대 만료 7일 전(D-7) 연장/반납 사전 공지 (관리자)"),
         ]
         db.add_all(configs)
         db.commit()

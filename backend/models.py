@@ -176,6 +176,9 @@ class Order(Base):
     remark = Column(Text, nullable=True)
     dealer_order_date = Column(DateTime, nullable=True)
     delivery_request_date = Column(String, nullable=True)
+    rental_expiry_date = Column(DateTime, nullable=True)
+    last_delivery_alert_month = Column(String, nullable=True)
+    rental_alert_sent = Column(Boolean, default=False, nullable=False)
     
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -214,6 +217,7 @@ class PromotionInventory(Base):
     reservation_expiry = Column(DateTime, nullable=True)
     final_buyer_dealer_id = Column(Integer, ForeignKey("dealer_companies.id"), nullable=True)
     promotion_price = Column(String, nullable=True)
+    expiry_alert_sent = Column(Boolean, default=False, nullable=False)
     
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -225,8 +229,8 @@ class EmailNotificationConfig(Base):
     __tablename__ = "email_notification_configs"
 
     id = Column(Integer, primary_key=True, index=True)
-    stage = Column(String, nullable=False) # ETD_IMMEDIATE, SHIPPING_INTERVAL, HAMBURG_ARRIVAL, HAMBURG_WAREHOUSE_COMPLETE
-    interval_days = Column(Integer, nullable=True) # e.g. 10 for SHIPPING_INTERVAL
+    stage = Column(String, nullable=False) # ETD_IMMEDIATE, SHIPPING_INTERVAL, HAMBURG_ARRIVAL, HAMBURG_WAREHOUSE_COMPLETE, DELIVERY_DUE_ALERT, PROMOTION_EXPIRY_ALERT, RENTAL_EXPIRY_ALERT
+    interval_days = Column(Integer, nullable=True) # e.g. 10 for SHIPPING_INTERVAL, 1 for D-1, 7 for D-7
     is_active = Column(Boolean, default=True, nullable=False)
     email_template = Column(Text, nullable=True)
 

@@ -523,15 +523,15 @@ export default function AdminPromotion({ isMobileView }) {
                           {dealers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                         </select>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{t('menu3.reservation_period', '예약 기간:')}</span>
-                          <input 
-                            type="number" 
-                            min="1" max="90" 
+                          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{t('menu3.reservation_period', '예약 기간:')}</span>
+                          <select 
                             value={reservedUntilDays} 
-                            onChange={e => setReservedUntilDays(e.target.value)}
-                            style={{ width: '60px', padding: '6px', borderRadius: '8px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', fontSize: '0.85rem' }}
-                          />
-                          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{t('menu3.day', '일')}</span>
+                            onChange={e => setReservedUntilDays(Number(e.target.value))}
+                            style={{ flex: 1, padding: '6px 10px', borderRadius: '8px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', fontSize: '0.85rem', fontWeight: 600 }}
+                          >
+                            <option value={7}>{t('menu3.days_7', '7일 (1주)')}</option>
+                            <option value={14}>{t('menu3.days_14', '14일 (2주)')}</option>
+                          </select>
                         </div>
                         <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
                           <button onClick={() => handleConfirmReserve(promo.id)} className="btn btn-primary" style={{ padding: '6px', fontSize: '0.85rem', flex: 1 }}>{t('menu3.btn_confirm', '확정')}</button>
@@ -539,7 +539,7 @@ export default function AdminPromotion({ isMobileView }) {
                         </div>
                       </div>
                     ) : (
-                      <button onClick={() => { setReservingId(promo.id); setSelectedDealerId(''); }} className="btn btn-outline" style={{ padding: '8px', fontSize: '0.85rem', width: '100%', borderColor: 'var(--accent-cyan)', color: 'var(--accent-cyan)', fontWeight: 600 }}>
+                      <button onClick={() => { setReservingId(promo.id); setSelectedDealerId(''); setReservedUntilDays(7); }} className="btn btn-outline" style={{ padding: '8px', fontSize: '0.85rem', width: '100%', borderColor: 'var(--accent-cyan)', color: 'var(--accent-cyan)', fontWeight: 600 }}>
                         {t('menu3.btn_reserve', '예약 진행')}
                       </button>
                     )
@@ -697,16 +697,16 @@ export default function AdminPromotion({ isMobileView }) {
                               <option value="">{t('menu3.select_dealer', '-- 예약 딜러사 선택 --')}</option>
                               {dealers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                             </select>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{t('menu3.reservation_period', '예약 기간:')}</span>
-                              <input 
-                                type="number" 
-                                min="1" max="90" 
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ fontSize: '11px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{t('menu3.reservation_period', '예약 기간:')}</span>
+                              <select 
                                 value={reservedUntilDays} 
-                                onChange={e => setReservedUntilDays(e.target.value)}
-                                style={{ width: '50px', padding: '4px', borderRadius: '6px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', fontSize: '11px' }}
-                              />
-                              <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{t('menu3.day', '일')}</span>
+                                onChange={e => setReservedUntilDays(Number(e.target.value))}
+                                style={{ flex: 1, padding: '4px 6px', borderRadius: '6px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', fontSize: '11px', fontWeight: 600 }}
+                              >
+                                <option value={7}>{t('menu3.days_7', '7일 (1주)')}</option>
+                                <option value={14}>{t('menu3.days_14', '14일 (2주)')}</option>
+                              </select>
                             </div>
                             <div style={{ display: 'flex', gap: '6px' }}>
                               <button onClick={() => handleConfirmReserve(promo.id)} className="btn btn-primary" style={{ padding: '3px 4px', fontSize: '10px', justifyContent: 'center', flex: 1 }}>{t('menu3.btn_confirm', '확정')}</button>
@@ -714,7 +714,7 @@ export default function AdminPromotion({ isMobileView }) {
                             </div>
                           </div>
                         ) : (
-                          <button onClick={() => { setReservingId(promo.id); setSelectedDealerId(''); }} className="btn btn-outline" style={{ padding: '3px 4px', fontSize: '10px', justifyContent: 'center', borderColor: 'var(--accent-cyan)', color: 'var(--accent-cyan)', width: '70px' }}>
+                          <button onClick={() => { setReservingId(promo.id); setSelectedDealerId(''); setReservedUntilDays(7); }} className="btn btn-outline" style={{ padding: '3px 4px', fontSize: '10px', justifyContent: 'center', borderColor: 'var(--accent-cyan)', color: 'var(--accent-cyan)', width: '70px' }}>
                             {t('menu3.btn_reserve', '예약')}
                           </button>
                         )

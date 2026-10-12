@@ -102,3 +102,43 @@ def send_warehouse_arrival_notification(to_email: str, order_ref: str, stock_typ
     content = f"장비({order_ref})가 유럽 현지 법인 창고에 입고 완료되었습니다.\n현재 상태: {stype_str} (가용 재고 전환)"
     target_email = to_email if to_email else ADMIN_EMAILS
     send_email_notification(target_email, subject, content)
+
+def send_delivery_due_alert(to_email: str, order_ref: str, delivery_req_date: str, current_status: str, model_name: str):
+    subject = f"[SCM 알림] 발주 {order_ref} 배송요청일({delivery_req_date}) 당월 마지막 주차 진입 지연 방지 안내"
+    content = (
+        f"발주번호: {order_ref}\n"
+        f"장비 모델: {model_name}\n"
+        f"배송요청일: {delivery_req_date}\n"
+        f"현재 진행상태: {current_status}\n\n"
+        f"해당 발주 건이 배송요청일 해당 월의 마지막 주차에 진입하였습니다.\n"
+        f"납기 지연을 사전에 방지하고 차질 없는 현지 인도를 위해 물류, 선적 및 통관 일정을 점검해 주시기 바랍니다."
+    )
+    target_email = to_email if to_email else ADMIN_EMAILS
+    send_email_notification(target_email, subject, content)
+
+def send_promotion_expiry_alert(to_email: str, order_ref: str, model_name: str, dealer_name: str, expiry_date_str: str):
+    subject = f"[SCM 프로모션 알림] 발주 {order_ref} 프로모션 예약 만료 1일 전(D-1) 안내"
+    content = (
+        f"프로모션 발주번호: {order_ref}\n"
+        f"장비 모델: {model_name}\n"
+        f"예약 딜러사: {dealer_name}\n"
+        f"예약 만료 일시: {expiry_date_str}\n\n"
+        f"해당 프로모션 장비의 예약 만료일이 1일 앞으로 도래하였습니다.\n"
+        f"만료 시점까지 정식 구매 확정(Order) 조치가 진행되지 않을 경우,\n"
+        f"타 딜러사가 즉시 예약 가능한 '판매가능(AVAILABLE)' 상태로 자동 취소(Roll-back) 처리될 예정입니다."
+    )
+    target_email = to_email if to_email else ADMIN_EMAILS
+    send_email_notification(target_email, subject, content)
+
+def send_rental_expiry_alert(to_email: str, order_ref: str, model_name: str, serial_no: str, dealer_name: str, expiry_date_str: str):
+    subject = f"[SCM 알림] 발주 {order_ref} 임대(Rental) 만료 7일 전 사전 공지 (연장/반납 안내)"
+    content = (
+        f"임대 발주번호: {order_ref}\n"
+        f"장비 모델: {model_name} (S/N: {serial_no or '-'})\n"
+        f"임대 딜러사: {dealer_name}\n"
+        f"임대 만료 예정일: {expiry_date_str}\n\n"
+        f"해당 장비의 임대(Rental) 계약 만료일이 7일 전(D-7)으로 다가왔습니다.\n"
+        f"임대 계약의 연장 여부 또는 기기 반납/회수 절차를 사전에 확인하여 진행해 주시기 바랍니다."
+    )
+    target_email = to_email if to_email else ADMIN_EMAILS
+    send_email_notification(target_email, subject, content)
