@@ -153,6 +153,7 @@ class OrderBase(BaseModel):
     remark: Optional[str] = None
     dealer_order_date: Optional[datetime] = None
     delivery_request_date: Optional[str] = None
+    rental_start_date: Optional[datetime] = None
     rental_expiry_date: Optional[datetime] = None
 
 class OrderCreate(BaseModel):
@@ -172,6 +173,7 @@ class OrderCreate(BaseModel):
     destination_port: Optional[str] = None
     dealer_order_date: Optional[datetime] = None
     delivery_request_date: Optional[str] = None
+    rental_start_date: Optional[datetime] = None
     rental_expiry_date: Optional[datetime] = None
 
 class OrderOut(OrderBase):
@@ -205,6 +207,7 @@ class OrderUpdate(BaseModel):
     remark: Optional[str] = None
     dealer_order_date: Optional[datetime] = None
     delivery_request_date: Optional[str] = None
+    rental_start_date: Optional[datetime] = None
     rental_expiry_date: Optional[datetime] = None
 
 class OrderStatusUpdate(BaseModel):

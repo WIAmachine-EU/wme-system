@@ -138,7 +138,10 @@
     "detail_port": "도착지",
     "detail_incoterms": "인코텀즈",
     "detail_vessel": "선박정보",
-    "detail_rental_dealer": "임대 딜러"
+    "detail_rental_dealer": "임대 딜러",
+    "detail_rental_period": "임대 기간",
+    "btn_edit_rental_period": "기간수정",
+    "btn_confirm_rental_period": "임대기간 확정"
   },
   "menu3": {
     "page_title": "WIA 프로모션",

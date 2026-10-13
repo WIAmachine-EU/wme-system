@@ -176,6 +176,7 @@ class Order(Base):
     remark = Column(Text, nullable=True)
     dealer_order_date = Column(DateTime, nullable=True)
     delivery_request_date = Column(String, nullable=True)
+    rental_start_date = Column(DateTime, nullable=True)
     rental_expiry_date = Column(DateTime, nullable=True)
     last_delivery_alert_month = Column(String, nullable=True)
     rental_alert_sent = Column(Boolean, default=False, nullable=False)

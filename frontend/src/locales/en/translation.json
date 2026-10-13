@@ -138,7 +138,10 @@
     "detail_port": "PORT",
     "detail_incoterms": "INCOTERMS",
     "detail_vessel": "VESSEL",
-    "detail_rental_dealer": "Rental to"
+    "detail_rental_dealer": "Rental to",
+    "detail_rental_period": "Rental Period",
+    "btn_edit_rental_period": "Edit Period",
+    "btn_confirm_rental_period": "Confirm Rental Period"
   },
   "menu3": {
     "page_title": "WIA Promotion",

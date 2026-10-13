@@ -101,6 +101,7 @@ def on_startup():
         if_not_exists = "IF NOT EXISTS " if is_pg else ""
 
         for col_def in [
+            f"ALTER TABLE orders ADD COLUMN {if_not_exists}rental_start_date {timestamp_type}",
             f"ALTER TABLE orders ADD COLUMN {if_not_exists}rental_expiry_date {timestamp_type}",
             f"ALTER TABLE orders ADD COLUMN {if_not_exists}last_delivery_alert_month VARCHAR",
             f"ALTER TABLE orders ADD COLUMN {if_not_exists}rental_alert_sent BOOLEAN DEFAULT FALSE",
@@ -537,6 +538,8 @@ def update_order_info(
         order.dealer_order_date = payload.dealer_order_date
     if hasattr(payload, 'delivery_request_date') and payload.delivery_request_date is not None:
         order.delivery_request_date = payload.delivery_request_date
+    if hasattr(payload, 'rental_start_date') and payload.rental_start_date is not None:
+        order.rental_start_date = payload.rental_start_date
     if hasattr(payload, 'rental_expiry_date') and payload.rental_expiry_date is not None:
         order.rental_expiry_date = payload.rental_expiry_date
         order.rental_alert_sent = False
@@ -663,7 +666,9 @@ def assign_order_to_dealer(
 
     order.dealer_company_id = dealer.id
     
-    if dealer.name.upper() == 'WME':
+    if order.stock_type == 'RENTAL':
+        order.is_corporate_stock = True
+    elif dealer.name.upper() == 'WME':
         order.is_corporate_stock = True
         order.stock_type = 'AVAILABLE'
     else:

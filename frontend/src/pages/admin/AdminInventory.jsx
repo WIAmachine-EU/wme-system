@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Package, CheckCircle2 } from 'lucide-react';
+import { Search, Package, CheckCircle2, Calendar, AlertCircle, X, Edit2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 export default function AdminInventory({ isMobileView }) {
@@ -12,7 +12,35 @@ export default function AdminInventory({ isMobileView }) {
   const [stockTypeFilter, setStockTypeFilter] = useState('ALL');
   const [pendingChanges, setPendingChanges] = useState({});
 
+  // 임대 기간 모달 상태
+  const [rentalModalOpen, setRentalModalOpen] = useState(false);
+  const [rentalOrder, setRentalOrder] = useState(null);
+  const [rentalDealerId, setRentalDealerId] = useState('');
+  const [rentalStartDate, setRentalStartDate] = useState('');
+  const [rentalEndDate, setRentalEndDate] = useState('');
+  const [isRentalEditMode, setIsRentalEditMode] = useState(false);
+  const [savingRental, setSavingRental] = useState(false);
+
   const [expandedRows, setExpandedRows] = useState(new Set());
+
+  const formatDateToYYYYMMDD = (dateVal) => {
+    if (!dateVal) return '';
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return '';
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const formatRentalPeriod = (startDate, endDate) => {
+    if (!startDate && !endDate) return '미설정';
+    const startStr = startDate ? new Date(startDate).toLocaleDateString() : '';
+    const endStr = endDate ? new Date(endDate).toLocaleDateString() : '';
+    if (startStr && endStr) return `${startStr} ~ ${endStr}`;
+    if (endStr) return `~ ${endStr}`;
+    return `${startStr} ~`;
+  };
 
   const toggleRow = (orderId) => {
     setExpandedRows(prev => {
@@ -132,6 +160,38 @@ export default function AdminInventory({ isMobileView }) {
     const changes = pendingChanges[orderId];
     if (!changes) return;
 
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    const effectiveStockType = changes.stockType !== undefined ? changes.stockType : (order.stock_type || 'AVAILABLE');
+    const effectiveDealerId = changes.dealerId !== undefined ? changes.dealerId : order.dealer_company_id;
+
+    // 만약 상태가 '임대'(RENTAL)인 경우 -> 팝업 모달창을 띄워 일정 입력 진행
+    if (effectiveStockType === 'RENTAL') {
+      if (!effectiveDealerId) {
+        alert("임대를 진행할 딜러를 선택해 주세요.");
+        return;
+      }
+      setRentalOrder(order);
+      setRentalDealerId(effectiveDealerId);
+
+      const today = new Date();
+      const defaultStart = order.rental_start_date ? formatDateToYYYYMMDD(order.rental_start_date) : formatDateToYYYYMMDD(today);
+      let defaultEnd = '';
+      if (order.rental_expiry_date) {
+        defaultEnd = formatDateToYYYYMMDD(order.rental_expiry_date);
+      } else {
+        const sixMonthsLater = new Date(today);
+        sixMonthsLater.setMonth(sixMonthsLater.getMonth() + 6);
+        defaultEnd = formatDateToYYYYMMDD(sixMonthsLater);
+      }
+      setRentalStartDate(defaultStart);
+      setRentalEndDate(defaultEnd);
+      setIsRentalEditMode(false);
+      setRentalModalOpen(true);
+      return;
+    }
+
     if (changes.dealerId || changes.stockType) {
       if (!window.confirm("선택한 내용으로 변경을 확정하시겠습니까?")) return;
     }
@@ -151,6 +211,89 @@ export default function AdminInventory({ isMobileView }) {
         return next;
       });
       fetchInventory(); // 목록 새로고침
+    }
+  };
+
+  // 상세내역에서 [기간수정] 버튼 클릭 시 모달 열기
+  const handleOpenRentalModalForEdit = (order) => {
+    setRentalOrder(order);
+    setRentalDealerId(order.dealer_company_id ? String(order.dealer_company_id) : '');
+
+    const today = new Date();
+    const defaultStart = order.rental_start_date ? formatDateToYYYYMMDD(order.rental_start_date) : formatDateToYYYYMMDD(today);
+    let defaultEnd = '';
+    if (order.rental_expiry_date) {
+      defaultEnd = formatDateToYYYYMMDD(order.rental_expiry_date);
+    } else {
+      const sixMonthsLater = new Date(today);
+      sixMonthsLater.setMonth(sixMonthsLater.getMonth() + 6);
+      defaultEnd = formatDateToYYYYMMDD(sixMonthsLater);
+    }
+    setRentalStartDate(defaultStart);
+    setRentalEndDate(defaultEnd);
+    setIsRentalEditMode(true);
+    setRentalModalOpen(true);
+  };
+
+  // 빠른 기간 프리셋 버튼
+  const handleQuickPeriod = (months) => {
+    const start = rentalStartDate ? new Date(rentalStartDate) : new Date();
+    const end = new Date(start);
+    end.setMonth(end.getMonth() + months);
+    if (!rentalStartDate) {
+      setRentalStartDate(formatDateToYYYYMMDD(start));
+    }
+    setRentalEndDate(formatDateToYYYYMMDD(end));
+  };
+
+  // 팝업 모달에서 [임대기간 확정] 클릭 시 저장
+  const handleSaveRentalPeriod = async () => {
+    if (!rentalOrder) return;
+    if (!rentalStartDate || !rentalEndDate) {
+      alert("임대 시작일과 종료일을 모두 입력(달력 선택)해 주세요.");
+      return;
+    }
+    if (new Date(rentalStartDate) > new Date(rentalEndDate)) {
+      alert("임대 종료일은 시작일보다 이후여야 합니다.");
+      return;
+    }
+
+    setSavingRental(true);
+    try {
+      const payload = {
+        stock_type: 'RENTAL',
+        rental_start_date: new Date(rentalStartDate).toISOString(),
+        rental_expiry_date: new Date(rentalEndDate).toISOString()
+      };
+      if (rentalDealerId) {
+        payload.dealer_company_id = parseInt(rentalDealerId);
+      }
+
+      const res = await fetch(`/api/orders/${rentalOrder.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        alert(isRentalEditMode ? "임대 기간이 수정되었습니다." : "임대 상태 및 임대 기간 설정이 완료되었습니다.");
+        setPendingChanges(prev => {
+          const next = { ...prev };
+          delete next[rentalOrder.id];
+          return next;
+        });
+        setRentalModalOpen(false);
+        setRentalOrder(null);
+        fetchInventory();
+      } else {
+        const errorData = await res.json();
+        alert(`저장 실패: ${errorData.detail || "알 수 없는 오류"}`);
+      }
+    } catch (err) {
+      console.error("Failed to save rental period:", err);
+      alert("임대 기간 저장 중 오류가 발생했습니다.");
+    } finally {
+      setSavingRental(false);
     }
   };
 
@@ -441,11 +584,10 @@ export default function AdminInventory({ isMobileView }) {
                         <select
                           value={sType}
                           onChange={(e) => handlePendingChange(order.id, 'stockType', e.target.value)}
-                          disabled={order.stock_type === 'RENTAL'}
                           style={{
                             background: typeBgColor, border: `1px solid ${typeBgColor}`, color: typeColor,
-                            padding: '6px 10px', borderRadius: '8px', fontSize: '0.85rem', cursor: order.stock_type === 'RENTAL' ? 'not-allowed' : 'pointer', width: '130px',
-                            fontWeight: 600, textAlign: 'center', opacity: order.stock_type === 'RENTAL' ? 0.7 : 1
+                            padding: '6px 10px', borderRadius: '8px', fontSize: '0.85rem', cursor: 'pointer', width: '130px',
+                            fontWeight: 600, textAlign: 'center'
                           }}
                         >
                           <option value="AVAILABLE" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>{t('menu2.type_available', '판매가능')}</option>
@@ -460,7 +602,7 @@ export default function AdminInventory({ isMobileView }) {
                         <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>ORDER</span>
                         <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flex: 1, justifyContent: 'flex-end' }}>
                           <select
-                            value={pendingChanges[order.id]?.dealerId || ""}
+                            value={pendingChanges[order.id]?.dealerId !== undefined ? pendingChanges[order.id].dealerId : (order.dealer_company_id || "")}
                             onChange={(e) => handlePendingChange(order.id, 'dealerId', e.target.value)}
                             style={{
                               background: 'var(--bg-secondary)', border: '1px solid var(--accent-cyan)', color: 'var(--text-primary)',
@@ -468,10 +610,9 @@ export default function AdminInventory({ isMobileView }) {
                             }}
                           >
                             <option value="" disabled>{t('menu2.convert_to_order', '딜러사 선택')}</option>
-                            {dealers.map(d => {
-                              if (order.stock_type === 'RENTAL' && d.name !== 'WME') return null;
-                              return <option key={d.id} value={d.id}>{d.name}</option>;
-                            })}
+                            {dealers.map(d => (
+                              <option key={d.id} value={d.id}>{d.name}</option>
+                            ))}
                           </select>
                           {pendingChanges[order.id] && (Object.keys(pendingChanges[order.id]).length > 0) && (
                             <button
@@ -496,8 +637,35 @@ export default function AdminInventory({ isMobileView }) {
                         <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>{t('menu2.detail_port', 'PORT')}:</strong> <span>{getStandardPort(order.destination_port)}</span></div>
                         <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>{t('menu2.detail_incoterms', 'INCOTERMS')}:</strong> <span>{order.incoterms || '-'}</span></div>
                         <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>{t('menu2.detail_vessel', 'VESSEL')}:</strong> <span>{order.vessel || '-'}</span></div>
-                        {order.stock_type === 'RENTAL' && order.dealer_company && order.dealer_company.name !== 'WME' && (
-                          <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>{t('menu2.detail_rental_dealer', '임대 딜러')}:</strong> <span>({order.dealer_company.name})</span></div>
+                        {order.stock_type === 'RENTAL' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <div style={{ display: 'flex' }}>
+                              <strong style={{ color: 'var(--text-primary)', width: '90px' }}>{t('menu2.detail_rental_dealer', '임대 딜러')}:</strong>
+                              <span>({order.dealer_company ? order.dealer_company.name : '미지정'})</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <strong style={{ color: 'var(--text-primary)', width: '90px' }}>{t('menu2.detail_rental_period', '임대 기간')}:</strong>
+                              <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
+                                {formatRentalPeriod(order.rental_start_date, order.rental_expiry_date)}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenRentalModalForEdit(order);
+                                }}
+                                className="btn btn-outline"
+                                style={{
+                                  padding: '2px 8px', fontSize: '11px', borderRadius: '4px',
+                                  borderColor: 'var(--wia-blue)', color: 'var(--wia-blue)', cursor: 'pointer',
+                                  display: 'inline-flex', alignItems: 'center', gap: '4px'
+                                }}
+                              >
+                                <Edit2 size={11} />
+                                {t('menu2.btn_edit_rental_period', '기간수정')}
+                              </button>
+                            </div>
+                          </div>
                         )}
                       </div>
                     )}
@@ -597,11 +765,10 @@ export default function AdminInventory({ isMobileView }) {
                             <select
                               value={sType}
                               onChange={(e) => handlePendingChange(order.id, 'stockType', e.target.value)}
-                              disabled={order.stock_type === 'RENTAL'}
                               style={{
                                 background: typeBgColor, border: `1px solid ${typeBgColor}`, color: typeColor,
-                                padding: '4px 8px', borderRadius: '6px', fontSize: '11px', cursor: order.stock_type === 'RENTAL' ? 'not-allowed' : 'pointer', width: '85px',
-                                fontWeight: 600, textAlign: 'center', opacity: order.stock_type === 'RENTAL' ? 0.7 : 1
+                                padding: '4px 8px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', width: '85px',
+                                fontWeight: 600, textAlign: 'center'
                               }}
                             >
                               <option value="AVAILABLE" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>{t('menu2.type_available', '판매가능')}</option>
@@ -614,7 +781,7 @@ export default function AdminInventory({ isMobileView }) {
                           <td onClick={e => e.stopPropagation()} style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px', textAlign: 'center' }}>
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                               <select
-                                value={pendingChanges[order.id]?.dealerId || ""}
+                                value={pendingChanges[order.id]?.dealerId !== undefined ? pendingChanges[order.id].dealerId : (order.dealer_company_id || "")}
                                 onChange={(e) => handlePendingChange(order.id, 'dealerId', e.target.value)}
                                 style={{
                                   background: 'var(--bg-secondary)', border: '1px solid var(--accent-cyan)', color: 'var(--text-primary)',
@@ -622,10 +789,9 @@ export default function AdminInventory({ isMobileView }) {
                                 }}
                               >
                                 <option value="" disabled>{t('menu2.convert_to_order', '딜러선택')}</option>
-                                {dealers.map(d => {
-                                  if (order.stock_type === 'RENTAL' && d.name !== 'WME') return null;
-                                  return <option key={d.id} value={d.id}>{d.name}</option>;
-                                })}
+                                {dealers.map(d => (
+                                  <option key={d.id} value={d.id}>{d.name}</option>
+                                ))}
                               </select>
                               {pendingChanges[order.id] && (Object.keys(pendingChanges[order.id]).length > 0) && (
                                 <button
@@ -678,8 +844,40 @@ export default function AdminInventory({ isMobileView }) {
                                   textAlign: 'left',
                                   paddingLeft: '16px',
                                 }}>
-                                  {order.stock_type === 'RENTAL' && order.dealer_company && order.dealer_company.name !== 'WME' && (
-                                    <div><span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{t('menu2.detail_rental_dealer', '임대 딜러')}: </span> ({order.dealer_company.name})</div>
+                                  {order.stock_type === 'RENTAL' && (
+                                    <>
+                                      <div>
+                                        <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{t('menu2.detail_rental_dealer', '임대 딜러')}: </span> ({order.dealer_company ? order.dealer_company.name : '미지정'})
+                                      </div>
+                                      <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                        <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{t('menu2.detail_rental_period', '임대 기간')}: </span>
+                                        <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
+                                          {formatRentalPeriod(order.rental_start_date, order.rental_expiry_date)}
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleOpenRentalModalForEdit(order);
+                                          }}
+                                          className="btn btn-outline"
+                                          style={{
+                                            padding: '2px 8px',
+                                            fontSize: '11px',
+                                            borderRadius: '4px',
+                                            borderColor: 'var(--wia-blue)',
+                                            color: 'var(--wia-blue)',
+                                            cursor: 'pointer',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '4px'
+                                          }}
+                                        >
+                                          <Edit2 size={11} />
+                                          {t('menu2.btn_edit_rental_period', '기간수정')}
+                                        </button>
+                                      </div>
+                                    </>
                                   )}
                                 </div>
                               </div>
@@ -695,10 +893,257 @@ export default function AdminInventory({ isMobileView }) {
           </div>
         )}
       </div>
+      {/* 임대 기간 설정 팝업 모달 */}
+      {rentalModalOpen && rentalOrder && (
+        <div
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 9999, padding: '20px'
+          }}
+          onClick={() => setRentalModalOpen(false)}
+        >
+          <div
+            className="glass-card"
+            style={{
+              width: '100%', maxWidth: '520px',
+              backgroundColor: 'var(--bg-card, #1a202c)',
+              border: '1px solid var(--border-color, rgba(255, 255, 255, 0.12))',
+              borderRadius: '16px',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.45)',
+              overflow: 'hidden',
+              animation: 'modalFadeIn 0.2s ease-out'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* 모달 헤더 */}
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '18px 24px',
+              borderBottom: '1px solid var(--border-color)',
+              background: 'linear-gradient(to right, rgba(0, 51, 153, 0.15), transparent)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '36px', height: '36px', borderRadius: '10px',
+                  backgroundColor: 'rgba(234, 179, 8, 0.15)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: 'var(--status-production, #eab308)'
+                }}>
+                  <Calendar size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    {isRentalEditMode ? "임대 기간 수정" : "임대 기간 설정"}
+                  </h3>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    {rentalOrder.product_model?.model_name || '장비'} ({rentalOrder.reference_no})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRentalModalOpen(false)}
+                style={{
+                  background: 'transparent', border: 'none', color: 'var(--text-muted)',
+                  cursor: 'pointer', padding: '6px', borderRadius: '8px', display: 'flex'
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* 모달 바디 */}
+            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              
+              {/* 공지 내용 텍스트 박스 */}
+              <div style={{
+                backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                border: '1px solid rgba(59, 130, 246, 0.25)',
+                borderRadius: '10px',
+                padding: '14px 16px',
+                display: 'flex', gap: '12px', alignItems: 'flex-start'
+              }}>
+                <AlertCircle size={20} color="var(--wia-blue, #2563eb)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', lineHeight: 1.5 }}>
+                  <div style={{ fontWeight: 700, marginBottom: '2px', color: 'var(--wia-blue, #2563eb)' }}>
+                    [공지] 임대 기간을 입력해 주시기 바랍니다.
+                  </div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
+                    달력 기능을 사용하여 임대 시작일과 종료일을 지정하신 후, 하단의 <strong>'임대기간 확정'</strong> 버튼을 클릭하여 일정을 저장해 주세요.
+                  </div>
+                </div>
+              </div>
+
+              {/* 장비 & 딜러 정보 카드 */}
+              <div style={{
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '10px',
+                padding: '12px 16px',
+                display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px',
+                fontSize: '0.85rem'
+              }}>
+                <div>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px' }}>모델</span>
+                  <strong style={{ color: 'var(--text-primary)' }}>{rentalOrder.product_model?.model_name || '-'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px' }}>발주번호</span>
+                  <strong style={{ color: 'var(--accent-cyan)' }}>{rentalOrder.reference_no || '-'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px' }}>임대 딜러</span>
+                  <strong style={{ color: 'var(--status-production, #eab308)' }}>
+                    {dealers.find(d => d.id === parseInt(rentalDealerId))?.name || rentalOrder.dealer_company?.name || '딜러 선택'}
+                  </strong>
+                </div>
+              </div>
+
+              {/* 날짜 선택 달력 입력란 */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                      임대 시작일
+                    </label>
+                    <input
+                      type="date"
+                      value={rentalStartDate}
+                      onChange={e => setRentalStartDate(e.target.value)}
+                      style={{
+                        width: '100%',
+                        background: 'var(--bg-input)',
+                        border: '1px solid var(--border-color)',
+                        color: 'var(--text-primary)',
+                        padding: '10px 12px',
+                        borderRadius: '8px',
+                        fontSize: '0.9rem',
+                        cursor: 'pointer',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                      임대 종료일 (만료일)
+                    </label>
+                    <input
+                      type="date"
+                      value={rentalEndDate}
+                      onChange={e => setRentalEndDate(e.target.value)}
+                      style={{
+                        width: '100%',
+                        background: 'var(--bg-input)',
+                        border: '1px solid var(--border-color)',
+                        color: 'var(--text-primary)',
+                        padding: '10px 12px',
+                        borderRadius: '8px',
+                        fontSize: '0.9rem',
+                        cursor: 'pointer',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* 빠른 기간 설정 프리셋 버튼 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginRight: '4px' }}>빠른 기간 선택:</span>
+                  {[
+                    { label: '+1개월', months: 1 },
+                    { label: '+3개월', months: 3 },
+                    { label: '+6개월', months: 6 },
+                    { label: '+1년', months: 12 },
+                    { label: '+2년', months: 24 }
+                  ].map(p => (
+                    <button
+                      key={p.label}
+                      type="button"
+                      onClick={() => handleQuickPeriod(p.months)}
+                      style={{
+                        background: 'var(--bg-secondary)',
+                        border: '1px solid var(--border-color)',
+                        color: 'var(--text-secondary)',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        fontSize: '0.78rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s'
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--wia-blue)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+
+            {/* 모달 푸터 버튼 */}
+            <div style={{
+              padding: '16px 24px',
+              borderTop: '1px solid var(--border-color)',
+              display: 'flex', justifyContent: 'flex-end', gap: '10px',
+              backgroundColor: 'var(--bg-card)'
+            }}>
+              <button
+                type="button"
+                onClick={() => setRentalModalOpen(false)}
+                style={{
+                  padding: '9px 18px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-color)',
+                  background: 'transparent',
+                  color: 'var(--text-secondary)',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer'
+                }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveRentalPeriod}
+                disabled={savingRental}
+                className="btn btn-primary"
+                style={{
+                  padding: '9px 20px',
+                  fontSize: '0.88rem',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: savingRental ? 'not-allowed' : 'pointer'
+                }}
+              >
+                <CheckCircle2 size={16} />
+                {savingRental ? "저장 중..." : (t('menu2.btn_confirm_rental_period', '임대기간 확정'))}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
         .sortable-th:hover {
           background-color: var(--bg-secondary) !important;
           color: var(--wia-blue) !important;
+        }
+        @keyframes modalFadeIn {
+          from {
+            opacity: 0;
+            transform: scale(0.96);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
         }
       `}</style>
     </div>
