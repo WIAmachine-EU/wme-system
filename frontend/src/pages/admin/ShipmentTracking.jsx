@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
-import Map, { Marker, NavigationControl, Source, Layer, Popup } from 'react-map-gl';
-import { ChevronDown, ChevronUp, MapPin, Ship, Navigation, ArrowLeft, Trash2, Link } from 'lucide-react';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import { ChevronDown, ChevronUp, MapPin, Ship, Navigation, ArrowLeft, Trash2, Link, Globe, Anchor } from 'lucide-react';
 import { DelayRateWidget } from '../../components/ShipmentWidgets';
+import TrackingMapboxWidget from '../../components/TrackingMapboxWidget';
 import { useQuery } from '@tanstack/react-query';
-
-const MAPBOX_TOKEN = 'pk.eyJ1IjoiZHVtbXkiLCJhIjoiY2x6ZHNhZHNhZHNhZHNhZHNhZHNhZHNhIn0.DummyTokenForMapboxGLJS123';
+import { checkIsDelayed } from '../../utils/geoUtils';
 
 const fetchShipments = async () => {
   const response = await fetch('/api/shipments');
@@ -15,7 +13,7 @@ const fetchShipments = async () => {
 
 export default function ShipmentTracking() {
   const [selectedMbl, setSelectedMbl] = useState(null);
-  const [activeTab, setActiveTab] = useState('Route'); // Route, Containers
+  const [activeTab, setActiveTab] = useState('Route'); // Route, Containers, Vessel, Exceptions
   
   const { data: shipments, isLoading } = useQuery({
     queryKey: ['shipments'],
@@ -25,94 +23,21 @@ export default function ShipmentTracking() {
 
   const activeShipment = shipments?.find(s => s.mbl_no === selectedMbl);
 
-  // Common port coordinates for dynamic map rendering
-  const PORT_COORDS = {
-    'KRBUS': [129.0756, 35.1796], // Busan
-    'Busan': [129.0756, 35.1796],
-    'DEHAM': [9.9937, 53.5511],   // Hamburg
-    'Hamburg': [9.9937, 53.5511],
-    'DEBRV': [8.5724, 53.5396],   // Bremerhaven
-  };
-
-  const getCoord = (port, defaultCoord) => PORT_COORDS[port] || defaultCoord;
-
-  const polCoord = activeShipment ? getCoord(activeShipment.pol, [129.0756, 35.1796]) : [129.0756, 35.1796];
-  const podCoord = activeShipment ? getCoord(activeShipment.pod, [9.9937, 53.5511]) : [9.9937, 53.5511];
-  
-  // Calculate a simple midpoint for the vessel location (mocking current progress)
-  // In a real scenario, TrackCargo API would provide current coordinates
-  const currentCoord = [
-    (polCoord[0] + podCoord[0]) / 2 + 5, // add offset for curve
-    (polCoord[1] + podCoord[1]) / 2 - 5
-  ];
-
-  // Dynamic Route generation for the map
-  const routeData = {
-    type: 'Feature',
-    properties: {},
-    geometry: {
-      type: 'LineString',
-      coordinates: [
-        polCoord,
-        currentCoord,
-        podCoord
-      ]
-    }
-  };
-
   return (
     <div style={{ position: 'relative', width: '100%', height: 'calc(100vh - 64px)', backgroundColor: '#eef2f6', overflow: 'hidden' }}>
       
-      {/* Mapbox Layer (Background) */}
+      {/* Mapbox 기반 해상 트래킹 맵 (배경 레이어) */}
       <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
-        <Map
-          mapboxAccessToken={MAPBOX_TOKEN}
-          initialViewState={{ longitude: 65, latitude: 20, zoom: 2 }}
-          mapStyle="mapbox://styles/mapbox/light-v11"
-          attributionControl={false}
-        >
-          <NavigationControl position="bottom-right" />
-          
-          {selectedMbl && activeShipment && (
-            <>
-              <Source id="route" type="geojson" data={routeData}>
-                <Layer
-                  id="route-line"
-                  type="line"
-                  paint={{
-                    'line-color': '#3b82f6',
-                    'line-width': 3,
-                    'line-dasharray': [2, 2]
-                  }}
-                />
-              </Source>
-
-              <Marker longitude={polCoord[0]} latitude={polCoord[1]} anchor="center">
-                <div style={{ width: '12px', height: '12px', backgroundColor: '#1f2937', borderRadius: '50%', border: '2px solid white', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }} />
-              </Marker>
-              <Marker longitude={podCoord[0]} latitude={podCoord[1]} anchor="center">
-                <div style={{ width: '12px', height: '12px', backgroundColor: '#1f2937', borderRadius: '50%', border: '2px solid white', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }} />
-              </Marker>
-              <Marker longitude={currentCoord[0]} latitude={currentCoord[1]} anchor="center">
-                <div style={{ backgroundColor: '#2563eb', color: 'white', padding: '6px', borderRadius: '50%', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', border: '2px solid white' }}>
-                  <Navigation size={16} style={{ transform: 'rotate(180deg)' }} />
-                </div>
-              </Marker>
-              
-              <Popup longitude={currentCoord[0]} latitude={currentCoord[1]} anchor="top" closeButton={false} style={{ marginTop: '8px', maxWidth: '250px' }}>
-                <div style={{ fontSize: '0.875rem', padding: '2px 4px' }}>
-                  <p style={{ fontWeight: 'bold', color: '#1f2937', margin: 0 }}>{activeShipment.mbl_no}</p>
-                  <p style={{ color: '#6b7280', fontSize: '0.75rem', marginTop: '2px', marginBottom: 0 }}>{activeShipment.pol} &gt; {activeShipment.pod}</p>
-                  <p style={{ color: '#2563eb', fontSize: '0.75rem', marginTop: '4px', marginBottom: 0, fontWeight: 500 }}>{activeShipment.trackcargo_status || 'In transit'}</p>
-                </div>
-              </Popup>
-            </>
-          )}
-        </Map>
+        <TrackingMapboxWidget
+          shipmentData={activeShipment}
+          allShipments={shipments || []}
+          onSelectShipment={(mbl) => setSelectedMbl(mbl)}
+        />
       </div>
 
       {/* Left Overlay Panel */}
-      <div style={{ position: 'absolute', top: '16px', left: '16px', bottom: '16px', width: '420px', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', zIndex: 10, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', top: '16px', left: '16px', bottom: '16px', width: '420px', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', zIndex: 10, display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+
         
         {!selectedMbl ? (
           // --- List View ---
@@ -133,31 +58,54 @@ export default function ShipmentTracking() {
 
               <div style={{ paddingTop: '8px', marginTop: '16px' }}>
                 <h3 style={{ fontSize: '0.875rem', fontWeight: 'bold', color: '#374151', marginBottom: '12px' }}>운송 중인 선적</h3>
-                {shipments?.map(s => (
-                  <div 
-                    key={s.mbl_no}
-                    onClick={() => setSelectedMbl(s.mbl_no)}
-                    style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px', marginBottom: '12px', cursor: 'pointer', backgroundColor: 'white', transition: 'all 0.2s' }}
-                    onMouseOver={(e) => { e.currentTarget.style.borderColor = '#60a5fa'; e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1)'; }}
-                    onMouseOut={(e) => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.boxShadow = 'none'; }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                      <span style={{ fontWeight: 'bold', color: '#111827' }}>{s.mbl_no}</span>
-                      <span style={{ fontSize: '0.75rem', backgroundColor: '#eff6ff', color: '#1d4ed8', padding: '2px 8px', borderRadius: '4px', fontWeight: 500, border: '1px solid #dbeafe' }}>In transit</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.875rem', color: '#4b5563' }}>
-                      <div>
-                        <p style={{ fontWeight: 500, color: '#1f2937', margin: 0 }}>{s.pol || 'Busan, KR'}</p>
-                        <p style={{ fontSize: '0.75rem', color: '#9ca3af', margin: 0 }}>ETD {s.etd ? new Date(s.etd).toLocaleDateString() : '-'}</p>
+                {shipments?.map(s => {
+                  const isDelayed = checkIsDelayed(s);
+                  const isDischarged = s.trackcargo_status === 'Discharged';
+                  return (
+                    <div 
+                      key={s.mbl_no}
+                      onClick={() => setSelectedMbl(s.mbl_no)}
+                      style={{ 
+                        border: '1px solid #e5e7eb', 
+                        borderRadius: '8px', 
+                        padding: '14px', 
+                        marginBottom: '10px', 
+                        cursor: 'pointer', 
+                        backgroundColor: 'white', 
+                        transition: 'all 0.2s',
+                        borderLeft: isDischarged ? '4px solid #9ca3af' : (isDelayed ? '4px solid #ef4444' : '4px solid #3b82f6')
+                      }}
+                      onMouseOver={(e) => { e.currentTarget.style.borderColor = '#60a5fa'; e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1)'; }}
+                      onMouseOut={(e) => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.boxShadow = 'none'; }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                        <span style={{ fontWeight: 'bold', color: '#111827' }}>{s.mbl_no}</span>
+                        <span style={{ 
+                          fontSize: '0.75rem', 
+                          backgroundColor: isDischarged ? '#f3f4f6' : (isDelayed ? '#fee2e2' : '#eff6ff'), 
+                          color: isDischarged ? '#4b5563' : (isDelayed ? '#b91c1c' : '#1d4ed8'), 
+                          padding: '2px 8px', 
+                          borderRadius: '4px', 
+                          fontWeight: 600, 
+                          border: `1px solid ${isDischarged ? '#e5e7eb' : (isDelayed ? '#fecaca' : '#dbeafe')}` 
+                        }}>
+                          {isDischarged ? '도착 (Discharged)' : (isDelayed ? '지연 (Delayed)' : (s.trackcargo_status || '운송중 (In transit)'))}
+                        </span>
                       </div>
-                      <Navigation size={16} color="#d1d5db" style={{ transform: 'rotate(90deg)' }} />
-                      <div style={{ textAlign: 'right' }}>
-                        <p style={{ fontWeight: 500, color: '#1f2937', margin: 0 }}>{s.pod || 'Hamburg, DE'}</p>
-                        <p style={{ fontSize: '0.75rem', color: '#9ca3af', margin: 0 }}>ETA {s.eta ? new Date(s.eta).toLocaleDateString() : '-'}</p>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.875rem', color: '#4b5563' }}>
+                        <div>
+                          <p style={{ fontWeight: 500, color: '#1f2937', margin: 0 }}>{s.pol || 'Busan, KR'}</p>
+                          <p style={{ fontSize: '0.75rem', color: '#9ca3af', margin: 0 }}>ETD {s.etd ? new Date(s.etd).toLocaleDateString() : '-'}</p>
+                        </div>
+                        <Navigation size={16} color={isDelayed ? '#f87171' : '#93c5fd'} style={{ transform: 'rotate(90deg)' }} />
+                        <div style={{ textAlign: 'right' }}>
+                          <p style={{ fontWeight: 500, color: '#1f2937', margin: 0 }}>{s.pod || 'Hamburg, DE'}</p>
+                          <p style={{ fontSize: '0.75rem', color: '#9ca3af', margin: 0 }}>ETA {s.eta ? new Date(s.eta).toLocaleDateString() : '-'}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {shipments?.length === 0 && (
                   <p style={{ fontSize: '0.875rem', color: '#6b7280', textAlign: 'center', padding: '16px 0' }}>운송 중인 선적 데이터가 없습니다.</p>
                 )}

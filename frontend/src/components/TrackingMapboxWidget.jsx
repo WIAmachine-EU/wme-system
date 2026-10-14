@@ -1,0 +1,644 @@
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import Map, { Source, Layer, Marker, Popup, NavigationControl, FullscreenControl } from 'react-map-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+import { 
+  getPortCoordinate, 
+  buildMaritimeRouteGeoJSON, 
+  calculateDistanceToGo, 
+  calculateHeading, 
+  checkIsDelayed, 
+  estimateVesselPosition 
+} from '../utils/geoUtils';
+import { Navigation, Anchor, AlertTriangle, CheckCircle2, Clock, MapPin, Compass, ShieldAlert } from 'lucide-react';
+
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
+
+/**
+ * [WIA 공작기계 ERP] Mapbox 기반 선적 트래킹 맵 컴포넌트
+ * 설계 가이드 v1.0 준수
+ * 
+ * Props:
+ * - shipmentData: 단일 선적 데이터 객체 (선택된 B/L)
+ * - allShipments: 전체 선적 배열 (글로벌 뷰)
+ * - onSelectShipment: 마커 클릭 시 선적 선택 콜백
+ * - height: 지도 높이 (기본값: '100%')
+ * - interactive: 지도 조작 가능 여부 (기본값: true)
+ */
+export default function TrackingMapboxWidget({
+  shipmentData,
+  allShipments = [],
+  onSelectShipment,
+  height = '100%',
+  interactive = true,
+}) {
+  const mapRef = useRef(null);
+  const [popupInfo, setPopupInfo] = useState(null);
+  const [viewState, setViewState] = useState({
+    longitude: 40,
+    latitude: 25,
+    zoom: 2.2,
+    pitch: 0,
+    bearing: 0,
+  });
+
+  // 단일 선적 데이터 정규화
+  const currentShipment = useMemo(() => {
+    if (!shipmentData) return null;
+
+    const polCoords = shipmentData.polCoords 
+      ? [shipmentData.polCoords.lng ?? shipmentData.polCoords[0], shipmentData.polCoords.lat ?? shipmentData.polCoords[1]]
+      : getPortCoordinate(shipmentData.pol || 'Busan');
+
+    const podCoords = shipmentData.podCoords 
+      ? [shipmentData.podCoords.lng ?? shipmentData.podCoords[0], shipmentData.podCoords.lat ?? shipmentData.podCoords[1]]
+      : getPortCoordinate(shipmentData.pod || 'Hamburg');
+
+    const isDelayed = shipmentData.isDelayed !== undefined 
+      ? shipmentData.isDelayed 
+      : checkIsDelayed(shipmentData);
+
+    const isDischarged = (shipmentData.trackcargo_status === 'Discharged' || shipmentData.status === 'Discharged');
+
+    // 현재 위치 (명시된 좌표가 있으면 사용, 없으면 ETD/ETA 기준 항로상 추정치)
+    let currentLng = shipmentData.currentLng ?? shipmentData.current_lng;
+    let currentLat = shipmentData.currentLat ?? shipmentData.current_lat;
+
+    if (currentLng == null || currentLat == null) {
+      if (isDischarged) {
+        [currentLng, currentLat] = podCoords;
+      } else {
+        [currentLng, currentLat] = estimateVesselPosition(
+          polCoords, 
+          podCoords, 
+          shipmentData.etd, 
+          shipmentData.eta
+        );
+      }
+    }
+
+    const currentCoord = [Number(currentLng), Number(currentLat)];
+    const distanceToGo = calculateDistanceToGo(currentCoord, podCoords);
+    const heading = shipmentData.heading ?? calculateHeading(currentCoord, podCoords);
+    const speed = shipmentData.speed || (isDischarged ? 0 : 16.8);
+
+    return {
+      mbl_no: shipmentData.mbl_no || 'N/A',
+      vesselName: shipmentData.vessel || shipmentData.vesselName || 'WIA Global Voyager',
+      voyage: shipmentData.voyage || '-',
+      polName: shipmentData.pol || 'KRBUS',
+      podName: shipmentData.pod || 'DEHAM',
+      polCoords,
+      podCoords,
+      currentCoord,
+      currentLng: currentCoord[0],
+      currentLat: currentCoord[1],
+      isDelayed,
+      isDischarged,
+      status: isDischarged ? 'Discharged (항구 도착)' : (isDelayed ? 'Delayed (지연 운항)' : 'In Transit (정상 운항)'),
+      distanceToGo,
+      heading,
+      speed,
+      etd: shipmentData.etd,
+      eta: shipmentData.eta,
+      raw: shipmentData
+    };
+  }, [shipmentData]);
+
+  // 선택된 선적이 변경될 때 부드러운 카메라 이동 (FlyTo)
+  useEffect(() => {
+    if (currentShipment && mapRef.current) {
+      mapRef.current.flyTo({
+        center: [currentShipment.currentLng, currentShipment.currentLat],
+        zoom: 4.2,
+        duration: 1500,
+        essential: true,
+      });
+    }
+  }, [currentShipment?.mbl_no]);
+
+  // 단일 선적 해상 항로 GeoJSON LineString
+  const singleRouteGeoJSON = useMemo(() => {
+    if (!currentShipment) return null;
+    return buildMaritimeRouteGeoJSON(
+      currentShipment.polCoords,
+      currentShipment.podCoords,
+      currentShipment.currentCoord
+    );
+  }, [currentShipment]);
+
+  // GeoJSON 궤적 선 스타일 (지연 시 Red #ef4444, 정상 시 Blue #3b82f6, 도착 시 Gray #9ca3af)
+  const routeLayerStyle = useMemo(() => {
+    if (!currentShipment) return null;
+    let lineColor = '#3b82f6';
+    if (currentShipment.isDischarged) {
+      lineColor = '#9ca3af';
+    } else if (currentShipment.isDelayed) {
+      lineColor = '#ef4444';
+    }
+
+    return {
+      id: 'maritime-route-line',
+      type: 'line',
+      paint: {
+        'line-color': lineColor,
+        'line-width': 3.5,
+        'line-dasharray': [2, 2],
+      },
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round'
+      }
+    };
+  }, [currentShipment]);
+
+  // 복수 선적 모드(글로벌 뷰) 정규화
+  const multiShipments = useMemo(() => {
+    if (shipmentData || !allShipments || allShipments.length === 0) return [];
+    return allShipments.map(s => {
+      const polCoords = getPortCoordinate(s.pol || 'Busan');
+      const podCoords = getPortCoordinate(s.pod || 'Hamburg');
+      const isDelayed = checkIsDelayed(s);
+      const isDischarged = s.trackcargo_status === 'Discharged';
+      const [lng, lat] = isDischarged 
+        ? podCoords 
+        : estimateVesselPosition(polCoords, podCoords, s.etd, s.eta);
+      const heading = calculateHeading([lng, lat], podCoords);
+
+      return {
+        ...s,
+        polCoords,
+        podCoords,
+        currentCoord: [lng, lat],
+        isDelayed,
+        isDischarged,
+        heading
+      };
+    });
+  }, [shipmentData, allShipments]);
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height, overflow: 'hidden', backgroundColor: '#e5e7eb' }}>
+      <Map
+        ref={mapRef}
+        {...viewState}
+        onMove={evt => setViewState(evt.viewState)}
+        mapStyle="mapbox://styles/mapbox/light-v11"
+        mapboxAccessToken={MAPBOX_TOKEN}
+        interactive={interactive}
+        attributionControl={false}
+      >
+        <NavigationControl position="bottom-right" />
+        <FullscreenControl position="bottom-right" />
+
+        {/* 1. 단일 선적 활성화 시 경로 렌더링 */}
+        {currentShipment && singleRouteGeoJSON && (
+          <Source id="active-shipment-route" type="geojson" data={singleRouteGeoJSON}>
+            <Layer {...routeLayerStyle} />
+          </Source>
+        )}
+
+        {/* 2. 출발항 (POL) 마커 */}
+        {currentShipment && (
+          <Marker 
+            longitude={currentShipment.polCoords[0]} 
+            latitude={currentShipment.polCoords[1]} 
+            anchor="center"
+          >
+            <div 
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                cursor: 'pointer'
+              }}
+              onClick={() => setPopupInfo({
+                type: 'port',
+                title: `출발항 (POL): ${currentShipment.polName}`,
+                desc: `ETD: ${currentShipment.etd ? new Date(currentShipment.etd).toLocaleDateString() : '-'}`,
+                coord: currentShipment.polCoords
+              })}
+            >
+              <div style={{
+                width: '14px',
+                height: '14px',
+                backgroundColor: '#1e3a8a',
+                border: '2px solid #ffffff',
+                borderRadius: '50%',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+              }} />
+              <span style={{
+                fontSize: '11px',
+                fontWeight: 600,
+                color: '#1e3a8a',
+                backgroundColor: 'rgba(255,255,255,0.92)',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+              }}>
+                POL: {currentShipment.polName}
+              </span>
+            </div>
+          </Marker>
+        )}
+
+        {/* 3. 도착항 (POD) 마커 */}
+        {currentShipment && (
+          <Marker 
+            longitude={currentShipment.podCoords[0]} 
+            latitude={currentShipment.podCoords[1]} 
+            anchor="center"
+          >
+            <div 
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                cursor: 'pointer'
+              }}
+              onClick={() => setPopupInfo({
+                type: 'port',
+                title: `도착항 (POD): ${currentShipment.podName}`,
+                desc: `ETA: ${currentShipment.eta ? new Date(currentShipment.eta).toLocaleDateString() : '-'}`,
+                coord: currentShipment.podCoords
+              })}
+            >
+              <div style={{
+                width: '14px',
+                height: '14px',
+                backgroundColor: '#047857',
+                border: '2px solid #ffffff',
+                borderRadius: '50%',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+              }} />
+              <span style={{
+                fontSize: '11px',
+                fontWeight: 600,
+                color: '#065f46',
+                backgroundColor: 'rgba(255,255,255,0.92)',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+              }}>
+                POD: {currentShipment.podName}
+              </span>
+            </div>
+          </Marker>
+        )}
+
+        {/* 4. 단일 선적 활성화 시 동적 선박 마커 (Custom HTML Marker with Heading) */}
+        {currentShipment && (
+          <Marker
+            longitude={currentShipment.currentLng}
+            latitude={currentShipment.currentLat}
+            anchor="center"
+          >
+            <div
+              onClick={() => setPopupInfo({
+                type: 'vessel',
+                data: currentShipment,
+                coord: currentShipment.currentCoord
+              })}
+              style={{
+                position: 'relative',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              {/* 펄스 애니메이션 링 (지연: Red, 정상: Blue, 도착: 회색(정지)) */}
+              {!currentShipment.isDischarged && (
+                <div 
+                  style={{
+                    position: 'absolute',
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '50%',
+                    backgroundColor: currentShipment.isDelayed ? 'rgba(239, 68, 68, 0.35)' : 'rgba(59, 130, 246, 0.35)',
+                    animation: 'ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite'
+                  }} 
+                />
+              )}
+
+              {/* 선박 마커 본체 */}
+              <div
+                style={{
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '50%',
+                  backgroundColor: currentShipment.isDischarged 
+                    ? '#6b7280' 
+                    : (currentShipment.isDelayed ? '#ef4444' : '#2563eb'),
+                  border: '2.5px solid #ffffff',
+                  boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#ffffff',
+                  transition: 'transform 0.3s ease'
+                }}
+              >
+                {/* 진행 방향(Heading)에 따른 선박 침로 회전 */}
+                <Navigation 
+                  size={18} 
+                  style={{ 
+                    transform: `rotate(${currentShipment.heading}deg)`,
+                    transition: 'transform 0.4s ease'
+                  }} 
+                />
+              </div>
+
+              {/* 선박명 라벨 태그 */}
+              <div style={{
+                position: 'absolute',
+                top: '38px',
+                whiteSpace: 'nowrap',
+                backgroundColor: '#1e293b',
+                color: '#f8fafc',
+                fontSize: '11px',
+                fontWeight: 600,
+                padding: '2px 8px',
+                borderRadius: '6px',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                pointerEvents: 'none'
+              }}>
+                🚢 {currentShipment.vesselName}
+              </div>
+            </div>
+          </Marker>
+        )}
+
+        {/* 5. 전체 선적 모드(글로벌 뷰) 선박 마커 목록 */}
+        {!currentShipment && multiShipments.map((s, idx) => (
+          <Marker
+            key={s.mbl_no || idx}
+            longitude={s.currentCoord[0]}
+            latitude={s.currentCoord[1]}
+            anchor="center"
+          >
+            <div
+              onClick={() => {
+                if (onSelectShipment) onSelectShipment(s.mbl_no);
+                setPopupInfo({
+                  type: 'vessel-compact',
+                  data: s,
+                  coord: s.currentCoord
+                });
+              }}
+              style={{
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'relative'
+              }}
+              title={`${s.mbl_no} (${s.vessel || 'Vessel'})`}
+            >
+              <div
+                style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '50%',
+                  backgroundColor: s.isDischarged 
+                    ? '#6b7280' 
+                    : (s.isDelayed ? '#ef4444' : '#3b82f6'),
+                  border: '2px solid white',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white'
+                }}
+              >
+                <Navigation 
+                  size={14} 
+                  style={{ transform: `rotate(${s.heading}deg)` }} 
+                />
+              </div>
+            </div>
+          </Marker>
+        ))}
+
+        {/* 6. 마커 클릭 시 정보 팝업 (Popup) */}
+        {popupInfo && (
+          <Popup
+            longitude={popupInfo.coord[0]}
+            latitude={popupInfo.coord[1]}
+            anchor="top"
+            closeOnClick={false}
+            onClose={() => setPopupInfo(null)}
+            style={{ zIndex: 30 }}
+          >
+            <div style={{ minWidth: '220px', padding: '4px' }}>
+              {popupInfo.type === 'vessel' && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e5e7eb', paddingBottom: '6px', marginBottom: '8px' }}>
+                    <span style={{ fontWeight: 700, fontSize: '13px', color: '#111827' }}>
+                      🚢 {popupInfo.data.vesselName}
+                    </span>
+                    <span style={{
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      backgroundColor: popupInfo.data.isDelayed ? '#fee2e2' : '#dbeafe',
+                      color: popupInfo.data.isDelayed ? '#b91c1c' : '#1e40af'
+                    }}>
+                      {popupInfo.data.status}
+                    </span>
+                  </div>
+
+                  <div style={{ fontSize: '12px', color: '#374151', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#6b7280' }}>B/L No:</span>
+                      <span style={{ fontWeight: 600 }}>{popupInfo.data.mbl_no}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#6b7280' }}>항로:</span>
+                      <span>{popupInfo.data.polName} → {popupInfo.data.podName}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#6b7280' }}>현재 속도:</span>
+                      <span style={{ fontWeight: 600 }}>{popupInfo.data.speed} kts</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#6b7280' }}>침로 (Heading):</span>
+                      <span>{Math.round(popupInfo.data.heading)}°</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #e5e7eb', paddingTop: '4px', marginTop: '4px' }}>
+                      <span style={{ color: '#6b7280' }}>최종 ETA:</span>
+                      <span style={{ fontWeight: 600, color: popupInfo.data.isDelayed ? '#dc2626' : '#2563eb' }}>
+                        {popupInfo.data.eta ? new Date(popupInfo.data.eta).toLocaleDateString() : '-'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {popupInfo.type === 'vessel-compact' && (
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '13px', color: '#111827', marginBottom: '4px' }}>
+                    {popupInfo.data.mbl_no}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}>
+                    {popupInfo.data.pol || 'Busan'} → {popupInfo.data.pod || 'Hamburg'}
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (onSelectShipment) onSelectShipment(popupInfo.data.mbl_no);
+                      setPopupInfo(null);
+                    }}
+                    style={{
+                      width: '100%',
+                      backgroundColor: '#2563eb',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '4px 8px',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    상세 항로 보기
+                  </button>
+                </div>
+              )}
+
+              {popupInfo.type === 'port' && (
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '13px', color: '#111827', marginBottom: '4px' }}>
+                    {popupInfo.title}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#4b5563' }}>
+                    {popupInfo.desc}
+                  </div>
+                </div>
+              )}
+            </div>
+          </Popup>
+        )}
+      </Map>
+
+      {/* 7. 핵심 성과 지표 (KPI) 대시보드 플로팅 연동 위젯 (Distance to Go & Delay Rate) */}
+      {currentShipment && (
+        <div style={{
+          position: 'absolute',
+          top: '16px',
+          right: '16px',
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          backdropFilter: 'blur(8px)',
+          borderRadius: '12px',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+          padding: '16px',
+          width: '320px',
+          zIndex: 10,
+          border: '1px solid rgba(229, 231, 235, 0.8)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px'
+        }}>
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '12px', fontWeight: 700, color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+              SCM Voyage KPI
+            </span>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '2px 8px',
+              borderRadius: '9999px',
+              fontSize: '11px',
+              fontWeight: 600,
+              backgroundColor: currentShipment.isDischarged 
+                ? '#f3f4f6' 
+                : (currentShipment.isDelayed ? '#fef2f2' : '#eff6ff'),
+              color: currentShipment.isDischarged 
+                ? '#4b5563' 
+                : (currentShipment.isDelayed ? '#dc2626' : '#2563eb'),
+              border: `1px solid ${currentShipment.isDischarged ? '#d1d5db' : (currentShipment.isDelayed ? '#fecaca' : '#bfdbfe')}`
+            }}>
+              {currentShipment.isDischarged ? (
+                <> <CheckCircle2 size={12} /> 항구 도착 완료 </>
+              ) : currentShipment.isDelayed ? (
+                <> <AlertTriangle size={12} /> 운송 지연 경고 (+3D) </>
+              ) : (
+                <> <CheckCircle2 size={12} /> 정상 정시 운항 </>
+              )}
+            </div>
+          </div>
+
+          {/* 운송 잔여 마일리지 (Distance to Go) */}
+          <div style={{
+            backgroundColor: '#f8fafc',
+            borderRadius: '8px',
+            padding: '12px',
+            border: '1px solid #e2e8f0'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+              <span style={{ fontSize: '12px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Compass size={14} color="#0284c7" /> 잔여 해상 거리 (Distance to Go)
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+              <span style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a' }}>
+                {currentShipment.isDischarged ? 0 : currentShipment.distanceToGo.nm.toLocaleString()}
+              </span>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748b' }}>NM (해리)</span>
+              <span style={{ fontSize: '12px', color: '#94a3b8', marginLeft: 'auto' }}>
+                ≈ {currentShipment.isDischarged ? 0 : currentShipment.distanceToGo.km.toLocaleString()} km
+              </span>
+            </div>
+          </div>
+
+          {/* 주요 운항 지표 그리드 */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <div style={{ backgroundColor: '#ffffff', padding: '8px 10px', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
+              <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '2px' }}>선박 속력 (Speed)</div>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: '#1e293b' }}>
+                {currentShipment.speed} kts
+              </div>
+            </div>
+            <div style={{ backgroundColor: '#ffffff', padding: '8px 10px', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
+              <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '2px' }}>진행 방위 (Heading)</div>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: '#1e293b' }}>
+                {Math.round(currentShipment.heading)}°
+              </div>
+            </div>
+            <div style={{ backgroundColor: '#ffffff', padding: '8px 10px', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
+              <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '2px' }}>출항일 (ETD)</div>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>
+                {currentShipment.etd ? new Date(currentShipment.etd).toLocaleDateString() : '-'}
+              </div>
+            </div>
+            <div style={{ backgroundColor: '#ffffff', padding: '8px 10px', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
+              <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '2px' }}>최종 예정일 (ETA)</div>
+              <div style={{ 
+                fontSize: '12px', 
+                fontWeight: 700, 
+                color: currentShipment.isDelayed ? '#dc2626' : '#2563eb' 
+              }}>
+                {currentShipment.eta ? new Date(currentShipment.eta).toLocaleDateString() : '-'}
+              </div>
+            </div>
+          </div>
+
+          {/* 선적 B/L & 선박 정보 푸터 */}
+          <div style={{ 
+            fontSize: '11px', 
+            color: '#64748b', 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            borderTop: '1px solid #f1f5f9', 
+            paddingTop: '8px' 
+          }}>
+            <span style={{ fontWeight: 600, color: '#334155' }}>B/L: {currentShipment.mbl_no}</span>
+            <span>Vessel: {currentShipment.vesselName}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
