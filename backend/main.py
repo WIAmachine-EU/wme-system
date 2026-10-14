@@ -105,6 +105,7 @@ def on_startup():
             f"ALTER TABLE orders ADD COLUMN {if_not_exists}rental_expiry_date {timestamp_type}",
             f"ALTER TABLE orders ADD COLUMN {if_not_exists}last_delivery_alert_month VARCHAR",
             f"ALTER TABLE orders ADD COLUMN {if_not_exists}rental_alert_sent BOOLEAN DEFAULT FALSE",
+            f"ALTER TABLE orders ADD COLUMN {if_not_exists}warehouse VARCHAR",
             f"ALTER TABLE promotion_inventory ADD COLUMN {if_not_exists}expiry_alert_sent BOOLEAN DEFAULT FALSE",
         ]:
             try:
@@ -112,6 +113,12 @@ def on_startup():
                 db.commit()
             except Exception:
                 db.rollback()
+
+        try:
+            db.execute(text("UPDATE orders SET warehouse = vessel WHERE (warehouse IS NULL OR warehouse = '') AND vessel IS NOT NULL AND vessel != ''"))
+            db.commit()
+        except Exception:
+            db.rollback()
 
         # Seed new EmailNotificationConfigs
         new_configs = [
