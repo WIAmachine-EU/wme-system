@@ -44,6 +44,11 @@ if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
                 c.execute("ALTER TABLE dealer_companies ADD COLUMN sap_code VARCHAR")
             except sqlite3.OperationalError:
                 pass # Column exists
+
+            try:
+                c.execute("ALTER TABLE orders ADD COLUMN warehouse VARCHAR")
+            except sqlite3.OperationalError:
+                pass # Column exists
                 
             conn.commit()
             conn.close()

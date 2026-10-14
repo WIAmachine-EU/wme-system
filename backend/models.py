@@ -171,6 +171,7 @@ class Order(Base):
     so_no = Column(String, nullable=True)
     incoterms = Column(String, nullable=True)
     vessel = Column(String, nullable=True)
+    warehouse = Column(String, nullable=True)
     destination_port = Column(String, nullable=True)
     price = Column(String, nullable=True)
     remark = Column(Text, nullable=True)

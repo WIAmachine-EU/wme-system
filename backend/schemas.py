@@ -148,6 +148,7 @@ class OrderBase(BaseModel):
     so_no: Optional[str] = None
     incoterms: Optional[str] = None
     vessel: Optional[str] = None
+    warehouse: Optional[str] = None
     destination_port: Optional[str] = None
     price: Optional[str] = None
     remark: Optional[str] = None
@@ -170,6 +171,8 @@ class OrderCreate(BaseModel):
     actual_date: Optional[datetime] = None
     nc: Optional[str] = None
     incoterms: Optional[str] = None
+    vessel: Optional[str] = None
+    warehouse: Optional[str] = None
     destination_port: Optional[str] = None
     dealer_order_date: Optional[datetime] = None
     delivery_request_date: Optional[str] = None
@@ -203,6 +206,7 @@ class OrderUpdate(BaseModel):
     incoterms: Optional[str] = None
     destination_port: Optional[str] = None
     vessel: Optional[str] = None
+    warehouse: Optional[str] = None
     price: Optional[str] = None
     remark: Optional[str] = None
     dealer_order_date: Optional[datetime] = None

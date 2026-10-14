@@ -124,6 +124,7 @@ export default function AdminDispatch({ isMobileView }) {
     destination_port: '',
     detail_spec: '',
     incoterms: '',
+    warehouse: '',
     vessel: '',
     remark: ''
   });
@@ -193,7 +194,8 @@ export default function AdminDispatch({ isMobileView }) {
       destination_port: order.destination_port || '',
       detail_spec: order.detail_spec || '',
       incoterms: order.incoterms || '',
-      vessel: order.vessel || '',
+      warehouse: order.warehouse || order.vessel || '',
+      vessel: order.warehouse || order.vessel || '',
       remark: order.remark || ''
     });
   };
@@ -216,7 +218,8 @@ export default function AdminDispatch({ isMobileView }) {
           destination_port: editForm.destination_port,
           detail_spec: editForm.detail_spec,
           incoterms: editForm.incoterms,
-          vessel: editForm.vessel,
+          warehouse: editForm.warehouse,
+          vessel: editForm.warehouse,
           remark: editForm.remark
         })
       });
@@ -282,7 +285,8 @@ export default function AdminDispatch({ isMobileView }) {
     const mn = o.product_model && o.product_model.model_name ? o.product_model.model_name.toLowerCase() : '';
     const po = o.reference_no ? o.reference_no.toLowerCase() : '';
     const nc = o.nc ? o.nc.toLowerCase() : '';
-    const matchesSearch = sn.includes(s) || mn.includes(s) || po.includes(s) || nc.includes(s);
+    const wh = (o.warehouse || o.vessel || '').toLowerCase();
+    const matchesSearch = sn.includes(s) || mn.includes(s) || po.includes(s) || nc.includes(s) || wh.includes(s);
     if (!matchesSearch) return false;
 
     if (agingFilter === 'LONG_DEAD') {
@@ -331,6 +335,10 @@ export default function AdminDispatch({ isMobileView }) {
       case 'sn':
         valA = a.serial_number || '';
         valB = b.serial_number || '';
+        break;
+      case 'warehouse':
+        valA = a.warehouse || a.vessel || '';
+        valB = b.warehouse || b.vessel || '';
         break;
       case 'aging': {
         const daysA = getAgingStatus(a.etd).days;
@@ -476,6 +484,8 @@ export default function AdminDispatch({ isMobileView }) {
               <option value="po_desc">P/O ▼</option>
               <option value="sn_asc">S/N ▲</option>
               <option value="sn_desc">S/N ▼</option>
+              <option value="warehouse_asc">창고 ▲ (오름차순)</option>
+              <option value="warehouse_desc">창고 ▼ (내림차순)</option>
               <option value="aging_asc">재고상태(에이징) ▲ (일반순)</option>
               <option value="aging_desc">재고상태(에이징) ▼ (장기순)</option>
               <option value="stock_type_asc">재고타입 ▲</option>
@@ -540,6 +550,7 @@ export default function AdminDispatch({ isMobileView }) {
                     <div className="mobile-order-meta">
                       <span>NC: <strong style={{ color: 'var(--text-primary)' }}>{order.nc || '-'}</strong></span>
                       <span>S/N: <strong style={{ color: 'var(--text-primary)' }}>{order.serial_number || '-'}</strong></span>
+                      <span>창고: <strong style={{ color: 'var(--text-primary)' }}>{order.warehouse || order.vessel || '-'}</strong></span>
                       <span>TYPE: <strong style={{ color: 'var(--text-primary)' }}>{displayType}</strong></span>
                     </div>
 
@@ -589,6 +600,7 @@ export default function AdminDispatch({ isMobileView }) {
                       <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px dashed var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                         <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>선적일자(ETD):</strong> <span>{order.etd ? new Date(order.etd).toLocaleDateString() : '-'}</span></div>
                         <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>입고일자:</strong> <span>{order.current_status_changed_at ? new Date(order.current_status_changed_at).toLocaleDateString() : '-'}</span></div>
+                        <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>창고:</strong> <span>{order.warehouse || order.vessel || '-'}</span></div>
                         <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>REMARK:</strong> <span>{order.remark || '-'}</span></div>
                         <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '100px' }}>DETAIL SPEC:</strong> <span>{order.detail_spec || '-'}</span></div>
                       </div>
@@ -611,21 +623,22 @@ export default function AdminDispatch({ isMobileView }) {
                   >
                     No.
                   </th>
-                  {renderSortHeader('model', '모델', '13%')}
-                  {renderSortHeader('nc', 'NC', '10%')}
-                  {renderSortHeader('po', 'P/O', '11%')}
-                  {renderSortHeader('sn', 'S/N', '12%')}
-                  {renderSortHeader('aging', '재고상태(에이징)', '12%')}
-                  {renderSortHeader('stock_type', '재고타입', '10%')}
-                  <th style={{ width: '8%', textAlign: 'center', fontWeight: 'bold' }}>화물</th>
-                  <th style={{ width: '20%', textAlign: 'center', fontWeight: 'bold' }}>진행</th>
+                  {renderSortHeader('model', '모델', '12%')}
+                  {renderSortHeader('nc', 'NC', '8%')}
+                  {renderSortHeader('po', 'P/O', '10%')}
+                  {renderSortHeader('sn', 'S/N', '11%')}
+                  {renderSortHeader('warehouse', '창고', '9%')}
+                  {renderSortHeader('aging', '재고상태(에이징)', '11%')}
+                  {renderSortHeader('stock_type', '재고타입', '9%')}
+                  <th style={{ width: '7%', textAlign: 'center', fontWeight: 'bold' }}>화물</th>
+                  <th style={{ width: '19%', textAlign: 'center', fontWeight: 'bold' }}>진행</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={9} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>데이터를 불러오는 중입니다...</td></tr>
+                  <tr><td colSpan={10} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>데이터를 불러오는 중입니다...</td></tr>
                 ) : sortedOrders.length === 0 ? (
-                  <tr><td colSpan={9} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>조건에 맞는 입고 장비가 없습니다.</td></tr>
+                  <tr><td colSpan={10} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>조건에 맞는 입고 장비가 없습니다.</td></tr>
                 ) : (
                   sortedOrders.map((order, index) => {
                     const aging = getAgingStatus(order.etd);
@@ -653,6 +666,9 @@ export default function AdminDispatch({ isMobileView }) {
                           </td>
                           <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px', textAlign: 'center' }}>
                             <div style={{ fontSize: '12px' }}>{order.serial_number || '-'}</div>
+                          </td>
+                          <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '12px', fontWeight: 600 }}>{order.warehouse || order.vessel || '-'}</div>
                           </td>
                           <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px', textAlign: 'center' }}>
                             <span style={{
@@ -712,7 +728,7 @@ export default function AdminDispatch({ isMobileView }) {
                         </tr>
                         {expandedRows.has(order.id) && (
                           <tr>
-                            <td colSpan={9} style={{ backgroundColor: 'var(--bg-card)', paddingTop: '12px', borderTop: '1px dashed var(--border-color)', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
+                            <td colSpan={10} style={{ backgroundColor: 'var(--bg-card)', paddingTop: '12px', borderTop: '1px dashed var(--border-color)', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', paddingLeft: '8px' }}>
                                 <div style={{
                                   fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.8', textAlign: 'left',
@@ -720,6 +736,7 @@ export default function AdminDispatch({ isMobileView }) {
                                 }}>
                                   <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>선적일자(ETD):</span> {order.etd ? new Date(order.etd).toLocaleDateString() : '-'}</div>
                                   <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>입고일자:</span> {order.current_status_changed_at ? new Date(order.current_status_changed_at).toLocaleDateString() : '-'}</div>
+                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>창고:</span> {order.warehouse || order.vessel || '-'}</div>
                                   <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>REMARK:</span> {order.remark || '-'}</div>
                                 </div>
                                 <div style={{
@@ -875,8 +892,17 @@ export default function AdminDispatch({ isMobileView }) {
                     <input type="text" value={editForm.incoterms} onChange={e => setEditForm({ ...editForm, incoterms: e.target.value })} placeholder={t('menu1.edit_modal.incoterms_placeholder', '인코텀즈 입력')} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>{t('menu1.edit_modal.vessel', '선박명')}</label>
-                    <input type="text" value={editForm.vessel} onChange={e => setEditForm({ ...editForm, vessel: e.target.value })} placeholder={t('menu1.edit_modal.vessel_placeholder', '선박명 입력')} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>{t('menu1.edit_modal.warehouse', '창고')}</label>
+                    <select
+                      value={editForm.warehouse || ''}
+                      onChange={e => setEditForm({ ...editForm, warehouse: e.target.value, vessel: e.target.value })}
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                    >
+                      <option value="">{t('menu1.edit_modal.warehouse_placeholder', '창고 선택')}</option>
+                      <option value="Hamburg">Hamburg (Germany)</option>
+                      <option value="Istanbul">Istanbul (Turkey)</option>
+                      <option value="Rotterdam">Rotterdam (Netherlands)</option>
+                    </select>
                   </div>
                 </div>
 

@@ -96,7 +96,10 @@
       "sn_placeholder": "S/N 입력",
       "so_placeholder": "S/O 번호",
       "detail_placeholder": "상세 스펙",
+      "vessel": "선박명",
       "vessel_placeholder": "선박명",
+      "warehouse": "창고",
+      "warehouse_placeholder": "창고 선택",
       "remark_placeholder": "비고 작성",
       "cancel": "취소",
       "save": "저장"

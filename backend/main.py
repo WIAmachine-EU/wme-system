@@ -532,6 +532,8 @@ def update_order_info(
         order.incoterms = payload.incoterms
     if payload.vessel is not None:
         order.vessel = payload.vessel
+    if hasattr(payload, 'warehouse') and payload.warehouse is not None:
+        order.warehouse = payload.warehouse
     if payload.remark is not None:
         order.remark = payload.remark
     if hasattr(payload, 'dealer_order_date') and payload.dealer_order_date is not None:

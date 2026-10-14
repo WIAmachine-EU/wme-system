@@ -96,7 +96,10 @@
       "sn_placeholder": "S/N",
       "so_placeholder": "S/O",
       "detail_placeholder": "detail",
+      "vessel": "VESSEL",
       "vessel_placeholder": "name",
+      "warehouse": "Warehouse",
+      "warehouse_placeholder": "Select Warehouse",
       "remark_placeholder": "text",
       "cancel": "cancell",
       "save": "Save"
