@@ -552,6 +552,10 @@ def update_order_info(
     if hasattr(payload, 'rental_expiry_date') and payload.rental_expiry_date is not None:
         order.rental_expiry_date = payload.rental_expiry_date
         order.rental_alert_sent = False
+    if "etd" in payload.model_fields_set:
+        order.etd = payload.etd
+    if "eta" in payload.model_fields_set:
+        order.eta = payload.eta
 
     db.commit()
     db.refresh(order)

@@ -100,6 +100,8 @@
       "vessel_placeholder": "name",
       "warehouse": "Warehouse",
       "warehouse_placeholder": "Select Warehouse",
+      "etd": "ETD",
+      "eta": "ETA",
       "remark_placeholder": "text",
       "cancel": "cancell",
       "save": "Save"

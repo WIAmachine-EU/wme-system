@@ -213,6 +213,8 @@ class OrderUpdate(BaseModel):
     delivery_request_date: Optional[str] = None
     rental_start_date: Optional[datetime] = None
     rental_expiry_date: Optional[datetime] = None
+    etd: Optional[datetime] = None
+    eta: Optional[datetime] = None
 
 class OrderStatusUpdate(BaseModel):
     to_status: OrderStatus

@@ -126,6 +126,8 @@ export default function AdminDispatch({ isMobileView }) {
     incoterms: '',
     warehouse: '',
     vessel: '',
+    etd: '',
+    eta: '',
     remark: ''
   });
 
@@ -181,8 +183,25 @@ export default function AdminDispatch({ isMobileView }) {
     fetch('/api/dealers').then(res => res.json()).then(data => Array.isArray(data) && setDealers(data)).catch(console.error);
   }, []);
 
+  const formatDateForInput = (dateVal) => {
+    if (!dateVal) return '';
+    try {
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return '';
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    } catch (e) {
+      return '';
+    }
+  };
+
   const handleEditClick = (order) => {
     setEditingOrder(order);
+    const initialWarehouse = order.warehouse || order.vessel || '';
+    const initialEtd = formatDateForInput(order.etd || order.shipment?.etd);
+    const initialEta = formatDateForInput(order.eta || order.shipment?.eta);
     setEditForm({
       product_model_id: order.product_model_id || '',
       reference_no: order.reference_no || '',
@@ -194,8 +213,10 @@ export default function AdminDispatch({ isMobileView }) {
       destination_port: order.destination_port || '',
       detail_spec: order.detail_spec || '',
       incoterms: order.incoterms || '',
-      warehouse: order.warehouse || order.vessel || '',
-      vessel: order.warehouse || order.vessel || '',
+      warehouse: initialWarehouse,
+      vessel: initialWarehouse,
+      etd: initialEtd,
+      eta: initialEta,
       remark: order.remark || ''
     });
   };
@@ -220,6 +241,8 @@ export default function AdminDispatch({ isMobileView }) {
           incoterms: editForm.incoterms,
           warehouse: editForm.warehouse,
           vessel: editForm.warehouse,
+          etd: editForm.etd ? `${editForm.etd}T00:00:00` : null,
+          eta: editForm.eta ? `${editForm.eta}T00:00:00` : null,
           remark: editForm.remark
         })
       });
@@ -599,6 +622,7 @@ export default function AdminDispatch({ isMobileView }) {
                     {expandedRows.has(order.id) && (
                       <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px dashed var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                         <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>선적일자(ETD):</strong> <span>{order.etd ? new Date(order.etd).toLocaleDateString() : '-'}</span></div>
+                        <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>도착예정(ETA):</strong> <span>{order.eta ? new Date(order.eta).toLocaleDateString() : '-'}</span></div>
                         <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>입고일자:</strong> <span>{order.current_status_changed_at ? new Date(order.current_status_changed_at).toLocaleDateString() : '-'}</span></div>
                         <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>창고:</strong> <span>{order.warehouse || order.vessel || '-'}</span></div>
                         <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>REMARK:</strong> <span>{order.remark || '-'}</span></div>
@@ -735,6 +759,7 @@ export default function AdminDispatch({ isMobileView }) {
                                   paddingLeft: '16px', borderLeft: '3px solid var(--wia-blue)',
                                 }}>
                                   <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>선적일자(ETD):</span> {order.etd ? new Date(order.etd).toLocaleDateString() : '-'}</div>
+                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>도착예정(ETA):</span> {order.eta ? new Date(order.eta).toLocaleDateString() : '-'}</div>
                                   <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>입고일자:</span> {order.current_status_changed_at ? new Date(order.current_status_changed_at).toLocaleDateString() : '-'}</div>
                                   <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>창고:</span> {order.warehouse || order.vessel || '-'}</div>
                                   <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>REMARK:</span> {order.remark || '-'}</div>
@@ -903,6 +928,33 @@ export default function AdminDispatch({ isMobileView }) {
                       <option value="Istanbul">Istanbul (Turkey)</option>
                       <option value="Rotterdam">Rotterdam (Netherlands)</option>
                     </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('menu1.edit_modal.etd', 'ETD')}</label>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>선적정보: <strong style={{ color: editForm.etd ? 'var(--text-primary)' : 'var(--text-muted)' }}>{editForm.etd || '-'}</strong></span>
+                    </div>
+                    <input
+                      type="date"
+                      value={editForm.etd}
+                      onChange={e => setEditForm({ ...editForm, etd: e.target.value })}
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                    />
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('menu1.edit_modal.eta', 'ETA')}</label>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>선적정보: <strong style={{ color: editForm.eta ? 'var(--text-primary)' : 'var(--text-muted)' }}>{editForm.eta || '-'}</strong></span>
+                    </div>
+                    <input
+                      type="date"
+                      value={editForm.eta}
+                      onChange={e => setEditForm({ ...editForm, eta: e.target.value })}
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                    />
                   </div>
                 </div>
 
