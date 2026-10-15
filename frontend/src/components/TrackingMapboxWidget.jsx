@@ -9,13 +9,14 @@ import {
   checkIsDelayed, 
   estimateVesselPosition 
 } from '../utils/geoUtils';
-import { Navigation, Anchor, AlertTriangle, CheckCircle2, Clock, MapPin, Compass, ShieldAlert } from 'lucide-react';
+import { Navigation, Anchor, AlertTriangle, CheckCircle2, Clock, MapPin, Compass, ShieldAlert, Globe as GlobeIcon, Map as MapIcon } from 'lucide-react';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
+const STORAGE_PROJECTION_KEY = 'wme_scm_map_projection';
 
 /**
  * [WIA 공작기계 ERP] Mapbox 기반 선적 트래킹 맵 컴포넌트
- * 설계 가이드 v1.0 준수
+ * 설계 가이드 v2.0 준수 (3D Globe / 2D Mercator 토글 및 개인화)
  * 
  * Props:
  * - shipmentData: 단일 선적 데이터 객체 (선택된 B/L)
@@ -23,6 +24,7 @@ const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
  * - onSelectShipment: 마커 클릭 시 선적 선택 콜백
  * - height: 지도 높이 (기본값: '100%')
  * - interactive: 지도 조작 가능 여부 (기본값: true)
+ * - defaultProjection: 기본 투영 방식 ('mercator' | 'globe')
  */
 export default function TrackingMapboxWidget({
   shipmentData,
@@ -30,9 +32,34 @@ export default function TrackingMapboxWidget({
   onSelectShipment,
   height = '100%',
   interactive = true,
+  defaultProjection = 'mercator'
 }) {
   const mapRef = useRef(null);
   const [popupInfo, setPopupInfo] = useState(null);
+
+  // [v2.0] 평면(mercator) vs 지구본(globe) 투영 모드 상태 관리 (개인화 스토리지 연동)
+  const [mapProjection, setMapProjection] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_PROJECTION_KEY);
+      if (saved === 'globe' || saved === 'mercator') {
+        return saved;
+      }
+    } catch (e) {
+      // 로컬 스토리지 접근 불가 시 무시
+    }
+    return defaultProjection;
+  });
+
+  const handleProjectionChange = (newProjection) => {
+    if (newProjection === mapProjection) return;
+    setMapProjection(newProjection);
+    try {
+      localStorage.setItem(STORAGE_PROJECTION_KEY, newProjection);
+    } catch (e) {
+      console.warn('Failed to save projection preference:', e);
+    }
+  };
+
   const [viewState, setViewState] = useState({
     longitude: 40,
     latitude: 25,
@@ -103,6 +130,20 @@ export default function TrackingMapboxWidget({
       raw: shipmentData
     };
   }, [shipmentData]);
+
+  // [v2.0] 선적일(ETD) 기준 운항/체화 경과일 수(Aging) 및 180일 이상 악성 재고 판정
+  const { voyageDays, isAgingAlert } = useMemo(() => {
+    if (!currentShipment || !currentShipment.etd) return { voyageDays: null, isAgingAlert: false };
+    const etdDate = new Date(currentShipment.etd);
+    const now = new Date();
+    const diffTime = now.getTime() - etdDate.getTime();
+    if (diffTime < 0) return { voyageDays: 0, isAgingAlert: false };
+    const days = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    return {
+      voyageDays: days,
+      isAgingAlert: days >= 180
+    };
+  }, [currentShipment?.etd]);
 
   // 선택된 선적이 변경될 때 부드러운 카메라 이동 (FlyTo)
   useEffect(() => {
@@ -184,6 +225,13 @@ export default function TrackingMapboxWidget({
         onMove={evt => setViewState(evt.viewState)}
         mapStyle="mapbox://styles/mapbox/light-v11"
         mapboxAccessToken={MAPBOX_TOKEN}
+        projection={mapProjection}
+        fog={mapProjection === 'globe' ? {
+          'color': 'rgb(220, 235, 255)',
+          'high-color': 'rgb(36, 92, 223)',
+          'space-color': 'rgb(11, 15, 25)',
+          'horizon-blend': 0.05
+        } : undefined}
         interactive={interactive}
         attributionControl={false}
       >
@@ -520,11 +568,100 @@ export default function TrackingMapboxWidget({
         )}
       </Map>
 
-      {/* 7. 핵심 성과 지표 (KPI) 대시보드 플로팅 연동 위젯 (Distance to Go & Delay Rate) */}
+      {/* [v2.0] 우측 상단 투영 방식 전환 토글 스위치 (3D 지구본 | 2D 평면) */}
+      <div 
+        style={{
+          position: 'absolute',
+          top: '16px',
+          right: '16px',
+          zIndex: 20,
+          display: 'flex',
+          alignItems: 'center',
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(226, 232, 240, 0.9)',
+          borderRadius: '10px',
+          boxShadow: '0 4px 16px -2px rgba(15, 23, 42, 0.12), 0 2px 4px -2px rgba(15, 23, 42, 0.06)',
+          padding: '4px',
+          gap: '4px'
+        }}
+      >
+        {/* 3D 지구본 모드 버튼 */}
+        <button
+          type="button"
+          onClick={() => handleProjectionChange('globe')}
+          title="3D 지구본 모드: 한국-유럽 대양 횡단(Deep Sea) 여정의 시각적 몰입감 제공"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '6px 12px',
+            borderRadius: '7px',
+            fontSize: '12px',
+            fontWeight: mapProjection === 'globe' ? 700 : 500,
+            cursor: 'pointer',
+            border: 'none',
+            transition: 'all 0.2s ease',
+            background: mapProjection === 'globe' 
+              ? 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)' 
+              : 'transparent',
+            color: mapProjection === 'globe' ? '#ffffff' : '#475569',
+            boxShadow: mapProjection === 'globe' 
+              ? '0 2px 6px rgba(37, 99, 235, 0.35)' 
+              : 'none',
+          }}
+          onMouseEnter={(e) => {
+            if (mapProjection !== 'globe') e.currentTarget.style.backgroundColor = '#f1f5f9';
+          }}
+          onMouseLeave={(e) => {
+            if (mapProjection !== 'globe') e.currentTarget.style.backgroundColor = 'transparent';
+          }}
+        >
+          <span style={{ fontSize: '13px' }}>🌍</span>
+          <span>3D 지구본</span>
+        </button>
+
+        {/* 2D 평면 모드 버튼 */}
+        <button
+          type="button"
+          onClick={() => handleProjectionChange('mercator')}
+          title="2D 평면 지도 모드: 좁은 유럽 내해 및 항구 근처 복잡한 경로 왜곡 최소화"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '6px 12px',
+            borderRadius: '7px',
+            fontSize: '12px',
+            fontWeight: mapProjection === 'mercator' ? 700 : 500,
+            cursor: 'pointer',
+            border: 'none',
+            transition: 'all 0.2s ease',
+            background: mapProjection === 'mercator' 
+              ? 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)' 
+              : 'transparent',
+            color: mapProjection === 'mercator' ? '#ffffff' : '#475569',
+            boxShadow: mapProjection === 'mercator' 
+              ? '0 2px 6px rgba(37, 99, 235, 0.35)' 
+              : 'none',
+          }}
+          onMouseEnter={(e) => {
+            if (mapProjection !== 'mercator') e.currentTarget.style.backgroundColor = '#f1f5f9';
+          }}
+          onMouseLeave={(e) => {
+            if (mapProjection !== 'mercator') e.currentTarget.style.backgroundColor = 'transparent';
+          }}
+        >
+          <span style={{ fontSize: '13px' }}>🗺️</span>
+          <span>2D 평면</span>
+        </button>
+      </div>
+
+      {/* 7. 핵심 성과 지표 (KPI) 대시보드 플로팅 연동 위젯 (Distance to Go & Delay Rate & Aging) */}
       {currentShipment && (
         <div style={{
           position: 'absolute',
-          top: '16px',
+          top: '68px',
           right: '16px',
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(8px)',
@@ -623,6 +760,28 @@ export default function TrackingMapboxWidget({
               </div>
             </div>
           </div>
+
+          {/* [v2.0] 출항 경과일 (Voyage Days) 및 180일 체화 재고 Aging 알림 */}
+          {voyageDays !== null && (
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between',
+              backgroundColor: isAgingAlert ? '#fff1f2' : '#f8fafc',
+              padding: '8px 10px',
+              borderRadius: '6px',
+              border: `1px solid ${isAgingAlert ? '#fecdd3' : '#e2e8f0'}`,
+              fontSize: '11px'
+            }}>
+              <span style={{ color: isAgingAlert ? '#be123c' : '#64748b', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500 }}>
+                <Clock size={13} color={isAgingAlert ? '#e11d48' : '#0284c7'} /> 
+                운항 경과 (Aging):
+              </span>
+              <span style={{ fontWeight: 700, color: isAgingAlert ? '#be123c' : '#1e293b' }}>
+                {voyageDays}일 경과 {isAgingAlert && <span style={{ color: '#e11d48', fontSize: '10px', fontWeight: 800 }}>(180일+ 체화 악성)</span>}
+              </span>
+            </div>
+          )}
 
           {/* 선적 B/L & 선박 정보 푸터 */}
           <div style={{ 

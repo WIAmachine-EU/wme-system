@@ -62,7 +62,7 @@ export function InventoryAgingWidget({ orders }) {
   );
 }
 
-export function DelayRateWidget({ shipments }) {
+export function DelayRateWidget({ shipments, isMobileView = false }) {
   let totalActive = 0;
   let delayed = 0;
   
@@ -91,13 +91,23 @@ export function DelayRateWidget({ shipments }) {
   ];
 
   return (
-    <div style={{ backgroundColor: '#fff', padding: '16px', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', border: '1px solid #f3f4f6', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ 
+      backgroundColor: '#fff', 
+      padding: isMobileView ? '14px 16px' : '16px', 
+      borderRadius: '12px', 
+      boxShadow: isMobileView ? '0 1px 3px rgba(0,0,0,0.05)' : '0 4px 6px -1px rgba(0,0,0,0.1)', 
+      border: '1px solid #e2e8f0', 
+      display: 'flex', 
+      flexDirection: 'column',
+      width: '100%',
+      boxSizing: 'border-box'
+    }}>
       <div style={{ marginBottom: '8px' }}>
-        <h3 style={{ fontSize: '1.125rem', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>해상 운송 지연율</h3>
-        <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>TrackCargo 연동 ETA 변동 기준</p>
+        <h3 style={{ fontSize: isMobileView ? '1rem' : '1.125rem', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>해상 운송 지연율</h3>
+        <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '2px 0 0 0' }}>TrackCargo 연동 ETA 변동 기준</p>
       </div>
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ width: '50%', height: '160px' }}>
+        <div style={{ width: '50%', height: isMobileView ? '135px' : '160px' }}>
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie data={data} cx="50%" cy="70%" startAngle={180} endAngle={0} innerRadius={50} outerRadius={70} paddingAngle={2} dataKey="value">
