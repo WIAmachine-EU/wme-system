@@ -76,6 +76,18 @@ class ShipmentBase(BaseModel):
     trackcargo_last_sync: Optional[datetime] = None
     trackcargo_error: Optional[str] = None
 
+    # [v3.0] Real AIS Tracking & Vessel Specs
+    vessel_name: Optional[str] = None
+    vessel_imo: Optional[str] = None
+    vessel_mmsi: Optional[str] = None
+    vessel_speed_kn: Optional[float] = None
+    vessel_course_deg: Optional[float] = None
+    reported_distance_km: Optional[float] = None
+    last_lat: Optional[float] = None
+    last_lng: Optional[float] = None
+    route_coordinates: Optional[List[Any]] = None
+    route_updated_at: Optional[datetime] = None
+
 class ShipmentCreate(ShipmentBase):
     pass
 
@@ -83,6 +95,34 @@ class ShipmentOut(ShipmentBase):
     id: int
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
+class ActiveVesselOut(BaseModel):
+    name: Optional[str] = None
+    imo: Optional[str] = None
+    mmsi: Optional[str] = None
+    speed_kn: Optional[float] = None
+    course_deg: Optional[float] = None
+
+class LastKnownPositionOut(BaseModel):
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+
+class RouteSummaryOut(BaseModel):
+    reported_distance_km: Optional[float] = None
+    route_points_count: Optional[int] = None
+    last_known_position: Optional[LastKnownPositionOut] = None
+    updated_at: Optional[datetime] = None
+
+class ShipmentRouteMapOut(BaseModel):
+    mbl_no: str
+    pol_code: Optional[str] = None
+    pod_code: Optional[str] = None
+    etd: Optional[datetime] = None
+    eta: Optional[datetime] = None
+    tracking_status: Optional[str] = None
+    active_vessel: Optional[ActiveVesselOut] = None
+    route_summary: Optional[RouteSummaryOut] = None
+    route_coordinates: Optional[List[Any]] = None
 
 class ShipmentUploadRow(BaseModel):
     mbl_no: str

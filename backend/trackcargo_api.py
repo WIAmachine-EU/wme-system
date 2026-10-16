@@ -210,14 +210,29 @@ async def fetch_tracking_data(order_id: str) -> Optional[Dict[str, Any]]:
                     except ValueError:
                         pass
                 
+                # [v3.0] Extract Route and Active Vessel details
+                from route_service import parse_trackcargo_detail_payload
+                route_detail = parse_trackcargo_detail_payload(data)
+                
+                vessel_result = route_detail.get("vessel_name") or data.get("vessel") or ""
+                
                 return {
                     "trackcargo_status": data.get("status", "Active"),
-                    "vessel": data.get("vessel", ""),
+                    "vessel": vessel_result,
                     "voyage": data.get("voyage", ""),
                     "pol": data.get("pol", ""),
                     "pod": data.get("pod", ""),
                     "etd": etd,
                     "eta": eta,
+                    "vessel_name": route_detail.get("vessel_name"),
+                    "vessel_imo": route_detail.get("vessel_imo"),
+                    "vessel_mmsi": route_detail.get("vessel_mmsi"),
+                    "vessel_speed_kn": route_detail.get("vessel_speed_kn"),
+                    "vessel_course_deg": route_detail.get("vessel_course_deg"),
+                    "reported_distance_km": route_detail.get("reported_distance_km"),
+                    "last_lat": route_detail.get("last_lat"),
+                    "last_lng": route_detail.get("last_lng"),
+                    "route_coordinates": route_detail.get("route_coordinates"),
                     "error": None
                 }
             else:

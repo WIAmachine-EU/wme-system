@@ -88,59 +88,82 @@ export function getPortCoordinate(portIdentifier, defaultCoord = [129.0756, 35.1
 }
 
 /**
- * 아시아-유럽 현실적 주요 해상 항로 웨이포인트 (마린 루트)
+ * [v3.0] 아시아-유럽 현실적 주요 해상 항로 웨이포인트 (남아공 희망봉 Cape of Good Hope 우회 항로)
+ * 수에즈 운하/홍해 통항 중단에 따른 글로벌 정기 컨테이너선 실제 운항 회랑 (총 약 26,000km)
  */
-const ASIA_EUROPE_MARITIME_CORRIDOR = [
+export const CAPE_OF_GOOD_HOPE_WAYPOINTS = [
   [129.08, 35.18],  // 부산 출발 (POL)
   [128.50, 33.50],  // 대한해협 통과
   [123.50, 27.50],  // 동중국해
   [119.50, 22.00],  // 대만 남단 / 바시 해협
-  [112.00, 12.00],  // 남중국해 중앙 항로
-  [104.50, 1.30],   // 싱가포르 말라카 해협 입구
-  [95.00, 5.50],    // 안다만해 통과
-  [80.00, 5.80],    // 스리랑카 남단
-  [65.00, 11.50],   // 아라비아해 중앙
-  [51.50, 12.00],   // 아덴만 입구
-  [43.50, 12.60],   // 바브엘만데브 해협
-  [38.00, 20.00],   // 홍해 남부
-  [33.00, 27.50],   // 홍해 북부
-  [32.30, 31.25],   // 수에즈 운하 북단 (포트사이드)
-  [25.00, 34.50],   // 지중해 동부 (크레타섬 남단)
-  [15.00, 36.50],   // 지중해 중앙 (몰타섬 인근)
-  [-5.50, 36.00],   // 지브롤터 해협 통과
-  [-9.50, 39.50],   // 포르투갈 해역 (대서양)
-  [-9.50, 44.00],   // 비스케이만 외곽
-  [-4.50, 48.50],   // 프랑스 브레스트 외곽
-  [-1.00, 50.00],   // 영국 해협
-  [2.50, 51.50],    // 도버 해협 북해 진입
-  [8.00, 54.00],    // 북해 엘베강 하구
+  [113.00, 14.00],  // 남중국해 중앙
+  [106.00, 3.50],   // 싱가포르/말레이 해협 접근
+  [105.80, -5.90],  // 순다 해협 통과
+  [104.50, -8.00],  // 인도양 진입
+  [95.00, -12.00],  // 동인도양 남하
+  [85.00, -17.00],  // 인도양 남부 대양 횡단
+  [75.00, -21.00],  // 인도양 중앙
+  [65.00, -24.50],  // 서인도양
+  [55.00, -28.00],  // 마다가스카르 동남해역
+  [45.00, -31.00],  // 마다가스카르 남단
+  [35.00, -34.00],  // 남아프리카 더반 외해
+  [27.00, -35.20],  // 포트엘리자베스 외해
+  [20.00, -35.50],  // 아굴라스곶 (아프리카 대륙 최남단)
+  [17.80, -34.20],  // 케이프타운 / 희망봉 통과
+  [15.00, -31.50],  // 남대서양 북상 진입
+  [11.00, -25.00],  // 나미비아 외해
+  [4.00, -15.00],   // 앙골라 외해
+  [-2.00, -5.00],   // 대서양 적도 횡단
+  [-12.00, 5.00],   // 서아프리카 기니만 외해
+  [-18.00, 15.00],  // 세네갈 다카르 외해
+  [-18.50, 24.00],  // 카나리아 제도 서쪽 대서양
+  [-14.00, 32.00],  // 마데이라 제도 외해
+  [-9.50, 38.50],   // 포르투갈 리스본 외해
+  [-9.50, 44.00],   // 비스케이만 외해
+  [-5.00, 48.50],   // 프랑스 브레스트 외해
+  [-0.50, 50.20],   // 영국 해협
+  [2.00, 51.20],    // 도버 해협 / 북해 진입
+  [3.99, 51.95],    // 로테르담 외곽 (AIS 최후 보고 위치)
   [9.99, 53.55],    // 함부르크 도착 (POD)
 ];
 
+// 레거시 호환용 별칭
+export const ASIA_EUROPE_MARITIME_CORRIDOR = CAPE_OF_GOOD_HOPE_WAYPOINTS;
+
 /**
- * 두 좌표 간 해상 이동 궤적을 부드러운 곡선 GeoJSON으로 생성
+ * [v3.0] 선적 해상 이동 궤적을 GeoJSON LineString으로 생성
+ * @param {Array} polCoord 출발항 [lng, lat]
+ * @param {Array} podCoord 도착항 [lng, lat]
+ * @param {Array} currentCoord 선박 현재 위치 [lng, lat]
+ * @param {Array} customCoordinates 실제 TrackCargo AIS 수집 궤적 배열 (존재 시 최우선 사용)
  */
-export function buildMaritimeRouteGeoJSON(polCoord, podCoord, currentCoord) {
-  // 출발지와 목적지가 아시아-유럽 루트인지 판단
-  const isAsiaPOL = polCoord[0] > 100;
-  const isEuropePOD = podCoord[0] < 35 && podCoord[1] > 35;
+export function buildMaritimeRouteGeoJSON(polCoord, podCoord, currentCoord, customCoordinates) {
+  // 1. TrackCargo 실제 수신 AIS 궤적 데이터가 존재하면 정밀 궤적 즉시 렌더링
+  if (customCoordinates && Array.isArray(customCoordinates) && customCoordinates.length > 1) {
+    return {
+      type: 'Feature',
+      properties: { 
+        isRealAisRoute: true, 
+        pointCount: customCoordinates.length 
+      },
+      geometry: {
+        type: 'LineString',
+        coordinates: customCoordinates
+      }
+    };
+  }
+
+  // 2. 출발지와 목적지가 아시아-유럽 루트인지 판단
+  const isAsiaPOL = polCoord && polCoord[0] > 100;
+  const isEuropePOD = podCoord && podCoord[0] < 35 && podCoord[1] > 35;
 
   let baseCoordinates = [];
 
   if (isAsiaPOL && isEuropePOD) {
-    // 실제 해상 통로 기반 웨이포인트 스플라인 생성
+    // [v3.0] 희망봉(Cape of Good Hope) 실제 해상 통로 웨이포인트 스플라인 생성
     baseCoordinates = [
       polCoord,
-      [125.0, 30.0],
-      [115.0, 15.0],
-      [104.5, 1.3],   // 말라카
-      [80.0, 5.8],    // 스리랑카
-      [51.5, 12.0],   // 아덴만
-      [33.0, 27.5],   // 홍해
-      [20.0, 35.0],   // 지중해
-      [-5.5, 36.0],   // 지브롤터
-      [-9.0, 43.0],   // 대서양
-      [2.0, 51.0],    // 도버
+      ...CAPE_OF_GOOD_HOPE_WAYPOINTS.slice(1, -1),
       podCoord
     ];
   } else {
@@ -150,10 +173,9 @@ export function buildMaritimeRouteGeoJSON(polCoord, podCoord, currentCoord) {
     baseCoordinates = [polCoord, [midLng, midLat], podCoord];
   }
 
-  // 선박 현재 위치가 있으면 가장 가까운 항로에 맞춤
   return {
     type: 'Feature',
-    properties: {},
+    properties: { isRealAisRoute: false, pointCount: baseCoordinates.length },
     geometry: {
       type: 'LineString',
       coordinates: baseCoordinates
@@ -228,15 +250,31 @@ export function checkIsDelayed(shipment) {
 }
 
 /**
- * 선박의 현재 진행률에 따른 모의 위경도 산출 (실시간 GPS 부재 시 해상 항로 보간)
+ * [v3.0] 선박의 현재 진행률에 따른 위경도 산출 (실제 수집 AIS 좌표 또는 해상 항로 보간)
  */
-export function estimateVesselPosition(polCoord, podCoord, etd, eta) {
+export function estimateVesselPosition(polCoord, podCoord, etd, eta, customCoordinates) {
+  // 1. 실제 AIS 궤적 데이터가 존재하는 경우
+  if (customCoordinates && Array.isArray(customCoordinates) && customCoordinates.length > 1) {
+    if (!etd || !eta) {
+      // ETD/ETA가 없을 시 최근 수신된 위치 반환
+      return customCoordinates[customCoordinates.length - 1];
+    }
+    const startDate = new Date(etd).getTime();
+    const endDate = new Date(eta).getTime();
+    const now = Date.now();
+
+    if (now <= startDate) return customCoordinates[0];
+    if (now >= endDate) return customCoordinates[customCoordinates.length - 1];
+
+    const progress = Math.min(Math.max((now - startDate) / (endDate - startDate), 0.01), 0.99);
+    const targetIdx = Math.min(Math.floor(progress * customCoordinates.length), customCoordinates.length - 1);
+    return customCoordinates[targetIdx];
+  }
+
+  // 2. AIS 궤적이 없을 때 기본 항로(희망봉 우회) 보간
   if (!etd || !eta) {
-    // 디폴트 중간 좌표
-    return [
-      (polCoord[0] + podCoord[0]) / 2 + 10,
-      (polCoord[1] + podCoord[1]) / 2 - 8
-    ];
+    // 디폴트 중간 좌표 (대서양 해역)
+    return [0.0, 0.0];
   }
 
   const startDate = new Date(etd).getTime();
@@ -248,18 +286,10 @@ export function estimateVesselPosition(polCoord, podCoord, etd, eta) {
 
   const progress = Math.min(Math.max((now - startDate) / (endDate - startDate), 0.05), 0.95);
 
-  // 아시아-유럽 항로 주요 포인트 기반 위치 보간
+  // [v3.0] 아시아-유럽 희망봉 우회 항로 기반 위치 보간
   const routePoints = [
     polCoord,
-    [125.0, 30.0],
-    [115.0, 15.0],
-    [104.5, 1.3],   // 말라카 해협
-    [80.0, 5.8],    // 스리랑카
-    [51.5, 12.0],   // 아덴만
-    [33.0, 27.5],   // 홍해
-    [20.0, 35.0],   // 지중해
-    [-5.5, 36.0],   // 지브롤터
-    [2.0, 51.0],    // 도버
+    ...CAPE_OF_GOOD_HOPE_WAYPOINTS.slice(1, -1),
     podCoord
   ];
 
@@ -276,3 +306,4 @@ export function estimateVesselPosition(polCoord, podCoord, etd, eta) {
 
   return [Number(currentLng.toFixed(4)), Number(currentLat.toFixed(4))];
 }
+

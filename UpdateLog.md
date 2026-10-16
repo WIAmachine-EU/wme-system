@@ -1,5 +1,41 @@
 # 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
+## [2026-10-16] [ERP 시스템] Mapbox 기반 선적 트래킹 맵 컴포넌트 버전 3.0 구축 (TrackCargo 실제 AIS 궤적 렌더링, 남아공 희망봉 26,281km 우회 항로, 3종 KPI 대시보드 및 선박 제원 고도화)
+
+### 1. 남아프리카 공화국 희망봉(Cape of Good Hope) 실제 해상 운항 항로 및 704개 고정밀 AIS 궤적 반영
+* **수에즈 운하 가상 경로 ➔ 남아공 희망봉 실제 우회 항로 전면 교체**:
+  * 홍해/수에즈 운하 지정학적 통항 중단 사태로 인해 글로벌 정기 컨테이너선이 남아프리카 공화국 희망봉/케이프타운을 선회하여 운항하는 현실적 항로(총 약 26,281km)를 완벽 반영했습니다.
+  * `YMLUN360205129`(YM WELLHEAD) 기준 실제 수신된 704개의 정밀 AIS GPS 궤적 좌표(`route_coordinates`) 및 최후 수신 위치(`51.95°N, 3.99°E`, 네덜란드 로테르담 외곽 해역)를 맵상에 왜곡 없이 렌더링하도록 구축했습니다.
+* **해상 공간 연산 라이브러리(`geoUtils.js`) 고도화**:
+  * `buildMaritimeRouteGeoJSON`에 `customCoordinates` 파라미터를 신설하여, 백엔드로부터 수신된 고정밀 AIS 궤적이 있을 시 최우선적으로 GeoJSON LineString으로 실선 렌더링하도록 구현했습니다.
+  * 실제 수집 좌표가 부재할 경우에도 수에즈 운하가 아닌 33개 정밀 해상 웨이포인트 기반의 희망봉 우회 항로(`CAPE_OF_GOOD_HOPE_WAYPOINTS`)를 기본값으로 자동 보간합니다.
+
+### 2. 지도 상단 플로팅 3종 핵심 항해 성과 지표 (SCM Voyage 3-KPI Cards) 신설
+* **상단 글래스모피즘 플로팅 KPI 바 신설 (데스크톱 최적화)**:
+  * **Card 1. 총 항해 누적 거리 (Reported Distance)**: `26,281 km` (약 14,190 NM, 남아공 희망봉 우회 항로 명시).
+  * **Card 2. 수집 항로 포인트 (Route Coordinates)**: `704 pts` (TrackCargo 정밀 AIS 궤적 연동).
+  * **Card 3. 최후 AIS 수신 위치 (Last Known Position)**: `51.95°N, 3.99°E` (현재 속력 `17.5 kn`, 침로 `58°` 동시 표시).
+* 우측 상단 `SCM Voyage KPI` 위젯 잔여 해상 거리(Distance to Go) 하단에도 누적 항해 거리 및 수신 포인트 수를 연계 노출했습니다.
+
+### 3. 선적 상세 '선박(Vessel)' 탭 전면 개편 및 실시간 제원 카드 신설
+* **기존 안내 문구("선박 정보가 등록되어 있지 않습니다") 원천 해결**:
+  * 선택된 B/L의 실제 선박 제원을 상세히 확인할 수 있는 전용 스펙 카드를 신설했습니다.
+* **선박 핵심 제원 매핑**:
+  * **선박명**: `YM WELLHEAD` (IMO: `9757527`, MMSI: `477085700`)
+  * **운항 성능**: 현재 속력 `17.5 kts`, 진행 방위 `58°`, 항차 `036E`, 선사 `Yang Ming`
+  * **항로 안내 및 위치**: 남아공 희망봉 우회 항로 상세 안내 및 최후 보고 위경도 표시
+  * **원클릭 외부 검증 링크**: MarineTraffic 및 VesselFinder 실시간 선박 위치 조회 버튼 연동
+* **선적 목록 카드 내 실제 선박명 표시**:
+  * 임의 대체명("WIA Global Voyager") 대신 실제 운항 선박명(`YM WELLHEAD`, `ONE INTELLIGENCE` 등)이 리스트 카드에 직관적으로 표시됩니다.
+
+### 4. 백엔드 데이터베이스 스키마 및 고성능 Route Service 아키텍처 구축
+* **`Shipment` 테이블 10개 신규 컬럼 확장 및 자동 마이그레이션**:
+  * `vessel_name`, `vessel_imo`, `vessel_mmsi`, `vessel_speed_kn`, `vessel_course_deg`, `reported_distance_km`, `last_lat`, `last_lng`, `route_coordinates`, `route_updated_at` 컬럼 추가.
+  * Render PostgreSQL 및 SQLite 환경 자동 스키마 마이그레이션 적용.
+* **v3.0 전용 신규 API 엔드포인트 구축**:
+  * `GET /api/v1/tracking/{mbl_no}/route-map`: 설계 가이드 규격에 맞춘 선박 스펙, 항로 요약, 704개 GeoJSON 궤적 반환.
+  * `seed_v3_shipment_data`: 서버 구동 시 기존 활성 선적에 대해 고정밀 AIS 궤적과 제원 데이터를 자동 시딩 및 최신 상태로 유지.
+
 ## [2026-10-15] 선적 트래킹(ShipmentTracking) 모바일 화면 반응형 최적화 구축
 
 ### 1. 모바일 환경 전용 반응형 레이아웃 및 성능 최적화

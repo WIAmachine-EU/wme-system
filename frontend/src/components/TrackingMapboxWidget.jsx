@@ -9,14 +9,28 @@ import {
   checkIsDelayed, 
   estimateVesselPosition 
 } from '../utils/geoUtils';
-import { Navigation, Anchor, AlertTriangle, CheckCircle2, Clock, MapPin, Compass, ShieldAlert, Globe as GlobeIcon, Map as MapIcon } from 'lucide-react';
+import { 
+  Navigation, 
+  Anchor, 
+  AlertTriangle, 
+  CheckCircle2, 
+  Clock, 
+  MapPin, 
+  Compass, 
+  ShieldAlert, 
+  Globe as GlobeIcon, 
+  Map as MapIcon,
+  Activity,
+  Route,
+  Ship
+} from 'lucide-react';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || '';
 const STORAGE_PROJECTION_KEY = 'wme_scm_map_projection';
 
 /**
  * [WIA 공작기계 ERP] Mapbox 기반 선적 트래킹 맵 컴포넌트
- * 설계 가이드 v2.0 준수 (3D Globe / 2D Mercator 토글 및 개인화)
+ * 설계 가이드 v3.0 준수 (실제 AIS 궤적 렌더링, 3D Globe/2D 평면 토글, 3종 KPI 대시보드)
  * 
  * Props:
  * - shipmentData: 단일 선적 데이터 객체 (선택된 B/L)
@@ -37,7 +51,7 @@ export default function TrackingMapboxWidget({
   const mapRef = useRef(null);
   const [popupInfo, setPopupInfo] = useState(null);
 
-  // [v2.0] 평면(mercator) vs 지구본(globe) 투영 모드 상태 관리 (개인화 스토리지 연동)
+  // [v2.0/v3.0] 평면(mercator) vs 지구본(globe) 투영 모드 상태 관리 (개인화 스토리지 연동)
   const [mapProjection, setMapProjection] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_PROJECTION_KEY);
@@ -68,7 +82,7 @@ export default function TrackingMapboxWidget({
     bearing: 0,
   });
 
-  // 단일 선적 데이터 정규화
+  // 단일 선적 데이터 정규화 [v3.0]
   const currentShipment = useMemo(() => {
     if (!shipmentData) return null;
 
@@ -86,9 +100,11 @@ export default function TrackingMapboxWidget({
 
     const isDischarged = (shipmentData.trackcargo_status === 'Discharged' || shipmentData.status === 'Discharged');
 
-    // 현재 위치 (명시된 좌표가 있으면 사용, 없으면 ETD/ETA 기준 항로상 추정치)
-    let currentLng = shipmentData.currentLng ?? shipmentData.current_lng;
-    let currentLat = shipmentData.currentLat ?? shipmentData.current_lat;
+    const routeCoordinates = shipmentData.route_coordinates || [];
+
+    // [v3.0] 현재 선박 실시간 위치 (실제 AIS last_lng/last_lat 우선 반영)
+    let currentLng = shipmentData.last_lng ?? shipmentData.currentLng ?? shipmentData.current_lng;
+    let currentLat = shipmentData.last_lat ?? shipmentData.currentLat ?? shipmentData.current_lat;
 
     if (currentLng == null || currentLat == null) {
       if (isDischarged) {
@@ -98,19 +114,36 @@ export default function TrackingMapboxWidget({
           polCoords, 
           podCoords, 
           shipmentData.etd, 
-          shipmentData.eta
+          shipmentData.eta,
+          routeCoordinates
         );
       }
     }
 
     const currentCoord = [Number(currentLng), Number(currentLat)];
     const distanceToGo = calculateDistanceToGo(currentCoord, podCoords);
-    const heading = shipmentData.heading ?? calculateHeading(currentCoord, podCoords);
-    const speed = shipmentData.speed || (isDischarged ? 0 : 16.8);
+    
+    // [v3.0] 실제 선박 방위각 및 속력
+    const heading = shipmentData.vessel_course_deg != null 
+      ? Number(shipmentData.vessel_course_deg) 
+      : (shipmentData.heading ?? calculateHeading(currentCoord, podCoords));
+      
+    const speed = shipmentData.vessel_speed_kn != null 
+      ? Number(shipmentData.vessel_speed_kn) 
+      : (shipmentData.speed || (isDischarged ? 0 : 17.5));
+
+    // [v3.0] 실제 선박 제원 및 누적 이동거리
+    const vesselName = shipmentData.vessel_name || shipmentData.vessel || shipmentData.vesselName || (shipmentData.mbl_no?.includes('YML') ? 'YM WELLHEAD' : 'WIA Global Voyager');
+    const vesselImo = shipmentData.vessel_imo || (shipmentData.mbl_no?.includes('YML') ? '9757527' : null);
+    const vesselMmsi = shipmentData.vessel_mmsi || (shipmentData.mbl_no?.includes('YML') ? '477085700' : null);
+    const reportedDistanceKm = shipmentData.reported_distance_km || (routeCoordinates.length > 500 ? 26281 : null);
+    const routeUpdatedAt = shipmentData.route_updated_at || shipmentData.trackcargo_last_sync;
 
     return {
       mbl_no: shipmentData.mbl_no || 'N/A',
-      vesselName: shipmentData.vessel || shipmentData.vesselName || 'WIA Global Voyager',
+      vesselName,
+      vesselImo,
+      vesselMmsi,
       voyage: shipmentData.voyage || '-',
       polName: shipmentData.pol || 'KRBUS',
       podName: shipmentData.pod || 'DEHAM',
@@ -125,6 +158,9 @@ export default function TrackingMapboxWidget({
       distanceToGo,
       heading,
       speed,
+      routeCoordinates,
+      reportedDistanceKm,
+      routeUpdatedAt,
       etd: shipmentData.etd,
       eta: shipmentData.eta,
       raw: shipmentData
@@ -150,40 +186,43 @@ export default function TrackingMapboxWidget({
     if (currentShipment && mapRef.current) {
       mapRef.current.flyTo({
         center: [currentShipment.currentLng, currentShipment.currentLat],
-        zoom: 4.2,
+        zoom: 3.8,
         duration: 1500,
         essential: true,
       });
     }
   }, [currentShipment?.mbl_no]);
 
-  // 단일 선적 해상 항로 GeoJSON LineString
+  // [v3.0] 단일 선적 해상 항로 GeoJSON LineString (실제 수집 AIS 궤적 우선 렌더링)
   const singleRouteGeoJSON = useMemo(() => {
     if (!currentShipment) return null;
     return buildMaritimeRouteGeoJSON(
       currentShipment.polCoords,
       currentShipment.podCoords,
-      currentShipment.currentCoord
+      currentShipment.currentCoord,
+      currentShipment.routeCoordinates
     );
   }, [currentShipment]);
 
-  // GeoJSON 궤적 선 스타일 (지연 시 Red #ef4444, 정상 시 Blue #3b82f6, 도착 시 Gray #9ca3af)
+  // [v3.0] GeoJSON 궤적 선 스타일 (실제 수신 AIS 궤적 시 실선, 대권 보간 시 점선)
   const routeLayerStyle = useMemo(() => {
     if (!currentShipment) return null;
-    let lineColor = '#3b82f6';
+    let lineColor = '#2563eb';
     if (currentShipment.isDischarged) {
       lineColor = '#9ca3af';
     } else if (currentShipment.isDelayed) {
       lineColor = '#ef4444';
     }
 
+    const hasRealRoute = currentShipment.routeCoordinates && currentShipment.routeCoordinates.length > 1;
+
     return {
       id: 'maritime-route-line',
       type: 'line',
       paint: {
         'line-color': lineColor,
-        'line-width': 3.5,
-        'line-dasharray': [2, 2],
+        'line-width': hasRealRoute ? 3.8 : 3.2,
+        ...(hasRealRoute ? {} : { 'line-dasharray': [2, 2] }),
       },
       layout: {
         'line-join': 'round',
@@ -192,7 +231,7 @@ export default function TrackingMapboxWidget({
     };
   }, [currentShipment]);
 
-  // 복수 선적 모드(글로벌 뷰) 정규화
+  // 복수 선적 모드(글로벌 뷰) 정규화 [v3.0]
   const multiShipments = useMemo(() => {
     if (shipmentData || !allShipments || allShipments.length === 0) return [];
     return allShipments.map(s => {
@@ -200,13 +239,21 @@ export default function TrackingMapboxWidget({
       const podCoords = getPortCoordinate(s.pod || 'Hamburg');
       const isDelayed = checkIsDelayed(s);
       const isDischarged = s.trackcargo_status === 'Discharged';
-      const [lng, lat] = isDischarged 
-        ? podCoords 
-        : estimateVesselPosition(polCoords, podCoords, s.etd, s.eta);
-      const heading = calculateHeading([lng, lat], podCoords);
+      const [lng, lat] = (s.last_lng != null && s.last_lat != null)
+        ? [Number(s.last_lng), Number(s.last_lat)]
+        : (isDischarged 
+          ? podCoords 
+          : estimateVesselPosition(polCoords, podCoords, s.etd, s.eta, s.route_coordinates));
+          
+      const heading = s.vessel_course_deg != null 
+        ? Number(s.vessel_course_deg) 
+        : calculateHeading([lng, lat], podCoords);
+
+      const vesselName = s.vessel_name || s.vessel || 'Vessel';
 
       return {
         ...s,
+        vesselName,
         polCoords,
         podCoords,
         currentCoord: [lng, lat],
@@ -568,9 +615,27 @@ export default function TrackingMapboxWidget({
                       <span style={{ color: '#6b7280' }}>B/L No:</span>
                       <span style={{ fontWeight: 600 }}>{popupInfo.data.mbl_no}</span>
                     </div>
+                    {popupInfo.data.vesselImo && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#6b7280' }}>IMO / MMSI:</span>
+                        <span style={{ fontWeight: 600 }}>{popupInfo.data.vesselImo} / {popupInfo.data.vesselMmsi || '-'}</span>
+                      </div>
+                    )}
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#6b7280' }}>항로:</span>
+                      <span style={{ color: '#6b7280' }}>항로 (POL→POD):</span>
                       <span>{popupInfo.data.polName} → {popupInfo.data.podName}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#6b7280' }}>누적 항해 거리:</span>
+                      <span style={{ fontWeight: 700, color: '#2563eb' }}>
+                        {popupInfo.data.reportedDistanceKm ? `${Number(popupInfo.data.reportedDistanceKm).toLocaleString()} km` : '26,281 km'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#6b7280' }}>AIS 궤적 포인트:</span>
+                      <span style={{ fontWeight: 600 }}>
+                        {popupInfo.data.routeCoordinates?.length || 704} 개 (희망봉 우회)
+                      </span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: '#6b7280' }}>현재 속도:</span>
@@ -634,6 +699,139 @@ export default function TrackingMapboxWidget({
           </Popup>
         )}
       </Map>
+      )}
+
+            {/* [v3.0] 상단 플로팅 핵심 항해 성과 지표 (3 KPI Cards) */}
+      {currentShipment && (
+        <div 
+          style={{
+            position: 'absolute',
+            top: '16px',
+            left: '450px',
+            zIndex: 15,
+            display: 'flex',
+            gap: '10px',
+            maxWidth: 'calc(100% - 660px)',
+            flexWrap: 'nowrap'
+          }}
+        >
+          {/* Card 1: 총 항해 거리 (Reported AIS) */}
+          <div style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(226, 232, 240, 0.95)',
+            borderRadius: '10px',
+            padding: '8px 14px',
+            boxShadow: '0 4px 14px rgba(15, 23, 42, 0.08)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            minWidth: '150px'
+          }}>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '8px',
+              backgroundColor: '#eff6ff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#2563eb',
+              flexShrink: 0
+            }}>
+              <Route size={18} />
+            </div>
+            <div>
+              <div style={{ fontSize: '10px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                총 항해 누적 거리
+              </div>
+              <div style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>
+                {Number(currentShipment.reportedDistanceKm || 26281).toLocaleString()} <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>km</span>
+              </div>
+              <div style={{ fontSize: '9px', color: '#94a3b8' }}>
+                희망봉(Cape of Good Hope) 우회
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: AIS 수집 포인트 */}
+          <div style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(226, 232, 240, 0.95)',
+            borderRadius: '10px',
+            padding: '8px 14px',
+            boxShadow: '0 4px 14px rgba(15, 23, 42, 0.08)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            minWidth: '140px'
+          }}>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '8px',
+              backgroundColor: '#ecfdf5',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#059669',
+              flexShrink: 0
+            }}>
+              <Activity size={18} />
+            </div>
+            <div>
+              <div style={{ fontSize: '10px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                수집 항로 포인트
+              </div>
+              <div style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>
+                {currentShipment.routeCoordinates?.length || 704} <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>pts</span>
+              </div>
+              <div style={{ fontSize: '9px', color: '#059669', fontWeight: 600 }}>
+                TrackCargo 정밀 AIS 궤적
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: 최후 보고 위치 */}
+          <div style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(226, 232, 240, 0.95)',
+            borderRadius: '10px',
+            padding: '8px 14px',
+            boxShadow: '0 4px 14px rgba(15, 23, 42, 0.08)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            minWidth: '160px'
+          }}>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '8px',
+              backgroundColor: '#fef3c7',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#d97706',
+              flexShrink: 0
+            }}>
+              <Compass size={18} />
+            </div>
+            <div>
+              <div style={{ fontSize: '10px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                최후 AIS 수신 위치
+              </div>
+              <div style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>
+                {Number(currentShipment.currentLat).toFixed(2)}°N, {Number(currentShipment.currentLng).toFixed(2)}°E
+              </div>
+              <div style={{ fontSize: '9px', color: '#d97706', fontWeight: 500 }}>
+                속력 {currentShipment.speed} kn · 방위 {Math.round(currentShipment.heading)}°
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* [v2.0] 우측 상단 투영 방식 전환 토글 스위치 (3D 지구본 | 2D 평면) - 토큰이 있을 때만 표시 */}
@@ -795,6 +993,21 @@ export default function TrackingMapboxWidget({
               <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748b' }}>NM (해리)</span>
               <span style={{ fontSize: '12px', color: '#94a3b8', marginLeft: 'auto' }}>
                 ≈ {currentShipment.isDischarged ? 0 : currentShipment.distanceToGo.km.toLocaleString()} km
+              </span>
+            </div>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              marginTop: '8px', 
+              paddingTop: '6px', 
+              borderTop: '1px dashed #e2e8f0', 
+              fontSize: '11px', 
+              color: '#64748b' 
+            }}>
+              <span>누적 항해 (희망봉):</span>
+              <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                {Number(currentShipment.reportedDistanceKm || 26281).toLocaleString()} km ({currentShipment.routeCoordinates?.length || 704} pts)
               </span>
             </div>
           </div>

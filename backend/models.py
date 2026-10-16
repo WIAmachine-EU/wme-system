@@ -82,6 +82,18 @@ class Shipment(Base):
     trackcargo_last_sync = Column(DateTime, nullable=True)
     trackcargo_error = Column(Text, nullable=True)
 
+    # [v3.0] TrackCargo PRO 해상 AIS 경로 및 선박 제원 필드
+    vessel_name = Column(String(100), nullable=True) # Fallback 선박명 (예: ONE INTELLIGENCE, YM WELLHEAD)
+    vessel_imo = Column(String(30), nullable=True) # IMO 번호
+    vessel_mmsi = Column(String(30), nullable=True) # MMSI 번호
+    vessel_speed_kn = Column(Float, nullable=True) # 현재 속력 (knots)
+    vessel_course_deg = Column(Float, nullable=True) # 진행 방위/침로 (도 단위, 0~360)
+    reported_distance_km = Column(Float, nullable=True) # 누적 이동 거리 (km, 예: 26,281 km)
+    last_lat = Column(Float, nullable=True) # 최후 확인 위도 (예: 51.95)
+    last_lng = Column(Float, nullable=True) # 최후 확인 경도 (예: 3.99)
+    route_coordinates = Column(JSON, default=list) # Mapbox 렌더링용 [lng, lat] 배열 (704개 등)
+    route_updated_at = Column(DateTime, nullable=True) # 경로 최종 동기화 시각
+
     created_at = Column(DateTime, default=datetime.utcnow)
     
     orders = relationship("Order", back_populates="shipment")

@@ -49,6 +49,24 @@ if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
                 c.execute("ALTER TABLE orders ADD COLUMN warehouse VARCHAR")
             except sqlite3.OperationalError:
                 pass # Column exists
+
+            # [v3.0] shipments 테이블 해상 AIS 경로 및 선박 제원 컬럼 신설
+            for col_name, col_type in [
+                ("vessel_name", "VARCHAR"),
+                ("vessel_imo", "VARCHAR"),
+                ("vessel_mmsi", "VARCHAR"),
+                ("vessel_speed_kn", "FLOAT"),
+                ("vessel_course_deg", "FLOAT"),
+                ("reported_distance_km", "FLOAT"),
+                ("last_lat", "FLOAT"),
+                ("last_lng", "FLOAT"),
+                ("route_coordinates", "JSON"),
+                ("route_updated_at", "DATETIME"),
+            ]:
+                try:
+                    c.execute(f"ALTER TABLE shipments ADD COLUMN {col_name} {col_type}")
+                except sqlite3.OperationalError:
+                    pass
                 
             conn.commit()
             conn.close()
