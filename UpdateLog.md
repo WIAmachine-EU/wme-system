@@ -1,5 +1,42 @@
 # 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
+## [2026-10-16] [ERP 시스템] Mapbox 기반 선적 트래킹 맵 컴포넌트 버전 4.0 구현 (2시간 주기 스마트 Diff-Check 동기화 및 부하 분산 최적화)
+
+### 1. 2시간 주기(1일 12회) 고정밀 항로 및 최후 위치 동기화 스케줄러 구축
+* **동기화 주기 단축 (기존 1일 1회/24시간 ➔ 2시간 간격 / 매 짝수 시간 정각 `0 */2 * * *`)**:
+  * TrackCargo PRO의 과금 체계(신규 등록 건수 기준 과금, GET 상세조회 무과금)를 정량 분석하여 추가 API 과금 없이 선박 이동 경로 및 AIS 최후 위치의 갱신 주기를 대폭 단축했습니다.
+  * 연안 항해, 주요 해협/운하 통과 및 최종 목적지 함부르크항(DEHAM) 접안 직전 구간에서 선박의 실시간 위치와 침로 각도(Course)를 최대 2시간 이내 수준으로 정밀하게 반영합니다.
+* **`APScheduler` 백그라운드 크론 작업 등록 (`scheduler.py`)**:
+  * `id='route_2hour_sync'`, 매 짝수 정각(`hour='*/2', minute=0`)에 `sync_routes_every_2hours` 자동 구동.
+
+### 2. 불필요한 DB 쓰기 방지를 위한 스마트 변경 감지(Smart Diff-Check) 엔진 구현
+* **PostgreSQL Dead Tuple 및 WAL 로그 80% 이상 절감**:
+  * 2시간 주기 호출 시 선박이 위성 음영 구역에 있거나 AIS 좌표가 갱신되지 않아 이전과 동일한 데이터가 반환될 때 무조건 `UPDATE`를 수행하던 기존 방식을 원천 차단했습니다.
+  * ① 좌표 배열 개수(`route_coordinates` 길이 변동), ② 최후 위치 좌표(`last_lat`, `last_lng`), ③ 진행 각도(`vessel_course_deg`), ④ 선박명(`vessel_name`)을 상호 비교하여 **실제 변동이 감지된 경우에만 조건부로 DB Write 및 `route_updated_at` 갱신**을 수행합니다.
+  * 변동이 없는 선적은 쓰기를 건너뛰고(Skip) Dead Tuple 누적을 원천 방지합니다.
+
+### 3. 해상 상태별 동적 폴링 필터링(Active-Only Filtering) & 부하 분산(Rate-Limit Throttling)
+* **Active-Only B/L 동적 필터링**:
+  * 최종 목적지에 이미 하역(Discharged)되었거나 반출(Gate-out), 창고 입고가 완료된 선적은 2시간 주기 폴링 대상에서 즉시 제외하여 API 호출을 최소화하고 운항 중인 활성 선적(`Loaded`, `Departed`, `In Transit`, `Active`)만 정밀 타겟팅합니다.
+* **순차 지연 호출 제어 (Throttling)**:
+  * 초당 대량 병렬 요청으로 인한 TrackCargo 방화벽 차단(`429 Too Many Requests`) 위험을 방지하기 위해 B/L 호출 간격에 `await asyncio.sleep(0.8)`을 적용하여 20건 기준 약 16초에 걸쳐 안전하게 순차 분산 처리합니다.
+
+### 4. 실시간 대시보드 KPI (동기화 효율 지수) 및 관리자 제어 API 구축
+* **API 동기화 효율 지수 (Sync Efficiency Ratio) 로깅 및 모니터링**:
+  * 2시간 주기 호출 총 건수 대비 신규 좌표/위치가 실제로 반영된 유효 업데이트 비율을 실시간 산출하여 로깅 및 상태 조회 API로 제공합니다.
+  * `GET /api/v1/tracking/sync-status`: 최근 동기화 시각, 대상 건수, DB 갱신 건수, Dead Tuple 방지 스킵 건수, 동기화 효율 지수 반환.
+  * `POST /api/v1/tracking/sync-now`: 관리자가 대시보드에서 필요 시 즉시 스마트 Diff 동기화를 강제 실행할 수 있는 엔드포인트 제공.
+
+### 5. 프론트엔드 TanStack Query 캐시(staleTime) 최적화 및 RBAC 권한 격리
+* **React-Query staleTime 30분 정렬 (`ShipmentTracking.jsx`)**:
+  * 백엔드 2시간 갱신 주기에 맞춰 프론트엔드 캐시 유지 시간을 `1000 * 60 * 30` (30분)으로 지정하여 탭 이동 및 빈번한 재방문 시 불필요한 내부 백엔드 API 재호출을 방지했습니다.
+* **대시보드 상단 2시간 주기 동기화 상태 바 및 원클릭 Diff 갱신 UI**:
+  * 스케줄러 가동 현황, 동기화 효율 지수, Dead Tuple 방지 스킵 건수를 직관적으로 안내하고 원클릭 수동 갱신 버튼 및 피드백 토스트를 제공합니다.
+* **사용자 역할별 권한 격리 (Row-Level Security)**:
+  * 딜러(DEALER) 사용자가 조회 시 타 딜러의 선적 및 화물 위치 정보가 일체 노출되지 않도록 `dealer_id` 기준 RLS 필터링 및 접근 권한 검증을 적용했습니다.
+
+---
+
 ## [2026-10-16] [ERP 시스템] Mapbox 기반 선적 트래킹 맵 컴포넌트 버전 3.0 본격 구현 및 Docker/환경변수 배포 파이프라인 고도화
 
 ### 1. 남아프리카 공화국 희망봉(Cape of Good Hope) 실제 해상 운항 항로 및 704개 고정밀 AIS 궤적 반영

@@ -320,10 +320,34 @@ def process_expired_promotion_reservations():
     finally:
         db.close()
 
+def run_route_2hour_sync_job():
+    """
+    [설계 가이드 v4.0] 2시간 주기 경로 및 선박 위치 스마트 Diff 동기화 작업 래퍼
+    """
+    import asyncio
+    try:
+        from services.trackcargo_route_scheduler import sync_routes_every_2hours
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(sync_routes_every_2hours())
+        loop.close()
+    except Exception as e:
+        logger.error(f"[2시간 주기 경로 동기화 실행 에러]: {e}")
+
 scheduler = BackgroundScheduler()
 
 def start_scheduler():
-    # 하루 3번 (06:00, 14:00, 22:00) Tracking 데이터 동기화
+    # [설계 가이드 v4.0] 매 2시간 정각(0 */2 * * *) 선박 경로/위치 Diff-Check 동기화
+    scheduler.add_job(
+        run_route_2hour_sync_job, 
+        'cron', 
+        hour='*/2', 
+        minute=0, 
+        id='route_2hour_sync', 
+        replace_existing=True
+    )
+    
+    # 하루 3번 (06:00, 14:00, 22:00) Tracking 데이터 및 ETA 알림 동기화
     scheduler.add_job(process_periodic_eta_notifications, 'cron', hour='6,14,22', minute=0, id='eta_notification_job', replace_existing=True)
     
     # 서버 재시작 시 즉시 1회 강제 동기화 실행 (확인용)
@@ -335,8 +359,9 @@ def start_scheduler():
     scheduler.add_job(process_expired_promotion_reservations, 'date', run_date=datetime.utcnow(), id='immediate_promo_check_job', replace_existing=True)
     
     scheduler.start()
-    logger.info("Scheduler started. (Cron: 06:00, 14:00, 22:00 + Promo Check: every 2h)")
+    logger.info("Scheduler started. (Route Diff-Sync: every 2h on '*/2', ETA Cron: 06:00, 14:00, 22:00 + Promo Check: every 2h)")
 
 def stop_scheduler():
     scheduler.shutdown()
     logger.info("Scheduler stopped.")
+

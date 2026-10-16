@@ -1066,6 +1066,28 @@ export default function TrackingMapboxWidget({
             </div>
           )}
 
+          {/* [v4.0] 2시간 주기 AIS 최신성 & 스마트 Diff 동기화 상태 인디케이터 */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between', 
+            backgroundColor: '#eff6ff', 
+            padding: '6px 10px', 
+            borderRadius: '6px', 
+            border: '1px solid #bfdbfe', 
+            fontSize: '11px', 
+            color: '#1e40af' 
+          }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+              <Activity size={12} color="#2563eb" /> 2시간 주기 AIS 동기화 (v4.0)
+            </span>
+            <span style={{ fontSize: '10px', color: '#2563eb', fontWeight: 500 }}>
+              {currentShipment.routeUpdatedAt 
+                ? `${new Date(currentShipment.routeUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} 갱신` 
+                : '스마트 Diff 적용'}
+            </span>
+          </div>
+
           {/* 선적 B/L & 선박 정보 푸터 */}
           <div style={{ 
             fontSize: '11px', 

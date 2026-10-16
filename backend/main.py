@@ -315,31 +315,69 @@ def get_port_codes(db: Session = Depends(get_db)):
     return [{"port_code": c.port_code, "country": c.country} for c in codes]
 
 from trackcargo_api import create_sea_tracking
+from services.trackcargo_route_scheduler import get_last_sync_stats, sync_routes_every_2hours
 
 @app.get("/api/shipments", response_model=List[schemas.ShipmentWithOrdersOut])
-def get_shipments(db: Session = Depends(get_db)):
-    # 주문 상태가 SHIPPING인 주문들을 포함하는 선적만 필터링하거나 일단 전체를 내려주되 
-    # 프론트엔드에서 필터링할 수 있도록 전체 선적을 반환합니다.
-    # 단, 주문이 하나도 없는 선적은 제외합니다.
+def get_shipments(
+    dealer_id: Optional[int] = Query(None, description="DEALER 권한인 경우 본인 회사 ID에 속한 선적만 격리 조회 (Row-Level Security)"),
+    db: Session = Depends(get_db)
+):
+    # 주문이 존재하는 선적 조회
     shipments = db.query(models.Shipment).filter(models.Shipment.orders.any()).all()
     
     # 운송 중(In-Transit) 필터링: 모든 주문이 도착(ARRIVED) 이후 상태인 경우는 제외
     active_shipments = []
     for s in shipments:
-        active_orders = [o for o in s.orders if o.current_status in [models.OrderStatus.SHIPPING, models.OrderStatus.CONFIRMED, models.OrderStatus.IN_PRODUCTION]]
+        # [설계 가이드 v4.0 RBAC] 딜러 격리 필터링
+        if dealer_id:
+            user_orders = [o for o in s.orders if o.dealer_company_id == dealer_id]
+            if not user_orders:
+                continue
+            orders_to_check = user_orders
+        else:
+            orders_to_check = s.orders
+
+        active_orders = [o for o in orders_to_check if o.current_status in [models.OrderStatus.SHIPPING, models.OrderStatus.CONFIRMED, models.OrderStatus.IN_PRODUCTION]]
         if active_orders:
-            # 반환되는 orders 리스트는 운송 중인 것들만 표시할 수도 있지만, 
-            # B/L 단위로 보므로 해당 선적의 모든 주문을 반환
+            # 딜러 권한인 경우 본인 회사 주문만 노출되도록 보장
+            if dealer_id:
+                s.orders = user_orders
             active_shipments.append(s)
             
     return active_shipments
 
+@app.get("/api/v1/tracking/sync-status", summary="2시간 주기 선박 경로 동기화 현황 및 효율 지수 조회")
+def get_tracking_sync_status():
+    """
+    [설계 가이드 v4.0] 2시간 주기 선박 이동 경로 및 AIS 최후 위치 동기화 상태,
+    대상 건수, DB 갱신 건수, Dead Tuple 방지 스킵 건수, 동기화 효율 지수(Sync Efficiency Ratio)를 조회합니다.
+    """
+    return get_last_sync_stats()
+
+@app.post("/api/v1/tracking/sync-now", summary="스마트 Diff-Check 2시간 주기 동기화 수동 강제 실행 (관리자용)")
+async def trigger_manual_route_sync():
+    """
+    [설계 가이드 v4.0] 관리자가 필요 시 즉시 스마트 Diff-Check 기반 2시간 주기 경로 동기화를 실행합니다.
+    """
+    result = await sync_routes_every_2hours()
+    return result
+
 @app.get("/api/v1/tracking/{mbl_no}/route-map", response_model=schemas.ShipmentRouteMapOut)
-def get_shipment_route_map(mbl_no: str, db: Session = Depends(get_db)):
+def get_shipment_route_map(
+    mbl_no: str, 
+    dealer_id: Optional[int] = Query(None, description="DEALER 권한 검증용 회사 ID"),
+    db: Session = Depends(get_db)
+):
     shipment = db.query(models.Shipment).filter(models.Shipment.mbl_no == mbl_no).first()
     if not shipment:
         raise HTTPException(status_code=404, detail="선적 정보를 찾을 수 없습니다.")
     
+    # [설계 가이드 v4.0 RBAC] 타 딜러 화물 위치 노출 차단 (Row-Level Security)
+    if dealer_id:
+        has_access = any(order.dealer_company_id == dealer_id for order in shipment.orders)
+        if not has_access:
+            raise HTTPException(status_code=403, detail="해당 선적의 화물 위치 정보에 대한 열람 권한이 없습니다.")
+
     # Active vessel specs
     vessel_name = shipment.vessel_name or shipment.vessel or ("YM WELLHEAD" if "YML" in mbl_no else "ONE INTELLIGENCE")
     vessel_imo = shipment.vessel_imo or ("9757527" if "YML" in mbl_no else "9933121")
@@ -377,6 +415,7 @@ def get_shipment_route_map(mbl_no: str, db: Session = Depends(get_db)):
         },
         "route_coordinates": coords
     }
+
 
 @app.post("/api/shipments/upload")
 async def upload_shipments(rows: List[schemas.ShipmentUploadRow], db: Session = Depends(get_db)):

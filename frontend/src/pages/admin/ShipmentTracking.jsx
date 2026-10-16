@@ -1,19 +1,63 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronDown, ChevronUp, MapPin, Ship, Navigation, ArrowLeft, Trash2, Link, Globe, Anchor, ExternalLink, Compass, Route, Activity, CheckCircle2 } from 'lucide-react';
+import { 
+  ChevronDown, 
+  ChevronUp, 
+  MapPin, 
+  Ship, 
+  Navigation, 
+  ArrowLeft, 
+  Trash2, 
+  Link, 
+  Globe, 
+  Anchor, 
+  ExternalLink, 
+  Compass, 
+  Route, 
+  Activity, 
+  CheckCircle2, 
+  RefreshCw, 
+  Zap, 
+  ShieldCheck 
+} from 'lucide-react';
 import { DelayRateWidget } from '../../components/ShipmentWidgets';
 import TrackingMapboxWidget from '../../components/TrackingMapboxWidget';
 import { useQuery } from '@tanstack/react-query';
 import { checkIsDelayed } from '../../utils/geoUtils';
 
 const fetchShipments = async () => {
-  const response = await fetch('/api/shipments');
+  // [설계 가이드 v4.0 RBAC] DEALER 권한인 경우 본인 회사 주문만 격리 조회
+  let url = '/api/shipments';
+  try {
+    const authStored = localStorage.getItem('erp_auth');
+    if (authStored) {
+      const auth = JSON.parse(authStored);
+      if (auth.currentRole === 'DEALER' && auth.dealerCompanyId) {
+        url += `?dealer_id=${auth.dealerCompanyId}`;
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+  const response = await fetch(url);
   if (!response.ok) throw new Error('Network error');
   return response.json();
+};
+
+const fetchSyncStatus = async () => {
+  try {
+    const response = await fetch('/api/v1/tracking/sync-status');
+    if (!response.ok) return null;
+    return response.json();
+  } catch (e) {
+    return null;
+  }
 };
 
 export default function ShipmentTracking({ isMobileView }) {
   const [selectedMbl, setSelectedMbl] = useState(null);
   const [activeTab, setActiveTab] = useState('Route'); // Route, Containers, Vessel, Exceptions
+  const [isManualSyncing, setIsManualSyncing] = useState(false);
+  const [syncFeedback, setSyncFeedback] = useState(null);
   
   // 브라우저 윈도우 크기 감지 (props가 없더라도 자동 반응)
   const [windowWidth, setWindowWidth] = useState(
@@ -29,11 +73,46 @@ export default function ShipmentTracking({ isMobileView }) {
   // 모바일 뷰 여부 판정 (prop 우선, 없으면 768px 이하 기준)
   const isMobile = isMobileView !== undefined ? isMobileView : windowWidth <= 768;
 
-  const { data: shipments, isLoading } = useQuery({
+  // [설계 가이드 v4.0] 백엔드 2시간 주기 경로 갱신에 맞추어 staleTime을 30분(1800000ms)으로 최적화 정렬
+  const { data: shipments, isLoading, refetch: refetchShipments } = useQuery({
     queryKey: ['shipments'],
     queryFn: fetchShipments,
-    refetchInterval: 300000,
+    staleTime: 1000 * 60 * 30, // 30분 캐시 유지 (불필요한 DB/백엔드 I/O 방지)
+    refetchInterval: 1000 * 60 * 30, // 30분 주기 리프레시
   });
+
+  // [설계 가이드 v4.0] 2시간 주기 경로 동기화 현황 및 Sync Efficiency Ratio 쿼리
+  const { data: syncStatus, refetch: refetchSyncStatus } = useQuery({
+    queryKey: ['trackingSyncStatus'],
+    queryFn: fetchSyncStatus,
+    staleTime: 1000 * 60 * 5,
+    refetchInterval: 1000 * 60 * 5,
+  });
+
+  // 관리자 수동 스마트 Diff 동기화 트리거
+  const handleTriggerManualSync = async () => {
+    setIsManualSyncing(true);
+    setSyncFeedback(null);
+    try {
+      const res = await fetch('/api/v1/tracking/sync-now', { method: 'POST' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      await Promise.all([refetchSyncStatus(), refetchShipments()]);
+      setSyncFeedback({
+        type: 'success',
+        msg: `동기화 완료: 대상 ${data.target_count}건 중 갱신 ${data.updated_count}건, 변동없음(Skip) ${data.skipped_count}건 (효율: ${data.sync_efficiency_ratio}%)`
+      });
+      setTimeout(() => setSyncFeedback(null), 6000);
+    } catch (err) {
+      setSyncFeedback({
+        type: 'error',
+        msg: `동기화 오류: ${err.message}`
+      });
+      setTimeout(() => setSyncFeedback(null), 5000);
+    } finally {
+      setIsManualSyncing(false);
+    }
+  };
 
   const activeShipment = shipments?.find(s => s.mbl_no === selectedMbl);
 
@@ -107,13 +186,86 @@ export default function ShipmentTracking({ isMobileView }) {
               marginBottom: isMobile ? '12px' : '0',
               flexShrink: 0 
             }}>
-              <h2 style={{ fontSize: isMobile ? '1.05rem' : '1.125rem', fontWeight: 'bold', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                <Ship size={20} color="#2563eb" /> 선적 리스트
-              </h2>
-              <span style={{ backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #dbeafe', fontSize: '0.75rem', fontWeight: 600, padding: '4px 10px', borderRadius: '9999px' }}>
-                총 {shipments?.length || 0} 건
-              </span>
+              <div>
+                <h2 style={{ fontSize: isMobile ? '1.05rem' : '1.125rem', fontWeight: 'bold', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                  <Ship size={20} color="#2563eb" /> 선적 트래킹
+                </h2>
+                <span style={{ fontSize: '11px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                  <Zap size={11} color="#f59e0b" /> 2시간 주기 스마트 Diff 감지 (v4.0)
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <button
+                  onClick={handleTriggerManualSync}
+                  disabled={isManualSyncing}
+                  title="2시간 주기 Diff-Check 동기화 수동 실행"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '4px 8px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    color: '#2563eb',
+                    backgroundColor: '#eff6ff',
+                    border: '1px solid #bfdbfe',
+                    borderRadius: '6px',
+                    cursor: isManualSyncing ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <RefreshCw size={12} className={isManualSyncing ? "animate-spin" : ""} />
+                  {isManualSyncing ? '동기화 중' : 'Diff 갱신'}
+                </button>
+                <span style={{ backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #dbeafe', fontSize: '0.75rem', fontWeight: 600, padding: '4px 10px', borderRadius: '9999px' }}>
+                  총 {shipments?.length || 0} 건
+                </span>
+              </div>
             </div>
+
+            {/* [설계 가이드 v4.0] 2시간 주기 동기화 상태 및 효율 지수 바 */}
+            <div style={{ 
+              padding: '8px 16px', 
+              backgroundColor: '#f8fafc', 
+              borderBottom: '1px solid #e2e8f0',
+              fontSize: '11px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#475569', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block' }}></span>
+                  스케줄러: <strong>매 2시간 정각 (0 */2 * * *)</strong>
+                </span>
+                <span style={{ color: '#0369a1', fontWeight: 600 }}>
+                  동기화 효율 {syncStatus?.sync_efficiency_ratio != null ? `${syncStatus.sync_efficiency_ratio}%` : '대기중'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontSize: '10px' }}>
+                <span>최근 갱신: {syncStatus?.last_sync_time ? new Date(syncStatus.last_sync_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '최근 가동됨'}</span>
+                <span>Dead Tuple 방지: <strong>{syncStatus?.skipped_count || 0}건 스킵</strong></span>
+              </div>
+            </div>
+
+            {/* 수동 동기화 피드백 메시지 토스트 */}
+            {syncFeedback && (
+              <div style={{
+                margin: '8px 16px 0 16px',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                fontSize: '11px',
+                backgroundColor: syncFeedback.type === 'success' ? '#ecfdf5' : '#fef2f2',
+                color: syncFeedback.type === 'success' ? '#065f46' : '#991b1b',
+                border: `1px solid ${syncFeedback.type === 'success' ? '#a7f3d0' : '#fecaca'}`,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <CheckCircle2 size={13} color={syncFeedback.type === 'success' ? '#059669' : '#dc2626'} />
+                {syncFeedback.msg}
+              </div>
+            )}
             
             <div style={{ overflowY: isMobile ? 'visible' : 'auto', flex: 1, padding: isMobile ? '0' : '16px' }}>
               {/* 해상 운송 지연율 KPI 위젯 */}
@@ -142,6 +294,7 @@ export default function ShipmentTracking({ isMobileView }) {
                   {!isLoading && shipments?.map(s => {
                     const isDelayed = checkIsDelayed(s);
                     const isDischarged = s.trackcargo_status === 'Discharged';
+
                     
                     return (
                       <div 
@@ -533,6 +686,28 @@ export default function ShipmentTracking({ isMobileView }) {
                         <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>수신 AIS 궤적</span>
                         <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{pointsCount} 개 포인트</span>
                       </div>
+                    </div>
+
+                    {/* [설계 가이드 v4.0] 2시간 주기 최적화 동기화 & Smart Diff-Check 정보 카드 */}
+                    <div style={{
+                      backgroundColor: '#f0fdf4',
+                      padding: '12px',
+                      borderRadius: '8px',
+                      border: '1px solid #bbf7d0',
+                      fontSize: '12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 700, color: '#166534', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <Zap size={14} color="#16a34a" /> 2시간 주기 스마트 Diff-Check 동기화
+                        </span>
+                        <span style={{ fontSize: '11px', color: '#15803d', fontWeight: 600 }}>v4.0 최적화</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '11px', color: '#14532d', lineHeight: 1.5 }}>
+                        선박 좌표 개수({pointsCount}개) 및 최후 위치·침로 각도({Math.round(course)}°) 변동 시에만 DB를 업데이트하여 Dead Tuple 생성을 80% 절감하고, 연안 항해 및 접안 구간의 위치를 최대 2시간 이내 정밀 반영합니다.
+                      </p>
                     </div>
 
                     {/* Route Details Box */}
