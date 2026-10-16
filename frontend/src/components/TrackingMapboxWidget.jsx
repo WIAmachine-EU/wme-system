@@ -11,7 +11,7 @@ import {
 } from '../utils/geoUtils';
 import { Navigation, Anchor, AlertTriangle, CheckCircle2, Clock, MapPin, Compass, ShieldAlert, Globe as GlobeIcon, Map as MapIcon } from 'lucide-react';
 
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || '';
 const STORAGE_PROJECTION_KEY = 'wme_scm_map_projection';
 
 /**
@@ -219,22 +219,89 @@ export default function TrackingMapboxWidget({
 
   return (
     <div style={{ position: 'relative', width: '100%', height, overflow: 'hidden', backgroundColor: '#e5e7eb' }}>
-      <Map
-        ref={mapRef}
-        {...viewState}
-        onMove={evt => setViewState(evt.viewState)}
-        mapStyle="mapbox://styles/mapbox/light-v11"
-        mapboxAccessToken={MAPBOX_TOKEN}
-        projection={mapProjection}
-        fog={mapProjection === 'globe' ? {
-          'color': 'rgb(220, 235, 255)',
-          'high-color': 'rgb(36, 92, 223)',
-          'space-color': 'rgb(11, 15, 25)',
-          'horizon-blend': 0.05
-        } : undefined}
-        interactive={interactive}
-        attributionControl={false}
-      >
+      {!MAPBOX_TOKEN ? (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: '#0f172a',
+          color: '#f8fafc',
+          padding: '24px',
+          textAlign: 'center',
+          zIndex: 5
+        }}>
+          <div style={{
+            maxWidth: '540px',
+            backgroundColor: '#1e293b',
+            padding: '32px 28px',
+            borderRadius: '16px',
+            border: '1px solid #334155',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+              <div style={{
+                width: '64px',
+                height: '64px',
+                backgroundColor: 'rgba(59, 130, 246, 0.12)',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '1px solid rgba(59, 130, 246, 0.3)'
+              }}>
+                <GlobeIcon size={32} color="#3b82f6" />
+              </div>
+            </div>
+
+            <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '8px', color: '#ffffff' }}>
+              Mapbox 지도 연동 토큰이 필요합니다
+            </h3>
+
+            <p style={{ fontSize: '13px', color: '#94a3b8', lineHeight: 1.6, marginBottom: '20px' }}>
+              선적 트래킹 해상 경로 및 3D 지구본 지도를 표시하려면<br />
+              <strong style={{ color: '#38bdf8' }}>Mapbox Access Token</strong>이 환경변수(`.env`)에 등록되어 있어야 합니다.
+            </p>
+
+            <div style={{
+              backgroundColor: '#0f172a',
+              padding: '14px 16px',
+              borderRadius: '10px',
+              border: '1px solid #334155',
+              textAlign: 'left',
+              fontSize: '12px',
+              fontFamily: 'Consolas, Monaco, monospace',
+              marginBottom: '16px'
+            }}>
+              <div style={{ color: '#64748b', marginBottom: '4px' }}># frontend/.env 파일에 추가</div>
+              <div style={{ color: '#facc15', fontWeight: 600 }}>VITE_MAPBOX_TOKEN=pk.eyJ1Ijoi...</div>
+              <div style={{ color: '#64748b', fontSize: '11px', marginTop: '4px' }}>또는 VITE_MAPBOX_ACCESS_TOKEN=pk.eyJ1Ijoi...</div>
+            </div>
+
+            <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>
+              💡 사내 Mapbox 공인 키를 <code style={{ color: '#93c5fd' }}>frontend/.env</code>에 입력 후 저장하시면 실시간 해상 항로가 정상 표시됩니다.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <Map
+          ref={mapRef}
+          {...viewState}
+          onMove={evt => setViewState(evt.viewState)}
+          mapStyle="mapbox://styles/mapbox/light-v11"
+          mapboxAccessToken={MAPBOX_TOKEN}
+          projection={mapProjection}
+          fog={mapProjection === 'globe' ? {
+            'color': 'rgb(220, 235, 255)',
+            'high-color': 'rgb(36, 92, 223)',
+            'space-color': 'rgb(11, 15, 25)',
+            'horizon-blend': 0.05
+          } : undefined}
+          interactive={interactive}
+          attributionControl={false}
+        >
         <NavigationControl position="bottom-right" />
         <FullscreenControl position="bottom-right" />
 
@@ -567,95 +634,98 @@ export default function TrackingMapboxWidget({
           </Popup>
         )}
       </Map>
+      )}
 
-      {/* [v2.0] 우측 상단 투영 방식 전환 토글 스위치 (3D 지구본 | 2D 평면) */}
-      <div 
-        style={{
-          position: 'absolute',
-          top: '16px',
-          right: '16px',
-          zIndex: 20,
-          display: 'flex',
-          alignItems: 'center',
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(10px)',
-          border: '1px solid rgba(226, 232, 240, 0.9)',
-          borderRadius: '10px',
-          boxShadow: '0 4px 16px -2px rgba(15, 23, 42, 0.12), 0 2px 4px -2px rgba(15, 23, 42, 0.06)',
-          padding: '4px',
-          gap: '4px'
-        }}
-      >
-        {/* 3D 지구본 모드 버튼 */}
-        <button
-          type="button"
-          onClick={() => handleProjectionChange('globe')}
-          title="3D 지구본 모드: 한국-유럽 대양 횡단(Deep Sea) 여정의 시각적 몰입감 제공"
+      {/* [v2.0] 우측 상단 투영 방식 전환 토글 스위치 (3D 지구본 | 2D 평면) - 토큰이 있을 때만 표시 */}
+      {MAPBOX_TOKEN && (
+        <div 
           style={{
+            position: 'absolute',
+            top: '16px',
+            right: '16px',
+            zIndex: 20,
             display: 'flex',
             alignItems: 'center',
-            gap: '6px',
-            padding: '6px 12px',
-            borderRadius: '7px',
-            fontSize: '12px',
-            fontWeight: mapProjection === 'globe' ? 700 : 500,
-            cursor: 'pointer',
-            border: 'none',
-            transition: 'all 0.2s ease',
-            background: mapProjection === 'globe' 
-              ? 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)' 
-              : 'transparent',
-            color: mapProjection === 'globe' ? '#ffffff' : '#475569',
-            boxShadow: mapProjection === 'globe' 
-              ? '0 2px 6px rgba(37, 99, 235, 0.35)' 
-              : 'none',
-          }}
-          onMouseEnter={(e) => {
-            if (mapProjection !== 'globe') e.currentTarget.style.backgroundColor = '#f1f5f9';
-          }}
-          onMouseLeave={(e) => {
-            if (mapProjection !== 'globe') e.currentTarget.style.backgroundColor = 'transparent';
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(226, 232, 240, 0.9)',
+            borderRadius: '10px',
+            boxShadow: '0 4px 16px -2px rgba(15, 23, 42, 0.12), 0 2px 4px -2px rgba(15, 23, 42, 0.06)',
+            padding: '4px',
+            gap: '4px'
           }}
         >
-          <span style={{ fontSize: '13px' }}>🌍</span>
-          <span>3D 지구본</span>
-        </button>
+          {/* 3D 지구본 모드 버튼 */}
+          <button
+            type="button"
+            onClick={() => handleProjectionChange('globe')}
+            title="3D 지구본 모드: 한국-유럽 대양 횡단(Deep Sea) 여정의 시각적 몰입감 제공"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              borderRadius: '7px',
+              fontSize: '12px',
+              fontWeight: mapProjection === 'globe' ? 700 : 500,
+              cursor: 'pointer',
+              border: 'none',
+              transition: 'all 0.2s ease',
+              background: mapProjection === 'globe' 
+                ? 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)' 
+                : 'transparent',
+              color: mapProjection === 'globe' ? '#ffffff' : '#475569',
+              boxShadow: mapProjection === 'globe' 
+                ? '0 2px 6px rgba(37, 99, 235, 0.35)' 
+                : 'none',
+            }}
+            onMouseEnter={(e) => {
+              if (mapProjection !== 'globe') e.currentTarget.style.backgroundColor = '#f1f5f9';
+            }}
+            onMouseLeave={(e) => {
+              if (mapProjection !== 'globe') e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <span style={{ fontSize: '13px' }}>🌍</span>
+            <span>3D 지구본</span>
+          </button>
 
-        {/* 2D 평면 모드 버튼 */}
-        <button
-          type="button"
-          onClick={() => handleProjectionChange('mercator')}
-          title="2D 평면 지도 모드: 좁은 유럽 내해 및 항구 근처 복잡한 경로 왜곡 최소화"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '6px 12px',
-            borderRadius: '7px',
-            fontSize: '12px',
-            fontWeight: mapProjection === 'mercator' ? 700 : 500,
-            cursor: 'pointer',
-            border: 'none',
-            transition: 'all 0.2s ease',
-            background: mapProjection === 'mercator' 
-              ? 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)' 
-              : 'transparent',
-            color: mapProjection === 'mercator' ? '#ffffff' : '#475569',
-            boxShadow: mapProjection === 'mercator' 
-              ? '0 2px 6px rgba(37, 99, 235, 0.35)' 
-              : 'none',
-          }}
-          onMouseEnter={(e) => {
-            if (mapProjection !== 'mercator') e.currentTarget.style.backgroundColor = '#f1f5f9';
-          }}
-          onMouseLeave={(e) => {
-            if (mapProjection !== 'mercator') e.currentTarget.style.backgroundColor = 'transparent';
-          }}
-        >
-          <span style={{ fontSize: '13px' }}>🗺️</span>
-          <span>2D 평면</span>
-        </button>
-      </div>
+          {/* 2D 평면 모드 버튼 */}
+          <button
+            type="button"
+            onClick={() => handleProjectionChange('mercator')}
+            title="2D 평면 지도 모드: 좁은 유럽 내해 및 항구 근처 복잡한 경로 왜곡 최소화"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              borderRadius: '7px',
+              fontSize: '12px',
+              fontWeight: mapProjection === 'mercator' ? 700 : 500,
+              cursor: 'pointer',
+              border: 'none',
+              transition: 'all 0.2s ease',
+              background: mapProjection === 'mercator' 
+                ? 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)' 
+                : 'transparent',
+              color: mapProjection === 'mercator' ? '#ffffff' : '#475569',
+              boxShadow: mapProjection === 'mercator' 
+                ? '0 2px 6px rgba(37, 99, 235, 0.35)' 
+                : 'none',
+            }}
+            onMouseEnter={(e) => {
+              if (mapProjection !== 'mercator') e.currentTarget.style.backgroundColor = '#f1f5f9';
+            }}
+            onMouseLeave={(e) => {
+              if (mapProjection !== 'mercator') e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <span style={{ fontSize: '13px' }}>🗺️</span>
+            <span>2D 평면</span>
+          </button>
+        </div>
+      )}
 
       {/* 7. 핵심 성과 지표 (KPI) 대시보드 플로팅 연동 위젯 (Distance to Go & Delay Rate & Aging) */}
       {currentShipment && (
