@@ -105,6 +105,55 @@ const getAgingStatus = (etd) => {
 
 export default function AdminDispatch({ isMobileView }) {
   const { t } = useTranslation();
+
+  const getStockTypeBadge = (rawType) => {
+    const sType = rawType || 'AVAILABLE';
+    switch (sType) {
+      case 'AVAILABLE':
+        return {
+          label: t('menu2.type_available', '판매가능'),
+          color: 'var(--status-stock)',
+          bg: 'hsla(142, 76%, 46%, 0.15)',
+          border: 'hsla(142, 76%, 46%, 0.3)'
+        };
+      case 'RENTAL':
+        return {
+          label: t('menu2.type_rental', '임대'),
+          color: 'var(--status-production)',
+          bg: 'hsla(45, 93%, 58%, 0.15)',
+          border: 'hsla(45, 93%, 58%, 0.3)'
+        };
+      case 'SHOWROOM':
+        return {
+          label: t('menu2.type_showroom', '전시'),
+          color: 'var(--accent-cyan)',
+          bg: 'hsla(200, 90%, 60%, 0.15)',
+          border: 'hsla(200, 90%, 60%, 0.3)'
+        };
+      case 'PROMOTION':
+        return {
+          label: t('menu2.type_promotion', '프로모션'),
+          color: 'var(--accent-pink)',
+          bg: 'hsla(340, 82%, 52%, 0.15)',
+          border: 'hsla(340, 82%, 52%, 0.3)'
+        };
+      case 'DEALER_ORDER':
+        return {
+          label: t('menu2.type_dealer_order', '딜러주문'),
+          color: 'var(--accent-cyan)',
+          bg: 'hsla(200, 76%, 46%, 0.15)',
+          border: 'hsla(200, 76%, 46%, 0.3)'
+        };
+      default:
+        return {
+          label: sType,
+          color: 'var(--text-secondary)',
+          bg: 'var(--bg-secondary)',
+          border: 'var(--border-color)'
+        };
+    }
+  };
+
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -128,7 +177,8 @@ export default function AdminDispatch({ isMobileView }) {
     vessel: '',
     etd: '',
     eta: '',
-    remark: ''
+    remark: '',
+    stock_type: 'AVAILABLE'
   });
 
   const [agingFilter, setAgingFilter] = useState('ALL');
@@ -217,7 +267,8 @@ export default function AdminDispatch({ isMobileView }) {
       vessel: initialWarehouse,
       etd: initialEtd,
       eta: initialEta,
-      remark: order.remark || ''
+      remark: order.remark || '',
+      stock_type: order.stock_type || 'AVAILABLE'
     });
   };
 
@@ -243,7 +294,8 @@ export default function AdminDispatch({ isMobileView }) {
           vessel: editForm.warehouse,
           etd: editForm.etd ? `${editForm.etd}T00:00:00` : null,
           eta: editForm.eta ? `${editForm.eta}T00:00:00` : null,
-          remark: editForm.remark
+          remark: editForm.remark,
+          stock_type: editForm.stock_type
         })
       });
       if (res.ok) {
@@ -476,11 +528,12 @@ export default function AdminDispatch({ isMobileView }) {
                 padding: '8px 14px', borderRadius: '10px', fontSize: '0.85rem', cursor: 'pointer'
               }}
             >
-              <option value="ALL">전체 타입</option>
-              <option value="AVAILABLE">판매가능 (AVAILABLE)</option>
-              <option value="RENTAL">임대 (RENTAL)</option>
-              <option value="SHOWROOM">전시 (SHOWROOM)</option>
-              <option value="PROMOTION">프로모션 (PROMOTION)</option>
+              <option value="ALL">전체 재고타입</option>
+              <option value="AVAILABLE">{t('menu2.type_available', '판매가능')}</option>
+              <option value="RENTAL">{t('menu2.type_rental', '임대')}</option>
+              <option value="SHOWROOM">{t('menu2.type_showroom', '전시')}</option>
+              <option value="PROMOTION">{t('menu2.type_promotion', '프로모션')}</option>
+              <option value="DEALER_ORDER">{t('menu2.type_dealer_order', '딜러주문')}</option>
             </select>
             <select
               value={sortConfig.key ? `${sortConfig.key}_${sortConfig.direction}` : ""}
@@ -558,7 +611,7 @@ export default function AdminDispatch({ isMobileView }) {
             ) : (
               sortedOrders.map((order) => {
                 const aging = getAgingStatus(order.etd);
-                const displayType = order.stock_type || 'AVAILABLE';
+                const stockBadge = getStockTypeBadge(order.stock_type);
 
                 return (
                   <div key={order.id} className="mobile-order-card" onClick={() => toggleRow(order.id)} style={{ cursor: 'pointer' }}>
@@ -574,7 +627,21 @@ export default function AdminDispatch({ isMobileView }) {
                       <span>NC: <strong style={{ color: 'var(--text-primary)' }}>{order.nc || '-'}</strong></span>
                       <span>S/N: <strong style={{ color: 'var(--text-primary)' }}>{order.serial_number || '-'}</strong></span>
                       <span>창고: <strong style={{ color: 'var(--text-primary)' }}>{order.warehouse || order.vessel || '-'}</strong></span>
-                      <span>TYPE: <strong style={{ color: 'var(--text-primary)' }}>{displayType}</strong></span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        재고타입: 
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '2px 8px',
+                          borderRadius: '12px',
+                          fontSize: '10px',
+                          fontWeight: 600,
+                          color: stockBadge.color,
+                          background: stockBadge.bg,
+                          border: `1px solid ${stockBadge.border}`
+                        }}>
+                          {stockBadge.label}
+                        </span>
+                      </span>
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingBottom: '8px', borderBottom: '1px dashed var(--border-color)' }}>
@@ -666,7 +733,7 @@ export default function AdminDispatch({ isMobileView }) {
                 ) : (
                   sortedOrders.map((order, index) => {
                     const aging = getAgingStatus(order.etd);
-                    const displayType = order.stock_type || 'AVAILABLE';
+                    const stockBadge = getStockTypeBadge(order.stock_type);
 
                     return (
                       <React.Fragment key={order.id}>
@@ -703,7 +770,18 @@ export default function AdminDispatch({ isMobileView }) {
                             </span>
                           </td>
                           <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px', textAlign: 'center' }}>
-                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{displayType}</span>
+                            <span style={{
+                              display: 'inline-block',
+                              padding: '4px 8px',
+                              borderRadius: '12px',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              color: stockBadge.color,
+                              background: stockBadge.bg,
+                              border: `1px solid ${stockBadge.border}`
+                            }}>
+                              {stockBadge.label}
+                            </span>
                           </td>
                           <td onClick={e => e.stopPropagation()} style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px', textAlign: 'center' }}>
                             <button
@@ -911,7 +989,7 @@ export default function AdminDispatch({ isMobileView }) {
                   <input type="text" value={editForm.detail_spec} onChange={e => setEditForm({ ...editForm, detail_spec: e.target.value })} placeholder={t('menu1.edit_modal.detail_placeholder', '스펙 입력')} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>{t('menu1.edit_modal.incoterms', '인코텀즈')}</label>
                     <input type="text" value={editForm.incoterms} onChange={e => setEditForm({ ...editForm, incoterms: e.target.value })} placeholder={t('menu1.edit_modal.incoterms_placeholder', '인코텀즈 입력')} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
@@ -927,6 +1005,20 @@ export default function AdminDispatch({ isMobileView }) {
                       <option value="Hamburg">Hamburg (Germany)</option>
                       <option value="Istanbul">Istanbul (Turkey)</option>
                       <option value="Rotterdam">Rotterdam (Netherlands)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>재고타입</label>
+                    <select
+                      value={editForm.stock_type || 'AVAILABLE'}
+                      onChange={e => setEditForm({ ...editForm, stock_type: e.target.value })}
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                    >
+                      <option value="AVAILABLE">{t('menu2.type_available', '판매가능')}</option>
+                      <option value="RENTAL">{t('menu2.type_rental', '임대')}</option>
+                      <option value="SHOWROOM">{t('menu2.type_showroom', '전시')}</option>
+                      <option value="PROMOTION">{t('menu2.type_promotion', '프로모션')}</option>
+                      <option value="DEALER_ORDER">{t('menu2.type_dealer_order', '딜러주문')}</option>
                     </select>
                   </div>
                 </div>
