@@ -309,5 +309,11 @@
     "no_apply": "해당없음",
     "header_request": "요청",
     "alert_msg": "[{{modelName}}] 예약/구매 요청이 유럽법인 영업팀으로 전달되었습니다. 곧 담당자가 연락드릴 예정입니다."
+  },
+  "map_controls": {
+    "globe_3d": "3D 지구본",
+    "map_2d": "2D 평면",
+    "globe_tooltip": "3D 지구본 모드: 한국-유럽 대양 횡단(Deep Sea) 여정의 시각적 몰입감 제공",
+    "map_tooltip": "2D 평면 지도 모드: 좁은 유럽 내해 및 항구 근처 복잡한 경로 왜곡 최소화"
   }
 }

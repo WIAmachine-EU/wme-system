@@ -486,17 +486,17 @@ async def upload_shipments(rows: List[schemas.ShipmentUploadRow], db: Session = 
                         shipments_dict[mbl].etd = tracking_data.get("etd")
                         shipments_dict[mbl].eta = tracking_data.get("eta")
             
-        # 4. Update orders
+        # 4. Update orders (P/O 기준 매칭 및 S/N 동기화)
         for mbl, data in mbl_groups.items():
             shipment = shipments_dict[mbl]
             for order_row in data["orders"]:
-                # Match by reference_no (P/O) or serial_number (S/N)
+                # P/O (reference_no) 기준 우선 매칭, 없으면 S/N (serial_number) 기준 매칭
                 matched_order = None
-                if order_row.serial_number:
-                    matched_order = db.query(models.Order).filter(models.Order.serial_number == order_row.serial_number).first()
+                if order_row.reference_no and order_row.reference_no.strip():
+                    matched_order = db.query(models.Order).filter(models.Order.reference_no == order_row.reference_no.strip()).first()
                 
-                if not matched_order and order_row.reference_no:
-                    matched_order = db.query(models.Order).filter(models.Order.reference_no == order_row.reference_no).first()
+                if not matched_order and order_row.serial_number and order_row.serial_number.strip():
+                    matched_order = db.query(models.Order).filter(models.Order.serial_number == order_row.serial_number.strip()).first()
                     
                 if matched_order:
                     matched_order.shipment_id = shipment.id
@@ -504,8 +504,72 @@ async def upload_shipments(rows: List[schemas.ShipmentUploadRow], db: Session = 
                     matched_order.etd = shipment.etd
                     matched_order.eta = shipment.eta
                     
+                    # [핵심] P/O 기준 S/N 정보 업데이트 적용
+                    if order_row.serial_number and order_row.serial_number.strip():
+                        matched_order.serial_number = order_row.serial_number.strip()
+                        
+                    # 선적 등록 시 CONFIRMED 또는 IN_PRODUCTION 상태라면 SHIPPING으로 승격
+                    if matched_order.current_status in [models.OrderStatus.CONFIRMED, models.OrderStatus.IN_PRODUCTION]:
+                        matched_order.current_status = models.OrderStatus.SHIPPING
+                    
         db.commit()
-        return {"status": "success", "message": f"{len(rows)}건의 선적 정보가 성공적으로 업로드되었습니다."}
+        return {"status": "success", "message": f"{len(rows)}건의 선적 정보 및 S/N가 성공적으로 업로드 및 동기화되었습니다."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/orders/sync-serial-numbers")
+def sync_orders_serial_numbers(
+    payload: Optional[List[dict]] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    P/O(reference_no) 번호 기준으로 데이터베이스 내 주문(Order)의 S/N(serial_number)을 업데이트/동기화합니다.
+    """
+    updated_items = []
+    
+    # 1. 전달받은 payload 처리
+    if payload:
+        for item in payload:
+            po = item.get("reference_no") or item.get("po") or item.get("P/O")
+            sn = item.get("serial_number") or item.get("sn") or item.get("S/N")
+            if po and sn:
+                order = db.query(models.Order).filter(models.Order.reference_no == str(po).strip()).first()
+                if order:
+                    order.serial_number = str(sn).strip()
+                    updated_items.append({"po": order.reference_no, "sn": order.serial_number})
+                    
+    # 2. 만약 payload가 없거나 추가 동기화가 필요한 경우, 기정의된 표준 선적 P/O-S/N 매핑 보장
+    known_po_sn_mappings = {
+        "F25-12-63": "G1737-0033",
+        "A26-04-12": "G2814-0259",
+        "A26-04-13": "G2814-0278",
+        "F26-05-01": "G1803-0022",
+        "F25-12-94": "G2815-0117",
+        "F25-12-95": "G2815-0118",
+        "A26-01-12": "G2814-0273",
+        "A25-12-30": "G2715-0046",
+        "A26-04-09": "G1753-0030",
+        "A26-06-14": "G1706-0233",
+        "A26-04-05": "G1706-0224",
+        "A26-05-50": "G1706-0228",
+        "A26-05-51": "G1721-0075",
+        "F25-05-63": "G1373-0047",
+        "A26-04-11": "G1721-0076"
+    }
+    for po, sn in known_po_sn_mappings.items():
+        order = db.query(models.Order).filter(models.Order.reference_no == po).first()
+        if order and (not order.serial_number or order.serial_number != sn):
+            order.serial_number = sn
+            updated_items.append({"po": order.reference_no, "sn": order.serial_number})
+
+    try:
+        db.commit()
+        return {
+            "status": "success",
+            "message": f"{len(updated_items)}건의 주문 S/N 정보가 P/O 기준에 맞춰 업데이트되었습니다.",
+            "updated": updated_items
+        }
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -1119,6 +1183,10 @@ async def upload_excel_bulk(file: UploadFile = File(...), db: Session = Depends(
             errors.append(f"{index + 2}행: 파일 내 중복된 P/O ('{ref_no}') - 건너뜀")
             continue
         
+        # S/N 컬럼 추출 (옵션)
+        sn_raw = str(row.get('S/N', row.get('SERIAL NUMBER', row.get('시리얼번호', '')))).strip()
+        sn_val = None if (not sn_raw or sn_raw.lower() == 'nan') else sn_raw
+        
         existing = db.query(models.Order).filter(models.Order.reference_no == ref_no).first()
         if not existing:
             is_corp_stock = (d_name.upper() == 'WME')
@@ -1133,7 +1201,7 @@ async def upload_excel_bulk(file: UploadFile = File(...), db: Session = Depends(
 
             new_order = models.Order(
                 reference_no=ref_no,
-                serial_number=None,
+                serial_number=sn_val,
                 product_model_id=models_dict[m_code],
                 dealer_company_id=dealers_dict[d_name],
                 dealer_order_date=parsed_order_date,
@@ -1153,7 +1221,12 @@ async def upload_excel_bulk(file: UploadFile = File(...), db: Session = Depends(
             session_ref_nos.add(ref_no)
             valid_count += 1
         else:
-            errors.append(f"{index + 2}행: 이미 시스템에 존재하는 P/O ('{ref_no}') - 건너뜀")
+            # 이미 존재하는 P/O인 경우, S/N 정보가 제공되었으면 데이터베이스 업데이트 적용
+            if sn_val:
+                existing.serial_number = sn_val
+                valid_count += 1
+            else:
+                errors.append(f"{index + 2}행: 이미 시스템에 존재하는 P/O ('{ref_no}') - 건너뜀")
 
     try:
         db.commit()

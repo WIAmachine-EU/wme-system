@@ -309,5 +309,11 @@
     "no_apply": "Unavailable",
     "header_request": "REQUEST",
     "alert_msg": "Your reservation/purchase request for [{{modelName}}] has been sent to the EU Sales Team. A representative will contact you shortly."
+  },
+  "map_controls": {
+    "globe_3d": "3D Globe",
+    "map_2d": "2D Map",
+    "globe_tooltip": "3D Globe Mode: Visual immersion for Korea-Europe Deep Sea voyage",
+    "map_tooltip": "2D Map Mode: Minimizes route distortion in European inland seas and near ports"
   }
 }

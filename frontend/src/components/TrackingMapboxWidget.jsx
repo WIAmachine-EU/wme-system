@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import Map, { Source, Layer, Marker, Popup, NavigationControl, FullscreenControl } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { 
@@ -48,6 +49,7 @@ export default function TrackingMapboxWidget({
   interactive = true,
   defaultProjection = 'mercator'
 }) {
+  const { t } = useTranslation();
   const mapRef = useRef(null);
   const [popupInfo, setPopupInfo] = useState(null);
 
@@ -834,7 +836,7 @@ export default function TrackingMapboxWidget({
         </div>
       )}
 
-      {/* [v2.0] 우측 상단 투영 방식 전환 토글 스위치 (3D 지구본 | 2D 평면) - 토큰이 있을 때만 표시 */}
+      {/* [v2.0] 우측 상단 투영 방식 전환 토글 스위치 (3D 지구본 위 / 2D 평면 아래) - 토큰이 있을 때만 표시 */}
       {MAPBOX_TOKEN && (
         <div 
           style={{
@@ -843,7 +845,7 @@ export default function TrackingMapboxWidget({
             right: '16px',
             zIndex: 20,
             display: 'flex',
-            alignItems: 'center',
+            flexDirection: 'column',
             backgroundColor: 'rgba(255, 255, 255, 0.95)',
             backdropFilter: 'blur(10px)',
             border: '1px solid rgba(226, 232, 240, 0.9)',
@@ -853,14 +855,15 @@ export default function TrackingMapboxWidget({
             gap: '4px'
           }}
         >
-          {/* 3D 지구본 모드 버튼 */}
+          {/* 3D 지구본 모드 버튼 (위쪽) */}
           <button
             type="button"
             onClick={() => handleProjectionChange('globe')}
-            title="3D 지구본 모드: 한국-유럽 대양 횡단(Deep Sea) 여정의 시각적 몰입감 제공"
+            title={t('map_controls.globe_tooltip', '3D 지구본 모드: 한국-유럽 대양 횡단(Deep Sea) 여정의 시각적 몰입감 제공')}
             style={{
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: '6px',
               padding: '6px 12px',
               borderRadius: '7px',
@@ -876,6 +879,9 @@ export default function TrackingMapboxWidget({
               boxShadow: mapProjection === 'globe' 
                 ? '0 2px 6px rgba(37, 99, 235, 0.35)' 
                 : 'none',
+              whiteSpace: 'nowrap',
+              width: '100%',
+              minWidth: '96px'
             }}
             onMouseEnter={(e) => {
               if (mapProjection !== 'globe') e.currentTarget.style.backgroundColor = '#f1f5f9';
@@ -885,17 +891,18 @@ export default function TrackingMapboxWidget({
             }}
           >
             <span style={{ fontSize: '13px' }}>🌍</span>
-            <span>3D 지구본</span>
+            <span>{t('map_controls.globe_3d', '3D 지구본')}</span>
           </button>
 
-          {/* 2D 평면 모드 버튼 */}
+          {/* 2D 평면 모드 버튼 (아래쪽) */}
           <button
             type="button"
             onClick={() => handleProjectionChange('mercator')}
-            title="2D 평면 지도 모드: 좁은 유럽 내해 및 항구 근처 복잡한 경로 왜곡 최소화"
+            title={t('map_controls.map_tooltip', '2D 평면 지도 모드: 좁은 유럽 내해 및 항구 근처 복잡한 경로 왜곡 최소화')}
             style={{
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: '6px',
               padding: '6px 12px',
               borderRadius: '7px',
@@ -911,6 +918,9 @@ export default function TrackingMapboxWidget({
               boxShadow: mapProjection === 'mercator' 
                 ? '0 2px 6px rgba(37, 99, 235, 0.35)' 
                 : 'none',
+              whiteSpace: 'nowrap',
+              width: '100%',
+              minWidth: '96px'
             }}
             onMouseEnter={(e) => {
               if (mapProjection !== 'mercator') e.currentTarget.style.backgroundColor = '#f1f5f9';
@@ -920,7 +930,7 @@ export default function TrackingMapboxWidget({
             }}
           >
             <span style={{ fontSize: '13px' }}>🗺️</span>
-            <span>2D 평면</span>
+            <span>{t('map_controls.map_2d', '2D 평면')}</span>
           </button>
         </div>
       )}
@@ -929,7 +939,7 @@ export default function TrackingMapboxWidget({
       {currentShipment && (
         <div style={{
           position: 'absolute',
-          top: '68px',
+          top: '104px',
           right: '16px',
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(8px)',

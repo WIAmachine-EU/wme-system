@@ -10,7 +10,6 @@ import {
   Link, 
   Globe, 
   Anchor, 
-  ExternalLink, 
   Compass, 
   Route, 
   Activity, 
@@ -572,21 +571,65 @@ export default function ShipmentTracking({ isMobileView }) {
               {activeTab === 'Containers' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {activeShipment.orders?.map((o, idx) => (
-                    <div key={idx} style={{ backgroundColor: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div 
+                      key={idx} 
+                      style={{ 
+                        backgroundColor: '#ffffff', 
+                        padding: '14px 16px', 
+                        borderRadius: '10px', 
+                        border: '1px solid #e2e8f0', 
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        gap: '8px',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 'bold', fontSize: '0.875rem', color: '#0f172a' }}>{o.product_model?.model_name || 'Machine'}</span>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 600, backgroundColor: 'white', padding: '2px 8px', borderRadius: '4px', border: '1px solid #e2e8f0', color: '#334155' }}>
+                        <span style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>
+                          {o.product_model?.model_name || 'Machine'}
+                        </span>
+                        <span style={{ 
+                          fontSize: '0.72rem', 
+                          fontWeight: 700, 
+                          backgroundColor: o.current_status === 'SHIPPING' ? '#eff6ff' : (o.current_status === 'CONFIRMED' ? '#ecfdf5' : '#f8fafc'), 
+                          color: o.current_status === 'SHIPPING' ? '#2563eb' : (o.current_status === 'CONFIRMED' ? '#059669' : '#475569'),
+                          padding: '3px 8px', 
+                          borderRadius: '6px', 
+                          border: `1px solid ${o.current_status === 'SHIPPING' ? '#bfdbfe' : (o.current_status === 'CONFIRMED' ? '#a7f3d0' : '#e2e8f0')}`,
+                          letterSpacing: '0.02em'
+                        }}>
                           {o.current_status || 'TRANSIT'}
                         </span>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>
-                        <span>S/N: {o.serial_number || '-'}</span>
-                        <span>P/O: {o.reference_no}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', paddingTop: '4px', borderTop: '1px dashed #f1f5f9' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ color: '#64748b', fontWeight: 600 }}>S/N:</span>
+                          {o.serial_number ? (
+                            <span style={{ 
+                              fontFamily: 'monospace', 
+                              fontWeight: 700, 
+                              color: '#1d4ed8', 
+                              backgroundColor: '#eff6ff', 
+                              padding: '2px 7px', 
+                              borderRadius: '4px',
+                              border: '1px solid #dbeafe'
+                            }}>
+                              {o.serial_number}
+                            </span>
+                          ) : (
+                            <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>미배정 (-)</span>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#475569' }}>
+                          <span style={{ color: '#94a3b8' }}>P/O:</span>
+                          <span style={{ fontWeight: 600, color: '#1e293b' }}>{o.reference_no}</span>
+                        </div>
                       </div>
                     </div>
                   ))}
                   {(!activeShipment.orders || activeShipment.orders.length === 0) && (
-                    <p style={{ fontSize: '0.875rem', color: '#64748b', textAlign: 'center', padding: '20px 0', margin: 0 }}>포함된 장비 정보가 없습니다.</p>
+                    <p style={{ fontSize: '0.875rem', color: '#64748b', textAlign: 'center', padding: '24px 0', margin: 0 }}>포함된 장비 정보가 없습니다.</p>
                   )}
                 </div>
               )}
@@ -729,54 +772,6 @@ export default function ShipmentTracking({ isMobileView }) {
                         최후 보고 위치: <strong>{lastLat.toFixed(4)}°N, {lastLng.toFixed(4)}°E</strong><br />
                         (홍해/수에즈 운하 지정학적 이슈로 인해 아프리카 대륙 최남단 케이프타운을 선회하여 유럽으로 입항)
                       </p>
-                    </div>
-
-                    {/* External AIS Links */}
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <a
-                        href={`https://www.marinetraffic.com/en/ais/details/ships/imo:${imo}/mmsi:${mmsi}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          flex: 1,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px',
-                          padding: '8px',
-                          borderRadius: '6px',
-                          border: '1px solid #cbd5e1',
-                          backgroundColor: '#ffffff',
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          color: '#334155',
-                          textDecoration: 'none'
-                        }}
-                      >
-                        <ExternalLink size={13} color="#2563eb" /> MarineTraffic
-                      </a>
-                      <a
-                        href={`https://www.vesselfinder.com/vessels?name=${imo}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          flex: 1,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px',
-                          padding: '8px',
-                          borderRadius: '6px',
-                          border: '1px solid #cbd5e1',
-                          backgroundColor: '#ffffff',
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          color: '#334155',
-                          textDecoration: 'none'
-                        }}
-                      >
-                        <ExternalLink size={13} color="#059669" /> VesselFinder
-                      </a>
                     </div>
                   </div>
                 );

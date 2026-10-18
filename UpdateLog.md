@@ -1,5 +1,40 @@
 # 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
+## [2026-10-18] [ERP 시스템] 선적 트래킹 UI/UX 고도화, P/O 기준 S/N 자동 동기화 체계 구축 및 레거시 데이터 정제
+
+### 1. 선적 트래킹 상세 페이지 UI/UX 개선 및 레이아웃 최적화
+* **'선박' 탭 내 외부 조회 링크 제거 (`ShipmentTracking.jsx`)**:
+  * B/L 상세 내역의 '선박' 탭 하단에 위치하던 불필요한 `MarineTraffic` 및 `VesselFinder` 바로가기 버튼과 미사용 아이콘(`ExternalLink`)을 제거하여 화면을 한층 간결하고 명확하게 정돈했습니다.
+* **우측 플로팅 정보창(SCM Voyage KPI) 위치 하향 조정 (`TrackingMapboxWidget.jsx`)**:
+  * 상단 AIS 통계 카드(최후 AIS 수신 위치 등) 및 우측 상단 투영 모드 토글 스위치와의 겹침 현상을 해결하기 위해 플로팅 정보창의 상단 위치를 기존 `top: 68px`에서 `top: 104px`로 하향 조정하여 최적의 상하 여백을 확보했습니다.
+* **3D / 2D 지도 투영 모드 토글 스위치 수직 스택 전환 (`TrackingMapboxWidget.jsx`)**:
+  * 기존 가로 배치(3D 좌측 / 2D 우측)에서 사용자 편의성이 높은 **위/아래 수직 스택 구조(`flexDirection: 'column'`)**로 개편했습니다.
+  * 위쪽 버튼: 🌍 3D 모드, 아래쪽 버튼: 🗺️ 2D 모드로 통일된 버튼 너비(`minWidth: '96px'`)와 시각적 안정성을 부여했습니다.
+* **투영 모드 버튼 한국어/영어 다국어(i18n) 정밀 연동 (`ko/translation.json`, `en/translation.json`)**:
+  * 상단 네비게이션 바 언어 변경 시 실시간 반영되도록 `map_controls` 번역 키를 추가했습니다.
+  * 한국어: `3D 지구본` / `2D 평면`, 영어: `3D Globe` / `2D Map`
+
+### 2. 선적 장비목록 S/N 및 P/O 기준 자동 동기화 파이프라인 구축
+* **선적 엑셀 템플릿(`Shipment_Upload_Template`) 업로드 시 S/N 자동 반영 (`main.py` - `/api/shipments/upload`)**:
+  * 엑셀 업로드 시 기존에 P/O 매칭 후 운항 일정만 갱신하고 S/N 저장이 누락되던 로직을 전면 수정했습니다.
+  * P/O(`reference_no`)를 우선 기준으로 데이터베이스 내 주문(Order)을 매칭한 후, 엑셀 템플릿에 기재된 S/N(`serial_number`)을 데이터베이스 주문 레코드에 즉시 업데이트하고 장비 상태를 `SHIPPING`으로 승격 처리합니다.
+* **발주 일괄 등록 엑셀 업로드 시 기존 P/O의 S/N 사후 업데이트 지원 (`main.py` - `/api/upload/excel`)**:
+  * 신규 주문 생성 시 `S/N` 컬럼 저장은 물론, 이미 등록된 P/O더라도 엑셀에 S/N 정보가 제공되면 기존 주문의 `serial_number`를 자동으로 갱신하도록 지원합니다.
+* **P/O 기반 S/N 동기화 전용 API 구축 (`main.py` - `POST /api/orders/sync-serial-numbers`)**:
+  * 엑셀 업로드를 거치지 않더라도 외부 시스템 연계나 배치 작업 시 P/O 번호만으로 언제든 S/N 정보를 데이터베이스에 안전하게 동기화할 수 있는 전용 엔드포인트를 신규 구축했습니다.
+* **15건 선적 장비 S/N 데이터 실시간 DB 커밋 완료**:
+  * 실제 운항 중인 3개 선적 B/L(HDMUSELE22174500, HDMUSELE59846400, YMLUN360205129)에 포함된 15개 장비의 P/O별 S/N 데이터를 운영 PostgreSQL(`frankfurt-postgres.render.com`) 및 로컬 DB에 100% 매핑 업데이트 완료했습니다.
+* **장비목록(Containers) 탭 UI/UX 고도화 (`ShipmentTracking.jsx`)**:
+  * S/N가 배정된 장비는 전용 모노스페이스 블루 태그(`fontFamily: monospace`, 배경 `#eff6ff`, 글자색 `#1d4ed8`)로 시인성을 극대화하여 장비별 출하 식별 번호를 한눈에 파악할 수 있도록 디자인을 개선했습니다.
+
+### 3. 데이터베이스 레거시 목업 선적 데이터 정제 및 스케줄러 안정화
+* **비정상 목업 선적 레코드 3건 완전 삭제 (`delete_legacy_shipments.py`)**:
+  * 초기 개발/테스트 시 등록되었던 선사 SCAC 코드(`HDMU`, `YMLU`) 누락 목업 데이터(`SELE22174500`, `SELE59846400`, `N360205129`)를 운영 PostgreSQL 및 로컬 SQLite에서 영구 삭제했습니다.
+* **스케줄러 무결성 확보**:
+  * 2시간 주기 TrackCargo 정기 스케줄러 구동 시 발생하던 `CARRIER-NOT-FOUND` 에러 로그를 원천 해소하고, 실제 3건의 정규 선적에 대해서만 고정밀 해상 AIS 및 주문 동기화가 깔끔하게 실행되도록 환경을 정제했습니다.
+
+---
+
 ## [2026-10-16] [ERP 시스템] Mapbox 기반 선적 트래킹 맵 컴포넌트 버전 4.0 구현 (2시간 주기 스마트 Diff-Check 동기화 및 부하 분산 최적화)
 
 ### 1. 2시간 주기(1일 12회) 고정밀 항로 및 최후 위치 동기화 스케줄러 구축
