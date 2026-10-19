@@ -3,6 +3,7 @@ import { Search, Package, CheckCircle, Clock, X, ExternalLink } from 'lucide-rea
 import { useTranslation } from 'react-i18next';
 
 function CargoDetailModal({ isOpen, onClose, serialNumber, modelName }) {
+  const { t } = useTranslation();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -42,7 +43,7 @@ function CargoDetailModal({ isOpen, onClose, serialNumber, modelName }) {
         </h2>
 
         {loading ? (
-          <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>데이터를 불러오는 중입니다...</div>
+          <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>{t('dispatch.loading', '데이터를 불러오는 중입니다...')}</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', borderBottom: '2px solid var(--border-color)', paddingBottom: '12px' }}>
@@ -91,20 +92,47 @@ function CargoDetailModal({ isOpen, onClose, serialNumber, modelName }) {
   );
 }
 
-const getAgingStatus = (etd) => {
-  if (!etd) return { status: '일반', days: 0, color: 'var(--status-stock)', bg: 'rgba(16, 185, 129, 0.1)' };
+const calculateAging = (etd) => {
+  if (!etd) return { type: 'NORMAL', status: '일반', days: 0, color: 'var(--status-stock)', bg: 'rgba(16, 185, 129, 0.1)' };
   const etdDate = new Date(etd);
   const today = new Date();
   const diffTime = Math.abs(today - etdDate);
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-  if (diffDays <= 180) return { status: '일반', days: diffDays, color: 'var(--status-stock)', bg: 'rgba(16, 185, 129, 0.1)' };
-  if (diffDays <= 360) return { status: '장기', days: diffDays, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' };
-  return { status: '악성', days: diffDays, color: 'var(--accent-red)', bg: 'rgba(239, 68, 68, 0.1)' };
+  if (diffDays <= 180) return { type: 'NORMAL', status: '일반', days: diffDays, color: 'var(--status-stock)', bg: 'rgba(16, 185, 129, 0.1)' };
+  if (diffDays <= 360) return { type: 'LONG', status: '장기', days: diffDays, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' };
+  return { type: 'CRITICAL', status: '악성', days: diffDays, color: 'var(--accent-red)', bg: 'rgba(239, 68, 68, 0.1)' };
 };
 
 export default function AdminDispatch({ isMobileView }) {
   const { t } = useTranslation();
+
+  const getStandardPort = (rawPort) => {
+    if (!rawPort) return '';
+    const p = rawPort.toLowerCase();
+    if (p.includes('hamburg') || p.includes('ham')) return 'Hamburg';
+    if (p.includes('rotterdam') || p.includes('rot')) return 'Rotterdam';
+    if (p.includes('istanbul') || p.includes('ist')) return 'Istanbul';
+    if (p.includes('antwerp') || p.includes('ant')) return 'Antwerp';
+    return rawPort;
+  };
+
+  const formatRentalPeriod = (startDate, endDate) => {
+    if (!startDate && !endDate) return '-';
+    const startStr = startDate ? new Date(startDate).toLocaleDateString() : '';
+    const endStr = endDate ? new Date(endDate).toLocaleDateString() : '';
+    if (startStr && endStr) return `${startStr} ~ ${endStr}`;
+    if (endStr) return `~ ${endStr}`;
+    return `${startStr} ~`;
+  };
+
+  const getAgingStatus = (etd) => {
+    const raw = calculateAging(etd);
+    let statusText = t('dispatch.aging_normal', '일반');
+    if (raw.type === 'LONG') statusText = t('dispatch.aging_long', '장기');
+    else if (raw.type === 'CRITICAL') statusText = t('dispatch.aging_critical', '악성');
+    return { ...raw, statusText };
+  };
 
   const getStockTypeBadge = (rawType) => {
     const sType = rawType || 'AVAILABLE';
@@ -403,15 +431,21 @@ export default function AdminDispatch({ isMobileView }) {
         valA = a.nc || '';
         valB = b.nc || '';
         break;
-      case 'po':
-        valA = a.reference_no || '';
-        valB = b.reference_no || '';
-        break;
       case 'sn':
         valA = a.serial_number || '';
         valB = b.serial_number || '';
         break;
+      case 'po':
+        valA = a.reference_no || '';
+        valB = b.reference_no || '';
+        break;
+      case 'stock_type':
+      case 'status':
+        valA = a.stock_type || 'AVAILABLE';
+        valB = b.stock_type || 'AVAILABLE';
+        break;
       case 'warehouse':
+      case 'location':
         valA = a.warehouse || a.vessel || '';
         valB = b.warehouse || b.vessel || '';
         break;
@@ -420,10 +454,6 @@ export default function AdminDispatch({ isMobileView }) {
         const daysB = getAgingStatus(b.etd).days;
         return sortConfig.direction === 'asc' ? daysA - daysB : daysB - daysA;
       }
-      case 'stock_type':
-        valA = a.stock_type || 'AVAILABLE';
-        valB = b.stock_type || 'AVAILABLE';
-        break;
       default:
         return 0;
     }
@@ -433,6 +463,7 @@ export default function AdminDispatch({ isMobileView }) {
 
   const renderSortHeader = (key, label, width = '10%', align = 'center') => {
     const isSorted = sortConfig.key === key;
+    const justify = align === 'left' ? 'flex-start' : (align === 'right' ? 'flex-end' : 'center');
     return (
       <th
         style={{
@@ -449,9 +480,10 @@ export default function AdminDispatch({ isMobileView }) {
         title={`${label} ${isSorted ? (sortConfig.direction === 'asc' ? '내림차순 정렬' : '오름차순 정렬') : '정렬'}`}
       >
         <div style={{
-          display: 'inline-flex',
+          display: 'flex',
           alignItems: 'center',
-          justifyContent: align === 'left' ? 'flex-start' : (align === 'right' ? 'flex-end' : 'center'),
+          justifyContent: justify,
+          width: '100%',
           gap: '5px'
         }}>
           <span>{label}</span>
@@ -479,9 +511,9 @@ export default function AdminDispatch({ isMobileView }) {
       />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', paddingTop: '4px', paddingLeft: '28px' }}>
         <div>
-          <h1 style={{ fontSize: '1.8rem', marginBottom: '4px' }}>WIA 창고</h1>
+          <h1 style={{ fontSize: '1.8rem', marginBottom: '4px' }}>{t('dispatch.page_title', 'WIA 창고')}</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
-            물류 및 담당자가 입고된 장비의 상태를 관리합니다.
+            {t('dispatch.page_desc', '물류 및 입고된 장비의 상태를 관리합니다.')}
           </p>
         </div>
       </div>
@@ -491,7 +523,7 @@ export default function AdminDispatch({ isMobileView }) {
           <div>
             <h2 style={{ fontSize: '1.3rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Package size={20} color="var(--accent-blue)" />
-              <span>입고된 장비 목록</span>
+              <span>{t('dispatch.list_title', '입고된 장비 목록')}</span>
             </h2>
           </div>
 
@@ -500,7 +532,7 @@ export default function AdminDispatch({ isMobileView }) {
               <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
               <input
                 type="text"
-                placeholder="검색"
+                placeholder={t('dispatch.search_placeholder', '검색')}
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 style={{
@@ -517,8 +549,8 @@ export default function AdminDispatch({ isMobileView }) {
                 padding: '8px 14px', borderRadius: '10px', fontSize: '0.85rem', cursor: 'pointer'
               }}
             >
-              <option value="ALL">전체 재고 (에이징)</option>
-              <option value="LONG_DEAD">장기/악성 재고만 보기</option>
+              <option value="ALL">{t('dispatch.filter_aging_all', '전체 재고 (에이징)')}</option>
+              <option value="LONG_DEAD">{t('dispatch.filter_aging_long_dead', '장기/악성 재고만 보기')}</option>
             </select>
             <select
               value={stockTypeFilter}
@@ -528,7 +560,7 @@ export default function AdminDispatch({ isMobileView }) {
                 padding: '8px 14px', borderRadius: '10px', fontSize: '0.85rem', cursor: 'pointer'
               }}
             >
-              <option value="ALL">전체 재고타입</option>
+              <option value="ALL">{t('dispatch.filter_stock_type_all', '전체 상태')}</option>
               <option value="AVAILABLE">{t('menu2.type_available', '판매가능')}</option>
               <option value="RENTAL">{t('menu2.type_rental', '임대')}</option>
               <option value="SHOWROOM">{t('menu2.type_showroom', '전시')}</option>
@@ -549,23 +581,23 @@ export default function AdminDispatch({ isMobileView }) {
                 background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)',
                 padding: '8px 14px', borderRadius: '10px', fontSize: '0.85rem', cursor: 'pointer', outline: 'none'
               }}
-              title="정렬 기준"
+              title={t('dispatch.sort_title', '정렬 기준')}
             >
-              <option value="">기본 정렬</option>
-              <option value="model_asc">모델 ▲ (오름차순)</option>
-              <option value="model_desc">모델 ▼ (내림차순)</option>
-              <option value="nc_asc">NC ▲</option>
-              <option value="nc_desc">NC ▼</option>
-              <option value="po_asc">P/O ▲</option>
-              <option value="po_desc">P/O ▼</option>
-              <option value="sn_asc">S/N ▲</option>
-              <option value="sn_desc">S/N ▼</option>
-              <option value="warehouse_asc">창고 ▲ (오름차순)</option>
-              <option value="warehouse_desc">창고 ▼ (내림차순)</option>
-              <option value="aging_asc">재고상태(에이징) ▲ (일반순)</option>
-              <option value="aging_desc">재고상태(에이징) ▼ (장기순)</option>
-              <option value="stock_type_asc">재고타입 ▲</option>
-              <option value="stock_type_desc">재고타입 ▼</option>
+              <option value="">{t('dispatch.sort_default', '기본 정렬')}</option>
+              <option value="model_asc">{t('dispatch.sort_model_asc', '모델 ▲ (오름차순)')}</option>
+              <option value="model_desc">{t('dispatch.sort_model_desc', '모델 ▼ (내림차순)')}</option>
+              <option value="nc_asc">{t('dispatch.sort_nc_asc', 'NC ▲')}</option>
+              <option value="nc_desc">{t('dispatch.sort_nc_desc', 'NC ▼')}</option>
+              <option value="sn_asc">{t('dispatch.sort_sn_asc', 'S/N ▲')}</option>
+              <option value="sn_desc">{t('dispatch.sort_sn_desc', 'S/N ▼')}</option>
+              <option value="po_asc">{t('dispatch.sort_po_asc', 'P/O ▲')}</option>
+              <option value="po_desc">{t('dispatch.sort_po_desc', 'P/O ▼')}</option>
+              <option value="stock_type_asc">{t('dispatch.sort_status_asc', '상태 ▲')}</option>
+              <option value="stock_type_desc">{t('dispatch.sort_status_desc', '상태 ▼')}</option>
+              <option value="warehouse_asc">{t('dispatch.sort_location_asc', '위치 ▲ (오름차순)')}</option>
+              <option value="warehouse_desc">{t('dispatch.sort_location_desc', '위치 ▼ (내림차순)')}</option>
+              <option value="aging_asc">{t('dispatch.sort_aging_asc', '에이징 ▲ (일반순)')}</option>
+              <option value="aging_desc">{t('dispatch.sort_aging_desc', '에이징 ▼ (장기순)')}</option>
             </select>
           </div>
         </div>
@@ -578,26 +610,26 @@ export default function AdminDispatch({ isMobileView }) {
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>전체:</span>
+            <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('dispatch.stat_total', '전체:')}</span>
             <span style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>{filteredOrders.length}</span>
           </div>
           <div style={{ height: '24px', width: '1px', backgroundColor: 'var(--border-color)' }}></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>일반 재고:</span>
+            <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('dispatch.stat_normal', '일반 재고:')}</span>
             <span style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--status-stock)' }}>
-              {filteredOrders.filter(o => getAgingStatus(o.etd).status === '일반').length}
+              {filteredOrders.filter(o => getAgingStatus(o.etd).type === 'NORMAL').length}
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>장기 재고:</span>
+            <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('dispatch.stat_long', '장기 재고:')}</span>
             <span style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#f59e0b' }}>
-              {filteredOrders.filter(o => getAgingStatus(o.etd).status === '장기').length}
+              {filteredOrders.filter(o => getAgingStatus(o.etd).type === 'LONG').length}
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>악성 재고:</span>
+            <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('dispatch.stat_critical', '악성 재고:')}</span>
             <span style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--accent-red)' }}>
-              {filteredOrders.filter(o => getAgingStatus(o.etd).status === '악성').length}
+              {filteredOrders.filter(o => getAgingStatus(o.etd).type === 'CRITICAL').length}
             </span>
           </div>
         </div>
@@ -605,9 +637,9 @@ export default function AdminDispatch({ isMobileView }) {
         {isMobileView ? (
           <div className="mobile-cards-grid">
             {loading ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>데이터를 불러오는 중입니다...</div>
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dispatch.loading', '데이터를 불러오는 중입니다...')}</div>
             ) : sortedOrders.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>조건에 맞는 입고 장비가 없습니다.</div>
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dispatch.no_data', '조건에 맞는 입고 장비가 없습니다.')}</div>
             ) : (
               sortedOrders.map((order) => {
                 const aging = getAgingStatus(order.etd);
@@ -624,11 +656,10 @@ export default function AdminDispatch({ isMobileView }) {
                       </div>
                     </div>
                     <div className="mobile-order-meta">
-                      <span>NC: <strong style={{ color: 'var(--text-primary)' }}>{order.nc || '-'}</strong></span>
-                      <span>S/N: <strong style={{ color: 'var(--text-primary)' }}>{order.serial_number || '-'}</strong></span>
-                      <span>창고: <strong style={{ color: 'var(--text-primary)' }}>{order.warehouse || order.vessel || '-'}</strong></span>
+                      <span>{t('dispatch.header_nc', 'NC')}: <strong style={{ color: 'var(--text-primary)' }}>{order.nc || '-'}</strong></span>
+                      <span>{t('dispatch.header_sn', 'S/N')}: <strong style={{ color: 'var(--text-primary)' }}>{order.serial_number || '-'}</strong></span>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                        재고타입: 
+                        {t('dispatch.header_status', '상태')}: 
                         <span style={{
                           display: 'inline-block',
                           padding: '2px 8px',
@@ -642,15 +673,16 @@ export default function AdminDispatch({ isMobileView }) {
                           {stockBadge.label}
                         </span>
                       </span>
+                      <span>{t('dispatch.header_location', '위치')}: <strong style={{ color: 'var(--text-primary)' }}>{order.warehouse || order.vessel || '-'}</strong></span>
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingBottom: '8px', borderBottom: '1px dashed var(--border-color)' }}>
-                      <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>재고상태(에이징):</span>
+                      <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{t('dispatch.header_aging', '에이징')}:</span>
                       <span style={{
                         display: 'inline-block', padding: '4px 8px', borderRadius: '12px',
                         fontSize: '0.8rem', fontWeight: 600, color: aging.color, background: aging.bg
                       }}>
-                        {aging.status} ({aging.days}일)
+                        {aging.statusText} ({aging.days}{t('dispatch.days_suffix', '일')})
                       </span>
                     </div>
 
@@ -661,39 +693,43 @@ export default function AdminDispatch({ isMobileView }) {
                         className="btn btn-outline"
                         style={{ flex: 1, padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', opacity: order.serial_number ? 1 : 0.5 }}
                       >
-                        <ExternalLink size={14} /> 화물
+                        <ExternalLink size={14} /> {t('dispatch.btn_dimension', '화물')}
                       </button>
                       <button
                         onClick={() => handleViewHistory(order)}
                         className="btn btn-outline"
                         style={{ flex: 1, padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                       >
-                        <Clock size={14} /> 이력
+                        <Clock size={14} /> {t('dispatch.btn_history', '이력')}
                       </button>
                       <button
                         onClick={() => handleEditClick(order)}
                         className="btn btn-outline"
                         style={{ flex: 1, padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                       >
-                        수정
+                        {t('dispatch.btn_edit', '수정')}
                       </button>
                       <button
                         onClick={() => handleDispatchOrder(order.id)}
                         className="btn btn-primary"
                         style={{ flex: 2, padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                       >
-                        <CheckCircle size={14} /> 출고 처리
+                        <CheckCircle size={14} /> {t('dispatch.btn_dispatch', '출고 처리')}
                       </button>
                     </div>
 
                     {expandedRows.has(order.id) && (
                       <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px dashed var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                        <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>선적일자(ETD):</strong> <span>{order.etd ? new Date(order.etd).toLocaleDateString() : '-'}</span></div>
-                        <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>도착예정(ETA):</strong> <span>{order.eta ? new Date(order.eta).toLocaleDateString() : '-'}</span></div>
-                        <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>입고일자:</strong> <span>{order.current_status_changed_at ? new Date(order.current_status_changed_at).toLocaleDateString() : '-'}</span></div>
-                        <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>창고:</strong> <span>{order.warehouse || order.vessel || '-'}</span></div>
-                        <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>REMARK:</strong> <span>{order.remark || '-'}</span></div>
-                        <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '100px' }}>DETAIL SPEC:</strong> <span>{order.detail_spec || '-'}</span></div>
+                        <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '100px' }}>{t('dispatch.detail_etd', 'ETD')}:</strong> <span>{order.etd ? new Date(order.etd).toLocaleDateString() : '-'}</span></div>
+                        <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '100px' }}>{t('dispatch.detail_eta', 'ETA')}:</strong> <span>{order.eta ? new Date(order.eta).toLocaleDateString() : '-'}</span></div>
+                        <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '100px' }}>{t('dispatch.detail_inbound_date', '입고일자')}:</strong> <span>{order.current_status_changed_at ? new Date(order.current_status_changed_at).toLocaleDateString() : '-'}</span></div>
+                        <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '100px' }}>{t('dispatch.detail_port', '항구')}:</strong> <span>{getStandardPort(order.destination_port) || order.warehouse || order.vessel || '-'}</span></div>
+                        <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '100px' }}>{t('dispatch.detail_so', 'S/O')}:</strong> <span>{order.so_no || '-'}</span></div>
+                        <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '100px' }}>{t('dispatch.detail_option', '옵션')}:</strong> <span>{order.detail_spec || '-'}</span></div>
+                        <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '100px' }}>{t('dispatch.detail_buying', '구매가')}:</strong> <span>{order.price ? (!isNaN(order.price) ? `€ ${Number(order.price).toLocaleString()}` : order.price) : '-'}</span></div>
+                        <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '100px' }}>{t('dispatch.detail_remark', 'REMARK')}:</strong> <span>{order.remark || '-'}</span></div>
+                        <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '100px' }}>{t('dispatch.detail_rental_dealer', '임대 딜러')}:</strong> <span>{order.dealer_company?.name || order.dealer?.name || (order.stock_type === 'RENTAL' ? (order.rental_dealer || '-') : '-')}</span></div>
+                        <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '100px' }}>{t('dispatch.detail_rental_period', '임대 기간')}:</strong> <span>{formatRentalPeriod(order.rental_start_date, order.rental_expiry_date)}</span></div>
                       </div>
                     )}
                   </div>
@@ -710,26 +746,26 @@ export default function AdminDispatch({ isMobileView }) {
                   <th 
                     style={{ width: '4%', textAlign: 'center', fontWeight: 'bold', cursor: 'pointer', userSelect: 'none' }}
                     onClick={() => setSortConfig({ key: null, direction: 'asc' })}
-                    title="기본 순서로 리셋"
+                    title={t('dispatch.sort_reset', '기본 순서로 리셋')}
                   >
-                    No.
+                    {t('dispatch.header_no', '*')}
                   </th>
-                  {renderSortHeader('model', '모델', '12%')}
-                  {renderSortHeader('nc', 'NC', '8%')}
-                  {renderSortHeader('po', 'P/O', '10%')}
-                  {renderSortHeader('sn', 'S/N', '11%')}
-                  {renderSortHeader('warehouse', '창고', '9%')}
-                  {renderSortHeader('aging', '재고상태(에이징)', '11%')}
-                  {renderSortHeader('stock_type', '재고타입', '9%')}
-                  <th style={{ width: '7%', textAlign: 'center', fontWeight: 'bold' }}>화물</th>
-                  <th style={{ width: '19%', textAlign: 'center', fontWeight: 'bold' }}>진행</th>
+                  {renderSortHeader('model', t('dispatch.header_model', '모델'), '12%', 'center')}
+                  {renderSortHeader('nc', t('dispatch.header_nc', 'NC'), '8%', 'center')}
+                  {renderSortHeader('sn', t('dispatch.header_sn', 'S/N'), '11%')}
+                  {renderSortHeader('po', t('dispatch.header_po', 'P/O'), '10%')}
+                  {renderSortHeader('stock_type', t('dispatch.header_status', '상태'), '9%')}
+                  {renderSortHeader('warehouse', t('dispatch.header_location', '위치'), '9%')}
+                  {renderSortHeader('aging', t('dispatch.header_aging', '에이징'), '11%')}
+                  <th style={{ width: '7%', textAlign: 'center', fontWeight: 'bold' }}>{t('dispatch.header_dimension', '화물')}</th>
+                  <th style={{ width: '19%', textAlign: 'center', fontWeight: 'bold' }}>{t('dispatch.header_progress', '진행')}</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={10} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>데이터를 불러오는 중입니다...</td></tr>
+                  <tr><td colSpan={10} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dispatch.loading', '데이터를 불러오는 중입니다...')}</td></tr>
                 ) : sortedOrders.length === 0 ? (
-                  <tr><td colSpan={10} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>조건에 맞는 입고 장비가 없습니다.</td></tr>
+                  <tr><td colSpan={10} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dispatch.no_data', '조건에 맞는 입고 장비가 없습니다.')}</td></tr>
                 ) : (
                   sortedOrders.map((order, index) => {
                     const aging = getAgingStatus(order.etd);
@@ -743,32 +779,31 @@ export default function AdminDispatch({ isMobileView }) {
                           onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-secondary)'}
                           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                         >
+                          {/* 1. * (NO.) */}
                           <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px', textAlign: 'center' }}>
                             <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 500 }}>{index + 1}</span>
                           </td>
+                          {/* 2. 모델 */}
                           <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px', textAlign: 'center' }}>
-                            <div style={{ fontWeight: 600, fontSize: '12px' }}>{order.product_model?.model_name || '-'}</div>
+                            <div style={{ fontWeight: 600, fontSize: '12px', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+                              {order.product_model?.model_name || '-'}
+                            </div>
                           </td>
+                          {/* 3. NC */}
                           <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px', textAlign: 'center' }}>
-                            <div style={{ fontSize: '12px' }}>{order.nc || '-'}</div>
+                            <div style={{ fontSize: '12px', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+                              {order.nc || '-'}
+                            </div>
                           </td>
-                          <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px', textAlign: 'center' }}>
-                            <div style={{ fontWeight: 700, color: 'var(--accent-cyan)', fontSize: '11px' }}>{order.reference_no || '-'}</div>
-                          </td>
+                          {/* 4. S/N */}
                           <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px', textAlign: 'center' }}>
                             <div style={{ fontSize: '12px' }}>{order.serial_number || '-'}</div>
                           </td>
+                          {/* 5. P/O */}
                           <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px', textAlign: 'center' }}>
-                            <div style={{ fontSize: '12px', fontWeight: 600 }}>{order.warehouse || order.vessel || '-'}</div>
+                            <div style={{ fontWeight: 700, color: 'var(--accent-cyan)', fontSize: '11px' }}>{order.reference_no || '-'}</div>
                           </td>
-                          <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px', textAlign: 'center' }}>
-                            <span style={{
-                              display: 'inline-block', padding: '4px 8px', borderRadius: '12px',
-                              fontSize: '11px', fontWeight: 600, color: aging.color, background: aging.bg
-                            }}>
-                              {aging.status} ({aging.days}일)
-                            </span>
-                          </td>
+                          {/* 6. 상태 */}
                           <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px', textAlign: 'center' }}>
                             <span style={{
                               display: 'inline-block',
@@ -783,6 +818,20 @@ export default function AdminDispatch({ isMobileView }) {
                               {stockBadge.label}
                             </span>
                           </td>
+                          {/* 7. 위치 */}
+                          <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '12px', fontWeight: 600 }}>{order.warehouse || order.vessel || '-'}</div>
+                          </td>
+                          {/* 8. 에이징 */}
+                          <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px', textAlign: 'center' }}>
+                            <span style={{
+                              display: 'inline-block', padding: '4px 8px', borderRadius: '12px',
+                              fontSize: '11px', fontWeight: 600, color: aging.color, background: aging.bg
+                            }}>
+                              {aging.statusText} ({aging.days}{t('dispatch.days_suffix', '일')})
+                            </span>
+                          </td>
+                          {/* 9. 화물 */}
                           <td onClick={e => e.stopPropagation()} style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px', textAlign: 'center' }}>
                             <button
                               onClick={() => openCargoModal(order.serial_number, order.product_model ? order.product_model.model_name : '')}
@@ -799,9 +848,10 @@ export default function AdminDispatch({ isMobileView }) {
                               }}
                               className={order.serial_number ? "hover-bg-subtle" : ""}
                             >
-                              <ExternalLink size={13} /> Details
+                              <ExternalLink size={13} /> {t('dispatch.btn_dimension', '화물')}
                             </button>
                           </td>
+                          {/* 10. 진행 */}
                           <td onClick={e => e.stopPropagation()} style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px', textAlign: 'center' }}>
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'center' }}>
                               <button
@@ -809,44 +859,52 @@ export default function AdminDispatch({ isMobileView }) {
                                 className="btn btn-outline"
                                 style={{ padding: '4px 8px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                               >
-                                <Clock size={13} /> 이력
+                                <Clock size={13} /> {t('dispatch.btn_history', '이력')}
                               </button>
                               <button
                                 onClick={() => handleEditClick(order)}
                                 className="btn btn-outline"
                                 style={{ padding: '4px 8px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                               >
-                                수정
+                                {t('dispatch.btn_edit', '수정')}
                               </button>
                               <button
                                 onClick={() => handleDispatchOrder(order.id)}
                                 className="btn btn-primary"
                                 style={{ padding: '4px 12px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                               >
-                                <CheckCircle size={13} /> 출고 처리
+                                <CheckCircle size={13} /> {t('dispatch.btn_dispatch', '출고 처리')}
                               </button>
                             </div>
                           </td>
                         </tr>
                         {expandedRows.has(order.id) && (
                           <tr>
-                            <td colSpan={10} style={{ backgroundColor: 'var(--bg-card)', paddingTop: '12px', borderTop: '1px dashed var(--border-color)', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', paddingLeft: '8px' }}>
+                            <td colSpan={10} style={{ backgroundColor: 'var(--bg-card)', paddingTop: '14px', borderTop: '1px dashed var(--border-color)', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', paddingLeft: '16px', paddingRight: '16px' }}>
+                                {/* [왼쪽] */}
                                 <div style={{
-                                  fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.8', textAlign: 'left',
+                                  fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.9', textAlign: 'left',
                                   paddingLeft: '16px', borderLeft: '3px solid var(--wia-blue)',
+                                  display: 'flex', flexDirection: 'column', gap: '4px'
                                 }}>
-                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>선적일자(ETD):</span> {order.etd ? new Date(order.etd).toLocaleDateString() : '-'}</div>
-                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>도착예정(ETA):</span> {order.eta ? new Date(order.eta).toLocaleDateString() : '-'}</div>
-                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>입고일자:</span> {order.current_status_changed_at ? new Date(order.current_status_changed_at).toLocaleDateString() : '-'}</div>
-                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>창고:</span> {order.warehouse || order.vessel || '-'}</div>
-                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>REMARK:</span> {order.remark || '-'}</div>
+                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '110px' }}>{t('dispatch.detail_etd', 'ETD')}:</span> {order.etd ? new Date(order.etd).toLocaleDateString() : '-'}</div>
+                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '110px' }}>{t('dispatch.detail_eta', 'ETA')}:</span> {order.eta ? new Date(order.eta).toLocaleDateString() : '-'}</div>
+                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '110px' }}>{t('dispatch.detail_inbound_date', '입고일자')}:</span> {order.current_status_changed_at ? new Date(order.current_status_changed_at).toLocaleDateString() : '-'}</div>
+                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '110px' }}>{t('dispatch.detail_port', '항구')}:</span> {getStandardPort(order.destination_port) || order.warehouse || order.vessel || '-'}</div>
+                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '110px' }}>{t('dispatch.detail_so', 'S/O')}:</span> {order.so_no || '-'}</div>
                                 </div>
+                                {/* [오른쪽] */}
                                 <div style={{
-                                  fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.8', textAlign: 'left',
+                                  fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.9', textAlign: 'left',
                                   paddingLeft: '16px', borderLeft: '3px solid var(--wia-blue)',
+                                  display: 'flex', flexDirection: 'column', gap: '4px'
                                 }}>
-                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>DETAIL SPEC:</span> {order.detail_spec || '-'}</div>
+                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '110px' }}>{t('dispatch.detail_option', '옵션')}:</span> {order.detail_spec || '-'}</div>
+                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '110px' }}>{t('dispatch.detail_buying', '구매가')}:</span> {order.price ? (!isNaN(order.price) ? `€ ${Number(order.price).toLocaleString()}` : order.price) : '-'}</div>
+                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '110px' }}>{t('dispatch.detail_remark', 'REMARK')}:</span> {order.remark || '-'}</div>
+                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '110px' }}>{t('dispatch.detail_rental_dealer', '임대 딜러')}:</span> {order.dealer_company?.name || order.dealer?.name || (order.stock_type === 'RENTAL' ? (order.rental_dealer || '-') : '-')}</div>
+                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '110px' }}>{t('dispatch.detail_rental_period', '임대 기간')}:</span> {formatRentalPeriod(order.rental_start_date, order.rental_expiry_date)}</div>
                                 </div>
                               </div>
                             </td>
@@ -867,9 +925,9 @@ export default function AdminDispatch({ isMobileView }) {
           <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
             <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <h3 style={{ margin: 0 }}>타임라인 뷰 (진행 이력)</h3>
+                <h3 style={{ margin: 0 }}>{t('dispatch.timeline_title', '타임라인 뷰 (진행 이력)')}</h3>
                 <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                  {selectedOrderForHistory.product_model?.model_name} (S/N: {selectedOrderForHistory.serial_number || '미배정'})
+                  {selectedOrderForHistory.product_model?.model_name} (S/N: {selectedOrderForHistory.serial_number || '-'})
                 </p>
               </div>
               <button onClick={closeHistory} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}>
@@ -903,11 +961,11 @@ export default function AdminDispatch({ isMobileView }) {
                   ))}
                 </div>
               ) : (
-                <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>이력 데이터가 없습니다.</div>
+                <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>{t('dispatch.no_history', '이력 데이터가 없습니다.')}</div>
               )}
             </div>
             <div className="modal-footer" style={{ borderTop: '1px solid var(--border-color)', padding: '16px 20px', display: 'flex', justifyContent: 'flex-end' }}>
-              <button onClick={closeHistory} className="btn btn-outline">닫기</button>
+              <button onClick={closeHistory} className="btn btn-outline">{t('dispatch.close', '닫기')}</button>
             </div>
           </div>
         </div>
@@ -937,18 +995,18 @@ export default function AdminDispatch({ isMobileView }) {
                     </select>
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>P/O 번호</label>
-                    <input type="text" value={editForm.reference_no} onChange={e => setEditForm({ ...editForm, reference_no: e.target.value })} placeholder="P/O 번호" style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>{t('dispatch.header_po', 'P/O')}</label>
+                    <input type="text" value={editForm.reference_no} onChange={e => setEditForm({ ...editForm, reference_no: e.target.value })} placeholder={t('dispatch.header_po', 'P/O')} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
                   </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>NC</label>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>{t('dispatch.header_nc', 'NC')}</label>
                     <input type="text" value={editForm.nc} onChange={e => setEditForm({ ...editForm, nc: e.target.value })} placeholder="NC" style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>딜러사</label>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>{t('menu1.header_dealer', '딜러사')}</label>
                     <select
                       value={editForm.dealer_company_id}
                       onChange={e => setEditForm({ ...editForm, dealer_company_id: e.target.value })}
@@ -995,7 +1053,7 @@ export default function AdminDispatch({ isMobileView }) {
                     <input type="text" value={editForm.incoterms} onChange={e => setEditForm({ ...editForm, incoterms: e.target.value })} placeholder={t('menu1.edit_modal.incoterms_placeholder', '인코텀즈 입력')} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>{t('menu1.edit_modal.warehouse', '창고')}</label>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>{t('dispatch.header_location', '위치')}</label>
                     <select
                       value={editForm.warehouse || ''}
                       onChange={e => setEditForm({ ...editForm, warehouse: e.target.value, vessel: e.target.value })}
@@ -1008,7 +1066,7 @@ export default function AdminDispatch({ isMobileView }) {
                     </select>
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>재고타입</label>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>{t('dispatch.header_status', '상태')}</label>
                     <select
                       value={editForm.stock_type || 'AVAILABLE'}
                       onChange={e => setEditForm({ ...editForm, stock_type: e.target.value })}
