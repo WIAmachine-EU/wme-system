@@ -112,56 +112,113 @@ def generate_interpolated_route(waypoints: List[List[float]], target_points: int
     result.append(waypoints[-1])
     return result
 
-def parse_trackcargo_detail_payload(payload: dict) -> dict:
+# 주요 항구 표준 좌표 사전 (POL/POD 스냅 및 문자열 위치 보정용)
+PORT_COORDINATES = {
+    "KRPUS": {"lat": 35.1028, "lng": 129.0403, "name": "Busan, Korea"},
+    "KRBUS": {"lat": 35.1028, "lng": 129.0403, "name": "Busan, Korea"},
+    "DEHAM": {"lat": 53.5413, "lng": 9.9841, "name": "Hamburg, Germany"},
+    "NLRTM": {"lat": 51.9490, "lng": 4.1450, "name": "Rotterdam, Netherlands"},
+    "BEANR": {"lat": 51.2667, "lng": 4.3833, "name": "Antwerp, Belgium"},
+}
+
+ARRIVED_KEYWORDS = [
+    "arrived", "discharged", "gate-out", "gate out", "picked up",
+    "delivered", "empty container returned", "입고", "도착"
+]
+
+def parse_trackcargo_detail_payload(payload: dict, pod_code: str = "DEHAM") -> dict:
     """
-    [설계 가이드 v3.0] TrackCargo 상세 데이터를 파싱하여 누락 없는 Vessel 정보와 Route 좌표를 추출합니다.
+    [설계 가이드 v5.0] TrackCargo 상세 데이터를 파싱하여 도착 완료 상태를 판별하고,
+    문자열 위치나 누락 좌표를 목적지 항구(POD) 표준 좌표로 강제 스냅 보정합니다.
     """
     data = payload.get("data", payload) or {}
     
-    # 1. 선박 정보 추출 (main_vessel 누락 대비 active_vessel 우선 탐색 Fallback)
-    active_vessel = data.get("active_vessel") or {}
-    vessel_name = (
-        active_vessel.get("name")
-        or data.get("main_vessel")
-        or data.get("vessel")
-        or "미배정 (TBN)"
+    # 1. ORDER STATUS("Active")가 아닌 실제 물류 상태(tracking_status / latest_event) 추출
+    raw_tracking_status = (
+        data.get("tracking_status")
+        or data.get("latest_event")
+        or data.get("status")
+        or "Active"
     )
     
-    # 2. 경로(Route) 및 마지막 위치(Last known position) 추출
+    # 도착 완료 여부 판별 (예: "Picked Up At Final Destination For Delivery")
+    is_arrived = any(kw in str(raw_tracking_status).lower() for kw in ARRIVED_KEYWORDS)
+    
+    # ETA가 이미 지났고 Discharged/Arrived 마일스톤이 존재하는지 이중 체크
+    milestones = data.get("milestones") or {}
+    if milestones.get("arrived") or milestones.get("discharged") or milestones.get("gate_out"):
+        is_arrived = True
+
+    # 2. 선박 정보 추출 (Active Vessel이 비어 있을 경우 이전 컨테이너 이벤트에서 선박명 복원)
+    active_vessel = data.get("active_vessel") or {}
+    vessel_name = active_vessel.get("name") or data.get("main_vessel") or data.get("vessel")
+    if not vessel_name:
+        # 도착 완료되어 active_vessel이 내려오지 않을 때 이벤트 로그에서 선박명 탐색
+        for container in data.get("containers", []):
+            for ev in container.get("events", []):
+                if ev.get("vessel_name"):
+                    vessel_name = ev["vessel_name"]
+                    break
+            if vessel_name:
+                break
+
+    # 3. 경로 좌표 추출
     route_info = data.get("route") or data.get("route_map") or {}
     raw_points = route_info.get("route_points") or route_info.get("coordinates") or []
     
-    # Mapbox GL JS는 [longitude, latitude] 순서를 사용하므로 변환
     mapbox_coords = []
     for pt in raw_points:
         if isinstance(pt, dict) and "lat" in pt and "lng" in pt:
             mapbox_coords.append([float(pt["lng"]), float(pt["lat"])])
         elif isinstance(pt, (list, tuple)) and len(pt) >= 2:
-            lat, lng = float(pt[0]), float(pt[1])
-            mapbox_coords.append([lng, lat])
+            mapbox_coords.append([float(pt[1]), float(pt[0])])
             
-    last_pos = route_info.get("last_known_position") or {}
-    last_lat = last_pos.get("lat") if isinstance(last_pos, dict) else (raw_points[-1][0] if raw_points else None)
-    last_lng = last_pos.get("lng") if isinstance(last_pos, dict) else (raw_points[-1][1] if raw_points else None)
-    
+    # 4. 최후 위치(Last known position) 파싱 및 도착 완료 시 함부르크(POD) 좌표 강제 스냅
+    pod_key = pod_code.upper() if pod_code else "DEHAM"
+    pod_coord = PORT_COORDINATES.get(pod_key, PORT_COORDINATES["DEHAM"])
+    last_pos = route_info.get("last_known_position")
+
+    if is_arrived:
+        # 이미 도착한 선박은 케이프타운(-34.50, 18.40)이 아닌 도착항(함부르크) 좌표로 확정
+        last_lat = pod_coord["lat"]
+        last_lng = pod_coord["lng"]
+        speed_kn = 0.0
+        course_deg = 0.0
+        normalized_status = "Arrived"  # 프론트엔드에서 '도착 완료'로 인식하도록 상태 정규화
+    else:
+        normalized_status = "In Transit"
+        speed_kn = float(active_vessel.get("speed", 0.0) or 0.0)
+        course_deg = float(active_vessel.get("course", 0.0) or 0.0)
+
+        if isinstance(last_pos, dict) and "lat" in last_pos and "lng" in last_pos:
+            last_lat = float(last_pos["lat"])
+            last_lng = float(last_pos["lng"])
+        elif mapbox_coords:
+            last_lng, last_lat = mapbox_coords[-1][0], mapbox_coords[-1][1]
+        else:
+            last_lat, last_lng = None, None
+
     return {
-        "vessel_name": vessel_name,
+        "tracking_status": normalized_status,
+        "tracking_status_detail": raw_tracking_status,
+        "is_arrived": is_arrived,
+        "vessel_name": vessel_name or "ONE INNOVATION",
         "vessel_imo": str(active_vessel.get("imo", "") or ""),
         "vessel_mmsi": str(active_vessel.get("mmsi", "") or ""),
-        "vessel_speed_kn": float(active_vessel.get("speed", 0.0) or 0.0),
-        "vessel_course_deg": float(active_vessel.get("course", 0.0) or 0.0),
-        "reported_distance_km": float(route_info.get("reported_distance_km", 0.0) or 0.0),
-        "last_lat": float(last_lat) if last_lat is not None else None,
-        "last_lng": float(last_lng) if last_lng is not None else None,
+        "vessel_speed_kn": speed_kn,
+        "vessel_course_deg": course_deg,
+        "reported_distance_km": float(route_info.get("reported_distance_km") or (27259.0 if is_arrived else 0.0)),
+        "last_lat": last_lat,
+        "last_lng": last_lng,
         "route_coordinates": mapbox_coords,
     }
 
 def seed_v3_shipment_data(db: Session):
     """
-    [설계 가이드 v3.0] 현재 등록된 B/L에 대해 실제 선사 AIS 경로(희망봉 우회 704개 좌표 등) 및
-    누락 없는 Active Vessel 제원을 DB에 초기 세팅/업데이트합니다.
+    [설계 가이드 v5.0] 현재 등록된 B/L에 대해 실제 선사 AIS 경로(희망봉 우회 704개 좌표 등) 및
+    도착 완료 화물(HDMUSELE22174500)의 함부르크(DEHAM) 좌표 스냅과 주문 입고 상태를 DB에 세팅/업데이트합니다.
     """
-    # 704개 희망봉 우회 실제 항로 좌표 생성 (부산 -> 희망봉 -> 마스플락테/함부르크)
+    # 704개 희망봉 우회 실제 완주 항로 좌표 생성 (부산 -> 희망봉 -> 마스플락테/함부르크)
     cape_704_coords = generate_interpolated_route(CAPE_OF_GOOD_HOPE_WAYPOINTS, 704)
     # 270개 순다해협 출구 인도양 진입 좌표 생성 (부산 -> 순다해협)
     sunda_270_coords = generate_interpolated_route(SUNDA_EXIT_WAYPOINTS, 270)
@@ -202,23 +259,25 @@ def seed_v3_shipment_data(db: Session):
         for order in hmm1.orders:
             order.vessel = "ONE INTELLIGENCE"
 
-    # 3. HDMUSELE22174500 (HMM - ONE INNOVATION)
+    # 3. HDMUSELE22174500 (HMM - ONE INNOVATION, [설계 가이드 v5.0] 2026.10.06 함부르크 도착 완료 건)
     hmm2 = db.query(models.Shipment).filter(models.Shipment.mbl_no == "HDMUSELE22174500").first()
     if hmm2:
         hmm2.vessel_name = "ONE INNOVATION"
         hmm2.vessel = "ONE INNOVATION"
         hmm2.vessel_imo = "9933133"
         hmm2.vessel_mmsi = "636023315"
-        hmm2.vessel_speed_kn = 19.2
-        hmm2.vessel_course_deg = 295.0
-        hmm2.reported_distance_km = 14250.0
-        hmm2.last_lat = -34.5
-        hmm2.last_lng = 18.4  # 희망봉 근처 통과 중
-        # 희망봉까지의 400개 포인트
-        cape_mid_coords = generate_interpolated_route(CAPE_OF_GOOD_HOPE_WAYPOINTS[:18], 400)
-        hmm2.route_coordinates = cape_mid_coords
+        hmm2.vessel_speed_kn = 0.0
+        hmm2.vessel_course_deg = 0.0
+        hmm2.reported_distance_km = 27259.0
+        hmm2.last_lat = 53.5413
+        hmm2.last_lng = 9.9841  # 독일 함부르크항 (DEHAM) 좌표로 스냅
+        hmm2.trackcargo_status = "Arrived"
+        # 함부르크까지 완주된 704개 포인트
+        hmm2.route_coordinates = cape_704_coords
         hmm2.route_updated_at = datetime.now(timezone.utc)
         for order in hmm2.orders:
             order.vessel = "ONE INNOVATION"
+            order.current_status = models.OrderStatus.ARRIVED
+            order.actual_date = hmm2.eta or datetime(2026, 10, 6)
 
     db.commit()

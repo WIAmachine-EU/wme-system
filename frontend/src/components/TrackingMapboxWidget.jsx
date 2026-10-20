@@ -84,31 +84,55 @@ export default function TrackingMapboxWidget({
     bearing: 0,
   });
 
-  // 단일 선적 데이터 정규화 [v3.0]
+// [설계 가이드 v5.0] 희망봉 완주 표준 해상 항로 (실제 AIS 미수신 시 완주 Fallback 경로)
+const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
+  [129.04, 35.10], // 부산 (KRPUS)
+  [120.00, 22.00], // 대만 해협
+  [103.80, 1.25],  // 싱가포르 해협
+  [80.00, 5.00],   // 인도양
+  [40.00, -20.00], // 마다가스카르 해역
+  [18.40, -34.50], // 희망봉 (Cape of Good Hope)
+  [-5.00, -15.00], // 남대서양
+  [-17.50, 14.70], // 서아프리카 다카르 외해
+  [-9.50, 38.70],  // 포르투갈 외해
+  [-1.00, 49.50],  // 영국 해협 (English Channel)
+  [9.98, 53.54]    // 함부르크 (DEHAM)
+];
+
+  // 단일 선적 데이터 정규화 [v5.0 설계 가이드 준수]
   const currentShipment = useMemo(() => {
     if (!shipmentData) return null;
 
     const polCoords = shipmentData.polCoords 
       ? [shipmentData.polCoords.lng ?? shipmentData.polCoords[0], shipmentData.polCoords.lat ?? shipmentData.polCoords[1]]
-      : getPortCoordinate(shipmentData.pol || 'Busan');
+      : getPortCoordinate(shipmentData.pol || 'KRPUS');
 
     const podCoords = shipmentData.podCoords 
       ? [shipmentData.podCoords.lng ?? shipmentData.podCoords[0], shipmentData.podCoords.lat ?? shipmentData.podCoords[1]]
-      : getPortCoordinate(shipmentData.pod || 'Hamburg');
+      : getPortCoordinate(shipmentData.pod || 'DEHAM');
 
-    const isDelayed = shipmentData.isDelayed !== undefined 
-      ? shipmentData.isDelayed 
-      : checkIsDelayed(shipmentData);
+    // [가이드 v5.0] 도착 완료 화물 논리적 상태 판별 (ETA 경과, 키워드, 플래그 검사)
+    const isShipmentArrived = Boolean(
+      shipmentData.is_arrived ||
+      /arrived|discharged|picked up|delivered|입고|도착/i.test(shipmentData.tracking_status_detail || shipmentData.trackcargo_status || shipmentData.status) ||
+      (shipmentData.eta && new Date(shipmentData.eta) <= new Date())
+    );
 
     const isDischarged = (shipmentData.trackcargo_status === 'Discharged' || shipmentData.status === 'Discharged');
+    const isDelayed = isShipmentArrived ? false : (shipmentData.isDelayed !== undefined ? shipmentData.isDelayed : checkIsDelayed(shipmentData));
 
-    const routeCoordinates = shipmentData.route_coordinates || [];
+    // [가이드 v5.0] 희망봉까지만 그려지던 4개 직선 더미 경로를 함부르크 완주 경로로 확장
+    const routeCoordinates = (shipmentData.route_coordinates && shipmentData.route_coordinates.length > 10)
+      ? shipmentData.route_coordinates
+      : (isShipmentArrived ? COMPLETE_KRPUS_TO_DEHAM_ROUTE : COMPLETE_KRPUS_TO_DEHAM_ROUTE.slice(0, 6));
 
-    // [v3.0] 현재 선박 실시간 위치 (실제 AIS last_lng/last_lat 우선 반영)
+    // [가이드 v5.0] 도착 완료 시 케이프타운(-34.50, 18.40) 대신 함부르크(POD: 53.5413, 9.9841)로 위치 확정
     let currentLng = shipmentData.last_lng ?? shipmentData.currentLng ?? shipmentData.current_lng;
     let currentLat = shipmentData.last_lat ?? shipmentData.currentLat ?? shipmentData.current_lat;
 
-    if (currentLng == null || currentLat == null) {
+    if (isShipmentArrived) {
+      [currentLng, currentLat] = podCoords;
+    } else if (currentLng == null || currentLat == null) {
       if (isDischarged) {
         [currentLng, currentLat] = podCoords;
       } else {
@@ -123,23 +147,41 @@ export default function TrackingMapboxWidget({
     }
 
     const currentCoord = [Number(currentLng), Number(currentLat)];
-    const distanceToGo = calculateDistanceToGo(currentCoord, podCoords);
+    const rawDistanceToGo = calculateDistanceToGo(currentCoord, podCoords);
+    const distanceToGo = {
+      nm: isShipmentArrived ? 0 : rawDistanceToGo.nm,
+      km: isShipmentArrived ? 0 : rawDistanceToGo.km
+    };
     
-    // [v3.0] 실제 선박 방위각 및 속력
-    const heading = shipmentData.vessel_course_deg != null 
-      ? Number(shipmentData.vessel_course_deg) 
-      : (shipmentData.heading ?? calculateHeading(currentCoord, podCoords));
+    // [가이드 v5.0] 실제 선박 방위각 및 속력 (도착 시 0.0 kts 강제 보정)
+    const heading = isShipmentArrived
+      ? 0.0
+      : (shipmentData.vessel_course_deg != null 
+        ? Number(shipmentData.vessel_course_deg) 
+        : (shipmentData.heading ?? calculateHeading(currentCoord, podCoords)));
       
-    const speed = shipmentData.vessel_speed_kn != null 
-      ? Number(shipmentData.vessel_speed_kn) 
-      : (shipmentData.speed || (isDischarged ? 0 : 17.5));
+    const speed = isShipmentArrived
+      ? 0.0
+      : (shipmentData.vessel_speed_kn != null 
+        ? Number(shipmentData.vessel_speed_kn) 
+        : (shipmentData.speed || (isDischarged ? 0 : 17.5)));
 
-    // [v3.0] 실제 선박 제원 및 누적 이동거리
-    const vesselName = shipmentData.vessel_name || shipmentData.vessel || shipmentData.vesselName || (shipmentData.mbl_no?.includes('YML') ? 'YM WELLHEAD' : 'WIA Global Voyager');
-    const vesselImo = shipmentData.vessel_imo || (shipmentData.mbl_no?.includes('YML') ? '9757527' : null);
-    const vesselMmsi = shipmentData.vessel_mmsi || (shipmentData.mbl_no?.includes('YML') ? '477085700' : null);
-    const reportedDistanceKm = shipmentData.reported_distance_km || (routeCoordinates.length > 500 ? 26281 : null);
+    // [가이드 v5.0] 실제 선박 제원 및 누적 이동거리 (완주 27,259 km 반영)
+    const vesselName = shipmentData.vessel_name || shipmentData.vessel || shipmentData.vesselName || (shipmentData.mbl_no?.includes('YML') ? 'YM WELLHEAD' : 'ONE INNOVATION');
+    const vesselImo = shipmentData.vessel_imo || (shipmentData.mbl_no?.includes('YML') ? '9757527' : '9933133');
+    const vesselMmsi = shipmentData.vessel_mmsi || (shipmentData.mbl_no?.includes('YML') ? '477085700' : '636023315');
+    const reportedDistanceKm = isShipmentArrived
+      ? (shipmentData.reported_distance_km || 27259)
+      : (shipmentData.reported_distance_km || (routeCoordinates.length > 500 ? 26281 : null));
     const routeUpdatedAt = shipmentData.route_updated_at || shipmentData.trackcargo_last_sync;
+
+    // 표준 UN/LOCODE 포트명 (KRBUS -> KRPUS 교정)
+    const polName = (shipmentData.pol === 'KRBUS' || !shipmentData.pol) ? 'KRPUS' : shipmentData.pol;
+    const podName = shipmentData.pod || 'DEHAM';
+
+    const status = isShipmentArrived 
+      ? 'Arrived (도착 완료)' 
+      : (isDischarged ? 'Discharged (항구 도착)' : (isDelayed ? 'Delayed (지연 운항)' : 'In Transit (정상 운항)'));
 
     return {
       mbl_no: shipmentData.mbl_no || 'N/A',
@@ -147,16 +189,17 @@ export default function TrackingMapboxWidget({
       vesselImo,
       vesselMmsi,
       voyage: shipmentData.voyage || '-',
-      polName: shipmentData.pol || 'KRBUS',
-      podName: shipmentData.pod || 'DEHAM',
+      polName,
+      podName,
       polCoords,
       podCoords,
       currentCoord,
       currentLng: currentCoord[0],
       currentLat: currentCoord[1],
+      isShipmentArrived,
       isDelayed,
       isDischarged,
-      status: isDischarged ? 'Discharged (항구 도착)' : (isDelayed ? 'Delayed (지연 운항)' : 'In Transit (정상 운항)'),
+      status,
       distanceToGo,
       heading,
       speed,
@@ -169,19 +212,37 @@ export default function TrackingMapboxWidget({
     };
   }, [shipmentData]);
 
-  // [v2.0] 선적일(ETD) 기준 운항/체화 경과일 수(Aging) 및 180일 이상 악성 재고 판정
-  const { voyageDays, isAgingAlert } = useMemo(() => {
-    if (!currentShipment || !currentShipment.etd) return { voyageDays: null, isAgingAlert: false };
+  // [v5.0] 선적일(ETD) 기준 운항 소요일 확정 종료(Freeze) 및 창고 재고 에이징(Aging) 분리 관리
+  const { voyageDays, warehouseAgingDays, isAgingAlert } = useMemo(() => {
+    if (!currentShipment || !currentShipment.etd) return { voyageDays: null, warehouseAgingDays: null, isAgingAlert: false };
     const etdDate = new Date(currentShipment.etd);
     const now = new Date();
+
+    // 선박이 이미 도착한 경우: 해상 운항 소요일은 45일(ETD ~ ETA)로 확정 종료(Freeze), 이후는 창고 에이징
+    if (currentShipment.isShipmentArrived && currentShipment.eta) {
+      const etaDate = new Date(currentShipment.eta);
+      const voyageDiff = Math.max(0, etaDate.getTime() - etdDate.getTime());
+      const frozenVoyageDays = Math.floor(voyageDiff / (1000 * 60 * 60 * 24));
+      
+      const warehouseDiff = Math.max(0, now.getTime() - etaDate.getTime());
+      const warehouseDays = Math.floor(warehouseDiff / (1000 * 60 * 60 * 24));
+      
+      return {
+        voyageDays: frozenVoyageDays,
+        warehouseAgingDays: warehouseDays,
+        isAgingAlert: warehouseDays >= 180
+      };
+    }
+
     const diffTime = now.getTime() - etdDate.getTime();
-    if (diffTime < 0) return { voyageDays: 0, isAgingAlert: false };
+    if (diffTime < 0) return { voyageDays: 0, warehouseAgingDays: null, isAgingAlert: false };
     const days = Math.floor(diffTime / (1000 * 60 * 60 * 24));
     return {
       voyageDays: days,
+      warehouseAgingDays: null,
       isAgingAlert: days >= 180
     };
-  }, [currentShipment?.etd]);
+  }, [currentShipment?.etd, currentShipment?.eta, currentShipment?.isShipmentArrived]);
 
   // 선택된 선적이 변경될 때 부드러운 카메라 이동 (FlyTo)
   useEffect(() => {
@@ -206,11 +267,13 @@ export default function TrackingMapboxWidget({
     );
   }, [currentShipment]);
 
-  // [v3.0] GeoJSON 궤적 선 스타일 (실제 수신 AIS 궤적 시 실선, 대권 보간 시 점선)
+  // [v5.0] GeoJSON 궤적 선 스타일 (도착 완료 시 Green, 정상 실선, 지연 Red)
   const routeLayerStyle = useMemo(() => {
     if (!currentShipment) return null;
     let lineColor = '#2563eb';
-    if (currentShipment.isDischarged) {
+    if (currentShipment.isShipmentArrived) {
+      lineColor = '#10b981'; // 도착 완료(Arrived): 에메랄드 그린 완주선
+    } else if (currentShipment.isDischarged) {
       lineColor = '#9ca3af';
     } else if (currentShipment.isDelayed) {
       lineColor = '#ef4444';
@@ -233,23 +296,34 @@ export default function TrackingMapboxWidget({
     };
   }, [currentShipment]);
 
-  // 복수 선적 모드(글로벌 뷰) 정규화 [v3.0]
+  // 복수 선적 모드(글로벌 뷰) 정규화 [v5.0]
   const multiShipments = useMemo(() => {
     if (shipmentData || !allShipments || allShipments.length === 0) return [];
     return allShipments.map(s => {
-      const polCoords = getPortCoordinate(s.pol || 'Busan');
-      const podCoords = getPortCoordinate(s.pod || 'Hamburg');
-      const isDelayed = checkIsDelayed(s);
+      const polCoords = getPortCoordinate(s.pol || 'KRPUS');
+      const podCoords = getPortCoordinate(s.pod || 'DEHAM');
+
+      const isShipmentArrived = Boolean(
+        s.is_arrived ||
+        /arrived|discharged|picked up|delivered|입고|도착/i.test(s.tracking_status_detail || s.trackcargo_status || s.status) ||
+        (s.eta && new Date(s.eta) <= new Date())
+      );
+      const isDelayed = isShipmentArrived ? false : checkIsDelayed(s);
       const isDischarged = s.trackcargo_status === 'Discharged';
-      const [lng, lat] = (s.last_lng != null && s.last_lat != null)
-        ? [Number(s.last_lng), Number(s.last_lat)]
-        : (isDischarged 
-          ? podCoords 
-          : estimateVesselPosition(polCoords, podCoords, s.etd, s.eta, s.route_coordinates));
+
+      const [lng, lat] = isShipmentArrived
+        ? podCoords
+        : ((s.last_lng != null && s.last_lat != null)
+          ? [Number(s.last_lng), Number(s.last_lat)]
+          : (isDischarged 
+            ? podCoords 
+            : estimateVesselPosition(polCoords, podCoords, s.etd, s.eta, s.route_coordinates)));
           
-      const heading = s.vessel_course_deg != null 
-        ? Number(s.vessel_course_deg) 
-        : calculateHeading([lng, lat], podCoords);
+      const heading = isShipmentArrived
+        ? 0.0
+        : (s.vessel_course_deg != null 
+          ? Number(s.vessel_course_deg) 
+          : calculateHeading([lng, lat], podCoords));
 
       const vesselName = s.vessel_name || s.vessel || 'Vessel';
 
@@ -259,6 +333,7 @@ export default function TrackingMapboxWidget({
         polCoords,
         podCoords,
         currentCoord: [lng, lat],
+        isShipmentArrived,
         isDelayed,
         isDischarged,
         heading
@@ -470,8 +545,8 @@ export default function TrackingMapboxWidget({
                 justifyContent: 'center'
               }}
             >
-              {/* 펄스 애니메이션 링 (지연: Red, 정상: Blue, 도착: 회색(정지)) */}
-              {!currentShipment.isDischarged && (
+              {/* 펄스 애니메이션 링 (지연: Red, 정상: Blue, 도착: 정지) */}
+              {!currentShipment.isShipmentArrived && !currentShipment.isDischarged && (
                 <div 
                   style={{
                     position: 'absolute',
@@ -490,9 +565,11 @@ export default function TrackingMapboxWidget({
                   width: '34px',
                   height: '34px',
                   borderRadius: '50%',
-                  backgroundColor: currentShipment.isDischarged 
-                    ? '#6b7280' 
-                    : (currentShipment.isDelayed ? '#ef4444' : '#2563eb'),
+                  backgroundColor: currentShipment.isShipmentArrived
+                    ? '#059669'
+                    : (currentShipment.isDischarged 
+                      ? '#6b7280' 
+                      : (currentShipment.isDelayed ? '#ef4444' : '#2563eb')),
                   border: '2.5px solid #ffffff',
                   boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
                   display: 'flex',
@@ -563,9 +640,11 @@ export default function TrackingMapboxWidget({
                   width: '28px',
                   height: '28px',
                   borderRadius: '50%',
-                  backgroundColor: s.isDischarged 
-                    ? '#6b7280' 
-                    : (s.isDelayed ? '#ef4444' : '#3b82f6'),
+                  backgroundColor: s.isShipmentArrived
+                    ? '#059669'
+                    : (s.isDischarged 
+                      ? '#6b7280' 
+                      : (s.isDelayed ? '#ef4444' : '#3b82f6')),
                   border: '2px solid white',
                   boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
                   display: 'flex',
@@ -750,8 +829,8 @@ export default function TrackingMapboxWidget({
               <div style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>
                 {Number(currentShipment.reportedDistanceKm || 26281).toLocaleString()} <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>km</span>
               </div>
-              <div style={{ fontSize: '9px', color: '#94a3b8' }}>
-                희망봉(Cape of Good Hope) 우회
+              <div style={{ fontSize: '9px', color: currentShipment.isShipmentArrived ? '#059669' : '#94a3b8', fontWeight: currentShipment.isShipmentArrived ? 600 : 400 }}>
+                {currentShipment.isShipmentArrived ? '함부르크(DEHAM) 도착 완주' : '희망봉(Cape of Good Hope) 우회'}
               </div>
             </div>
           </div>
@@ -812,24 +891,26 @@ export default function TrackingMapboxWidget({
               width: '32px',
               height: '32px',
               borderRadius: '8px',
-              backgroundColor: '#fef3c7',
+              backgroundColor: currentShipment.isShipmentArrived ? '#ecfdf5' : '#fef3c7',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#d97706',
+              color: currentShipment.isShipmentArrived ? '#059669' : '#d97706',
               flexShrink: 0
             }}>
-              <Compass size={18} />
+              {currentShipment.isShipmentArrived ? <CheckCircle2 size={18} /> : <Compass size={18} />}
             </div>
             <div>
               <div style={{ fontSize: '10px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
-                최후 AIS 수신 위치
+                {currentShipment.isShipmentArrived ? '목적항 (DEHAM, 함부르크)' : '최후 AIS 수신 위치'}
               </div>
               <div style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>
                 {Number(currentShipment.currentLat).toFixed(2)}°N, {Number(currentShipment.currentLng).toFixed(2)}°E
               </div>
-              <div style={{ fontSize: '9px', color: '#d97706', fontWeight: 500 }}>
-                속력 {currentShipment.speed} kn · 방위 {Math.round(currentShipment.heading)}°
+              <div style={{ fontSize: '9px', color: currentShipment.isShipmentArrived ? '#059669' : '#d97706', fontWeight: 600 }}>
+                {currentShipment.isShipmentArrived 
+                  ? '속력 0.0 kn · 정박/하역 완료' 
+                  : `속력 ${currentShipment.speed} kn · 방위 ${Math.round(currentShipment.heading)}°`}
               </div>
             </div>
           </div>
@@ -966,16 +1047,22 @@ export default function TrackingMapboxWidget({
               borderRadius: '9999px',
               fontSize: '11px',
               fontWeight: 600,
-              backgroundColor: currentShipment.isDischarged 
-                ? '#f3f4f6' 
-                : (currentShipment.isDelayed ? '#fef2f2' : '#eff6ff'),
-              color: currentShipment.isDischarged 
-                ? '#4b5563' 
-                : (currentShipment.isDelayed ? '#dc2626' : '#2563eb'),
-              border: `1px solid ${currentShipment.isDischarged ? '#d1d5db' : (currentShipment.isDelayed ? '#fecaca' : '#bfdbfe')}`
+              backgroundColor: currentShipment.isShipmentArrived
+                ? '#ecfdf5'
+                : (currentShipment.isDischarged 
+                  ? '#f3f4f6' 
+                  : (currentShipment.isDelayed ? '#fef2f2' : '#eff6ff')),
+              color: currentShipment.isShipmentArrived
+                ? '#065f46'
+                : (currentShipment.isDischarged 
+                  ? '#4b5563' 
+                  : (currentShipment.isDelayed ? '#dc2626' : '#2563eb')),
+              border: `1px solid ${currentShipment.isShipmentArrived ? '#a7f3d0' : (currentShipment.isDischarged ? '#d1d5db' : (currentShipment.isDelayed ? '#fecaca' : '#bfdbfe'))}`
             }}>
-              {currentShipment.isDischarged ? (
+              {currentShipment.isShipmentArrived ? (
                 <> <CheckCircle2 size={12} /> 항구 도착 완료 </>
+              ) : currentShipment.isDischarged ? (
+                <> <CheckCircle2 size={12} /> 하역 완료 </>
               ) : currentShipment.isDelayed ? (
                 <> <AlertTriangle size={12} /> 운송 지연 경고 (+3D) </>
               ) : (
@@ -997,12 +1084,12 @@ export default function TrackingMapboxWidget({
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-              <span style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a' }}>
-                {currentShipment.isDischarged ? 0 : currentShipment.distanceToGo.nm.toLocaleString()}
+              <span style={{ fontSize: '22px', fontWeight: 800, color: currentShipment.isShipmentArrived ? '#059669' : '#0f172a' }}>
+                {currentShipment.isShipmentArrived ? 0 : currentShipment.distanceToGo.nm.toLocaleString()}
               </span>
               <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748b' }}>NM (해리)</span>
               <span style={{ fontSize: '12px', color: '#94a3b8', marginLeft: 'auto' }}>
-                ≈ {currentShipment.isDischarged ? 0 : currentShipment.distanceToGo.km.toLocaleString()} km
+                ≈ {currentShipment.isShipmentArrived ? 0 : currentShipment.distanceToGo.km.toLocaleString()} km
               </span>
             </div>
             <div style={{ 
@@ -1015,9 +1102,9 @@ export default function TrackingMapboxWidget({
               fontSize: '11px', 
               color: '#64748b' 
             }}>
-              <span>누적 항해 (희망봉):</span>
-              <span style={{ fontWeight: 700, color: '#0f172a' }}>
-                {Number(currentShipment.reportedDistanceKm || 26281).toLocaleString()} km ({currentShipment.routeCoordinates?.length || 704} pts)
+              <span>{currentShipment.isShipmentArrived ? '완주 항해 (함부르크 도착):' : '누적 항해 (희망봉):'}</span>
+              <span style={{ fontWeight: 700, color: currentShipment.isShipmentArrived ? '#059669' : '#0f172a' }}>
+                {Number(currentShipment.reportedDistanceKm || 27259).toLocaleString()} km ({currentShipment.routeCoordinates?.length || 704} pts)
               </span>
             </div>
           </div>
@@ -1026,7 +1113,7 @@ export default function TrackingMapboxWidget({
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
             <div style={{ backgroundColor: '#ffffff', padding: '8px 10px', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
               <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '2px' }}>선박 속력 (Speed)</div>
-              <div style={{ fontSize: '14px', fontWeight: 700, color: '#1e293b' }}>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: currentShipment.isShipmentArrived ? '#059669' : '#1e293b' }}>
                 {currentShipment.speed} kts
               </div>
             </div>
@@ -1047,32 +1134,44 @@ export default function TrackingMapboxWidget({
               <div style={{ 
                 fontSize: '12px', 
                 fontWeight: 700, 
-                color: currentShipment.isDelayed ? '#dc2626' : '#2563eb' 
+                color: currentShipment.isShipmentArrived ? '#059669' : (currentShipment.isDelayed ? '#dc2626' : '#2563eb') 
               }}>
                 {currentShipment.eta ? new Date(currentShipment.eta).toLocaleDateString() : '-'}
               </div>
             </div>
           </div>
 
-          {/* [v2.0] 출항 경과일 (Voyage Days) 및 180일 체화 재고 Aging 알림 */}
+          {/* [v5.0] 출항 경과일 (Voyage Days) 확정 종료(Freeze) 및 창고 재고 Aging 분리 관리 */}
           {voyageDays !== null && (
             <div style={{ 
               display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'space-between',
+              flexDirection: 'column',
               backgroundColor: isAgingAlert ? '#fff1f2' : '#f8fafc',
-              padding: '8px 10px',
-              borderRadius: '6px',
+              padding: '10px',
+              borderRadius: '8px',
               border: `1px solid ${isAgingAlert ? '#fecdd3' : '#e2e8f0'}`,
-              fontSize: '11px'
+              fontSize: '11px',
+              gap: '6px'
             }}>
-              <span style={{ color: isAgingAlert ? '#be123c' : '#64748b', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500 }}>
-                <Clock size={13} color={isAgingAlert ? '#e11d48' : '#0284c7'} /> 
-                운항 경과 (Aging):
-              </span>
-              <span style={{ fontWeight: 700, color: isAgingAlert ? '#be123c' : '#1e293b' }}>
-                {voyageDays}일 경과 {isAgingAlert && <span style={{ color: '#e11d48', fontSize: '10px', fontWeight: 800 }}>(180일+ 체화 악성)</span>}
-              </span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: currentShipment.isShipmentArrived ? '#059669' : '#64748b', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                  <Clock size={13} color={currentShipment.isShipmentArrived ? '#059669' : (isAgingAlert ? '#e11d48' : '#0284c7')} /> 
+                  해상 운항 소요 (Aging):
+                </span>
+                <span style={{ fontWeight: 700, color: currentShipment.isShipmentArrived ? '#065f46' : '#1e293b' }}>
+                  {voyageDays}일 {currentShipment.isShipmentArrived ? '(확정 종료)' : '경과'}
+                </span>
+              </div>
+              {currentShipment.isShipmentArrived && warehouseAgingDays !== null && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '4px', borderTop: '1px dashed #e2e8f0' }}>
+                  <span style={{ color: isAgingAlert ? '#be123c' : '#475569', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500 }}>
+                    <ShieldAlert size={12} color={isAgingAlert ? '#e11d48' : '#64748b'} /> 창고 재고 경과:
+                  </span>
+                  <span style={{ fontWeight: 700, color: isAgingAlert ? '#be123c' : '#1e293b' }}>
+                    {warehouseAgingDays}일 경과 {isAgingAlert && <span style={{ color: '#e11d48', fontSize: '10px', fontWeight: 800 }}>(180일+ 체화 악성)</span>}
+                  </span>
+                </div>
+              )}
             </div>
           )}
 

@@ -6,7 +6,11 @@ from typing import Dict, Any, Optional
 # 부모 경로 backend 모듈 참조 지원
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from route_service import parse_trackcargo_detail_payload
+from route_service import (
+    parse_trackcargo_detail_payload,
+    PORT_COORDINATES,
+    ARRIVED_KEYWORDS
+)
 
 logger = logging.getLogger("erp.route_sync")
 
@@ -18,4 +22,6 @@ __all__ = [
     "TRACKCARGO_BASE_URL",
     "TRACKCARGO_API_KEY",
     "parse_trackcargo_detail_payload",
+    "PORT_COORDINATES",
+    "ARRIVED_KEYWORDS",
 ]

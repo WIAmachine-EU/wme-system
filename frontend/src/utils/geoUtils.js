@@ -6,10 +6,11 @@
 // 주요 항구 좌표 사전 (경도 Lng, 위도 Lat)
 export const PORT_COORDINATES = {
   // 대한민국 주요 출발항 (POL)
-  'KRBUS': [129.0756, 35.1796],
-  'Busan': [129.0756, 35.1796],
-  '부산': [129.0756, 35.1796],
-  '부산항': [129.0756, 35.1796],
+  'KRPUS': [129.0403, 35.1028], // 표준 UN/LOCODE 부산항
+  'KRBUS': [129.0403, 35.1028], // 오타/호환용 부산항
+  'Busan': [129.0403, 35.1028],
+  '부산': [129.0403, 35.1028],
+  '부산항': [129.0403, 35.1028],
   'KRKAN': [127.6953, 34.9144],
   'Gwangyang': [127.6953, 34.9144],
   '광양': [127.6953, 34.9144],
@@ -24,9 +25,9 @@ export const PORT_COORDINATES = {
   '평택': [126.8375, 36.9839],
 
   // 유럽 및 글로벌 목적항 (POD)
-  'DEHAM': [9.9937, 53.5511],
-  'Hamburg': [9.9937, 53.5511],
-  '함부르크': [9.9937, 53.5511],
+  'DEHAM': [9.9841, 53.5413],
+  'Hamburg': [9.9841, 53.5413],
+  '함부르크': [9.9841, 53.5413],
   'NLRTM': [4.4777, 51.9244],
   'Rotterdam': [4.4777, 51.9244],
   '로테르담': [4.4777, 51.9244],
@@ -235,6 +236,15 @@ export function calculateHeading(fromCoord, toCoord) {
  */
 export function checkIsDelayed(shipment) {
   if (!shipment) return false;
+
+  // [가이드 v5.0] 이미 목적지에 도착 완료되었거나 픽업된 화물은 운송 지연 경고 즉시 해제
+  const isShipmentArrived = 
+    shipment.is_arrived ||
+    /arrived|discharged|picked up|delivered|입고|도착/i.test(shipment.tracking_status_detail || shipment.trackcargo_status || shipment.status) ||
+    (shipment.eta && new Date(shipment.eta) <= new Date());
+
+  if (isShipmentArrived) return false;
+
   if (shipment.trackcargo_status === 'Delayed') return true;
   if (shipment.trackcargo_error && shipment.trackcargo_error.toLowerCase().includes('delay')) return true;
 

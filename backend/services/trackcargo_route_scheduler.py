@@ -109,9 +109,10 @@ async def sync_routes_every_2hours() -> Dict[str, Any]:
                             payload = resp.json()
 
                     if payload:
-                        parsed = parse_trackcargo_detail_payload(payload)
+                        pod_code = shipment.pod or "DEHAM"
+                        parsed = parse_trackcargo_detail_payload(payload, pod_code=pod_code)
 
-                        # 2. 변경 감지 (Diff-Check): 좌표 개수, 최후 위경도, 침로(Course), 선박명 비교
+                        # 2. 변경 감지 (Diff-Check): 좌표 개수, 최후 위경도, 침로(Course), 선박명 및 트래킹 상태 비교
                         old_points_len = len(shipment.route_coordinates or [])
                         new_points_len = len(parsed.get("route_coordinates") or [])
 
@@ -120,7 +121,8 @@ async def sync_routes_every_2hours() -> Dict[str, Any]:
                             shipment.last_lng != parsed.get("last_lng") or
                             old_points_len != new_points_len or
                             shipment.vessel_course_deg != parsed.get("vessel_course_deg") or
-                            shipment.vessel_name != parsed.get("vessel_name")
+                            shipment.vessel_name != parsed.get("vessel_name") or
+                            shipment.trackcargo_status != parsed.get("tracking_status")
                         )
 
                         # 3. 실제 위치나 선박 정보가 갱신된 경우에만 DB Write 수행 (I/O 부하 방지)
@@ -134,12 +136,17 @@ async def sync_routes_every_2hours() -> Dict[str, Any]:
                             shipment.last_lat = parsed.get("last_lat")
                             shipment.last_lng = parsed.get("last_lng")
                             shipment.route_coordinates = parsed.get("route_coordinates")
+                            shipment.trackcargo_status = parsed.get("tracking_status")
                             shipment.route_updated_at = datetime.now(timezone.utc)
                             
-                            # 연결된 주문 선박명 업데이트
+                            # 연결된 주문 선박명 및 도착 완료 상태(가이드 v5.0) 자동 동기화
                             for order in shipment.orders:
                                 if order.vessel != parsed.get("vessel_name"):
                                     order.vessel = parsed.get("vessel_name")
+                                if parsed.get("is_arrived"):
+                                    order.current_status = models.OrderStatus.ARRIVED
+                                    if not order.actual_date and shipment.eta:
+                                        order.actual_date = shipment.eta
 
                             updated_count += 1
                         else:

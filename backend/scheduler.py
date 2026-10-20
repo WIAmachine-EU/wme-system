@@ -86,6 +86,11 @@ def process_periodic_eta_notifications():
                             order.vessel = tracking_data.get("vessel")
                             changed = True
                             
+                        if tracking_data.get("is_arrived") or shipment.trackcargo_status == "Arrived":
+                            if order.current_status != models.OrderStatus.ARRIVED:
+                                order.current_status = models.OrderStatus.ARRIVED
+                                changed = True
+                                
                         if changed:
                             logger.info(f"Order {order.reference_no} updated from TrackCargo Shipment {shipment.mbl_no}")
                             if new_eta:

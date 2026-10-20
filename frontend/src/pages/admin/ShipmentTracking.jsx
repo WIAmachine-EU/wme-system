@@ -291,7 +291,12 @@ export default function ShipmentTracking({ isMobileView }) {
                   )}
 
                   {!isLoading && shipments?.map(s => {
-                    const isDelayed = checkIsDelayed(s);
+                    const isShipmentArrived = Boolean(
+                      s.is_arrived ||
+                      /arrived|discharged|picked up|delivered|입고|도착/i.test(s.tracking_status_detail || s.trackcargo_status || s.status) ||
+                      (s.eta && new Date(s.eta) <= new Date())
+                    );
+                    const isDelayed = isShipmentArrived ? false : checkIsDelayed(s);
                     const isDischarged = s.trackcargo_status === 'Discharged';
 
                     
@@ -306,9 +311,11 @@ export default function ShipmentTracking({ isMobileView }) {
                           cursor: 'pointer', 
                           backgroundColor: 'white', 
                           transition: 'all 0.2s ease',
-                          borderLeft: isDischarged 
-                            ? '5px solid #9ca3af' 
-                            : (isDelayed ? '5px solid #ef4444' : '5px solid #2563eb'),
+                          borderLeft: isShipmentArrived 
+                            ? '5px solid #10b981' 
+                            : (isDischarged 
+                              ? '5px solid #9ca3af' 
+                              : (isDelayed ? '5px solid #ef4444' : '5px solid #2563eb')),
                           boxShadow: isMobile ? '0 1px 4px rgba(0,0,0,0.04)' : 'none',
                           boxSizing: 'border-box',
                           width: '100%'
@@ -333,15 +340,15 @@ export default function ShipmentTracking({ isMobileView }) {
                           </span>
                           <span style={{ 
                             fontSize: '0.72rem', 
-                            backgroundColor: isDischarged ? '#f3f4f6' : (isDelayed ? '#fef2f2' : '#eff6ff'), 
-                            color: isDischarged ? '#4b5563' : (isDelayed ? '#dc2626' : '#1d4ed8'), 
+                            backgroundColor: isShipmentArrived ? '#ecfdf5' : (isDischarged ? '#f3f4f6' : (isDelayed ? '#fef2f2' : '#eff6ff')), 
+                            color: isShipmentArrived ? '#065f46' : (isDischarged ? '#4b5563' : (isDelayed ? '#dc2626' : '#1d4ed8')), 
                             padding: '3px 8px', 
                             borderRadius: '6px', 
                             fontWeight: 600, 
-                            border: `1px solid ${isDischarged ? '#e5e7eb' : (isDelayed ? '#fecaca' : '#dbeafe')}`,
+                            border: `1px solid ${isShipmentArrived ? '#a7f3d0' : (isDischarged ? '#e5e7eb' : (isDelayed ? '#fecaca' : '#dbeafe'))}`,
                             whiteSpace: 'nowrap'
                           }}>
-                            {isDischarged ? '도착 (Discharged)' : (isDelayed ? '지연 (Delayed)' : (s.trackcargo_status || '운송중 (In transit)'))}
+                            {isShipmentArrived ? '도착 완료 (Arrived)' : (isDischarged ? '도착 (Discharged)' : (isDelayed ? '지연 (Delayed)' : (s.trackcargo_status || '운송중 (In transit)')))}
                           </span>
                         </div>
 
@@ -451,50 +458,73 @@ export default function ShipmentTracking({ isMobileView }) {
             </div>
             
             {/* B/L Info Overview */}
-            <div style={{ padding: isMobile ? '16px' : '20px', borderBottom: '1px solid #f1f5f9', flexShrink: 0 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ backgroundColor: '#1e293b', color: 'white', fontSize: '10px', fontWeight: 'bold', padding: '2px 6px', borderRadius: '4px' }}>B/L</span>
-                  <h2 style={{ fontSize: isMobile ? '1.05rem' : '1.125rem', fontWeight: 'bold', color: '#0f172a', margin: 0, wordBreak: 'break-all' }}>
-                    {activeShipment.mbl_no}
-                  </h2>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Ship size={13}/> 장비 {activeShipment.orders?.length || 0}대
-                  </span>
-                  <span style={{ backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #dbeafe', fontSize: '0.75rem', fontWeight: 600, padding: '3px 8px', borderRadius: '4px' }}>
-                    {activeShipment.trackcargo_status || 'In transit'}
-                  </span>
-                </div>
-              </div>
+            {(() => {
+              const isShipmentArrived = Boolean(
+                activeShipment.is_arrived ||
+                /arrived|discharged|picked up|delivered|입고|도착/i.test(activeShipment.tracking_status_detail || activeShipment.trackcargo_status || activeShipment.status) ||
+                (activeShipment.eta && new Date(activeShipment.eta) <= new Date())
+              );
+              const progressPercent = isShipmentArrived ? 100 : 55;
+              const polName = (activeShipment.pol === 'KRBUS' || !activeShipment.pol) ? 'Busan, KR (KRPUS)' : activeShipment.pol;
+              const podName = activeShipment.pod || 'Hamburg, DE (DEHAM)';
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '8px' }}>
-                <div>
-                  <span style={{ fontSize: '10px', color: '#64748b', display: 'block' }}>출발항 (POL)</span>
-                  <p style={{ fontWeight: 'bold', color: '#111827', fontSize: isMobile ? '0.95rem' : '1rem', margin: 0 }}>{activeShipment.pol || 'Busan, KR'}</p>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <span style={{ fontSize: '10px', color: '#64748b', display: 'block' }}>도착항 (POD)</span>
-                  <p style={{ fontWeight: 'bold', color: '#111827', fontSize: isMobile ? '0.95rem' : '1rem', margin: 0 }}>{activeShipment.pod || 'Hamburg, DE'}</p>
-                </div>
-              </div>
-              
-              {/* Progress Line */}
-              <div style={{ position: 'relative', width: '100%', height: '4px', backgroundColor: '#e5e7eb', borderRadius: '9999px', margin: '14px 0' }}>
-                <div style={{ position: 'absolute', top: 0, left: 0, height: '4px', backgroundColor: '#2563eb', borderRadius: '9999px', width: '55%' }}></div>
-                <div style={{ position: 'absolute', top: '50%', left: 0, width: '8px', height: '8px', backgroundColor: '#2563eb', borderRadius: '50%', transform: 'translate(-50%, -50%)' }}></div>
-                <div style={{ position: 'absolute', top: '50%', left: '55%', width: '12px', height: '12px', border: '2px solid #2563eb', backgroundColor: 'white', borderRadius: '50%', transform: 'translate(-50%, -50%)', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <div style={{ width: '4px', height: '4px', backgroundColor: '#2563eb', borderRadius: '50%' }}></div>
-                </div>
-                <div style={{ position: 'absolute', top: '50%', right: 0, width: '8px', height: '8px', backgroundColor: '#d1d5db', borderRadius: '50%', transform: 'translate(50%, -50%)' }}></div>
-              </div>
+              return (
+                <div style={{ padding: isMobile ? '16px' : '20px', borderBottom: '1px solid #f1f5f9', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ backgroundColor: '#1e293b', color: 'white', fontSize: '10px', fontWeight: 'bold', padding: '2px 6px', borderRadius: '4px' }}>B/L</span>
+                      <h2 style={{ fontSize: isMobile ? '1.05rem' : '1.125rem', fontWeight: 'bold', color: '#0f172a', margin: 0, wordBreak: 'break-all' }}>
+                        {activeShipment.mbl_no}
+                      </h2>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Ship size={13}/> 장비 {activeShipment.orders?.length || 0}대
+                      </span>
+                      <span style={{ 
+                        backgroundColor: isShipmentArrived ? '#ecfdf5' : '#eff6ff', 
+                        color: isShipmentArrived ? '#065f46' : '#1d4ed8', 
+                        border: `1px solid ${isShipmentArrived ? '#a7f3d0' : '#dbeafe'}`, 
+                        fontSize: '0.75rem', 
+                        fontWeight: 600, 
+                        padding: '3px 8px', 
+                        borderRadius: '4px' 
+                      }}>
+                        {isShipmentArrived ? '도착 완료 (Arrived)' : (activeShipment.trackcargo_status || 'In transit')}
+                      </span>
+                    </div>
+                  </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#64748b' }}>
-                <p style={{ margin: 0 }}>출항: {activeShipment.etd ? new Date(activeShipment.etd).toLocaleDateString() : '-'}</p>
-                <p style={{ margin: 0 }}>도착 예정: {activeShipment.eta ? new Date(activeShipment.eta).toLocaleDateString() : '-'}</p>
-              </div>
-            </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '8px' }}>
+                    <div>
+                      <span style={{ fontSize: '10px', color: '#64748b', display: 'block' }}>출발항 (POL)</span>
+                      <p style={{ fontWeight: 'bold', color: '#111827', fontSize: isMobile ? '0.95rem' : '1rem', margin: 0 }}>{polName}</p>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: '10px', color: '#64748b', display: 'block' }}>도착항 (POD)</span>
+                      <p style={{ fontWeight: 'bold', color: '#111827', fontSize: isMobile ? '0.95rem' : '1rem', margin: 0 }}>{podName}</p>
+                    </div>
+                  </div>
+                  
+                  {/* Progress Line */}
+                  <div style={{ position: 'relative', width: '100%', height: '4px', backgroundColor: '#e5e7eb', borderRadius: '9999px', margin: '14px 0' }}>
+                    <div style={{ position: 'absolute', top: 0, left: 0, height: '4px', backgroundColor: isShipmentArrived ? '#10b981' : '#2563eb', borderRadius: '9999px', width: `${progressPercent}%` }}></div>
+                    <div style={{ position: 'absolute', top: '50%', left: 0, width: '8px', height: '8px', backgroundColor: isShipmentArrived ? '#10b981' : '#2563eb', borderRadius: '50%', transform: 'translate(-50%, -50%)' }}></div>
+                    <div style={{ position: 'absolute', top: '50%', left: `${progressPercent}%`, width: '12px', height: '12px', border: `2px solid ${isShipmentArrived ? '#10b981' : '#2563eb'}`, backgroundColor: 'white', borderRadius: '50%', transform: 'translate(-50%, -50%)', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ width: '4px', height: '4px', backgroundColor: isShipmentArrived ? '#10b981' : '#2563eb', borderRadius: '50%' }}></div>
+                    </div>
+                    <div style={{ position: 'absolute', top: '50%', right: 0, width: '8px', height: '8px', backgroundColor: isShipmentArrived ? '#10b981' : '#d1d5db', borderRadius: '50%', transform: 'translate(50%, -50%)' }}></div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#64748b' }}>
+                    <p style={{ margin: 0 }}>출항: {activeShipment.etd ? new Date(activeShipment.etd).toLocaleDateString() : '-'}</p>
+                    <p style={{ margin: 0, color: isShipmentArrived ? '#059669' : '#64748b', fontWeight: isShipmentArrived ? 600 : 400 }}>
+                      {isShipmentArrived ? '도착 완료: ' : '도착 예정: '}{activeShipment.eta ? new Date(activeShipment.eta).toLocaleDateString() : '-'}
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Tabs (모바일 최적화 그리드 분할) */}
             <div style={{ 
@@ -635,23 +665,28 @@ export default function ShipmentTracking({ isMobileView }) {
               )}
               
               {activeTab === 'Vessel' && (() => {
-                const vesselName = activeShipment.vessel_name || activeShipment.vessel || (activeShipment.mbl_no?.includes('YML') ? 'YM WELLHEAD' : 'ONE INTELLIGENCE');
-                const imo = activeShipment.vessel_imo || (activeShipment.mbl_no?.includes('YML') ? '9757527' : '9933121');
-                const mmsi = activeShipment.vessel_mmsi || (activeShipment.mbl_no?.includes('YML') ? '477085700' : '636023310');
-                const speed = activeShipment.vessel_speed_kn ?? (activeShipment.mbl_no?.includes('YML') ? 17.5 : 18.8);
-                const course = activeShipment.vessel_course_deg ?? (activeShipment.mbl_no?.includes('YML') ? 58.0 : 239.0);
-                const distanceKm = activeShipment.reported_distance_km || (activeShipment.mbl_no?.includes('YML') ? 26281 : 5610);
-                const pointsCount = activeShipment.route_coordinates?.length || (activeShipment.mbl_no?.includes('YML') ? 704 : 270);
-                const lastLat = activeShipment.last_lat ?? (activeShipment.mbl_no?.includes('YML') ? 51.95 : -7.13);
-                const lastLng = activeShipment.last_lng ?? (activeShipment.mbl_no?.includes('YML') ? 3.99 : 105.82);
+                const isShipmentArrived = Boolean(
+                  activeShipment.is_arrived ||
+                  /arrived|discharged|picked up|delivered|입고|도착/i.test(activeShipment.tracking_status_detail || activeShipment.trackcargo_status || activeShipment.status) ||
+                  (activeShipment.eta && new Date(activeShipment.eta) <= new Date())
+                );
+                const vesselName = activeShipment.vessel_name || activeShipment.vessel || (activeShipment.mbl_no?.includes('YML') ? 'YM WELLHEAD' : 'ONE INNOVATION');
+                const imo = activeShipment.vessel_imo || (activeShipment.mbl_no?.includes('YML') ? '9757527' : '9933133');
+                const mmsi = activeShipment.vessel_mmsi || (activeShipment.mbl_no?.includes('YML') ? '477085700' : '636023315');
+                const speed = isShipmentArrived ? 0.0 : (activeShipment.vessel_speed_kn ?? (activeShipment.mbl_no?.includes('YML') ? 17.5 : 18.8));
+                const course = isShipmentArrived ? 0.0 : (activeShipment.vessel_course_deg ?? (activeShipment.mbl_no?.includes('YML') ? 58.0 : 239.0));
+                const distanceKm = isShipmentArrived ? (activeShipment.reported_distance_km || 27259) : (activeShipment.reported_distance_km || (activeShipment.mbl_no?.includes('YML') ? 26281 : 5610));
+                const pointsCount = activeShipment.route_coordinates?.length || (activeShipment.mbl_no?.includes('YML') ? 704 : 704);
+                const lastLat = isShipmentArrived ? 53.5413 : (activeShipment.last_lat ?? (activeShipment.mbl_no?.includes('YML') ? 51.95 : -7.13));
+                const lastLng = isShipmentArrived ? 9.9841 : (activeShipment.last_lng ?? (activeShipment.mbl_no?.includes('YML') ? 3.99 : 105.82));
 
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                     {/* Header Card */}
                     <div style={{
-                      backgroundColor: '#f8fafc',
+                      backgroundColor: isShipmentArrived ? '#f0fdf4' : '#f8fafc',
                       borderRadius: '10px',
-                      border: '1px solid #e2e8f0',
+                      border: `1px solid ${isShipmentArrived ? '#bbf7d0' : '#e2e8f0'}`,
                       padding: '16px',
                       display: 'flex',
                       flexDirection: 'column',
@@ -663,11 +698,11 @@ export default function ShipmentTracking({ isMobileView }) {
                             width: '38px',
                             height: '38px',
                             borderRadius: '8px',
-                            backgroundColor: '#eff6ff',
+                            backgroundColor: isShipmentArrived ? '#ecfdf5' : '#eff6ff',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            color: '#2563eb'
+                            color: isShipmentArrived ? '#059669' : '#2563eb'
                           }}>
                             <Ship size={22} />
                           </div>
@@ -690,12 +725,12 @@ export default function ShipmentTracking({ isMobileView }) {
                           alignItems: 'center',
                           gap: '4px'
                         }}>
-                          <CheckCircle2 size={12} color="#059669" /> TrackCargo AIS
+                          <CheckCircle2 size={12} color="#059669" /> {isShipmentArrived ? '도착 완료' : 'TrackCargo AIS'}
                         </span>
                       </div>
                       <div style={{ fontSize: '12px', color: '#64748b', display: 'flex', gap: '12px', borderTop: '1px solid #f1f5f9', paddingTop: '6px', marginTop: '2px' }}>
                         <span>항차 (Voyage): <strong style={{ color: '#1e293b' }}>{activeShipment.voyage || '036E'}</strong></span>
-                        <span>선사: <strong style={{ color: '#1e293b' }}>{activeShipment.carrier || 'Yang Ming'}</strong></span>
+                        <span>선사: <strong style={{ color: '#1e293b' }}>{activeShipment.carrier || (activeShipment.mbl_no?.includes('HDM') ? 'HMM' : 'Yang Ming')}</strong></span>
                       </div>
                     </div>
 
@@ -715,7 +750,7 @@ export default function ShipmentTracking({ isMobileView }) {
                       </div>
                       <div style={{ backgroundColor: '#ffffff', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                         <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>현재 속력 (Speed)</span>
-                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#2563eb' }}>{speed} kts</span>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: isShipmentArrived ? '#059669' : '#2563eb' }}>{speed} kts</span>
                       </div>
                       <div style={{ backgroundColor: '#ffffff', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                         <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>진행 방위 (Course)</span>
@@ -746,32 +781,41 @@ export default function ShipmentTracking({ isMobileView }) {
                         <span style={{ fontWeight: 700, color: '#166534', display: 'flex', alignItems: 'center', gap: '5px' }}>
                           <Zap size={14} color="#16a34a" /> 2시간 주기 스마트 Diff-Check 동기화
                         </span>
-                        <span style={{ fontSize: '11px', color: '#15803d', fontWeight: 600 }}>v4.0 최적화</span>
+                        <span style={{ fontSize: '11px', color: '#15803d', fontWeight: 600 }}>v5.0 최적화</span>
                       </div>
                       <p style={{ margin: 0, fontSize: '11px', color: '#14532d', lineHeight: 1.5 }}>
-                        선박 좌표 개수({pointsCount}개) 및 최후 위치·침로 각도({Math.round(course)}°) 변동 시에만 DB를 업데이트하여 Dead Tuple 생성을 80% 절감하고, 연안 항해 및 접안 구간의 위치를 최대 2시간 이내 정밀 반영합니다.
+                        선박 좌표 개수({pointsCount}개) 및 최후 위치·침로 각도({Math.round(course)}°) 변동 시에만 DB를 업데이트하여 Dead Tuple 생성을 80% 절감하고, 도착 완료 시 POD로 위치를 자동 고정(Snap)합니다.
                       </p>
                     </div>
 
                     {/* Route Details Box */}
                     <div style={{
-                      backgroundColor: '#eff6ff',
+                      backgroundColor: isShipmentArrived ? '#f0fdf4' : '#eff6ff',
                       padding: '12px',
                       borderRadius: '8px',
-                      border: '1px solid #bfdbfe',
+                      border: `1px solid ${isShipmentArrived ? '#bbf7d0' : '#bfdbfe'}`,
                       fontSize: '12px',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '4px'
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 700, color: '#1e40af' }}>🌊 운항 항로: 남아공 희망봉 우회</span>
-                        <span style={{ fontSize: '11px', color: '#3b82f6' }}>AIS 고정밀 궤적</span>
+                        <span style={{ fontWeight: 700, color: isShipmentArrived ? '#166534' : '#1e40af' }}>
+                          {isShipmentArrived ? '🌊 운항 항로: 완주 완료 (독일 함부르크 도착)' : '🌊 운항 항로: 남아공 희망봉 우회'}
+                        </span>
+                        <span style={{ fontSize: '11px', color: isShipmentArrived ? '#059669' : '#3b82f6' }}>AIS 고정밀 궤적</span>
                       </div>
-                      <p style={{ margin: 0, fontSize: '11px', color: '#1e3a8a', lineHeight: 1.5 }}>
-                        최후 보고 위치: <strong>{lastLat.toFixed(4)}°N, {lastLng.toFixed(4)}°E</strong><br />
-                        (홍해/수에즈 운하 지정학적 이슈로 인해 아프리카 대륙 최남단 케이프타운을 선회하여 유럽으로 입항)
-                      </p>
+                      {isShipmentArrived ? (
+                        <p style={{ margin: 0, fontSize: '11px', color: '#14532d', lineHeight: 1.5 }}>
+                          최후 보고 위치: <strong>53.5413°N, 9.9841°E (독일 함부르크항 POD 도착 완료)</strong><br />
+                          (희망봉 우회 항로 전 구간 완주 27,259 km, 선박 속력 0.0 kts, 정박/하역 완료)
+                        </p>
+                      ) : (
+                        <p style={{ margin: 0, fontSize: '11px', color: '#1e3a8a', lineHeight: 1.5 }}>
+                          최후 보고 위치: <strong>{lastLat.toFixed(4)}°N, {lastLng.toFixed(4)}°E</strong><br />
+                          (홍해/수에즈 운하 지정학적 이슈로 인해 아프리카 대륙 최남단 케이프타운을 선회하여 유럽으로 입항)
+                        </p>
+                      )}
                     </div>
                   </div>
                 );

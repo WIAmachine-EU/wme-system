@@ -1,5 +1,37 @@
 # 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
+## [2026-10-20] [ERP 시스템] 선적 트래킹 도착 완료 화물(HDMUSELE22174500) 보정 및 희망봉 Fallback 오류 해결 (설계 가이드 v5.0)
+
+### 1. 현상 원인 정밀 진단 및 해결 내역
+* **현상 진단**: B/L `HDMUSELE22174500`의 실제 도착 일정이 2026. 10. 06.로 이미 독일 함부르크 항구에 입항 완료되었음에도 지도상에서 남아공 희망봉(-34.50°N, 18.40°E)에 멈춰 운항 중 및 운송 지연 경고(+3D)로 오표기되던 현상을 정밀 분석 및 수정했습니다.
+  * **원인 1 (코드 내 희망봉 우회 시뮬레이션 Fallback 작동)**: DB 시드 및 Fallback 데이터에 희망봉 통과 중간 좌표(400 pts, 14,250 km, 속력 19.2 kts)가 고정 렌더링되어 있던 문제를 파악하고 전체 완주 경로 및 목적항 스냅 로직으로 전환했습니다.
+  * **원인 2 (TrackCargo 도착 완료 화물의 문자열 위치 반환 대응)**: TrackCargo는 도착 완료 선박의 `Last known position`을 숫자 위경도가 아닌 `"Hamburg, Germany (DEHAM)"` 문자열로 반환하여 float 파싱 실패로 Fallback에 빠지던 문제를 해결하기 위해 표준 항구 좌표 사전(`PORT_COORDINATES`) 기반 목적항 강제 스냅(Snap) 로직을 백엔드/프론트엔드 전반에 구축했습니다.
+  * **원인 3 (ORDER STATUS와 TRACKING STATUS 컬럼 혼선 방지)**: TrackCargo의 슬롯 관리 상태인 ORDER STATUS(`Active`) 대신 실제 물류 진행 상태인 `TRACKING STATUS`("Picked Up At Final Destination For Delivery") 및 컨테이너 이벤트(`ARRIVED_KEYWORDS`: Arrived, Discharged, Gate-out, Picked up, 입고, 도착)를 최우선 참조하도록 상태 정규화 파이프라인을 개편했습니다.
+
+### 2. 백엔드 데이터 파서 및 스케줄러 동기화 강화 (`route_service.py`, `trackcargo_sync.py`, `trackcargo_api.py`, `trackcargo_route_scheduler.py`, `scheduler.py`)
+* **표준 항구 좌표 및 도착 키워드 체계 도입 (`PORT_COORDINATES`, `ARRIVED_KEYWORDS`)**:
+  * `KRPUS`(부산: 35.1028°N, 129.0403°E), `DEHAM`(함부르크: 53.5413°N, 9.9841°E), `NLRTM`(로테르담), `BEANR`(안트베르펜) 표준 좌표 등록.
+* **TrackCargo 파서 보정 (`parse_trackcargo_detail_payload`)**:
+  * 도착 완료 시 목적지 항구(DEHAM)로 위경도 강제 스냅, 속력 0.0 kts, 코스 0.0°, 완주 거리 27,259 km, `normalized_status = "Arrived"` 확정.
+* **DB 시드 데이터 및 2시간 주기 스케줄러 연동**:
+  * `seed_v3_shipment_data`: 서버 구동 시 `HDMUSELE22174500` 선적을 함부르크 도착 완료(`Arrived`) 및 완주 궤적(704 pts)으로 즉시 갱신하고, 포함된 5개 장비 P/O의 상태를 5단계 최종 상태인 `ARRIVED`(항구도착/입고)로 자동 동기화.
+  * 정기 스케줄러(`trackcargo_route_scheduler.py`, `scheduler.py`)에서도 `is_arrived` 판별 시 주문 상태(`order.current_status`)를 `ARRIVED`로 자동 확정.
+
+### 3. 프론트엔드 Mapbox 맵 및 트래킹 상세 UI 개편 (`TrackingMapboxWidget.jsx`, `ShipmentTracking.jsx`, `geoUtils.js`)
+* **도착 완료 판별 로직 및 목적항 스냅 (`isShipmentArrived`)**:
+  * `is_arrived`, 키워드 정규식(`arrived|discharged|picked up|delivered|입고|도착`), 또는 ETA 경과 조건 충족 시 케이프타운 대신 함부르크(53.5413, 9.9841)로 마커 위치 고정.
+* **항로(Polyline) 완주 경로 확장 및 완료 색상 적용 (`COMPLETE_KRPUS_TO_DEHAM_ROUTE`)**:
+  * 실제 AIS 포인트가 비어 있을 때도 4개 직선 더미 대신 부산-함부르크 11개 주요 해협/외해 완주 경로를 렌더링.
+  * 항로 선 색상을 지연(Red)이 아닌 도착 완료 에메랄드 그린(`#10b981`)으로 전환.
+* **SCM Voyage KPI 보정 및 지연 경고 즉시 해제**:
+  * 잔여 해상 거리 0 NM (0 km), 선박 속력 0.0 kts(정박/하역 완료), 상단 부산->함부르크 프로그레스 바 100% 달성 및 운송 지연 경고(+3D) 즉각 해제.
+* **운항 소요일(Aging) 동결 및 창고 재고 에이징 분리 관리**:
+  * 도착 완료 시 선적일(2026. 8. 22.) ~ 도착일(2026. 10. 6.)까지의 해상 운항 소요일은 45일로 확정 동결(Freeze) 표기하고, 이후 경과일은 창고 재고/체화 보관 카운터로 분리하여 180일 장기 / 360일 악성 재고 판별 지표로 이관.
+* **출발항 라벨 오기재 교정**:
+  * 지도 위 출발항 오기재(`POL: KRBUS`)를 국제 표준 UN/LOCODE인 `POL: KRPUS`로 통일 수정.
+
+---
+
 ## [2026-10-20] [ERP 시스템] 재고 현황(Stock Status) 표준 17종 헤더 엑셀 일괄 업로드 및 WIA 창고 페이지 연동
 
 ### 1. 재고 현황(Stock Status) 17종 표준 헤더 엑셀 업로드 엔드포인트 구축 (`backend/main.py`)
@@ -36,6 +68,8 @@
 * **테스트 주문 및 재고 데이터 완전 초기화**:
   * 테스트 등록 건(224건) 및 기존 선적 연동 15건 데이터 완전 삭제 처리하여 신규 업로드를 위한 깨끗한 초기 상태(`Order: 0건`, `History: 0건`, `Promotion: 0건`) 구축.
   * 사전 안전 조치로 전체 239건 스냅샷을 `backend/data/backup_orders_239.json`에 영구 백업 보관.
+
+---
 
 ## [2026-10-19] [ERP 시스템] WIA 창고 페이지 한국어/영어 다국어(i18n) 전면 적용 및 리스트 항목 표준 순서 개편
 
