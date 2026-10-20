@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Package, CheckCircle, Clock, X, ExternalLink } from 'lucide-react';
+import { Search, Package, CheckCircle, Clock, X, ExternalLink, Upload, FileSpreadsheet } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import StockStatusUploadModal from '../../components/StockStatusUploadModal';
 
 function CargoDetailModal({ isOpen, onClose, serialNumber, modelName }) {
   const { t } = useTranslation();
@@ -220,6 +221,35 @@ export default function AdminDispatch({ isMobileView }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedSN, setSelectedSN] = useState(null);
   const [selectedModel, setSelectedModel] = useState(null);
+
+  // 입고증 PDF 및 재고 엑셀 업로드 상태
+  const [pdfFile, setPdfFile] = useState(null);
+  const [pdfUploading, setPdfUploading] = useState(false);
+  const [pdfUploadResult, setPdfUploadResult] = useState(null);
+  const [stockModalOpen, setStockModalOpen] = useState(false);
+
+  const handlePdfUpload = async (e) => {
+    e.preventDefault();
+    if (!pdfFile) return alert("업로드할 입고증 PDF 파일을 선택해주세요.");
+
+    setPdfUploading(true);
+    setPdfUploadResult(null);
+    const formData = new FormData();
+    formData.append('file', pdfFile);
+
+    try {
+      const res = await fetch('/api/upload/pdf-cargo', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      setPdfUploadResult(data);
+    } catch (err) {
+      setPdfUploadResult({ status: 'error', message: '서버 통신 중 오류가 발생했습니다.' });
+    } finally {
+      setPdfUploading(false);
+    }
+  };
 
   const openCargoModal = (sn, model) => {
     if (!sn) return;
@@ -918,7 +948,108 @@ export default function AdminDispatch({ isMobileView }) {
             </table>
           </div>
         )}
+
+        {/* ============================================================== */}
+        {/* 하단 창고 데이터 입고 관리 (입고증 PDF 및 재고 엑셀 업로드) */}
+        {/* ============================================================== */}
+        <div style={{ marginTop: '36px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ borderBottom: '2px solid var(--border-color)', paddingBottom: '12px' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 6px 0', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Package color="var(--wia-blue)" size={22} />
+              창고 데이터 입고 및 문서 관리
+            </h2>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+              입고증(Einlagerungsmeldung) PDF 및 재고 현황(Stock Status) 엑셀을 업로드하여 창고 데이터를 최신으로 유지합니다.
+            </p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '20px' }}>
+            {/* 1. 입고증 PDF 업로드 (Cargo Details) */}
+            <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                  <Upload color="var(--accent-green)" size={20} />
+                  <h3 style={{ fontSize: '1.1rem', margin: 0, color: 'var(--text-primary)', fontWeight: 600 }}>
+                    입고증 PDF 업로드 (Cargo Details)
+                  </h3>
+                </div>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', margin: '0 0 16px 0', lineHeight: 1.5 }}>
+                  입고증(Einlagerungsmeldung) PDF 파일을 업로드하면 AI가 화물 상세 정보(치수, 중량, 박스 번호)를 자동 추출하여 DB에 반영합니다.
+                </p>
+
+                <form onSubmit={handlePdfUpload} style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', background: 'var(--bg-secondary)', padding: '16px', borderRadius: '10px', border: '1px dashed var(--border-color)' }}>
+                  <input
+                    type="file"
+                    accept=".pdf"
+                    onChange={e => setPdfFile(e.target.files[0])}
+                    style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', flex: 1 }}
+                  />
+                  <button type="submit" disabled={pdfUploading || !pdfFile} className="btn btn-primary" style={{ padding: '8px 16px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Upload size={15} />
+                    <span>{pdfUploading ? '분석 중...' : 'PDF 업로드'}</span>
+                  </button>
+                </form>
+              </div>
+
+              {pdfUploadResult && (
+                <div style={{
+                  marginTop: '14px', padding: '12px', borderRadius: '8px',
+                  background: pdfUploadResult.status === 'success' ? 'hsla(142, 76%, 46%, 0.15)' : 'hsla(0, 84%, 60%, 0.15)',
+                  border: `1px solid ${pdfUploadResult.status === 'success' ? 'var(--status-stock)' : 'var(--status-shipping)'}`,
+                  fontSize: '0.85rem'
+                }}>
+                  <strong style={{ color: pdfUploadResult.status === 'success' ? 'var(--status-stock)' : 'var(--status-shipping)' }}>
+                    {pdfUploadResult.message}
+                  </strong>
+                </div>
+              )}
+            </div>
+
+            {/* 2. 재고 엑셀 업로드 (Stock Status) */}
+            <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                  <FileSpreadsheet color="var(--accent-blue)" size={20} />
+                  <h3 style={{ fontSize: '1.1rem', margin: 0, color: 'var(--text-primary)', fontWeight: 600 }}>
+                    재고 엑셀 업로드 (Stock Status)
+                  </h3>
+                </div>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', margin: '0 0 14px 0', lineHeight: 1.5 }}>
+                  과거 2023~2025년 도착 장비 및 현재 창고 재고 현황(Stock Status) 엑셀을 업로드하여 창고 페이지에 일괄 등록/갱신합니다.
+                </p>
+
+                <div style={{ background: 'var(--bg-secondary)', padding: '14px', borderRadius: '10px', marginBottom: '14px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                    📋 표준 헤더 (17개 열 자동 인식):
+                  </div>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.6, wordBreak: 'break-all' }}>
+                    <code>MODEL - NC - S/N - P/O - BUYING PRICE - B/L DATE - OPTION - STATUS - SITUATION - LOCATION - ORDER DEALER - PO DATE - RENTAL DEALER - START - END - REMARKS - S/O</code>
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--accent-amber, #f59e0b)', marginTop: '4px' }}>
+                    * 1행 마지막 열의 'NO' 헤더는 수량 참고용이므로 업로드 대상에서 자동 제외됩니다.
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => { setStockModalOpen(true); }}
+                className="btn btn-primary"
+                style={{ padding: '10px 18px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', alignSelf: 'flex-start' }}
+              >
+                <Upload size={16} />
+                <span>[재고 엑셀 업로드] 모달 열기</span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* 재고 엑셀 업로드 모달 */}
+      <StockStatusUploadModal
+        isOpen={stockModalOpen}
+        onClose={() => setStockModalOpen(false)}
+        onUploadSuccess={() => fetchDispatchOrders()}
+      />
 
       {selectedOrderForHistory && (
         <div className="modal-overlay" onClick={closeHistory}>

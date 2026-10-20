@@ -1,5 +1,42 @@
 # 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
+## [2026-10-20] [ERP 시스템] 재고 현황(Stock Status) 표준 17종 헤더 엑셀 일괄 업로드 및 WIA 창고 페이지 연동
+
+### 1. 재고 현황(Stock Status) 17종 표준 헤더 엑셀 업로드 엔드포인트 구축 (`backend/main.py`)
+* **API 라우터 추가 (`POST /api/upload/stock-status`)**:
+  * 2023년~2025년 과거 선적 도착 완료 장비 및 정기 현황 데이터를 엑셀(`.xlsx`, `.xls`)을 통해 대량 일괄 등록/갱신 지원.
+  * **표준 헤더 17종 자동 매핑**:
+    * `MODEL`, `NC`, `S/N`, `P/O`, `BUYING PRICE`, `B/L DATE`, `OPTION`, `STATUS`, `SITUATION`, `LOCATION`, `ORDER DEALER`, `PO DATE`, `RENTAL DEALER`, `START`, `END`, `REMARKS`, `S/O`
+    * **특이사항 반영**: 1행 마지막 열의 `NO` 헤더는 수량 카운트용이므로 업로드/DB 반영 대상에서 자동 제외.
+  * **지능형 다중 행 헤더 지원**: 1행 단일 헤더뿐만 아니라 2행 병합 서브헤더(ORDER DETAILS / RENTAL 하위 DEALER, PO DATE 등) 구조도 100% 자동 감지 및 호환.
+  * **Upsert 및 무결성 제어**: `P/O` 또는 `S/N` 기준으로 기존 장비가 존재할 경우 최신 값으로 Update(갱신), 없을 경우 신규 Insert(등록)하여 중복 제약 에러 방지.
+  * **자동 상태 설정**: 창고 페이지 노출을 위해 `current_status = OrderStatus.IN_STOCK`, `is_corporate_stock = True`, `etd = B/L DATE`(정확한 에이징 일수 자동 계산), `stock_type` 자동 분류(RENTAL, SHOWROOM, AVAILABLE).
+
+### 2. 창고 페이지 하단 입고증 PDF 및 재고 엑셀 업로드 섹션 구축 (`AdminDispatch.jsx`, `StockStatusUploadModal.jsx`)
+* **WIA 창고 페이지 하단 전용 문서 관리 영역 신설**:
+  * **카드 1 - 입고증 PDF 업로드 (Cargo Details)**: Einlagerungsmeldung PDF 업로드 및 AI 화물 상세 분석 연동.
+  * **카드 2 - 재고 엑셀 업로드 (Stock Status)**: 17종 표준 헤더 안내와 함께 클릭 시 원클릭 모달 창 호출.
+* **재고 엑셀 업로드 전용 모달 (`StockStatusUploadModal`) 컴포넌트 개발**:
+  * 드래그 앤 드롭 파일 선택 및 선택된 엑셀 파일명/용량 실시간 프리뷰.
+  * 17개 표준 헤더 가이드 및 'NO' 열 자동 제외 안내 뱃지 제공.
+  * 비동기 업로드 진행 표시 및 처리 결과(총 처리 건수, 신규 등록 건수, 기존 갱신 건수, 경고 내역) 상세 피드백.
+  * 업로드 완료 즉시 창고 목록(`fetchDispatchOrders()`) 자동 새로고침 연동.
+* **업로드/설정관리 페이지 동기화 (`UploadSettings.jsx`)**:
+  * `입고증 PDF 업로드 (Cargo Details)` 카드 바로 아래에 동일한 `재고 엑셀 업로드 (Stock Status)` 카드 및 모달 연동 완료.
+
+### 3. WMEINS 아키텍처 및 핵심 코드 컨텍스트 문서 구축 (`WMEINS_CONTEXT.md`)
+* **Google Antigravity 에이전트 및 팀 공유용 공식 레퍼런스 문서 생성**:
+  * 프로젝트 전체 폴더 및 파일 트리 디렉토리 구조 수록.
+  * 전체 39개 API 라우터 엔드포인트 목록 및 핸들러 함수, 상세 설명 표 정리.
+  * `models.py`, `trackcargo_api.py`, `route_service.py`, `scheduler.py`, `trackcargo_route_scheduler.py`, `trackcargo_sync.py` 백엔드 핵심 코드 전문 수록.
+  * `geoUtils.js`(희망봉 -34.50°N, 18.40°E 관련 연산), `TrackingMapboxWidget.jsx`, `Login.jsx` 프론트엔드 핵심 코드 전문 수록.
+  * 민감 정보(비밀번호, 테스트 계정 패스워드, 관리자 이메일, API Key 등) `***MASKED***` 보안 마스킹 적용.
+
+### 4. 순차적 재고 업로드를 위한 데이터베이스 클린 리셋 (Clean-State Reset)
+* **테스트 주문 및 재고 데이터 완전 초기화**:
+  * 테스트 등록 건(224건) 및 기존 선적 연동 15건 데이터 완전 삭제 처리하여 신규 업로드를 위한 깨끗한 초기 상태(`Order: 0건`, `History: 0건`, `Promotion: 0건`) 구축.
+  * 사전 안전 조치로 전체 239건 스냅샷을 `backend/data/backup_orders_239.json`에 영구 백업 보관.
+
 ## [2026-10-19] [ERP 시스템] WIA 창고 페이지 한국어/영어 다국어(i18n) 전면 적용 및 리스트 항목 표준 순서 개편
 
 ### 1. WIA 창고 페이지 다국어(i18n) 적용 (`ko/translation.json`, `en/translation.json`, `AdminDispatch.jsx`)

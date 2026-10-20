@@ -1247,6 +1247,251 @@ async def upload_excel_bulk(file: UploadFile = File(...), db: Session = Depends(
     }
 
 # ==========================================
+# 5-1. 재고 현황(Stock Status) 표준 엑셀 일괄 업로드 API
+# ==========================================
+@app.post("/api/upload/stock-status")
+async def upload_stock_status_excel(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_role: Optional[str] = Depends(get_current_role)
+):
+    if current_role == "RSM":
+        raise HTTPException(status_code=403, detail="접근 권한이 없습니다.")
+    if not file.filename.lower().endswith(('.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="엑셀 파일(.xlsx, .xls)만 업로드 가능합니다.")
+    
+    content = await file.read()
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+        sheet = wb.active
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"엑셀 파일 판독 오류: {str(e)}")
+
+    # 1. 컬럼 매핑 (표준 헤더 17종 + NO 열 제외)
+    # [표준헤더] MODEL - NC - S/N - P/O - BUYING PRICE - B/L DATE - OPTION - STATUS - SITUATION - LOCATION - ORDER DEALER - PO DATE - RENTAL DEALER - START - END - REMARKS - S/O
+    col_map = {}
+    for c in range(1, sheet.max_column + 1):
+        v1 = str(sheet.cell(1, c).value or '').strip().upper().replace('\n', ' ')
+        v2 = str(sheet.cell(2, c).value or '').strip().upper().replace('\n', ' ') if sheet.max_row >= 2 else ''
+        combined = f"{v1} {v2}".strip()
+        
+        # 'NO' 열은 개수 참고용이므로 명시적 제외
+        if v1 == 'NO' or v2 == 'NO' or combined == 'NO' or v1.startswith('NO.') or v1.startswith('NO '):
+            continue
+            
+        if 'MODEL' in v1: col_map['model'] = c
+        elif v1 == 'NC': col_map['nc'] = c
+        elif 'SERIAL' in v1 or v1 == 'S/N': col_map['sn'] = c
+        elif 'P/O' in v1 or 'P/ONO' in v1: col_map['po'] = c
+        elif 'BUYING' in v1 or 'PRICE' in v1: col_map['price'] = c
+        elif 'B/L' in v1: col_map['bl_date'] = c
+        elif 'OPTION' in v1: col_map['option'] = c
+        elif v1 == 'STATUS': col_map['status'] = c
+        elif 'SITUATION' in v1: col_map['situation'] = c
+        elif 'LOCATION' in v1: col_map['location'] = c
+        elif 'ORDER' in v1 and ('DEALER' in v2 or 'DEALER' in v1): col_map['order_dealer'] = c
+        elif v1 == 'ORDER DEALER': col_map['order_dealer'] = c
+        elif 'PO DATE' in combined: col_map['po_date'] = c
+        elif 'RENTAL' in v1 and ('DEALER' in v2 or 'DEALER' in v1): col_map['rental_dealer'] = c
+        elif v1 == 'RENTAL DEALER': col_map['rental_dealer'] = c
+        elif v2 == 'START' or 'START' in combined: col_map['start'] = c
+        elif v2 == 'END' or 'END' in combined: col_map['end'] = c
+        elif 'REMARK' in v1: col_map['remarks'] = c
+        elif 'S/O' in v1: col_map['so'] = c
+
+    has_subheaders = any(sheet.cell(2, c).value in ['DEALER', 'PO DATE', 'START', 'END'] for c in range(1, sheet.max_column + 1))
+    start_row = 3 if has_subheaders else 2
+
+    if 'model' not in col_map or 'po' not in col_map:
+        return {
+            "status": "error",
+            "message": "필수 헤더가 누락되었습니다. (최소 MODEL, P/O 헤더 필요)",
+            "inserted_count": 0,
+            "updated_count": 0,
+            "errors": [f"인식된 헤더: {list(col_map.keys())}"]
+        }
+
+    dealers_by_name = {d.name.strip().upper(): d for d in db.query(models.DealerCompany).all()}
+    wme_dealer = dealers_by_name.get('WME') or db.query(models.DealerCompany).first()
+    
+    models_by_name = {m.model_name.strip().upper(): m for m in db.query(models.ProductModel).all()}
+    models_by_code = {m.model_code.strip().upper(): m for m in db.query(models.ProductModel).all()}
+    default_category = db.query(models.ProductCategory).first()
+
+    inserted_count = 0
+    updated_count = 0
+    errors = []
+    total_valid_rows = 0
+
+    def parse_excel_date(val):
+        if not val:
+            return None
+        if isinstance(val, datetime):
+            return val
+        if hasattr(val, 'date'):
+            return datetime.combine(val, datetime.min.time())
+        try:
+            return pd.to_datetime(val).to_pydatetime()
+        except:
+            return None
+
+    for r in range(start_row, sheet.max_row + 1):
+        m_val = str(sheet.cell(r, col_map['model']).value or '').strip()
+        po_val = str(sheet.cell(r, col_map['po']).value or '').strip()
+        
+        if not m_val and not po_val:
+            continue
+        if not po_val or not m_val:
+            errors.append(f"{r}행: MODEL 또는 P/O 누락 (MODEL: '{m_val}', P/O: '{po_val}')")
+            continue
+            
+        total_valid_rows += 1
+        
+        m_key = m_val.upper()
+        prod_model = models_by_name.get(m_key) or models_by_code.get(m_key)
+        if not prod_model:
+            cat_id = default_category.id if default_category else 1
+            prod_model = models.ProductModel(
+                model_code=m_val,
+                model_name=m_val,
+                category_id=cat_id,
+                safety_stock_qty=5
+            )
+            db.add(prod_model)
+            db.flush()
+            models_by_name[m_key] = prod_model
+            models_by_code[m_key] = prod_model
+
+        order_dealer_str = str(sheet.cell(r, col_map.get('order_dealer', 0)).value or '').strip() if 'order_dealer' in col_map else ''
+        dealer_obj = dealers_by_name.get(order_dealer_str.upper()) if order_dealer_str else None
+        if not dealer_obj:
+            dealer_obj = wme_dealer
+
+        nc_val = str(sheet.cell(r, col_map.get('nc', 0)).value or '').strip() if 'nc' in col_map else None
+        nc_val = nc_val if nc_val and nc_val.lower() != 'none' else None
+        
+        sn_val = str(sheet.cell(r, col_map.get('sn', 0)).value or '').strip() if 'sn' in col_map else None
+        sn_val = sn_val if sn_val and sn_val.lower() != 'none' and sn_val != '//' else None
+        
+        price_val = str(sheet.cell(r, col_map.get('price', 0)).value or '').strip() if 'price' in col_map else None
+        price_val = price_val if price_val and price_val.lower() != 'none' else None
+        
+        bl_date = parse_excel_date(sheet.cell(r, col_map.get('bl_date', 0)).value) if 'bl_date' in col_map else None
+        po_date = parse_excel_date(sheet.cell(r, col_map.get('po_date', 0)).value) if 'po_date' in col_map else None
+        start_date = parse_excel_date(sheet.cell(r, col_map.get('start', 0)).value) if 'start' in col_map else None
+        end_date = parse_excel_date(sheet.cell(r, col_map.get('end', 0)).value) if 'end' in col_map else None
+
+        option_val = str(sheet.cell(r, col_map.get('option', 0)).value or '').strip() if 'option' in col_map else None
+        option_val = option_val if option_val and option_val.lower() != 'none' else None
+
+        situation_val = str(sheet.cell(r, col_map.get('situation', 0)).value or '').strip().upper() if 'situation' in col_map else ''
+        status_val = str(sheet.cell(r, col_map.get('status', 0)).value or '').strip().upper() if 'status' in col_map else ''
+        
+        stock_type = 'AVAILABLE'
+        if 'RENTAL' in situation_val or 'RENTAL' in status_val:
+            stock_type = 'RENTAL'
+        elif 'SHOWROOM' in situation_val or 'SHOWROOM' in status_val:
+            stock_type = 'SHOWROOM'
+        elif 'ORDERED' in status_val:
+            stock_type = 'DEALER_ORDER'
+            
+        location_val = str(sheet.cell(r, col_map.get('location', 0)).value or '').strip() if 'location' in col_map else None
+        location_val = location_val if location_val and location_val.lower() != 'none' else None
+        
+        rental_dealer_str = str(sheet.cell(r, col_map.get('rental_dealer', 0)).value or '').strip() if 'rental_dealer' in col_map else ''
+        remarks_val = str(sheet.cell(r, col_map.get('remarks', 0)).value or '').strip() if 'remarks' in col_map else None
+        remarks_val = remarks_val if remarks_val and remarks_val.lower() != 'none' else None
+        if rental_dealer_str and rental_dealer_str.lower() != 'none':
+            remarks_val = f"[Rental Dealer: {rental_dealer_str}] {remarks_val or ''}".strip()
+
+        so_val = str(sheet.cell(r, col_map.get('so', 0)).value or '').strip() if 'so' in col_map else None
+        so_val = so_val if so_val and so_val.lower() != 'none' else None
+
+        # Upsert 로직
+        existing_order = db.query(models.Order).filter(models.Order.reference_no == po_val).first()
+        if not existing_order and sn_val:
+            existing_order = db.query(models.Order).filter(models.Order.serial_number == sn_val).first()
+            
+        if existing_order:
+            existing_order.product_model_id = prod_model.id
+            if sn_val:
+                existing_order.serial_number = sn_val
+            if nc_val:
+                existing_order.nc = nc_val
+            if price_val:
+                existing_order.price = price_val
+            if bl_date:
+                existing_order.etd = bl_date
+                existing_order.actual_date = bl_date
+            if option_val:
+                existing_order.detail_spec = option_val
+            existing_order.stock_type = stock_type
+            if location_val:
+                existing_order.warehouse = location_val
+            if dealer_obj:
+                existing_order.dealer_company_id = dealer_obj.id
+            if po_date:
+                existing_order.dealer_order_date = po_date
+            if start_date:
+                existing_order.rental_start_date = start_date
+            if end_date:
+                existing_order.rental_expiry_date = end_date
+            if remarks_val:
+                existing_order.remark = remarks_val
+            if so_val:
+                existing_order.so_no = so_val
+            existing_order.current_status = models.OrderStatus.IN_STOCK
+            existing_order.is_corporate_stock = True
+            updated_count += 1
+        else:
+            new_order = models.Order(
+                reference_no=po_val,
+                serial_number=sn_val,
+                product_model_id=prod_model.id,
+                dealer_company_id=dealer_obj.id if dealer_obj else None,
+                current_status=models.OrderStatus.IN_STOCK,
+                etd=bl_date,
+                eta=bl_date,
+                actual_date=bl_date,
+                is_corporate_stock=True,
+                stock_type=stock_type,
+                nc=nc_val,
+                detail_spec=option_val,
+                warehouse=location_val,
+                price=price_val,
+                dealer_order_date=po_date,
+                rental_start_date=start_date,
+                rental_expiry_date=end_date,
+                remark=remarks_val,
+                so_no=so_val
+            )
+            db.add(new_order)
+            inserted_count += 1
+
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        return {
+            "status": "error",
+            "message": f"데이터베이스 저장 중 무결성 오류: {str(e)}",
+            "total_rows": total_valid_rows,
+            "inserted_count": 0,
+            "updated_count": 0,
+            "errors": [str(e)]
+        }
+
+    return {
+        "status": "success" if not errors else "partial_success",
+        "message": f"총 {total_valid_rows}건 처리 완료: 신규 등록 {inserted_count}건, 기존 갱신 {updated_count}건",
+        "total_rows": total_valid_rows,
+        "inserted_count": inserted_count,
+        "updated_count": updated_count,
+        "errors": errors[:50]
+    }
+
+# ==========================================
 # 6. 주기 조절형 자동 ETA 알림 스케줄러 설정 API
 # ==========================================
 @app.get("/api/email-configs", response_model=List[schemas.EmailConfigOut])

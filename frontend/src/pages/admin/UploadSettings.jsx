@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FileSpreadsheet, Upload, Mail, Plus, X, ShoppingCart } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import StockStatusUploadModal from '../../components/StockStatusUploadModal';
 
 const STAGE_ORDER = [
   'ETD_IMMEDIATE',
@@ -96,6 +97,9 @@ export default function UploadSettings() {
   const [selectedPdfFile, setSelectedPdfFile] = useState(null);
   const [pdfUploadResult, setPdfUploadResult] = useState(null);
   const [pdfUploading, setPdfUploading] = useState(false);
+
+  // 재고 엑셀 업로드 모달 상태
+  const [stockModalOpen, setStockModalOpen] = useState(false);
 
   const loadConfigs = async () => {
     try {
@@ -332,6 +336,43 @@ export default function UploadSettings() {
           </div>
         )}
       </div>
+
+      {/* 재고 엑셀 업로드 (Stock Status) - 입고증 PDF 업로드 바로 아래 배치 */}
+      <div className="glass-card" style={{ padding: '28px', marginBottom: '32px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+          <FileSpreadsheet color="var(--accent-blue)" size={24} />
+          <h2 style={{ fontSize: '1.3rem' }}>재고 엑셀 업로드 (Stock Status)</h2>
+        </div>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '16px' }}>
+          과거 2023~2025년 도착 장비 및 현재 창고 재고 현황(Stock Status) 엑셀을 업로드하여 창고 페이지에 일괄 등록/갱신합니다.
+        </p>
+
+        <div style={{ background: 'var(--bg-secondary)', padding: '16px', borderRadius: '12px', marginBottom: '20px', border: '1px solid var(--border-color)' }}>
+          <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
+            📋 표준 헤더 (17개 열 자동 인식):
+          </div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.6, wordBreak: 'break-all' }}>
+            <code>MODEL - NC - S/N - P/O - BUYING PRICE - B/L DATE - OPTION - STATUS - SITUATION - LOCATION - ORDER DEALER - PO DATE - RENTAL DEALER - START - END - REMARKS - S/O</code>
+          </div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--accent-amber, #f59e0b)', marginTop: '6px' }}>
+            * 1행 마지막 열의 'NO' 헤더는 수량 참고용이므로 업로드 대상에서 자동 제외됩니다.
+          </div>
+        </div>
+
+        <button
+          onClick={() => setStockModalOpen(true)}
+          className="btn btn-primary upload-hover-btn"
+          style={{ padding: '10px 22px', fontSize: '0.95rem', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+        >
+          <Upload size={18} />
+          <span>[재고 엑셀 업로드] 모달 열기</span>
+        </button>
+      </div>
+
+      <StockStatusUploadModal
+        isOpen={stockModalOpen}
+        onClose={() => setStockModalOpen(false)}
+      />
 
       <div className="glass-card" style={{ padding: '28px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
