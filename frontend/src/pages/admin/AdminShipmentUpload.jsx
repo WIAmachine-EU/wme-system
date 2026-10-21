@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { UploadCloud, CheckCircle, AlertTriangle, Download, Loader2, FileSpreadsheet, X, Check } from 'lucide-react';
+import { UploadCloud, CheckCircle, AlertTriangle, Download, Loader2, FileSpreadsheet, X, Check, Clipboard, Lock } from 'lucide-react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 
@@ -11,6 +11,9 @@ export default function AdminShipmentUpload({ isMobileView }) {
   const [uploadStatus, setUploadStatus] = useState(null); // 'idle', 'success', 'error'
   const [isDragging, setIsDragging] = useState(false);
   const [currentFile, setCurrentFile] = useState(null);
+  const [isPasteModalOpen, setIsPasteModalOpen] = useState(false);
+  const [pastedText, setPastedText] = useState('');
+  const [drmModalInfo, setDrmModalInfo] = useState(null);
   
   const fileInputRef = useRef(null);
   const dragCounterRef = useRef(0);
@@ -123,7 +126,18 @@ export default function AdminShipmentUpload({ isMobileView }) {
           validateAndSetData(json);
         } catch (err) {
           console.error('Excel parse error:', err);
-          alert(`엑셀 파일을 분석하는 중 오류가 발생했습니다: ${err.message}`);
+          const errMsg = String(err.message || err);
+          const isDrm = errMsg.includes('Encrypted') || 
+                        errMsg.includes('EncryptionInfo') || 
+                        errMsg.includes('DRM') || 
+                        errMsg.includes('password') ||
+                        errMsg.includes('ECMA-376');
+          if (isDrm) {
+            setDrmModalInfo({ fileName: file.name, error: errMsg });
+          } else {
+            alert(`엑셀 파일을 분석하는 중 오류가 발생했습니다: ${errMsg}`);
+          }
+          resetCurrentFile();
         }
       };
       reader.onerror = () => {
@@ -236,6 +250,71 @@ export default function AdminShipmentUpload({ isMobileView }) {
     XLSX.writeFile(wb, "Shipment_Upload_Template.xlsx");
   };
 
+  const downloadCsvTemplate = () => {
+    const csvContent = "\uFEFF" +
+      "MBL (선하증권 번호),PORT (도착항/POD),MODEL (장비명),S/N (시리얼 번호),P/O (주문 번호)\n" +
+      "HDMUSELE22174500,Hamburg,KF5600II,K3G112,PO-2601\n" +
+      "HDMUSELE22174500,Hamburg,E200C,E2C991,PO-2602\n";
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'Shipment_Upload_Template.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleApplyPastedText = (text) => {
+    if (!text || !text.trim()) return;
+
+    // Papa.parse automatically detects TSV (from Excel clipboard) and CSV
+    Papa.parse(text.trim(), {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        if (results.data && results.data.length > 0) {
+          const firstRow = results.data[0];
+          const hasKnownHeaders = Object.keys(firstRow).some(k => {
+            const clean = k.replace(/[\s\(\)\/_\-\.]/g, '').toLowerCase();
+            return ['mbl', 'pod', 'port', 'model', 'sn', 'po', 'serial', '선하증권', '도착항', '장비명', '주문번호'].some(alias => clean.includes(alias));
+          });
+
+          if (hasKnownHeaders) {
+            validateAndSetData(results.data);
+            setCurrentFile({ name: '클립보드 직접 붙여넣기', size: text.length });
+            setIsPasteModalOpen(false);
+            setPastedText('');
+          } else {
+            // 헤더 없이 데이터 행만 복사한 경우 (0: MBL, 1: POD, 2: MODEL, 3: S/N, 4: PO)
+            Papa.parse(text.trim(), {
+              header: false,
+              skipEmptyLines: true,
+              complete: (noHeaderResults) => {
+                const rows = noHeaderResults.data.map(arr => ({
+                  'MBL': arr[0] || '',
+                  'PORT': arr[1] || '',
+                  'MODEL': arr[2] || '',
+                  'S/N': arr[3] || '',
+                  'P/O': arr[4] || ''
+                }));
+                validateAndSetData(rows);
+                setCurrentFile({ name: '클립보드 직접 붙여넣기', size: text.length });
+                setIsPasteModalOpen(false);
+                setPastedText('');
+              }
+            });
+          }
+        } else {
+          alert('붙여넣은 데이터에서 유효한 행을 찾을 수 없습니다.');
+        }
+      },
+      error: (err) => {
+        alert('붙여넣은 데이터를 분석하는 중 오류가 발생했습니다: ' + err.message);
+      }
+    });
+  };
+
   const handleSubmit = async () => {
     if (data.length === 0) return;
     if (errors.length > 0) {
@@ -296,23 +375,44 @@ export default function AdminShipmentUpload({ isMobileView }) {
       onDrop={(e) => { e.preventDefault(); e.stopPropagation(); }}
       style={{ padding: isMobileView ? '16px' : '32px', maxWidth: '1200px', margin: '0 auto' }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <h1 style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
             선적정보 업로드 (API Tracking 연동)
           </h1>
           <p style={{ margin: '4px 0 0 0', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-            엑셀 템플릿 양식(.xlsx, .csv)으로 선적 MBL 및 장비 P/O, S/N 목록을 일괄 등록하고 화물 트래킹을 자동 시작합니다.
+            엑셀 템플릿 양식(.xlsx, .csv) 또는 복사/붙여넣기로 선적 MBL 및 장비 목록을 일괄 등록합니다.
           </p>
         </div>
-        <button 
-          onClick={downloadTemplate}
-          className="btn btn-outline"
-          style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
-        >
-          <Download size={18} />
-          <span>템플릿 다운로드</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <button 
+            onClick={() => setIsPasteModalOpen(true)}
+            className="btn btn-primary"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', backgroundColor: '#0284c7', borderColor: '#0284c7', color: 'white' }}
+            title="사내 DRM 암호화와 무관하게 엑셀 내용을 복사하여 붙여넣기"
+          >
+            <Clipboard size={16} />
+            <span>엑셀 복사/붙여넣기</span>
+          </button>
+          <button 
+            onClick={downloadTemplate}
+            className="btn btn-outline"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+            title="엑셀 형식(.xlsx) 템플릿 다운로드"
+          >
+            <Download size={15} />
+            <span>템플릿 (.xlsx)</span>
+          </button>
+          <button 
+            onClick={downloadCsvTemplate}
+            className="btn btn-outline"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+            title="사내 DRM 암호화 영향을 받지 않는 CSV 형식 템플릿 다운로드"
+          >
+            <Download size={15} />
+            <span>템플릿 (.csv)</span>
+          </button>
+        </div>
       </div>
 
       {/* 파일 업로드 드롭존 */}
@@ -511,6 +611,242 @@ export default function AdminShipmentUpload({ isMobileView }) {
                 </>
               )}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 엑셀 복사/붙여넣기 모달 (DRM 우회 솔루션) */}
+      {isPasteModalOpen && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.6)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 9999, padding: '20px'
+        }}>
+          <div style={{
+            background: 'var(--bg-primary, #ffffff)',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '680px',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.3)',
+            border: '1px solid var(--border-color)',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid var(--border-color)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '36px', height: '36px', borderRadius: '8px',
+                  backgroundColor: 'rgba(2, 132, 199, 0.1)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                  <Clipboard size={20} color="#0284c7" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 600 }}>
+                    엑셀 데이터 직접 복사 / 붙여넣기
+                  </h3>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    사내 DRM(MIP) 암호화와 무관하게 엑셀 내용을 즉시 등록할 수 있습니다.
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsPasteModalOpen(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: '20px 24px' }}>
+              <div style={{
+                backgroundColor: 'rgba(2, 132, 199, 0.05)',
+                border: '1px solid rgba(2, 132, 199, 0.2)',
+                borderRadius: '8px',
+                padding: '12px 16px',
+                marginBottom: '16px',
+                fontSize: '0.85rem',
+                color: 'var(--text-secondary)',
+                lineHeight: 1.5
+              }}>
+                💡 <strong>사용 방법:</strong> 엑셀에서 표 범위를 드래그하여 <strong>복사(Ctrl+C)</strong>한 뒤, 아래 상자에 <strong>붙여넣기(Ctrl+V)</strong>하고 [데이터 적용]을 누르세요.
+              </div>
+
+              <textarea
+                value={pastedText}
+                onChange={(e) => setPastedText(e.target.value)}
+                placeholder="엑셀에서 복사(Ctrl+C)한 셀 데이터를 이곳에 붙여넣기(Ctrl+V) 하세요...&#10;&#10;예시:&#10;MBL (선하증권 번호)	PORT (도착항/POD)	MODEL (장비명)	S/N (시리얼 번호)	P/O (주문 번호)&#10;HDMUSELE22174500	Hamburg	KF5600II	K3G112	PO-2601"
+                rows={8}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-color)',
+                  backgroundColor: 'var(--bg-secondary)',
+                  color: 'var(--text-primary)',
+                  fontFamily: 'monospace',
+                  fontSize: '0.85rem',
+                  resize: 'vertical',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            <div style={{
+              padding: '16px 24px',
+              borderTop: '1px solid var(--border-color)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              backgroundColor: 'var(--bg-secondary)'
+            }}>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const text = await navigator.clipboard.readText();
+                    if (text) setPastedText(text);
+                  } catch (e) {
+                    alert('클립보드 접근 권한이 없거나 지원되지 않습니다. 텍스트 상자를 클릭 후 Ctrl+V를 눌러주세요.');
+                  }
+                }}
+                className="btn btn-outline"
+                style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Clipboard size={14} />
+                <span>클립보드에서 가져오기</span>
+              </button>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsPasteModalOpen(false)}
+                  className="btn btn-outline"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleApplyPastedText(pastedText)}
+                  disabled={!pastedText.trim()}
+                  className="btn btn-primary"
+                  style={{ backgroundColor: '#0284c7', borderColor: '#0284c7', color: 'white' }}
+                >
+                  데이터 파싱 및 적용
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 사내 보안 DRM/MIP 암호화 감지 안내 모달 */}
+      {drmModalInfo && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.65)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 10000, padding: '20px'
+        }}>
+          <div style={{
+            background: 'var(--bg-primary, #ffffff)',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '620px',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.3)',
+            border: '1px solid #f87171',
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              padding: '20px 24px',
+              backgroundColor: '#fef2f2',
+              borderBottom: '1px solid #fecaca',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
+              <div style={{
+                width: '40px', height: '40px', borderRadius: '50%',
+                backgroundColor: '#fee2e2', color: '#dc2626',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <Lock size={22} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, color: '#991b1b', fontSize: '1.1rem', fontWeight: 700 }}>
+                  사내 보안(Microsoft Information Protection / DRM) 암호화 감지
+                </h3>
+                <span style={{ fontSize: '0.8rem', color: '#b91c1c' }}>
+                  {drmModalInfo.fileName} 파일은 사내 보안 정책으로 암호화되어 있어 웹에서 직접 읽을 수 없습니다.
+                </span>
+              </div>
+            </div>
+
+            <div style={{ padding: '24px', fontSize: '0.9rem', color: 'var(--text-primary)', lineHeight: 1.6 }}>
+              <p style={{ margin: '0 0 16px 0', color: 'var(--text-secondary)' }}>
+                기업용 Office 365(현대위아 사내 PC 등)에서 엑셀 문서를 저장할 때 <strong>Microsoft Information Protection(MIP)</strong> 보안 라벨이 자동 적용되어 웹 브라우저가 파일 내부 데이터를 읽을 수 없도록 암호화됩니다.
+              </p>
+
+              <div style={{
+                backgroundColor: 'var(--bg-secondary)',
+                borderRadius: '10px',
+                padding: '16px',
+                border: '1px solid var(--border-color)',
+                marginBottom: '20px'
+              }}>
+                <div style={{ fontWeight: 700, marginBottom: '8px', color: '#0284c7' }}>
+                  💡 권장 해결 방법 (3가지 중 선택):
+                </div>
+                <ol style={{ margin: 0, paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem' }}>
+                  <li>
+                    <strong>📋 엑셀 내용 직접 복사/붙여넣기 (가장 편리)</strong>: 엑셀에서 표 범위를 복사(Ctrl+C)한 뒤, 시스템에 붙여넣기(Ctrl+V)하면 암호화 영향을 전혀 받지 않습니다.
+                  </li>
+                  <li>
+                    <strong>💾 CSV 형식으로 저장 후 업로드</strong>: 엑셀에서 [파일] → [다른 이름으로 저장] → 파일 형식을 <code>CSV UTF-8 (쉼표로 분리)(*.csv)</code>로 저장하여 업로드하세요.
+                  </li>
+                  <li>
+                    <strong>🔓 엑셀 문서 민감도(보안) 라벨 변경</strong>: 엑셀 상단 [민감도 / Sensitivity] 탭에서 암호화 보안 라벨을 '일반' 또는 '공개'로 변경 후 저장하세요.
+                  </li>
+                </ol>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => setDrmModalInfo(null)}
+                  className="btn btn-outline"
+                >
+                  닫기
+                </button>
+                <button
+                  onClick={downloadCsvTemplate}
+                  className="btn btn-outline"
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Download size={15} />
+                  <span>CSV 템플릿 받기</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setDrmModalInfo(null);
+                    setIsPasteModalOpen(true);
+                  }}
+                  className="btn btn-primary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#0284c7', borderColor: '#0284c7', color: 'white' }}
+                >
+                  <Clipboard size={15} />
+                  <span>지금 바로 복사/붙여넣기</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
