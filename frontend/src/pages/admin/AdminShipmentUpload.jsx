@@ -1,9 +1,31 @@
-import React, { useState, useRef } from 'react';
-import { UploadCloud, CheckCircle, AlertTriangle, Download, Loader2, FileSpreadsheet, X, Check, Clipboard, Lock } from 'lucide-react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { 
+  UploadCloud, 
+  CheckCircle, 
+  AlertTriangle, 
+  Download, 
+  Loader2, 
+  FileSpreadsheet, 
+  X, 
+  Check, 
+  Clipboard, 
+  Lock, 
+  Ship, 
+  RefreshCw, 
+  Calendar, 
+  ChevronRight, 
+  ChevronDown, 
+  Search, 
+  Copy, 
+  Package, 
+  Anchor, 
+  ListFilter 
+} from 'lucide-react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 
 export default function AdminShipmentUpload({ isMobileView }) {
+  // ================= [ 우측: 선적정보 업로드 State ] =================
   const [data, setData] = useState([]);
   const [errors, setErrors] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -18,7 +40,96 @@ export default function AdminShipmentUpload({ isMobileView }) {
   const fileInputRef = useRef(null);
   const dragCounterRef = useRef(0);
 
-  // Drag & Drop 이벤트 핸들러
+  // ================= [ 좌측: 선적내역 리스트 State ] =================
+  const [historyList, setHistoryList] = useState([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState(null);
+  const [selectedYear, setSelectedYear] = useState('ALL'); // 'ALL', '2026', '2025', '2024', ...
+  const [searchQuery, setSearchQuery] = useState('');
+  const [expandedMbl, setExpandedMbl] = useState(null);
+  const [copiedMbl, setCopiedMbl] = useState(null);
+
+  // 브라우저 너비 감지
+  const [windowWidth, setWindowWidth] = useState(
+    typeof window !== 'undefined' ? window.innerWidth : 1200
+  );
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isMobile = isMobileView !== undefined ? isMobileView : windowWidth <= 1024;
+
+  // ================= [ 선적내역 리스트 API 조회 ] =================
+  const fetchShipmentHistory = async () => {
+    setIsLoadingHistory(true);
+    setHistoryError(null);
+    try {
+      // include_all=true: 도착 완료된 선적(HDMUSELE22174500 등) 포함 전체 업로드 이력 조회
+      const res = await fetch('/api/shipments?include_all=true');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      setHistoryList(json || []);
+    } catch (err) {
+      console.error('Failed to fetch shipment history:', err);
+      setHistoryError('선적내역을 불러오는 중 오류가 발생했습니다.');
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchShipmentHistory();
+  }, []);
+
+  // 출항 연도(ETD 기준) 드롭다운 목록 생성 (2026, 2025, 2024 기본 포함 및 실제 데이터 연도 자동 수집)
+  const availableYears = useMemo(() => {
+    const yearSet = new Set(['2026', '2025', '2024']);
+    historyList.forEach(item => {
+      if (item.etd) {
+        try {
+          const y = String(new Date(item.etd).getFullYear());
+          if (!isNaN(y) && y.length === 4) yearSet.add(y);
+        } catch (e) {}
+      }
+    });
+    return Array.from(yearSet).sort((a, b) => Number(b) - Number(a));
+  }, [historyList]);
+
+  // 필터링된 선적내역 (출항 연도 드롭다운 + 검색어)
+  const filteredHistory = useMemo(() => {
+    return historyList.filter(item => {
+      // 1. 출항 연도 필터링
+      if (selectedYear !== 'ALL') {
+        if (!item.etd) return false;
+        const y = String(new Date(item.etd).getFullYear());
+        if (y !== selectedYear) return false;
+      }
+      // 2. 검색어 필터링 (B/L번호 또는 도착항)
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchMbl = item.mbl_no?.toLowerCase().includes(q);
+        const matchPod = item.pod?.toLowerCase().includes(q);
+        const matchVessel = item.vessel?.toLowerCase().includes(q);
+        return matchMbl || matchPod || matchVessel;
+      }
+      return true;
+    });
+  }, [historyList, selectedYear, searchQuery]);
+
+  // B/L 번호 클립보드 복사
+  const handleCopyMbl = (e, mbl) => {
+    e.stopPropagation();
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(mbl);
+      setCopiedMbl(mbl);
+      setTimeout(() => setCopiedMbl(null), 2000);
+    }
+  };
+
+  // ================= [ 업로드 Drag & Drop 핸들러 ] =================
   const handleDragEnter = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -64,7 +175,6 @@ export default function AdminShipmentUpload({ isMobileView }) {
     if (file) {
       handleFileUpload(file);
     }
-    // 동일 파일 재선택 가능하도록 input value 초기화
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -86,7 +196,6 @@ export default function AdminShipmentUpload({ isMobileView }) {
     setUploadStatus('idle');
     setUploadProgress(0);
     
-    // 파일 확장자 대소문자 무관하게 검사 (.xlsx, .XLSX, .xls, .csv 등)
     const fileName = file.name || '';
     const ext = fileName.slice(fileName.lastIndexOf('.')).toLowerCase();
     
@@ -181,7 +290,6 @@ export default function AdminShipmentUpload({ isMobileView }) {
     const snSet = new Set();
 
     rawData.forEach((row, index) => {
-      // 헤더 변형 유연 매핑
       const mbl = extractFieldValue(row, ['MBL (선하증권 번호)', 'MBL', 'mbl', 'MBL NO', 'MBL No', 'B/L', 'BL', 'BL NO', '선하증권', '선하증권번호']);
       const port = extractFieldValue(row, ['PORT (도착항/POD)', 'PORT', 'port', 'POD', 'pod', '도착항', '목적항', 'DESTINATION']);
       const model = extractFieldValue(row, ['MODEL (장비명)', 'MODEL', 'model', '장비명', '기종', 'Model Name', '모델명']);
@@ -190,7 +298,7 @@ export default function AdminShipmentUpload({ isMobileView }) {
 
       const rowData = {
         mbl_no: mbl,
-        pol: '', // 기본값
+        pol: '',
         pod: port,
         model_name: model,
         serial_number: sn,
@@ -268,7 +376,6 @@ export default function AdminShipmentUpload({ isMobileView }) {
   const handleApplyPastedText = (text) => {
     if (!text || !text.trim()) return;
 
-    // Papa.parse automatically detects TSV (from Excel clipboard) and CSV
     Papa.parse(text.trim(), {
       header: true,
       skipEmptyLines: true,
@@ -286,7 +393,6 @@ export default function AdminShipmentUpload({ isMobileView }) {
             setIsPasteModalOpen(false);
             setPastedText('');
           } else {
-            // 헤더 없이 데이터 행만 복사한 경우 (0: MBL, 1: POD, 2: MODEL, 3: S/N, 4: PO)
             Papa.parse(text.trim(), {
               header: false,
               skipEmptyLines: true,
@@ -324,7 +430,6 @@ export default function AdminShipmentUpload({ isMobileView }) {
 
     setIsUploading(true);
     setUploadStatus('idle');
-    // Start progress simulation
     const progressInterval = setInterval(() => {
       setUploadProgress(prev => {
         if (prev >= 90) return prev;
@@ -353,6 +458,8 @@ export default function AdminShipmentUpload({ isMobileView }) {
 
       if (res.ok) {
         setUploadStatus('success');
+        // 업로드 성공 후 좌측 선적내역 리스트 즉시 자동 갱신
+        fetchShipmentHistory();
         setTimeout(() => {
           resetCurrentFile();
         }, 3000);
@@ -373,249 +480,747 @@ export default function AdminShipmentUpload({ isMobileView }) {
     <div 
       onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
       onDrop={(e) => { e.preventDefault(); e.stopPropagation(); }}
-      style={{ padding: isMobileView ? '16px' : '32px', maxWidth: '1200px', margin: '0 auto' }}
+      style={{ 
+        padding: isMobile ? '16px' : '24px 32px', 
+        maxWidth: '1680px', 
+        margin: '0 auto',
+        boxSizing: 'border-box'
+      }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+      {/* ================= [ 페이지 상단 안내 바 ] ================= */}
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        marginBottom: '20px', 
+        flexWrap: 'wrap', 
+        gap: '12px' 
+      }}>
         <div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-            선적정보 업로드 (API Tracking 연동)
+          <h1 style={{ 
+            fontSize: isMobile ? '1.3rem' : '1.5rem', 
+            fontWeight: 700, 
+            color: 'var(--text-primary)', 
+            margin: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <Ship size={24} color="#0284c7" />
+            선적 관리 & 업로드
           </h1>
-          <p style={{ margin: '4px 0 0 0', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-            엑셀 템플릿 양식(.xlsx, .csv) 또는 복사/붙여넣기로 선적 MBL 및 장비 목록을 일괄 등록합니다.
+          <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+            기존에 등록된 선적 내역을 조회하고, 신규 선적(MBL) 및 장비 시리얼 정보를 실시간 업로드합니다.
           </p>
         </div>
+
+        {/* 상단 빠른 템플릿 다운로드 버튼 그룹 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <button 
             onClick={() => setIsPasteModalOpen(true)}
             className="btn btn-primary"
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', backgroundColor: '#0284c7', borderColor: '#0284c7', color: 'white' }}
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px', 
+              cursor: 'pointer', 
+              backgroundColor: '#0284c7', 
+              borderColor: '#0284c7', 
+              color: 'white',
+              fontSize: '0.85rem',
+              padding: '6px 12px'
+            }}
             title="사내 DRM 암호화와 무관하게 엑셀 내용을 복사하여 붙여넣기"
           >
-            <Clipboard size={16} />
+            <Clipboard size={15} />
             <span>엑셀 복사/붙여넣기</span>
           </button>
           <button 
             onClick={downloadTemplate}
             className="btn btn-outline"
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.85rem', padding: '6px 12px' }}
             title="엑셀 형식(.xlsx) 템플릿 다운로드"
           >
-            <Download size={15} />
+            <Download size={14} />
             <span>템플릿 (.xlsx)</span>
           </button>
           <button 
             onClick={downloadCsvTemplate}
             className="btn btn-outline"
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.85rem', padding: '6px 12px' }}
             title="사내 DRM 암호화 영향을 받지 않는 CSV 형식 템플릿 다운로드"
           >
-            <Download size={15} />
+            <Download size={14} />
             <span>템플릿 (.csv)</span>
           </button>
         </div>
       </div>
 
-      {/* 파일 업로드 드롭존 */}
-      <div 
-        onDragEnter={handleDragEnter}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        onClick={() => fileInputRef.current?.click()}
-        style={{
-          maxWidth: '620px',
-          margin: '0 auto 28px',
-          border: isDragging ? '2px dashed #0284c7' : '2px dashed var(--border-color)',
-          borderRadius: '16px',
-          padding: '36px 24px',
-          textAlign: 'center',
-          backgroundColor: isDragging ? 'rgba(14, 165, 233, 0.1)' : 'var(--bg-secondary)',
-          boxShadow: isDragging ? '0 0 20px rgba(14, 165, 233, 0.25)' : 'none',
-          transform: isDragging ? 'scale(1.01)' : 'scale(1)',
-          cursor: 'pointer',
-          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-          position: 'relative'
-        }}
-      >
-        <div style={{ pointerEvents: 'none' }}>
-          <div style={{
-            width: '64px',
-            height: '64px',
-            borderRadius: '50%',
-            backgroundColor: isDragging ? 'rgba(14, 165, 233, 0.2)' : 'var(--bg-primary)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 16px',
-            transition: 'all 0.2s ease'
-          }}>
-            <UploadCloud 
-              size={36} 
-              color={isDragging ? '#0284c7' : 'var(--wia-light-gold)'} 
-            />
-          </div>
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 600, marginBottom: '8px', color: isDragging ? '#0284c7' : 'var(--text-primary)' }}>
-            {isDragging ? '여기에 엑셀 파일을 놓으세요 (Drop File)' : '클릭하거나 엑셀 파일을 이곳에 드롭하세요'}
-          </h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', margin: '0 0 12px' }}>
-            지원 형식: <strong>.xlsx, .xls, .csv</strong> (헤더 자동 매핑)
-          </p>
-          <div style={{ display: 'inline-flex', gap: '8px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            <span>필수 헤더: MBL (선하증권 번호)</span>
-            <span>•</span>
-            <span>S/N 또는 P/O</span>
-            <span>•</span>
-            <span>POD (도착항)</span>
-          </div>
-        </div>
+      {/* ================= [ 메인 레이아웃: 화면 2등분 (좌: 선적내역 리스트, 우: 선적정보 업로드) ] ================= */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+        gap: '24px',
+        alignItems: 'start'
+      }}>
 
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          style={{ display: 'none' }} 
-          accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, .xlsx, .xls"
-          onChange={handleFileSelect}
-        />
-      </div>
-
-      {/* 선택된 파일 정보 배너 */}
-      {currentFile && (
+        {/* ----------------- [ 왼쪽: 선적내역 리스트 ] ----------------- */}
         <div style={{
-          maxWidth: '620px',
-          margin: '-12px auto 24px',
-          padding: '12px 16px',
-          borderRadius: '10px',
-          backgroundColor: 'var(--bg-primary)',
+          background: 'var(--bg-primary, #ffffff)',
+          borderRadius: '16px',
           border: '1px solid var(--border-color)',
+          boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.05))',
+          overflow: 'hidden',
           display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          boxShadow: 'var(--shadow-sm)'
+          flexDirection: 'column'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <FileSpreadsheet size={22} color="#0284c7" />
-            <div>
-              <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                {currentFile.name}
+          {/* 좌측 패널 헤더 */}
+          <div style={{
+            padding: '16px 20px',
+            borderBottom: '1px solid var(--border-color)',
+            backgroundColor: 'var(--bg-secondary, #f8fafc)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '12px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                backgroundColor: 'rgba(2, 132, 199, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#0284c7'
+              }}>
+                <Ship size={18} />
               </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                {(currentFile.size / 1024).toFixed(1)} KB • {data.length}개 행 감지됨
+              <div>
+                <h2 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                  선적내역 리스트
+                </h2>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                  과거 및 현재 등록된 전체 B/L 선적 이력
+                </span>
               </div>
             </div>
-          </div>
-          <button
-            onClick={resetCurrentFile}
-            title="파일 초기화"
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--text-secondary)',
-              cursor: 'pointer',
-              padding: '4px',
-              borderRadius: '4px',
-              display: 'flex',
-              alignItems: 'center'
-            }}
-          >
-            <X size={18} />
-          </button>
-        </div>
-      )}
 
-      {data.length > 0 && (
-        <div style={{ background: 'var(--bg-primary)', borderRadius: '12px', padding: '24px', boxShadow: 'var(--shadow-sm)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>데이터 검증 결과 ({data.length}건)</h3>
-            {errors.length > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#ef4444' }}>
-                <AlertTriangle size={18} />
-                <span style={{ fontSize: '0.9rem' }}>{errors.length}개의 오류 발견</span>
+            {/* 필터 컨트롤: 출항 년도 드롭다운 + 새로고침 버튼 + 총 건수 배지 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              {/* 출항 년도 드롭다운 메뉴 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Calendar size={14} color="#64748b" />
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value)}
+                  style={{
+                    padding: '5px 8px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-color)',
+                    backgroundColor: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    outline: 'none'
+                  }}
+                  title="출항 년도(ETD) 기준 필터링"
+                >
+                  <option value="ALL">전체 년도</option>
+                  {availableYears.map(year => (
+                    <option key={year} value={year}>{year}년</option>
+                  ))}
+                </select>
               </div>
+
+              {/* 새로고침 버튼 */}
+              <button
+                onClick={fetchShipmentHistory}
+                disabled={isLoadingHistory}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '5px 8px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-color)',
+                  backgroundColor: 'var(--bg-primary)',
+                  color: '#0284c7',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  cursor: isLoadingHistory ? 'not-allowed' : 'pointer'
+                }}
+                title="선적내역 새로고침"
+              >
+                <RefreshCw size={13} className={isLoadingHistory ? 'animate-spin' : ''} />
+                <span>새로고침</span>
+              </button>
+
+              {/* 총 건수 뱃지 */}
+              <span style={{
+                backgroundColor: '#eff6ff',
+                color: '#1d4ed8',
+                border: '1px solid #dbeafe',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                padding: '4px 8px',
+                borderRadius: '9999px'
+              }}>
+                총 {filteredHistory.length}건
+              </span>
+            </div>
+          </div>
+
+          {/* 좌측 패널 검색 필터 바 */}
+          <div style={{
+            padding: '10px 16px',
+            borderBottom: '1px solid var(--border-color)',
+            backgroundColor: 'var(--bg-primary)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <Search size={15} color="#94a3b8" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="B/L 번호, 도착지 항구, 선박명 검색..."
+              style={{
+                border: 'none',
+                outline: 'none',
+                width: '100%',
+                fontSize: '0.85rem',
+                backgroundColor: 'transparent',
+                color: 'var(--text-primary)'
+              }}
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#94a3b8' }}
+              >
+                <X size={14} />
+              </button>
             )}
           </div>
 
-          <div style={{ overflowX: 'auto', marginBottom: '24px', maxHeight: '400px' }}>
-            <table className="wia-table" style={{ width: '100%' }}>
-              <thead style={{ position: 'sticky', top: 0, zIndex: 1, backgroundColor: 'var(--bg-primary)' }}>
-                <tr>
-                  <th style={{ width: '40px' }}>No</th>
-                  <th>MBL (선하증권)</th>
-                  <th>POD (도착항)</th>
-                  <th>장비명</th>
-                  <th>S/N (시리얼 번호)</th>
-                  <th>P/O (주문 번호)</th>
-                  <th>상태</th>
+          {/* 에러 피드백 */}
+          {historyError && (
+            <div style={{
+              margin: '12px 16px',
+              padding: '10px 14px',
+              borderRadius: '8px',
+              backgroundColor: '#fef2f2',
+              color: '#b91c1c',
+              border: '1px solid #fecaca',
+              fontSize: '0.85rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <AlertTriangle size={16} />
+              <span>{historyError}</span>
+            </div>
+          )}
+
+          {/* 좌측 선적내역 테이블 본체 (5개 컬럼 구성) */}
+          <div style={{ overflowX: 'auto', maxHeight: '680px', overflowY: 'auto' }}>
+            <table className="wia-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: 'var(--bg-secondary, #f8fafc)' }}>
+                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  <th style={{ width: '45px', textAlign: 'center', padding: '10px 8px', color: 'var(--text-secondary)' }}>번호</th>
+                  <th style={{ textAlign: 'left', padding: '10px 10px', color: 'var(--text-secondary)' }}>B/L 번호</th>
+                  <th style={{ textAlign: 'center', padding: '10px 8px', color: 'var(--text-secondary)' }}>ETD (출항일)</th>
+                  <th style={{ textAlign: 'left', padding: '10px 10px', color: 'var(--text-secondary)' }}>도착지 항구</th>
+                  <th style={{ textAlign: 'center', padding: '10px 10px', color: 'var(--text-secondary)' }}>장비개수 (S/N)</th>
                 </tr>
               </thead>
               <tbody>
-                {data.map((row, idx) => (
-                  <tr key={idx} style={{ backgroundColor: row._isValid ? 'transparent' : 'rgba(239, 68, 68, 0.05)' }}>
-                    <td>{idx + 1}</td>
-                    <td style={{ color: !row.mbl_no ? '#ef4444' : 'inherit' }}>{row.mbl_no || '-'}</td>
-                    <td>{row.pod}</td>
-                    <td>{row.model_name}</td>
-                    <td style={{ color: (!row.serial_number && !row.reference_no) ? '#ef4444' : 'inherit' }}>{row.serial_number || '-'}</td>
-                    <td style={{ color: (!row.serial_number && !row.reference_no) ? '#ef4444' : 'inherit' }}>{row.reference_no || '-'}</td>
-                    <td>
-                      {row._isValid ? (
-                        <CheckCircle size={18} color="#22c55e" />
-                      ) : (
-                        <div title={row._errorMsg} style={{ color: '#ef4444', cursor: 'help' }}>
-                          <AlertTriangle size={18} />
-                        </div>
-                      )}
+                {isLoadingHistory && (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: 'center', padding: '40px 16px', color: '#0284c7' }}>
+                      <Loader2 size={24} className="animate-spin" style={{ margin: '0 auto 8px' }} />
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>선적내역을 불러오는 중입니다...</div>
                     </td>
                   </tr>
-                ))}
+                )}
+
+                {!isLoadingHistory && filteredHistory.length === 0 && (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: 'center', padding: '48px 16px', color: 'var(--text-secondary)' }}>
+                      <Ship size={32} color="#cbd5e1" style={{ margin: '0 auto 8px' }} />
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>선적내역이 존재하지 않습니다.</div>
+                      <div style={{ fontSize: '0.75rem', marginTop: '4px' }}>
+                        {selectedYear !== 'ALL' ? `${selectedYear}년도에 출항한 선적이 없습니다.` : '오른쪽에서 신규 선적정보를 업로드해 보세요.'}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+
+                {!isLoadingHistory && filteredHistory.map((shipment, index) => {
+                  // S/N이 존재하는 장비 개수 계산
+                  const validSnOrders = shipment.orders?.filter(
+                    o => o.serial_number && String(o.serial_number).trim() !== ''
+                  ) || [];
+                  const snCount = validSnOrders.length;
+                  const totalOrderCount = shipment.orders?.length || 0;
+                  
+                  // 출항일 포맷 (YYYY-MM-DD)
+                  const etdStr = shipment.etd ? String(shipment.etd).slice(0, 10) : '-';
+                  
+                  const isExpanded = expandedMbl === shipment.mbl_no;
+
+                  return (
+                    <React.Fragment key={shipment.mbl_no || index}>
+                      <tr 
+                        onClick={() => setExpandedMbl(isExpanded ? null : shipment.mbl_no)}
+                        style={{
+                          borderBottom: '1px solid var(--border-color)',
+                          cursor: 'pointer',
+                          backgroundColor: isExpanded ? 'rgba(2, 132, 199, 0.04)' : 'transparent',
+                          transition: 'background-color 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isExpanded) e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.02)';
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isExpanded) e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                      >
+                        {/* 1. 번호 (순차번호) */}
+                        <td style={{ textAlign: 'center', padding: '12px 8px', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                          {index + 1}
+                        </td>
+
+                        {/* 2. B/L 번호 */}
+                        <td style={{ padding: '12px 10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontWeight: 700, color: '#0369a1', fontFamily: 'monospace', fontSize: '0.9rem' }}>
+                              {shipment.mbl_no || '-'}
+                            </span>
+                            <button
+                              onClick={(e) => handleCopyMbl(e, shipment.mbl_no)}
+                              title="B/L 번호 복사"
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                padding: '2px',
+                                cursor: 'pointer',
+                                color: copiedMbl === shipment.mbl_no ? '#16a34a' : '#94a3b8',
+                                display: 'flex',
+                                alignItems: 'center'
+                              }}
+                            >
+                              {copiedMbl === shipment.mbl_no ? <Check size={13} /> : <Copy size={13} />}
+                            </button>
+                          </div>
+                          {shipment.vessel && (
+                            <div style={{ fontSize: '0.72rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '3px', marginTop: '2px' }}>
+                              <Anchor size={10} />
+                              <span>{shipment.vessel}</span>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* 3. ETD (출항일) */}
+                        <td style={{ textAlign: 'center', padding: '12px 8px', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                          <span style={{ fontFamily: 'monospace', fontWeight: 500 }}>
+                            {etdStr}
+                          </span>
+                        </td>
+
+                        {/* 4. 도착지 항구 */}
+                        <td style={{ padding: '12px 10px', color: 'var(--text-primary)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ fontWeight: 600 }}>{shipment.pod || '-'}</span>
+                          </div>
+                          {shipment.carrier && (
+                            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                              선사: {shipment.carrier}
+                            </span>
+                          )}
+                        </td>
+
+                        {/* 5. 장비개수 (S/N개수 기준) */}
+                        <td style={{ textAlign: 'center', padding: '12px 10px' }}>
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            backgroundColor: snCount > 0 ? '#ecfdf5' : '#f1f5f9',
+                            color: snCount > 0 ? '#059669' : '#475569',
+                            border: `1px solid ${snCount > 0 ? '#a7f3d0' : '#e2e8f0'}`,
+                            padding: '3px 10px',
+                            borderRadius: '9999px',
+                            fontWeight: 700,
+                            fontSize: '0.8rem'
+                          }}>
+                            <Package size={12} />
+                            {snCount > 0 ? `${snCount}대` : `${totalOrderCount}대`}
+                          </span>
+                        </td>
+                      </tr>
+
+                      {/* 행 클릭 시 상세 장비(S/N 및 모델) 목록 아코디언 확장 뷰 */}
+                      {isExpanded && (
+                        <tr style={{ backgroundColor: '#f8fafc' }}>
+                          <td colSpan={5} style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color)' }}>
+                            <div style={{
+                              backgroundColor: 'white',
+                              borderRadius: '8px',
+                              border: '1px solid #e2e8f0',
+                              padding: '12px 14px'
+                            }}>
+                              <div style={{ 
+                                display: 'flex', 
+                                justifyContent: 'space-between', 
+                                alignItems: 'center', 
+                                marginBottom: '8px',
+                                borderBottom: '1px solid #f1f5f9',
+                                paddingBottom: '6px'
+                              }}>
+                                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>
+                                  📦 선적 장비 상세 목록 ({shipment.orders?.length || 0}건 / S/N 부여: {snCount}건)
+                                </span>
+                                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                  ETA: {shipment.eta ? String(shipment.eta).slice(0, 10) : '-'} | 상태: {shipment.trackcargo_status || '운송중'}
+                                </span>
+                              </div>
+
+                              {(!shipment.orders || shipment.orders.length === 0) ? (
+                                <div style={{ fontSize: '0.75rem', color: '#94a3b8', textAlign: 'center', padding: '8px' }}>
+                                  등록된 장비 주문이 없습니다.
+                                </div>
+                              ) : (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '8px' }}>
+                                  {shipment.orders.map((ord, oIdx) => (
+                                    <div key={ord.id || oIdx} style={{
+                                      padding: '8px 10px',
+                                      borderRadius: '6px',
+                                      backgroundColor: '#f8fafc',
+                                      border: '1px solid #e2e8f0',
+                                      fontSize: '0.75rem',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '2px'
+                                    }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                                          {ord.product_model?.model_name || '장비'}
+                                        </span>
+                                        <span style={{
+                                          fontSize: '0.68rem',
+                                          padding: '1px 5px',
+                                          borderRadius: '4px',
+                                          backgroundColor: ord.current_status === 'ARRIVED' ? '#dcfce7' : '#e0f2fe',
+                                          color: ord.current_status === 'ARRIVED' ? '#15803d' : '#0369a1',
+                                          fontWeight: 600
+                                        }}>
+                                          {ord.current_status}
+                                        </span>
+                                      </div>
+                                      <div style={{ color: '#475569' }}>
+                                        S/N: <strong style={{ color: ord.serial_number ? '#0284c7' : '#94a3b8' }}>{ord.serial_number || '미부여'}</strong>
+                                      </div>
+                                      <div style={{ color: '#64748b', fontSize: '0.7rem' }}>
+                                        P/O: {ord.reference_no || '-'}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
+        </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', justifyContent: 'flex-end' }}>
-            {isUploading && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, maxWidth: '400px' }}>
-                <div style={{ height: '8px', background: 'var(--bg-secondary)', borderRadius: '4px', flex: 1, overflow: 'hidden' }}>
-                  <div style={{ 
-                    height: '100%', 
-                    background: 'var(--accent-cyan)', 
-                    width: `${uploadProgress}%`,
-                    transition: 'width 0.3s ease'
-                  }}></div>
-                </div>
-                <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{uploadProgress}%</span>
+        {/* ----------------- [ 오른쪽: 선적정보 업로드 (API Tracking 연동) ] ----------------- */}
+        <div style={{
+          background: 'var(--bg-primary, #ffffff)',
+          borderRadius: '16px',
+          border: '1px solid var(--border-color)',
+          boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.05))',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          {/* 우측 패널 헤더 */}
+          <div style={{
+            padding: '16px 20px',
+            borderBottom: '1px solid var(--border-color)',
+            backgroundColor: 'var(--bg-secondary, #f8fafc)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                backgroundColor: 'rgba(2, 132, 199, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#0284c7'
+              }}>
+                <UploadCloud size={18} />
               </div>
-            )}
-            
-            {uploadStatus === 'success' && (
-              <div style={{ color: '#22c55e', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <CheckCircle size={20} />
-                <span>업로드 성공! TrackCargo 연동이 시작되었습니다.</span>
+              <div>
+                <h2 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                  선적정보 업로드 (API Tracking 연동)
+                </h2>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                  엑셀 파일 드롭 또는 복사/붙여넣기로 TrackCargo 실시간 등록
+                </span>
               </div>
-            )}
+            </div>
 
-            <button
-              className="btn btn-primary"
-              onClick={handleSubmit}
-              disabled={isUploading || uploadStatus === 'success'}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '160px', justifyContent: 'center' }}
+            {data.length > 0 && (
+              <button
+                onClick={resetCurrentFile}
+                className="btn btn-outline"
+                style={{ fontSize: '0.75rem', padding: '4px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}
+              >
+                <X size={12} />
+                <span>취소/재선택</span>
+              </button>
+            )}
+          </div>
+
+          <div style={{ padding: '20px' }}>
+            {/* 파일 업로드 드롭존 */}
+            <div 
+              onDragEnter={handleDragEnter}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                border: isDragging ? '2px dashed #0284c7' : '2px dashed var(--border-color)',
+                borderRadius: '14px',
+                padding: '28px 20px',
+                textAlign: 'center',
+                backgroundColor: isDragging ? 'rgba(14, 165, 233, 0.1)' : 'var(--bg-secondary, #f8fafc)',
+                boxShadow: isDragging ? '0 0 20px rgba(14, 165, 233, 0.25)' : 'none',
+                transform: isDragging ? 'scale(1.01)' : 'scale(1)',
+                cursor: 'pointer',
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                position: 'relative',
+                marginBottom: '16px'
+              }}
             >
-              {isUploading ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" />
-                  <span>처리중...</span>
-                </>
-              ) : (
-                <>
-                  <UploadCloud size={18} />
-                  <span>업로드 최종 확정</span>
-                </>
-              )}
-            </button>
+              <div style={{ pointerEvents: 'none' }}>
+                <div style={{
+                  width: '52px',
+                  height: '52px',
+                  borderRadius: '50%',
+                  backgroundColor: isDragging ? 'rgba(14, 165, 233, 0.2)' : 'var(--bg-primary, #ffffff)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 12px',
+                  transition: 'all 0.2s ease',
+                  border: '1px solid var(--border-color)'
+                }}>
+                  <UploadCloud 
+                    size={28} 
+                    color={isDragging ? '#0284c7' : '#0284c7'} 
+                  />
+                </div>
+                <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '6px', color: isDragging ? '#0284c7' : 'var(--text-primary)' }}>
+                  {isDragging ? '여기에 엑셀 파일을 놓으세요 (Drop File)' : '클릭하거나 엑셀 파일을 이곳에 드롭하세요'}
+                </h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: '0 0 8px' }}>
+                  지원 형식: <strong>.xlsx, .xls, .csv</strong> (헤더 지능형 자동 매핑)
+                </p>
+                <div style={{ display: 'inline-flex', gap: '6px', fontSize: '0.72rem', color: 'var(--text-muted, #94a3b8)', flexWrap: 'wrap', justifyContent: 'center' }}>
+                  <span>필수 헤더: MBL (선하증권)</span>
+                  <span>•</span>
+                  <span>S/N 또는 P/O</span>
+                  <span>•</span>
+                  <span>POD (도착항)</span>
+                </div>
+              </div>
+
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                style={{ display: 'none' }} 
+                accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, .xlsx, .xls"
+                onChange={handleFileSelect}
+              />
+            </div>
+
+            {/* 선택된 파일 정보 배너 */}
+            {currentFile && (
+              <div style={{
+                padding: '10px 14px',
+                borderRadius: '8px',
+                backgroundColor: 'var(--bg-secondary, #f8fafc)',
+                border: '1px solid var(--border-color)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                boxShadow: 'var(--shadow-sm)',
+                marginBottom: '16px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <FileSpreadsheet size={20} color="#0284c7" />
+                  <div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {currentFile.name}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                      {(currentFile.size / 1024).toFixed(1)} KB • {data.length}개 행 감지됨
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={resetCurrentFile}
+                  title="파일 초기화"
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    padding: '4px',
+                    borderRadius: '4px',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            )}
+
+            {/* 데이터 검증 결과 테이블 */}
+            {data.length > 0 && (
+              <div style={{ background: 'var(--bg-primary)', borderRadius: '10px', padding: '16px', border: '1px solid var(--border-color)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <h3 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                    데이터 검증 결과 ({data.length}건)
+                  </h3>
+                  {errors.length > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ef4444' }}>
+                      <AlertTriangle size={15} />
+                      <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{errors.length}개의 오류 발견</span>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ overflowX: 'auto', marginBottom: '16px', maxHeight: '280px', overflowY: 'auto' }}>
+                  <table className="wia-table" style={{ width: '100%', fontSize: '0.78rem' }}>
+                    <thead style={{ position: 'sticky', top: 0, zIndex: 1, backgroundColor: 'var(--bg-secondary, #f8fafc)' }}>
+                      <tr>
+                        <th style={{ width: '35px' }}>No</th>
+                        <th>MBL</th>
+                        <th>POD</th>
+                        <th>장비명</th>
+                        <th>S/N</th>
+                        <th>P/O</th>
+                        <th style={{ width: '40px' }}>검증</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.map((row, idx) => (
+                        <tr key={idx} style={{ backgroundColor: row._isValid ? 'transparent' : 'rgba(239, 68, 68, 0.05)' }}>
+                          <td>{idx + 1}</td>
+                          <td style={{ color: !row.mbl_no ? '#ef4444' : 'inherit', fontWeight: 600 }}>{row.mbl_no || '-'}</td>
+                          <td>{row.pod}</td>
+                          <td>{row.model_name}</td>
+                          <td style={{ color: (!row.serial_number && !row.reference_no) ? '#ef4444' : 'inherit' }}>{row.serial_number || '-'}</td>
+                          <td style={{ color: (!row.serial_number && !row.reference_no) ? '#ef4444' : 'inherit' }}>{row.reference_no || '-'}</td>
+                          <td style={{ textAlign: 'center' }}>
+                            {row._isValid ? (
+                              <CheckCircle size={15} color="#22c55e" />
+                            ) : (
+                              <div title={row._errorMsg} style={{ color: '#ef4444', cursor: 'help', display: 'inline-block' }}>
+                                <AlertTriangle size={15} />
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* 프로그레스 바 및 최종 확정 버튼 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                  {isUploading && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '180px' }}>
+                      <div style={{ height: '6px', background: 'var(--bg-secondary)', borderRadius: '3px', flex: 1, overflow: 'hidden' }}>
+                        <div style={{ 
+                          height: '100%', 
+                          background: '#0284c7', 
+                          width: `${uploadProgress}%`,
+                          transition: 'width 0.3s ease'
+                        }}></div>
+                      </div>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{uploadProgress}%</span>
+                    </div>
+                  )}
+                  
+                  {uploadStatus === 'success' && (
+                    <div style={{ color: '#16a34a', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', fontWeight: 600 }}>
+                      <CheckCircle size={18} />
+                      <span>업로드 성공! TrackCargo 연동 시작 및 리스트 갱신 완료</span>
+                    </div>
+                  )}
+
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleSubmit}
+                    disabled={isUploading || uploadStatus === 'success'}
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '6px', 
+                      minWidth: '150px', 
+                      justifyContent: 'center',
+                      backgroundColor: '#0284c7',
+                      borderColor: '#0284c7',
+                      color: 'white',
+                      fontSize: '0.85rem',
+                      padding: '8px 16px'
+                    }}
+                  >
+                    {isUploading ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>연동 처리중...</span>
+                      </>
+                    ) : (
+                      <>
+                        <UploadCloud size={16} />
+                        <span>업로드 최종 확정</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
-      )}
 
-      {/* 엑셀 복사/붙여넣기 모달 (DRM 우회 솔루션) */}
+      </div>
+
+      {/* ================= [ 엑셀 복사/붙여넣기 모달 (DRM 우회 솔루션) ] ================= */}
       {isPasteModalOpen && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -690,7 +1295,7 @@ export default function AdminShipmentUpload({ isMobileView }) {
                   padding: '12px',
                   borderRadius: '8px',
                   border: '1px solid var(--border-color)',
-                  backgroundColor: 'var(--bg-secondary)',
+                  backgroundColor: 'var(--bg-secondary, #f8fafc)',
                   color: 'var(--text-primary)',
                   fontFamily: 'monospace',
                   fontSize: '0.85rem',
@@ -706,7 +1311,7 @@ export default function AdminShipmentUpload({ isMobileView }) {
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              backgroundColor: 'var(--bg-secondary)'
+              backgroundColor: 'var(--bg-secondary, #f8fafc)'
             }}>
               <button
                 type="button"
@@ -748,7 +1353,7 @@ export default function AdminShipmentUpload({ isMobileView }) {
         </div>
       )}
 
-      {/* 사내 보안 DRM/MIP 암호화 감지 안내 모달 */}
+      {/* ================= [ 사내 보안 DRM/MIP 암호화 감지 안내 모달 ] ================= */}
       {drmModalInfo && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -797,7 +1402,7 @@ export default function AdminShipmentUpload({ isMobileView }) {
               </p>
 
               <div style={{
-                backgroundColor: 'var(--bg-secondary)',
+                backgroundColor: 'var(--bg-secondary, #f8fafc)',
                 borderRadius: '10px',
                 padding: '16px',
                 border: '1px solid var(--border-color)',

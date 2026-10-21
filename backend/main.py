@@ -320,12 +320,25 @@ from services.trackcargo_route_scheduler import get_last_sync_stats, sync_routes
 @app.get("/api/shipments", response_model=List[schemas.ShipmentWithOrdersOut])
 def get_shipments(
     dealer_id: Optional[int] = Query(None, description="DEALER 권한인 경우 본인 회사 ID에 속한 선적만 격리 조회 (Row-Level Security)"),
+    include_all: bool = Query(False, description="True일 경우 도착 완료된 선적을 포함한 전체 선적 내역(업로드 이력)을 반환"),
     db: Session = Depends(get_db)
 ):
-    # 주문이 존재하는 선적 조회
-    shipments = db.query(models.Shipment).filter(models.Shipment.orders.any()).all()
+    # 주문이 존재하는 선적 조회 (최신 출항일/생성일 순 정렬)
+    shipments = db.query(models.Shipment).filter(models.Shipment.orders.any()).order_by(models.Shipment.etd.desc().nullslast(), models.Shipment.id.desc()).all()
     
-    # 운송 중(In-Transit) 필터링: 모든 주문이 도착(ARRIVED) 이후 상태인 경우는 제외
+    # [선적내역 리스트용] 전체 선적 내역 조회 모드
+    if include_all:
+        all_shipments = []
+        for s in shipments:
+            if dealer_id:
+                user_orders = [o for o in s.orders if o.dealer_company_id == dealer_id]
+                if not user_orders:
+                    continue
+                s.orders = user_orders
+            all_shipments.append(s)
+        return all_shipments
+
+    # [선적 트래킹용 기본값] 운송 중(In-Transit) 필터링: 모든 주문이 도착(ARRIVED) 이후 상태인 경우는 제외
     active_shipments = []
     for s in shipments:
         # [설계 가이드 v4.0 RBAC] 딜러 격리 필터링
