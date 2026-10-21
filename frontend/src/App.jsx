@@ -225,7 +225,12 @@ export default function App() {
           {activeTab === 'analytics' && currentRole !== 'RSM' && <SalesAnalytics isMobileView={isMobileView} isDesktopOptimized={isDesktopOptimized} />}
           {activeTab === 'admin-promotion' && (currentRole === 'SCM_ADMIN' || currentRole === 'RSM') && <AdminPromotion isMobileView={isMobileView} />}
           {activeTab === 'admin-shipment-upload' && currentRole !== 'RSM' && <AdminShipmentUpload isMobileView={isMobileView} />}
-          {activeTab === 'admin-tracking' && currentRole !== 'RSM' && <ShipmentTracking isMobileView={isMobileView} />}
+          {activeTab === 'admin-tracking' && currentRole !== 'RSM' && (
+            <ShipmentTracking 
+              isMobileView={isMobileView} 
+              onNavigateUpload={() => setActiveTab('admin-shipment-upload')} 
+            />
+          )}
           {activeTab === 'management' && currentRole !== 'RSM' && <UploadSettings />}
           {activeTab === 'admin-library' && (currentRole === 'SCM_ADMIN' || currentRole === 'RSM') && <ProductLibrary currentRole={currentRole} isMobileView={isMobileView} />}
 

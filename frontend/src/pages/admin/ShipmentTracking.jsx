@@ -16,7 +16,8 @@ import {
   CheckCircle2, 
   RefreshCw, 
   Zap, 
-  ShieldCheck 
+  ShieldCheck,
+  UploadCloud
 } from 'lucide-react';
 import { DelayRateWidget } from '../../components/ShipmentWidgets';
 import TrackingMapboxWidget from '../../components/TrackingMapboxWidget';
@@ -52,7 +53,7 @@ const fetchSyncStatus = async () => {
   }
 };
 
-export default function ShipmentTracking({ isMobileView }) {
+export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
   const [selectedMbl, setSelectedMbl] = useState(null);
   const [activeTab, setActiveTab] = useState('Route'); // Route, Containers, Vessel, Exceptions
   const [isManualSyncing, setIsManualSyncing] = useState(false);
@@ -194,6 +195,29 @@ export default function ShipmentTracking({ isMobileView }) {
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {onNavigateUpload && (
+                  <button
+                    onClick={onNavigateUpload}
+                    title="선적정보 엑셀 일괄 업로드 페이지로 이동"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '4px 8px',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      color: '#0284c7',
+                      backgroundColor: '#f0f9ff',
+                      border: '1px solid #bae6fd',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <UploadCloud size={12} />
+                    선적 업로드
+                  </button>
+                )}
                 <button
                   onClick={handleTriggerManualSync}
                   disabled={isManualSyncing}
