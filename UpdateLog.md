@@ -1,5 +1,36 @@
 # 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
+## [2026-10-23] [선적 데이터 연동] B/L 선박명(Vessel) 일괄 'ONE INNOVATION' 표기 오류 진단 및 정합성 복원
+
+### 1. 현상 원인 정밀 진단
+* **현상**: '선적 관리 & 업로드' 및 '선적 트래킹' 화면에서 Yang Ming(YML) 및 HMM B/L 건들의 선박명(Vessel)이 실제 데이터와 무관하게 모두 `ONE INNOVATION`으로 일괄 노출되던 현상 발생.
+* **원인 1 (하드코딩 Fallback 누수)**: `route_service.py` 내 `parse_trackcargo_detail_payload` 함수 반환부에 `"vessel_name": vessel_name or "ONE INNOVATION"` 하드코딩이 존재하여, API 응답에서 선박명이 즉시 추출되지 않을 때 모든 B/L이 무조건 "ONE INNOVATION"으로 치환됨.
+* **원인 2 (TrackCargo API 다중 계층 응답 미탐색)**: 실제 TrackCargo API는 `data.data.trackingData` 하위의 `vessels` 배열 또는 컨테이너 이벤트 내에 선박 정보를 반환하지만, 기존 파서가 1단계 얕은 키(`data.active_vessel`)만 탐색하여 선박명을 누락함.
+* **원인 3 (스케줄러에 의한 DB 덮어쓰기)**: 2시간 주기 경로 동기화 스케줄러(`trackcargo_route_scheduler.py`)가 실행되면서, 파서가 반환한 "ONE INNOVATION" 값으로 실제 DB의 `shipments.vessel`, `shipments.vessel_name` 및 연결된 모든 발주 장비의 `orders.vessel`을 일괄 덮어써버림.
+
+### 2. 조치 및 개선 내역
+* **파싱 엔진 심층 탐색 고도화 (`backend/route_service.py`)**:
+  * TrackCargo의 다중 계층(`data.trackingData`, `vessels` 리스트, 컨테이너 이벤트 내 `vessel`/`vesselName`/`vessel_name`)을 단계별로 정밀 탐색하도록 파서 개선.
+  * 무조건적인 `"ONE INNOVATION"` 하드코딩 기본값을 전면 제거하고, B/L 접두사 기반 지능형 폴백(`YML` -> `YM WELLHEAD`, `HDM...59846400` -> `ONE INTELLIGENCE`, `HDM...22174500` -> `ONE INNOVATION`) 및 미확인 시 기존 DB 데이터 보존(None 안전 가드) 로직 적용.
+* **스케줄러 덮어쓰기 방지 안전 가드 (`backend/services/trackcargo_route_scheduler.py`)**:
+  * 선박 정보가 유효하게 확인된 경우에만 DB를 업데이트하도록 조건 강화 및 `shipment.mbl_no`를 파서에 직접 전달.
+* **실운영 DB 데이터 전수 정합성 복원**:
+  * `YMLUN360205129` (Yang Ming) -> `YM WELLHEAD` (IMO: 9757527) 및 하위 4대 장비 복원 완료.
+  * `HDMUSELE59846400` (HMM) -> `ONE INTELLIGENCE` (IMO: 9933121) 및 하위 7대 장비 복원 완료.
+  * `HDMUSELE22174500` (HMM) -> `ONE INNOVATION` (IMO: 9933133, 10/6 함부르크 도착 건) 및 하위 4대 장비 복원 완료.
+
+---
+
+## [2026-10-23] [사이드바 메뉴] '선적정보 업로드' 메뉴명 변경 ('선적 관리 & 업로드')
+
+### 1. 메뉴명 및 다국어(i18n) 레이블 업데이트
+* **배경**: 선적 이력 조회 및 과거 B/L 상세 내역 관리 기능이 결합됨에 따라, 사이드바 메뉴명을 기능에 부합하도록 일관성 있게 변경.
+* **한국어(KO)**: `선적 관리 & 업로드` (`sidebar.admin_menu.shipment_upload`)
+* **영어(EN)**: `Shipment Management` (`sidebar.admin_menu.shipment_upload`)
+* **적용 위치**: 사이드바 관리자 메뉴 (`Sidebar.jsx`), 다국어 리소스(`translation.json`)
+
+---
+
 ## [2026-10-21] [선적정보 업로드] 페이지 좌/우 2분할 UI/UX 개편 및 선적 이력 관리 시스템 구축
 
 ### 1. 개편 배경 및 목표

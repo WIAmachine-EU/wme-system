@@ -212,10 +212,11 @@ async def fetch_tracking_data(order_id: str) -> Optional[Dict[str, Any]]:
                 
                 # [v5.0] Extract Route and Active Vessel details with POD code & Arrived status
                 from route_service import parse_trackcargo_detail_payload
-                pod_code = data.get("pod") or "DEHAM"
-                route_detail = parse_trackcargo_detail_payload(data, pod_code=pod_code)
+                pod_code = data.get("pod") or tracking_data.get("pod") or "DEHAM"
+                mbl_cand = data.get("trackingId") or (isinstance(data.get("data"), dict) and data["data"].get("trackingId")) or tracking_data.get("trackingId") or data.get("mbl_no")
+                route_detail = parse_trackcargo_detail_payload(data, pod_code=pod_code, mbl_no=mbl_cand)
                 
-                vessel_result = route_detail.get("vessel_name") or data.get("vessel") or ""
+                vessel_result = route_detail.get("vessel_name") or data.get("vessel") or tracking_data.get("vessel") or None
                 normalized_status = route_detail.get("tracking_status") or data.get("status", "Active")
                 
                 return {
