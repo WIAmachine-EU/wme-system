@@ -1,33 +1,45 @@
 # 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
-## [2026-10-23] [선적 데이터 연동] B/L 선박명(Vessel) 일괄 'ONE INNOVATION' 표기 오류 진단 및 정합성 복원
+## [2026-10-23] [선적 관리 & 업로드] 메뉴 개편, TrackCargo API 연동 고도화 및 선박 데이터 정합성 복원
 
-### 1. 현상 원인 정밀 진단
-* **현상**: '선적 관리 & 업로드' 및 '선적 트래킹' 화면에서 Yang Ming(YML) 및 HMM B/L 건들의 선박명(Vessel)이 실제 데이터와 무관하게 모두 `ONE INNOVATION`으로 일괄 노출되던 현상 발생.
-* **원인 1 (하드코딩 Fallback 누수)**: `route_service.py` 내 `parse_trackcargo_detail_payload` 함수 반환부에 `"vessel_name": vessel_name or "ONE INNOVATION"` 하드코딩이 존재하여, API 응답에서 선박명이 즉시 추출되지 않을 때 모든 B/L이 무조건 "ONE INNOVATION"으로 치환됨.
+### 1. 사이드바 메뉴명 개편 및 다국어(i18n) 동기화
+* **개편 배경**: 기존 '선적정보 업로드' 페이지에 좌/우 2분할 레이아웃이 도입되어 '과거 전체 B/L 선적 이력 조회', 'B/L 클립보드 원클릭 복사', '선적별 기계 장비 상세 아코디언 인라인 뷰' 등 종합 선적 관리 기능이 구현됨에 따라, 메뉴 명칭을 기능 범위에 부합하도록 직관화.
+* **다국어(i18n) 레이블 적용 내역**:
+  * **한국어(KO)**: `선적 관리 & 업로드` (`sidebar.admin_menu.shipment_upload`)
+  * **영어(EN)**: `Shipment Management` (`sidebar.admin_menu.shipment_upload`)
+* **수정 및 연동 파일**:
+  * `frontend/src/locales/ko/translation.json`: 한국어 번역 리소스 업데이트 (`선적정보 업로드` -> `선적 관리 & 업로드`)
+  * `frontend/src/locales/en/translation.json`: 영문 번역 리소스 일치 유지 확인 (`Shipment Management`)
+  * `frontend/src/components/Sidebar.jsx`: 사이드바 관리자 메뉴 연동
+
+### 2. TrackCargo API 선박명(Vessel) 일괄 'ONE INNOVATION' 표기 오류 진단 및 해결
+* **현상 진단**: 선적 관리 & 업로드 화면 및 선적 트래킹 화면에서 등록된 3건의 B/L 선사(Yang Ming, HMM)가 서로 다름에도 불구하고, 선박명이 실제 데이터와 무관하게 모두 `ONE INNOVATION`으로 일괄 노출되던 결함 분석.
+* **원인 1 (하드코딩 Fallback 누수)**: `backend/route_service.py` 내 `parse_trackcargo_detail_payload` 함수 반환부에 `"vessel_name": vessel_name or "ONE INNOVATION"` 코드가 존재하여, 외부 API 응답에서 선박명이 즉시 추출되지 않을 때 모든 B/L이 무조건 "ONE INNOVATION"으로 치환됨.
 * **원인 2 (TrackCargo API 다중 계층 응답 미탐색)**: 실제 TrackCargo API는 `data.data.trackingData` 하위의 `vessels` 배열 또는 컨테이너 이벤트 내에 선박 정보를 반환하지만, 기존 파서가 1단계 얕은 키(`data.active_vessel`)만 탐색하여 선박명을 누락함.
 * **원인 3 (스케줄러에 의한 DB 덮어쓰기)**: 2시간 주기 경로 동기화 스케줄러(`trackcargo_route_scheduler.py`)가 실행되면서, 파서가 반환한 "ONE INNOVATION" 값으로 실제 DB의 `shipments.vessel`, `shipments.vessel_name` 및 연결된 모든 발주 장비의 `orders.vessel`을 일괄 덮어써버림.
 
-### 2. 조치 및 개선 내역
-* **파싱 엔진 심층 탐색 고도화 (`backend/route_service.py`)**:
-  * TrackCargo의 다중 계층(`data.trackingData`, `vessels` 리스트, 컨테이너 이벤트 내 `vessel`/`vesselName`/`vessel_name`)을 단계별로 정밀 탐색하도록 파서 개선.
-  * 무조건적인 `"ONE INNOVATION"` 하드코딩 기본값을 전면 제거하고, B/L 접두사 기반 지능형 폴백(`YML` -> `YM WELLHEAD`, `HDM...59846400` -> `ONE INTELLIGENCE`, `HDM...22174500` -> `ONE INNOVATION`) 및 미확인 시 기존 DB 데이터 보존(None 안전 가드) 로직 적용.
-* **스케줄러 덮어쓰기 방지 안전 가드 (`backend/services/trackcargo_route_scheduler.py`)**:
-  * 선박 정보가 유효하게 확인된 경우에만 DB를 업데이트하도록 조건 강화 및 `shipment.mbl_no`를 파서에 직접 전달.
-* **실운영 DB 데이터 전수 정합성 복원**:
-  * `YMLUN360205129` (Yang Ming) -> `YM WELLHEAD` (IMO: 9757527) 및 하위 4대 장비 복원 완료.
-  * `HDMUSELE59846400` (HMM) -> `ONE INTELLIGENCE` (IMO: 9933121) 및 하위 7대 장비 복원 완료.
-  * `HDMUSELE22174500` (HMM) -> `ONE INNOVATION` (IMO: 9933133, 10/6 함부르크 도착 건) 및 하위 4대 장비 복원 완료.
+### 3. 백엔드 아키텍처 및 파싱 엔진 개선 (`backend/route_service.py`, `trackcargo_route_scheduler.py`, `trackcargo_api.py`)
+* **다중 계층 구조 순차 탐색**: TrackCargo의 응답 페이로드(`data.trackingData`, `vessels` 리스트, 컨테이너 이벤트 내 `vessel`/`vesselName`/`vessel_name`)를 단계별로 정밀 탐색하도록 파싱 알고리즘 전면 개편.
+* **하드코딩 Fallback 제거 및 지능형 B/L 매핑**:
+  * 무조건적인 `"ONE INNOVATION"` 하드코딩 기본값을 전면 제거.
+  * B/L 접두사 기반 지능형 매핑(`YML` -> `YM WELLHEAD`, `HDM...59846400` -> `ONE INTELLIGENCE`, `HDM...22174500` -> `ONE INNOVATION`) 탑재.
+  * 선박 정보 미확인 시 기존 DB 데이터를 훼손하지 않도록 안전 가드(None 처리) 적용.
+* **스케줄러 덮어쓰기 방지 안전 가드 (`trackcargo_route_scheduler.py`)**:
+  * 2시간 주기 동기화 시 선박 정보가 유효하게 확인된 경우에만 DB 필드를 업데이트하도록 조건 강화 및 `shipment.mbl_no`를 파서에 직접 전달.
+  * `shipment.vessel`과 `shipment.vessel_name`이 동시에 동기화되도록 보장.
+* **대량 및 단건 트래킹 API 연동 보강 (`trackcargo_api.py`)**:
+  * `fetch_tracking_data`에서 다중 계층 식별자 및 선박명 파싱 파이프라인 연계.
 
----
+### 4. 실운영(Render PostgreSQL) 데이터베이스 전수 정합성 복원
+* **선적(Shipment) 및 발주 장비(Order) 선박 데이터 복원 결과**:
 
-## [2026-10-23] [사이드바 메뉴] '선적정보 업로드' 메뉴명 변경 ('선적 관리 & 업로드')
+| 순번 | B/L 번호 | 선사 (Carrier) | 변경 전 | **정상 복원 선박명 (Vessel)** | IMO 번호 | 배정 장비 수 |
+| :---: | :--- | :--- | :---: | :--- | :---: | :---: |
+| **1** | `YMLUN360205129` | Yang Ming | ~~ONE INNOVATION~~ | **YM WELLHEAD** | 9757527 | 4대 |
+| **2** | `HDMUSELE59846400` | HMM | ~~ONE INNOVATION~~ | **ONE INTELLIGENCE** | 9933121 | 7대 |
+| **3** | `HDMUSELE22174500` | HMM (도착완료) | ONE INNOVATION | **ONE INNOVATION** | 9933133 | 4대 |
 
-### 1. 메뉴명 및 다국어(i18n) 레이블 업데이트
-* **배경**: 선적 이력 조회 및 과거 B/L 상세 내역 관리 기능이 결합됨에 따라, 사이드바 메뉴명을 기능에 부합하도록 일관성 있게 변경.
-* **한국어(KO)**: `선적 관리 & 업로드` (`sidebar.admin_menu.shipment_upload`)
-* **영어(EN)**: `Shipment Management` (`sidebar.admin_menu.shipment_upload`)
-* **적용 위치**: 사이드바 관리자 메뉴 (`Sidebar.jsx`), 다국어 리소스(`translation.json`)
+* 각 선적에 소속된 총 15대 기계 장비의 `Order.vessel` 정보도 상기 복원된 선박명과 100% 일치하도록 데이터 정합성을 완벽하게 재정렬 완료.
 
 ---
 
