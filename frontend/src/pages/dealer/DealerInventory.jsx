@@ -235,14 +235,18 @@ export default function DealerInventory({ isMobileView }) {
               <option value="">기본 정렬</option>
               <option value="model_asc">{t('menu2.header_model', '모델')} ▲ (오름차순)</option>
               <option value="model_desc">{t('menu2.header_model', '모델')} ▼ (내림차순)</option>
-              <option value="eta_asc">{t('menu2.header_eta', '도착일정')} ▲ (빠른순)</option>
-              <option value="eta_desc">{t('menu2.header_eta', '도착일정')} ▼ (늦은순)</option>
-              <option value="po_asc">{t('menu2.header_po', '발주번호')} ▲</option>
-              <option value="po_desc">{t('menu2.header_po', '발주번호')} ▼</option>
               <option value="nc_asc">{t('menu2.header_nc', 'NC')} ▲</option>
               <option value="nc_desc">{t('menu2.header_nc', 'NC')} ▼</option>
+              <option value="po_asc">{t('menu2.header_po', '발주번호')} ▲</option>
+              <option value="po_desc">{t('menu2.header_po', '발주번호')} ▼</option>
+              <option value="detail_spec_asc">{t('menu2.header_detailspec', '옵션 상세')} ▲</option>
+              <option value="detail_spec_desc">{t('menu2.header_detailspec', '옵션 상세')} ▼</option>
+              <option value="eta_asc">{t('menu2.header_eta', '도착일정')} ▲ (빠른순)</option>
+              <option value="eta_desc">{t('menu2.header_eta', '도착일정')} ▼ (늦은순)</option>
               <option value="port_asc">{t('menu2.header_port', '도착지')} ▲</option>
               <option value="port_desc">{t('menu2.header_port', '도착지')} ▼</option>
+              <option value="stock_type_asc">{t('menu2.header_status', '상태')} ▲</option>
+              <option value="stock_type_desc">{t('menu2.header_status', '상태')} ▼</option>
             </select>
           </div>
         </div>
@@ -319,13 +323,13 @@ export default function DealerInventory({ isMobileView }) {
                   >
                     {t('menu2.header_no')}
                   </th>
-                  {renderSortHeader('model', t('menu2.header_model'), '15%')}
-                  {renderSortHeader('nc', t('menu2.header_nc'), '10%')}
-                  {renderSortHeader('po', t('menu2.header_po'), '15%')}
+                  {renderSortHeader('model', t('menu2.header_model'), '15%', 'center')}
+                  {renderSortHeader('nc', t('menu2.header_nc'), '10%', 'center')}
+                  {renderSortHeader('po', t('menu2.header_po'), '15%', 'center')}
                   {renderSortHeader('detail_spec', t('menu2.header_detailspec'), '20%', 'left')}
-                  {renderSortHeader('eta', t('menu2.header_eta'), '10%')}
-                  {renderSortHeader('port', t('menu2.header_port'), '10%')}
-                  {renderSortHeader('stock_type', t('menu2.type_available'), '15%')}
+                  {renderSortHeader('eta', t('menu2.header_eta'), '10%', 'center')}
+                  {renderSortHeader('port', t('menu2.header_port'), '10%', 'center')}
+                  {renderSortHeader('stock_type', t('menu2.header_status', '상태'), '15%', 'center')}
                 </tr>
               </thead>
             <tbody>
@@ -344,33 +348,33 @@ export default function DealerInventory({ isMobileView }) {
                         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-secondary)'}
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                       >
-                        <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
+                        <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
                           <div style={{ fontWeight: 500, fontSize: '12px' }}>{index + 1}</div>
                         </td>
-                        <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
+                        <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
                           <div style={{ fontWeight: 600, fontSize: '12px' }}>{order.product_model ? order.product_model.model_name : 'Unknown Model'}</div>
                         </td>
-                        <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
+                        <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
                           <div style={{ fontSize: '10px' }}>{order.nc || 'F0iP'}</div>
                         </td>
-                        <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
+                        <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
                           <div style={{ fontWeight: 700, color: 'var(--accent-cyan)', fontSize: '12px' }}>{order.reference_no}</div>
                         </td>
-                        <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
+                        <td style={{ textAlign: 'left', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
                           <div style={{ fontSize: '10px' }}>{order.detail_spec || 'T/F, CC(S-H)+B, 20BAR, B/I, P/C, Q(A)'}</div>
                         </td>
-                        <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
+                        <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
                           <div style={{ fontSize: '10px' }}>{order.eta ? new Date(order.eta).toLocaleDateString() : '-'}</div>
                         </td>
-                        <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
+                        <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
                           <div style={{ fontSize: '10px' }}>{getStandardPort(order.destination_port)}</div>
                         </td>
-                        <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
-                          {sType === 'AVAILABLE' && <span className="status-badge" style={{ background: 'hsla(142, 76%, 46%, 0.2)', color: 'var(--status-stock)', width: '72px', justifyContent: 'center', fontSize: '11px' }}>{t('menu2.type_available')}</span>}
-                          {sType === 'DEALER_ORDER' && <span className="status-badge" style={{ background: 'hsla(200, 76%, 46%, 0.2)', color: 'var(--accent-cyan)', width: '72px', justifyContent: 'center', fontSize: '11px' }}>{t('menu2.type_dealer_order')}</span>}
-                          {sType === 'RENTAL' && <span className="status-badge" style={{ background: 'hsla(45, 93%, 58%, 0.2)', color: 'var(--status-production)', width: '72px', justifyContent: 'center', fontSize: '11px' }}>{t('menu2.type_rental')}</span>}
-                          {sType === 'SHOWROOM' && <span className="status-badge" style={{ background: 'hsla(280, 80%, 60%, 0.2)', color: 'var(--accent-purple)', width: '72px', justifyContent: 'center', fontSize: '11px' }}>{t('menu2.type_showroom')}</span>}
-                          {sType === 'PROMOTION' && <span className="status-badge" style={{ background: 'hsla(340, 82%, 52%, 0.2)', color: 'var(--accent-pink)', width: '72px', justifyContent: 'center', fontSize: '11px' }}>{t('menu2.type_promotion')}</span>}
+                        <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
+                          {sType === 'AVAILABLE' && <span className="status-badge" style={{ background: 'hsla(142, 76%, 46%, 0.2)', color: 'var(--status-stock)', width: '72px', margin: '0 auto', justifyContent: 'center', fontSize: '11px' }}>{t('menu2.type_available')}</span>}
+                          {sType === 'DEALER_ORDER' && <span className="status-badge" style={{ background: 'hsla(200, 76%, 46%, 0.2)', color: 'var(--accent-cyan)', width: '72px', margin: '0 auto', justifyContent: 'center', fontSize: '11px' }}>{t('menu2.type_dealer_order')}</span>}
+                          {sType === 'RENTAL' && <span className="status-badge" style={{ background: 'hsla(45, 93%, 58%, 0.2)', color: 'var(--status-production)', width: '72px', margin: '0 auto', justifyContent: 'center', fontSize: '11px' }}>{t('menu2.type_rental')}</span>}
+                          {sType === 'SHOWROOM' && <span className="status-badge" style={{ background: 'hsla(280, 80%, 60%, 0.2)', color: 'var(--accent-purple)', width: '72px', margin: '0 auto', justifyContent: 'center', fontSize: '11px' }}>{t('menu2.type_showroom')}</span>}
+                          {sType === 'PROMOTION' && <span className="status-badge" style={{ background: 'hsla(340, 82%, 52%, 0.2)', color: 'var(--accent-pink)', width: '72px', margin: '0 auto', justifyContent: 'center', fontSize: '11px' }}>{t('menu2.type_promotion')}</span>}
                         </td>
                       </tr>
                       {expandedRows.has(order.id) && (

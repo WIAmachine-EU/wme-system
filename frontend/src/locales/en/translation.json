@@ -122,6 +122,7 @@
     "header_detailspec": "DETAIL SPEC",
     "header_eta": "ETA",
     "header_port": "PORT",
+    "header_status": "TYPE",
     "header_status_change": "TYPE",
     "header_dealer_order": "ORDER",
     "filter_all": "All type",

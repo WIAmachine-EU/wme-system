@@ -122,6 +122,7 @@
     "header_detailspec": "옵션 상세",
     "header_eta": "도착일정",
     "header_port": "도착지",
+    "header_status": "상태",
     "header_status_change": "상태",
     "header_dealer_order": "주문선택",
     "filter_all": "전체 상태 조회",

@@ -68,6 +68,9 @@ if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
                 except sqlite3.OperationalError:
                     pass
                 
+            # P/O 기준 도착항(destination_port) 보정
+            c.execute("UPDATE orders SET destination_port = 'Hamburg' WHERE reference_no = 'C26-08-01' AND destination_port IS NULL")
+                
             conn.commit()
             conn.close()
     except Exception as e:

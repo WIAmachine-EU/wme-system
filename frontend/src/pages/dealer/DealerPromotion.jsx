@@ -296,14 +296,16 @@ export default function DealerPromotion({ isMobileView }) {
                 <option value="">기본 정렬</option>
                 <option value="model_asc">{t('menu3.header_model', '모델')} ▲ (오름차순)</option>
                 <option value="model_desc">{t('menu3.header_model', '모델')} ▼ (내림차순)</option>
-                <option value="price_asc">{t('menu3.header_price', 'PRICE')} ▲ (낮은순)</option>
-                <option value="price_desc">{t('menu3.header_price', 'PRICE')} ▼ (높은순)</option>
-                <option value="eta_asc">{t('menu3.header_eta', 'ETA')} ▲ (빠른순)</option>
-                <option value="eta_desc">{t('menu3.header_eta', 'ETA')} ▼ (늦은순)</option>
-                <option value="po_asc">{t('menu3.header_po', '발주번호')} ▲</option>
-                <option value="po_desc">{t('menu3.header_po', '발주번호')} ▼</option>
                 <option value="nc_asc">{t('menu3.header_nc', 'NC')} ▲</option>
                 <option value="nc_desc">{t('menu3.header_nc', 'NC')} ▼</option>
+                <option value="price_asc">{t('menu3.header_price', 'PRICE')} ▲ (낮은순)</option>
+                <option value="price_desc">{t('menu3.header_price', 'PRICE')} ▼ (높은순)</option>
+                <option value="po_asc">{t('menu3.header_po', '발주번호')} ▲</option>
+                <option value="po_desc">{t('menu3.header_po', '발주번호')} ▼</option>
+                <option value="detail_spec_asc">{t('menu3.header_detailspec', '옵션 상세')} ▲</option>
+                <option value="detail_spec_desc">{t('menu3.header_detailspec', '옵션 상세')} ▼</option>
+                <option value="eta_asc">{t('menu3.header_eta', 'ETA')} ▲ (빠른순)</option>
+                <option value="eta_desc">{t('menu3.header_eta', 'ETA')} ▼ (늦은순)</option>
                 <option value="port_asc">{t('menu2.header_port', 'PORT')} ▲</option>
                 <option value="port_desc">{t('menu2.header_port', 'PORT')} ▼</option>
                 <option value="status_asc">{t('menu3.header_promotion_status', '상태')} ▲</option>
@@ -401,14 +403,14 @@ export default function DealerPromotion({ isMobileView }) {
                   >
                     {t('menu3.header_no')}
                   </th>
-                  {renderSortHeader('model', t('menu3.header_model'), '10%')}
-                  {renderSortHeader('nc', t('menu3.header_nc'), '5%')}
-                  {renderSortHeader('price', t('menu3.header_price', 'PRICE(€)'), '7%', 'right')}
-                  {renderSortHeader('po', t('menu3.header_po'), '10%')}
+                  {renderSortHeader('model', t('menu3.header_model'), '10%', 'center')}
+                  {renderSortHeader('nc', t('menu3.header_nc'), '5%', 'center')}
+                  {renderSortHeader('price', t('menu3.header_price', 'PRICE(€)'), '7%', 'center')}
+                  {renderSortHeader('po', t('menu3.header_po'), '10%', 'center')}
                   {renderSortHeader('detail_spec', t('menu3.header_detailspec'), '21%', 'left')}
-                  {renderSortHeader('eta', t('menu3.header_eta'), '8%')}
-                  {renderSortHeader('port', t('menu2.header_port', 'PORT'), '8%')}
-                  {renderSortHeader('status', t('menu3.header_promotion_status'), '10%')}
+                  {renderSortHeader('eta', t('menu3.header_eta'), '8%', 'center')}
+                  {renderSortHeader('port', t('menu2.header_port', 'PORT'), '8%', 'center')}
+                  {renderSortHeader('status', t('menu3.header_promotion_status'), '10%', 'center')}
                   <th style={{ width: '14%', textAlign: 'center' }}>{t('dealer_promotion.header_request', 'REQUEST')}</th>
                 </tr>
               </thead>
@@ -423,27 +425,27 @@ export default function DealerPromotion({ isMobileView }) {
                         <td style={{ textAlign: 'center' }}>
                           <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 500 }}>{index + 1}</span>
                         </td>
-                        <td>
+                        <td style={{ textAlign: 'center' }}>
                           <div style={{ fontWeight: 600, fontSize: '12px' }}>
                             {modelName}
                           </div>
                         </td>
-                        <td>
+                        <td style={{ textAlign: 'center' }}>
                           <div style={{ fontSize: '12px' }}>
                             {promo.order && promo.order.nc ? promo.order.nc : 'F0iP'}
                           </div>
                         </td>
-                        <td>
+                        <td style={{ textAlign: 'center' }}>
                           <div style={{ fontSize: '12px', fontWeight: 600 }}>
                             {promo.promotion_price || '-'}
                           </div>
                         </td>
-                        <td>
+                        <td style={{ textAlign: 'center' }}>
                           <div style={{ fontWeight: 700, color: 'var(--accent-cyan)', fontSize: '11px' }}>
                             {(promo.order && promo.order.reference_no) || 'F26-88-30'}
                           </div>
                         </td>
-                        <td>
+                        <td style={{ textAlign: 'left' }}>
                           <div style={{ fontSize: '11px' }}>
                             {(promo.order && promo.order.detail_spec) || 'T/F, CC(S-H)+B, 20BAR, B/I, P/C, Q(A)'}
                           </div>

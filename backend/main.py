@@ -521,6 +521,12 @@ async def upload_shipments(rows: List[schemas.ShipmentUploadRow], db: Session = 
                     if order_row.serial_number and order_row.serial_number.strip():
                         matched_order.serial_number = order_row.serial_number.strip()
                         
+                    # [핵심] P/O 기준 도착항(destination_port) 정보 업데이트 적용
+                    if order_row.pod and order_row.pod.strip():
+                        matched_order.destination_port = order_row.pod.strip()
+                    elif shipment.pod and shipment.pod.strip() and not matched_order.destination_port:
+                        matched_order.destination_port = shipment.pod.strip()
+
                     # 선적 등록 시 CONFIRMED 또는 IN_PRODUCTION 상태라면 SHIPPING으로 승격
                     if matched_order.current_status in [models.OrderStatus.CONFIRMED, models.OrderStatus.IN_PRODUCTION]:
                         matched_order.current_status = models.OrderStatus.SHIPPING

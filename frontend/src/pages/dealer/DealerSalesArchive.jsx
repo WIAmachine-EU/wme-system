@@ -120,6 +120,7 @@ const getStatusColor = (status) => {
 export default function DealerSalesArchive({ isMobileView }) {
   const { t } = useTranslation();
   const [orders, setOrders] = useState([]);
+  const [portCodes, setPortCodes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -130,8 +131,15 @@ export default function DealerSalesArchive({ isMobileView }) {
   const fetchSoldOrders = async () => {
     setLoading(true);
     try {
-      const dealersRes = await fetch('/api/dealers');
+      const [dealersRes, portsRes] = await Promise.all([
+        fetch('/api/dealers'),
+        fetch('/api/master-data/port-codes')
+      ]);
       const dealers = await dealersRes.json();
+      if (portsRes.ok) {
+        const portsData = await portsRes.json();
+        setPortCodes(Array.isArray(portsData) ? portsData : []);
+      }
       const akMakina = dealers.find(d => d.name === 'AK MAKINA');
       const dealerId = akMakina ? akMakina.id : '';
 
@@ -158,17 +166,52 @@ export default function DealerSalesArchive({ isMobileView }) {
     fetchSoldOrders();
   }, []);
 
+  // 도착지 항구 표준화 함수
+  const getStandardPort = (rawPort) => {
+    if (!rawPort || rawPort === '-') return '-';
+    if (!portCodes || portCodes.length === 0) return rawPort;
+    const lowerRaw = String(rawPort).toLowerCase().trim();
+    const exactMatch = portCodes.find(p => p.port_code.toLowerCase() === lowerRaw);
+    if (exactMatch) return exactMatch.port_code;
+    const startsMatch = portCodes.find(p => p.port_code.toLowerCase().startsWith(lowerRaw));
+    if (startsMatch) return startsMatch.port_code;
+    return rawPort;
+  };
+
+  // P/O (reference_no) 기준 동일한 PORT 정보 매핑 맵
+  const poPortMap = React.useMemo(() => {
+    const map = {};
+    orders.forEach(o => {
+      const po = (o.reference_no || '').trim();
+      if (!po) return;
+      const rawPort = o.destination_port || o.shipment?.pod;
+      if (rawPort && (!map[po] || map[po] === '-')) {
+        map[po] = rawPort;
+      }
+    });
+    return map;
+  }, [orders]);
+
+  // 주문별 P/O 기준 도착항 반환 함수
+  const getOrderPort = (order) => {
+    const po = (order.reference_no || '').trim();
+    const rawPort = (po && poPortMap[po]) || order.destination_port || order.shipment?.pod || '';
+    return getStandardPort(rawPort);
+  };
+
   const handleExportCSV = () => {
     if (orders.length === 0) return;
 
-    const headers = ['Order Date', 'Model', 'S/N', 'N/C', 'P/O', 'Status', 'Pick-up'];
+    const headers = ['Order Date', 'Model', 'NC', 'S/N', 'P/O', 'Status', 'PORT', 'Cargo Detail', 'Pick-up'];
     const rows = orders.map(order => [
       new Date(order.dealer_order_date || order.created_at).toLocaleDateString(),
       order.product_model ? order.product_model.model_name : '-',
-      order.serial_number || '-',
       order.nc || '-',
+      order.serial_number || '-',
       order.reference_no || '-',
       getStatusLabel(order.current_status),
+      getOrderPort(order),
+      order.serial_number ? 'Details' : '-',
       order.current_status === 'SOLD' ? '완료' : '-'
     ]);
 
@@ -186,11 +229,14 @@ export default function DealerSalesArchive({ isMobileView }) {
   };
 
   const filteredOrders = orders.filter(o => {
-    const s = searchQuery.toLowerCase();
-    const sn = o.serial_number ? o.serial_number.toLowerCase() : '';
-    const mn = o.product_model ? o.product_model.model_name.toLowerCase() : '';
-    const po = o.reference_no ? o.reference_no.toLowerCase() : '';
-    return sn.includes(s) || mn.includes(s) || po.includes(s);
+    const s = searchQuery.toLowerCase().trim();
+    if (!s) return true;
+    const sn = (o.serial_number || '').toLowerCase();
+    const mn = (o.product_model?.model_name || '').toLowerCase();
+    const po = (o.reference_no || '').toLowerCase();
+    const nc = (o.nc || '').toLowerCase();
+    const port = getOrderPort(o).toLowerCase();
+    return sn.includes(s) || mn.includes(s) || po.includes(s) || nc.includes(s) || port.includes(s);
   });
 
   // 정렬 (Sorting) 상태 및 핸들러
@@ -220,13 +266,13 @@ export default function DealerSalesArchive({ isMobileView }) {
         valA = a.product_model?.model_name || '';
         valB = b.product_model?.model_name || '';
         break;
-      case 'sn':
-        valA = a.serial_number || '';
-        valB = b.serial_number || '';
-        break;
       case 'nc':
         valA = a.nc || '';
         valB = b.nc || '';
+        break;
+      case 'sn':
+        valA = a.serial_number || '';
+        valB = b.serial_number || '';
         break;
       case 'po':
         valA = a.reference_no || '';
@@ -235,6 +281,10 @@ export default function DealerSalesArchive({ isMobileView }) {
       case 'status':
         valA = getStatusLabel(a.current_status) || '';
         valB = getStatusLabel(b.current_status) || '';
+        break;
+      case 'port':
+        valA = getOrderPort(a);
+        valB = getOrderPort(b);
         break;
       case 'pickup':
         valA = a.current_status === 'SOLD' ? 'Picked Up' : '';
@@ -247,7 +297,7 @@ export default function DealerSalesArchive({ isMobileView }) {
     return sortConfig.direction === 'asc' ? cmp : -cmp;
   });
 
-  const renderSortHeader = (key, label, width = '12%', align = 'left') => {
+  const renderSortHeader = (key, label, width = '12%', align = 'center') => {
     const isSorted = sortConfig.key === key;
     return (
       <th
@@ -348,14 +398,18 @@ export default function DealerSalesArchive({ isMobileView }) {
               <option value="order_date_desc">Order Date ▼ (최신순)</option>
               <option value="model_asc">Model ▲ (오름차순)</option>
               <option value="model_desc">Model ▼ (내림차순)</option>
+              <option value="nc_asc">NC ▲</option>
+              <option value="nc_desc">NC ▼</option>
               <option value="sn_asc">S/N ▲</option>
               <option value="sn_desc">S/N ▼</option>
-              <option value="nc_asc">N/C ▲</option>
-              <option value="nc_desc">N/C ▼</option>
               <option value="po_asc">P/O ▲</option>
               <option value="po_desc">P/O ▼</option>
               <option value="status_asc">Status ▲</option>
               <option value="status_desc">Status ▼</option>
+              <option value="port_asc">PORT ▲</option>
+              <option value="port_desc">PORT ▼</option>
+              <option value="pickup_asc">Pick up ▲</option>
+              <option value="pickup_desc">Pick up ▼</option>
             </select>
             <button onClick={handleExportCSV} className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', fontSize: '0.85rem' }}>
               <Download size={16} /> Export
@@ -399,10 +453,11 @@ export default function DealerSalesArchive({ isMobileView }) {
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
                         <div><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Order Date</span>{new Date(order.dealer_order_date || order.created_at).toLocaleDateString()}</div>
                         <div><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>P/O</span><span style={{ fontWeight: 500 }}>{order.reference_no || '-'}</span></div>
+                        <div><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>NC</span>{order.nc || '-'}</div>
                         <div><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>S/N</span><span style={{ fontWeight: 600 }}>{order.serial_number || '-'}</span></div>
-                        <div><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>N/C</span>{order.nc || '-'}</div>
-                        <div style={{ gridColumn: 'span 2' }}>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Pickup</span>
+                        <div><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>PORT</span><span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{getOrderPort(order)}</span></div>
+                        <div>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Pick up</span>
                           {isPickedUp ? <span style={{ color: 'var(--success-color)', fontWeight: 600 }}>Picked Up</span> : <span>-</span>}
                         </div>
                       </div>
@@ -441,20 +496,21 @@ export default function DealerSalesArchive({ isMobileView }) {
               <thead>
                 <tr>
                   <th 
-                    style={{ width: '5%', textAlign: 'center', fontWeight: 'bold', cursor: 'pointer', userSelect: 'none' }}
+                    style={{ width: '4%', textAlign: 'center', fontWeight: 'bold', cursor: 'pointer', userSelect: 'none' }}
                     onClick={() => setSortConfig({ key: null, direction: 'asc' })}
                     title="기본 순서로 리셋"
                   >
                     *
                   </th>
-                  {renderSortHeader('order_date', 'Order Date', '10%')}
-                  {renderSortHeader('model', 'Model', '15%')}
-                  {renderSortHeader('sn', 'S/N', '12%')}
-                  {renderSortHeader('nc', 'N/C', '10%')}
-                  {renderSortHeader('po', 'P/O', '12%')}
+                  {renderSortHeader('order_date', 'Order Date', '11%', 'center')}
+                  {renderSortHeader('model', 'Model', '13%', 'center')}
+                  {renderSortHeader('nc', 'NC', '9%', 'center')}
+                  {renderSortHeader('sn', 'S/N', '11%', 'center')}
+                  {renderSortHeader('po', 'P/O', '11%', 'center')}
                   {renderSortHeader('status', 'Status', '10%', 'center')}
-                  <th style={{ width: '14%', textAlign: 'center' }}>Cargo detail</th>
-                  {renderSortHeader('pickup', 'Pickup', '12%', 'center')}
+                  {renderSortHeader('port', 'PORT', '11%', 'center')}
+                  <th style={{ width: '10%', textAlign: 'center' }}>Cargo detail</th>
+                  {renderSortHeader('pickup', 'Pick up', '10%', 'center')}
                 </tr>
               </thead>
               <tbody>
@@ -468,19 +524,19 @@ export default function DealerSalesArchive({ isMobileView }) {
                         <td style={{ padding: '14px 12px', textAlign: 'center', fontSize: '12px' }}>
                           <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>{index + 1}</span>
                         </td>
-                        <td style={{ padding: '14px 12px', fontSize: '12px' }}>
+                        <td style={{ padding: '14px 12px', textAlign: 'center', fontSize: '12px' }}>
                           {new Date(order.dealer_order_date || order.created_at).toLocaleDateString()}
                         </td>
-                        <td style={{ padding: '14px 12px', fontWeight: 600, fontSize: '12px' }}>
+                        <td style={{ padding: '14px 12px', textAlign: 'center', fontWeight: 600, fontSize: '12px' }}>
                           {order.product_model ? order.product_model.model_name : '-'}
                         </td>
-                        <td style={{ padding: '14px 12px', fontSize: '12px' }}>
-                          {order.serial_number || '-'}
-                        </td>
-                        <td style={{ padding: '14px 12px', fontSize: '12px' }}>
+                        <td style={{ padding: '14px 12px', textAlign: 'center', fontSize: '12px' }}>
                           {order.nc || '-'}
                         </td>
-                        <td style={{ padding: '14px 12px', fontWeight: 500, fontSize: '12px' }}>
+                        <td style={{ padding: '14px 12px', textAlign: 'center', fontSize: '12px' }}>
+                          {order.serial_number || '-'}
+                        </td>
+                        <td style={{ padding: '14px 12px', textAlign: 'center', fontWeight: 500, fontSize: '12px' }}>
                           {order.reference_no || '-'}
                         </td>
                         <td style={{ padding: '14px 12px', textAlign: 'center', fontSize: '12px' }}>
@@ -490,6 +546,11 @@ export default function DealerSalesArchive({ isMobileView }) {
                             backgroundColor: `${statusColor}20`, color: statusColor, border: `1px solid ${statusColor}40`
                           }}>
                             {getStatusLabel(order.current_status)}
+                          </span>
+                        </td>
+                        <td style={{ padding: '14px 12px', textAlign: 'center', fontSize: '12px' }}>
+                          <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                            {getOrderPort(order)}
                           </span>
                         </td>
                         <td style={{ padding: '14px 12px', textAlign: 'center', fontSize: '12px' }}>
@@ -523,7 +584,7 @@ export default function DealerSalesArchive({ isMobileView }) {
                   })
                 ) : (
                   <tr>
-                    <td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                    <td colSpan="10" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
                       내역이 존재하지 않습니다.
                     </td>
                   </tr>
