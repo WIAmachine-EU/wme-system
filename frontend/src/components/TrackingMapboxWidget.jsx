@@ -47,7 +47,8 @@ export default function TrackingMapboxWidget({
   onSelectShipment,
   height = '100%',
   interactive = true,
-  defaultProjection = 'mercator'
+  defaultProjection = 'mercator',
+  dealerPopupMode = false // [신규] 딜러 포털 팝업 전용 2D 평면 고정 모드
 }) {
   const { t } = useTranslation();
   const mapRef = useRef(null);
@@ -66,6 +67,9 @@ export default function TrackingMapboxWidget({
     return defaultProjection;
   });
 
+  // 1. 딜러 팝업 모드일 경우 무조건 2D 평면 지도('mercator') 고정
+  const activeProjection = dealerPopupMode ? 'mercator' : mapProjection;
+
   const handleProjectionChange = (newProjection) => {
     if (newProjection === mapProjection) return;
     setMapProjection(newProjection);
@@ -76,12 +80,23 @@ export default function TrackingMapboxWidget({
     }
   };
 
-  const [viewState, setViewState] = useState({
-    longitude: 40,
-    latitude: 25,
-    zoom: 2.2,
-    pitch: 0,
-    bearing: 0,
+  const [viewState, setViewState] = useState(() => {
+    if (dealerPopupMode && shipmentData?.isWaitingDeparture) {
+      return {
+        longitude: 129.0756,
+        latitude: 35.1796,
+        zoom: 4.5,
+        pitch: 0,
+        bearing: 0,
+      };
+    }
+    return {
+      longitude: 40,
+      latitude: 25,
+      zoom: 2.2,
+      pitch: 0,
+      bearing: 0,
+    };
   });
 
 // [설계 가이드 v5.0] 희망봉 완주 표준 해상 항로 (실제 AIS 미수신 시 완주 Fallback 경로)
@@ -110,6 +125,34 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
     const podCoords = shipmentData.podCoords 
       ? [shipmentData.podCoords.lng ?? shipmentData.podCoords[0], shipmentData.podCoords.lat ?? shipmentData.podCoords[1]]
       : getPortCoordinate(shipmentData.pod || 'DEHAM');
+
+    const isWaitingDeparture = Boolean(shipmentData.isWaitingDeparture);
+
+    // [신규] 출항 전(생산 중/주문) 단계일 경우 무조건 부산항(polCoords) 좌표로 위치 고정
+    if (isWaitingDeparture) {
+      return {
+        mbl_no: shipmentData.mbl_no || '-',
+        vesselName: shipmentData.vessel_name || '생산완료 후 출항',
+        polName: shipmentData.pol || 'KRPUS (Busan)',
+        podName: shipmentData.pod || 'POD',
+        polCoords,
+        podCoords,
+        currentCoord: polCoords,
+        currentLng: polCoords[0],
+        currentLat: polCoords[1],
+        isWaitingDeparture: true,
+        isDelayed: false,
+        isDischarged: false,
+        status: '생산 중 (출항 준비)',
+        distanceToGo: calculateDistanceToGo(polCoords, podCoords),
+        heading: 0,
+        speed: 0,
+        routeCoordinates: [], // 출항 전이므로 해상 항로선 미표시
+        etd: null,
+        eta: shipmentData.eta || null,
+        raw: shipmentData
+      };
+    }
 
     // [가이드 v5.0] 도착 완료 화물 논리적 상태 판별 (ETA 경과, 키워드, 플래그 검사)
     const isShipmentArrived = Boolean(
@@ -249,16 +292,16 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
     if (currentShipment && mapRef.current) {
       mapRef.current.flyTo({
         center: [currentShipment.currentLng, currentShipment.currentLat],
-        zoom: 3.8,
+        zoom: currentShipment.isWaitingDeparture ? 4.5 : 3.8,
         duration: 1500,
         essential: true,
       });
     }
-  }, [currentShipment?.mbl_no]);
+  }, [currentShipment?.mbl_no, currentShipment?.currentLng, currentShipment?.currentLat, currentShipment?.isWaitingDeparture]);
 
-  // [v3.0] 단일 선적 해상 항로 GeoJSON LineString (실제 수집 AIS 궤적 우선 렌더링)
+  // [v3.0] 단일 선적 해상 항로 GeoJSON LineString (출항 대기 중일 때는 해상 항로선을 그리지 않음)
   const singleRouteGeoJSON = useMemo(() => {
-    if (!currentShipment) return null;
+    if (!currentShipment || currentShipment.isWaitingDeparture) return null;
     return buildMaritimeRouteGeoJSON(
       currentShipment.polCoords,
       currentShipment.podCoords,
@@ -416,8 +459,8 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
           onMove={evt => setViewState(evt.viewState)}
           mapStyle="mapbox://styles/mapbox/light-v11"
           mapboxAccessToken={MAPBOX_TOKEN}
-          projection={mapProjection}
-          fog={mapProjection === 'globe' ? {
+          projection={activeProjection}
+          fog={activeProjection === 'globe' ? {
             'color': 'rgb(220, 235, 255)',
             'high-color': 'rgb(36, 92, 223)',
             'space-color': 'rgb(11, 15, 25)',
@@ -453,7 +496,7 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
               onClick={() => setPopupInfo({
                 type: 'port',
                 title: `출발항 (POL): ${currentShipment.polName}`,
-                desc: `ETD: ${currentShipment.etd ? new Date(currentShipment.etd).toLocaleDateString() : '-'}`,
+                desc: `ETD: ${currentShipment.etd ? new Date(currentShipment.etd).toLocaleDateString() : (currentShipment.isWaitingDeparture ? '출항 대기 중' : '-')}`,
                 coord: currentShipment.polCoords
               })}
             >
@@ -545,7 +588,7 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
                 justifyContent: 'center'
               }}
             >
-              {/* 펄스 애니메이션 링 (지연: Red, 정상: Blue, 도착: 정지) */}
+              {/* 펄스 애니메이션 링 (지연: Red, 정상: Blue, 출항 대기/생산 중: Blue, 도착: 정지) */}
               {!currentShipment.isShipmentArrived && !currentShipment.isDischarged && (
                 <div 
                   style={{
@@ -553,7 +596,9 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
                     width: '42px',
                     height: '42px',
                     borderRadius: '50%',
-                    backgroundColor: currentShipment.isDelayed ? 'rgba(239, 68, 68, 0.35)' : 'rgba(59, 130, 246, 0.35)',
+                    backgroundColor: currentShipment.isWaitingDeparture
+                      ? 'rgba(37, 99, 235, 0.35)'
+                      : (currentShipment.isDelayed ? 'rgba(239, 68, 68, 0.35)' : 'rgba(59, 130, 246, 0.35)'),
                     animation: 'ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite'
                   }} 
                 />
@@ -565,11 +610,13 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
                   width: '34px',
                   height: '34px',
                   borderRadius: '50%',
-                  backgroundColor: currentShipment.isShipmentArrived
-                    ? '#059669'
-                    : (currentShipment.isDischarged 
-                      ? '#6b7280' 
-                      : (currentShipment.isDelayed ? '#ef4444' : '#2563eb')),
+                  backgroundColor: currentShipment.isWaitingDeparture
+                    ? '#2563eb'
+                    : (currentShipment.isShipmentArrived
+                      ? '#059669'
+                      : (currentShipment.isDischarged 
+                        ? '#6b7280' 
+                        : (currentShipment.isDelayed ? '#ef4444' : '#2563eb'))),
                   border: '2.5px solid #ffffff',
                   boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
                   display: 'flex',
@@ -579,14 +626,18 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
                   transition: 'transform 0.3s ease'
                 }}
               >
-                {/* 진행 방향(Heading)에 따른 선박 침로 회전 */}
-                <Navigation 
-                  size={18} 
-                  style={{ 
-                    transform: `rotate(${currentShipment.heading}deg)`,
-                    transition: 'transform 0.4s ease'
-                  }} 
-                />
+                {/* 진행 방향(Heading)에 따른 선박 침로 회전 또는 출항 대기/생산 중 마커 */}
+                {currentShipment.isWaitingDeparture ? (
+                  <MapPin size={18} />
+                ) : (
+                  <Navigation 
+                    size={18} 
+                    style={{ 
+                      transform: `rotate(${currentShipment.heading}deg)`,
+                      transition: 'transform 0.4s ease'
+                    }} 
+                  />
+                )}
               </div>
 
               {/* 선박명 라벨 태그 */}
@@ -594,7 +645,7 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
                 position: 'absolute',
                 top: '38px',
                 whiteSpace: 'nowrap',
-                backgroundColor: '#1e293b',
+                backgroundColor: currentShipment.isWaitingDeparture ? '#1e3a8a' : '#1e293b',
                 color: '#f8fafc',
                 fontSize: '11px',
                 fontWeight: 600,
@@ -603,7 +654,7 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
                 boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
                 pointerEvents: 'none'
               }}>
-                🚢 {currentShipment.vesselName}
+                {currentShipment.isWaitingDeparture ? '⚙️ 생산 중 (부산, KR)' : `🚢 ${currentShipment.vesselName}`}
               </div>
             </div>
           </Marker>
@@ -782,8 +833,8 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
       </Map>
       )}
 
-            {/* [v3.0] 상단 플로팅 핵심 항해 성과 지표 (3 KPI Cards) */}
-      {currentShipment && (
+            {/* [v3.0] 상단 플로팅 핵심 항해 성과 지표 (3 KPI Cards) - 딜러 팝업 모드에서는 숨김 */}
+      {!dealerPopupMode && currentShipment && (
         <div 
           style={{
             position: 'absolute',
@@ -917,8 +968,8 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
         </div>
       )}
 
-      {/* [v2.0] 우측 상단 투영 방식 전환 토글 스위치 (3D 지구본 위 / 2D 평면 아래) - 토큰이 있을 때만 표시 */}
-      {MAPBOX_TOKEN && (
+      {/* [v2.0] 우측 상단 투영 방식 전환 토글 스위치 (3D 지구본 위 / 2D 평면 아래) - 토큰이 있고 딜러 팝업 모드가 아닐 때만 표시 */}
+      {!dealerPopupMode && MAPBOX_TOKEN && (
         <div 
           style={{
             position: 'absolute',
@@ -1016,8 +1067,8 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
         </div>
       )}
 
-      {/* 7. 핵심 성과 지표 (KPI) 대시보드 플로팅 연동 위젯 (Distance to Go & Delay Rate & Aging) */}
-      {currentShipment && (
+      {/* 7. 핵심 성과 지표 (KPI) 대시보드 플로팅 연동 위젯 (Distance to Go & Delay Rate & Aging) - 딜러 팝업 모드에서는 숨김 */}
+      {!dealerPopupMode && currentShipment && (
         <div style={{
           position: 'absolute',
           top: '104px',

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Search, MapPin, Clock, Smartphone, Monitor } from 'lucide-react';
+import { Search, MapPin, Clock, Smartphone, Monitor, Ship } from 'lucide-react';
 import StepBar from '../../components/StepBar';
+import DealerVesselTrackingModal from '../../components/DealerVesselTrackingModal';
 
 export default function DealerOrders({ isMobileView }) {
   const { t } = useTranslation();
@@ -11,7 +12,15 @@ export default function DealerOrders({ isMobileView }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('ALL');
 
+  // 선박(주문화물) 추적 팝업 상태
+  const [trackingModalOpen, setTrackingModalOpen] = useState(false);
+  const [selectedTrackingOrder, setSelectedTrackingOrder] = useState(null);
+  const [shipmentsMap, setShipmentsMap] = useState({});
 
+  const handleOpenTrackingModal = (order) => {
+    setSelectedTrackingOrder(order);
+    setTrackingModalOpen(true);
+  };
 
   const [expandedRows, setExpandedRows] = useState(new Set());
 
@@ -30,15 +39,38 @@ export default function DealerOrders({ isMobileView }) {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const [dealersRes, portsRes] = await Promise.all([
+      const [dealersRes, portsRes, shipmentsRes] = await Promise.all([
         fetch('/api/dealers'),
-        fetch('/api/master-data/port-codes')
+        fetch('/api/master-data/port-codes'),
+        fetch('/api/shipments?include_all=true').catch(() => null)
       ]);
       const dealers = await dealersRes.json();
       const akMakina = dealers.find(d => d.name === 'AK MAKINA');
       const dealerId = akMakina ? akMakina.id : '';
 
       setPortCodes(await portsRes.json());
+
+      if (shipmentsRes && shipmentsRes.ok) {
+        try {
+          const shipmentsData = await shipmentsRes.json();
+          const sMap = {};
+          if (Array.isArray(shipmentsData)) {
+            shipmentsData.forEach(s => {
+              if (s.id) sMap[s.id] = s;
+              if (s.mbl_no) sMap[s.mbl_no] = s;
+              if (s.orders && Array.isArray(s.orders)) {
+                s.orders.forEach(o => {
+                  if (o.id) sMap[o.id] = s;
+                  if (o.reference_no) sMap[o.reference_no] = s;
+                });
+              }
+            });
+          }
+          setShipmentsMap(sMap);
+        } catch (e) {
+          console.warn("Failed to parse shipments data:", e);
+        }
+      }
 
       const res = await fetch(`/api/orders?dealer_id=${dealerId}&exclude_completed=true`);
       const data = await res.json();
@@ -297,6 +329,33 @@ export default function DealerOrders({ isMobileView }) {
                     </div>
                   </div>
 
+                  {/* 모바일 화물추적 버튼 */}
+                  <div style={{ marginTop: '12px' }} onClick={e => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenTrackingModal(order)}
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        backgroundColor: '#2563eb',
+                        color: '#ffffff',
+                        border: 'none',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)'
+                      }}
+                    >
+                      <span>🚢</span>
+                      <span>{t('dealer_orders.cargo_tracking_btn', '화물추적')}</span>
+                    </button>
+                  </div>
+
                   {expandedRows.has(order.id) && (
                     <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px dashed var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)' }} onClick={e => e.stopPropagation()}>
                       <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>S/O:</strong> <span>{order.so_no || '-'}</span></div>
@@ -327,16 +386,19 @@ export default function DealerOrders({ isMobileView }) {
                   </th>
                   {renderSortHeader('model', t('dealer_orders.header_model'), '12%', 'left')}
                   {renderSortHeader('po', t('dealer_orders.header_po_sn'), '15%', 'left')}
-                  {renderSortHeader('dealer', t('dealer_orders.header_dealer'), '15%', 'left')}
-                  {renderSortHeader('status', t('dealer_orders.header_status'), '40%', 'center')}
-                  {renderSortHeader('port', t('dealer_orders.header_port'), '15%', 'left')}
+                  {renderSortHeader('dealer', t('dealer_orders.header_dealer'), '12%', 'left')}
+                  {renderSortHeader('status', t('dealer_orders.header_status'), '35%', 'center')}
+                  {renderSortHeader('port', t('dealer_orders.header_port'), '13%', 'left')}
+                  <th style={{ width: '10%', textAlign: 'center', fontWeight: 'bold' }}>
+                    {t('dealer_orders.header_tracking', '화물추적')}
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('navbar.init_seed_loading')}</td></tr>
+                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('navbar.init_seed_loading')}</td></tr>
                 ) : sortedOrders.length === 0 ? (
-                  <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dealer_orders.no_orders')}</td></tr>
+                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dealer_orders.no_orders')}</td></tr>
                 ) : (
                   sortedOrders.map((order, index) => {
                     const showSchedule = !['CONFIRMED', 'IN_PRODUCTION'].includes(order.current_status);
@@ -387,10 +449,53 @@ export default function DealerOrders({ isMobileView }) {
                               </>
                             )}
                           </td>
+                          {/* 화물추적 액션 컬럼 */}
+                          <td 
+                            style={{ 
+                              textAlign: 'center', 
+                              borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', 
+                              paddingBottom: '12px', 
+                              paddingTop: '12px' 
+                            }} 
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleOpenTrackingModal(order)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                padding: '6px 12px',
+                                borderRadius: '8px',
+                                backgroundColor: '#2563eb',
+                                color: '#ffffff',
+                                border: 'none',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)',
+                                transition: 'all 0.15s ease',
+                                whiteSpace: 'nowrap'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#1d4ed8';
+                                e.currentTarget.style.transform = 'translateY(-1px)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = '#2563eb';
+                                e.currentTarget.style.transform = 'translateY(0)';
+                              }}
+                            >
+                              <span>🚢</span>
+                              <span>{t('dealer_orders.cargo_tracking_btn', '화물추적')}</span>
+                            </button>
+                          </td>
                         </tr>
                         {expandedRows.has(order.id) && (
                           <tr>
-                            <td colSpan={6} style={{ backgroundColor: 'var(--bg-card)', paddingTop: '8px', borderTop: '1px dashed var(--border-color)', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
+                            <td colSpan={7} style={{ backgroundColor: 'var(--bg-card)', paddingTop: '8px', borderTop: '1px dashed var(--border-color)', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', paddingLeft: '8px' }}>
                                 <div style={{
                                   fontSize: '0.8rem',
@@ -432,6 +537,15 @@ export default function DealerOrders({ isMobileView }) {
           </div>
         )}
       </div>
+
+      {/* 선박(주문화물) 추적 팝업 모달 */}
+      <DealerVesselTrackingModal
+        isOpen={trackingModalOpen}
+        onClose={() => setTrackingModalOpen(false)}
+        selectedOrder={selectedTrackingOrder}
+        timelineOrders={sortedOrders}
+        shipmentsMap={shipmentsMap}
+      />
 
     </div>
   );

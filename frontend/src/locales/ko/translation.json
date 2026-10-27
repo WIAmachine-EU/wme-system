@@ -299,7 +299,9 @@
     "header_po_sn": "P/O & S/N",
     "header_dealer": "Dealer",
     "header_status": "Status",
-    "header_port": "Port"
+    "header_port": "Port",
+    "header_tracking": "화물추적",
+    "cargo_tracking_btn": "화물추적"
   },
   "dealer_promotion": {
     "page_title": "WIA 프로모션",
