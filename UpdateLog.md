@@ -1,5 +1,39 @@
 # 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
+## [2026-10-30] WIA 가용재고 목록 예약(RESERVED) 기능 구축, 전용 팝업 UI/UX 고도화 및 딜러포털 동기화
+
+### 1. WIA 재고리스트(`AdminInventory.jsx`) 상태 메뉴 개편 및 예약(`RESERVED`) 설정 워크플로우 구축
+* **상태 드롭다운 순서 표준화 및 통계 연동**:
+  * 가용재고 목록의 상단 상태 필터, 데스크톱 테이블, 모바일 카드 뷰 드롭다운 메뉴 순서를 `[판매가능 > 예약 > 딜러주문 > 임대 > 전시 > 프로모션]`(`AVAILABLE > RESERVED > DEALER_ORDER > RENTAL > SHOWROOM > PROMOTION`)으로 일괄 적용했습니다.
+  * 상단 재고 수량 통계 헤더 바에 `예약` 상태 장비 집계 카운트를 신규 추가했습니다.
+* **임대 설정과 일관된 '예약 기간 설정' 팝업 모달 탑재**:
+  * 행에서 `[상태: 예약]` 및 `[주문선택: 딜러]` 지정 후 우측 `[확정]` 버튼을 클릭하면 전용 **'예약 기간 설정'** 팝업 모달이 실행되도록 구성했습니다.
+  * 팝업 내부에 안내 공지 배너, 3열 요약 카드(`모델`, `발주번호`, 팝업 내에서도 변경 가능한 `예약 딜러`), 달력 기반 `예약 시작일`·`예약 종료일(만료일)` 선택기, 빠른 기간 프리셋 버튼(**`+1주`**, **`+2주`**) 및 `[예약기간 확정]` 저장 기능을 구현했습니다.
+
+### 2. 예약 완료 시 '주문선택' 셀 전용 UI 전환 및 상세·판매완료 액션 모달 구현
+* **예약 완료 행 '주문선택' 전용 레이아웃 적용**:
+  * 예약 확정 시 상태 컬럼이 `예약`으로 전환되며, '주문선택' 컬럼에 예약 딜러명, 영문 월 표기 만료일(`만료: YYYY.MMM.DD`, 예: `2026.OCT.30`), **`[예약내역]`** 버튼 및 **`[판매완료]`** 버튼이 데스크톱·모바일 뷰 모두에 표시되도록 구현했습니다.
+  * 행 클릭 시 펼쳐지는 하단 상세내역 영역에도 예약 딜러, 예약 기간 및 `[예약내역]` 바로가기 버튼을 연동했습니다.
+* **`[예약내역]` 상세 팝업 및 `[예약취소]`·`[기간수정]` 기능**:
+  * 예약 딜러사(국가 포함), 잔여일(`D-Day`) 배지, 예약 시작일/만료일(`기간수정` 바로가기 지원) 및 장비 제원·옵션 상세 스펙을 한눈에 확인할 수 있는 팝업을 구축했습니다.
+  * 팝업 하단 `[예약취소]` 클릭 시 예약을 즉시 해제하고 해당 장비를 다시 `판매가능(AVAILABLE)` 상태로 복귀시킵니다.
+* **`[판매완료]` 확정 팝업 및 딜러 발주 자동 귀속 전환**:
+  * 예약 딜러사가 기본 선택된 상태에서 최종 실구매 딜러를 확인(변경 가능) 후 확정하면, 법인 가용재고(`is_corporate_stock=False`)에서 해당 딜러사의 확정 발주로 즉시 이관되어 `주문/배송현황` 및 `WIA 창고` 출고 프로세스와 유기적으로 연동됩니다.
+
+### 3. 백엔드 DB 스키마 확장, 전용 API 신설 및 자동 만료 복귀·알림 스케줄러 연동
+* **DB 모델 및 무중단 자동 마이그레이션 (`models.py`, `schemas.py`, `database.py`, `main.py`)**:
+  * `Order` 테이블에 예약 전용 컬럼 4종(`reserved_dealer_id`, `reservation_start_date`, `reservation_expiry_date`, `reservation_expiry_alert_sent`)을 추가하고 `DealerCompany` 이중 외래키(`foreign_keys`) 관계를 명시하여 법인 재고 소유권(`WME`)과 예약 딜러 정보를 안전하게 분리했습니다.
+  * 서버 구동 시 PostgreSQL(Render 운영 DB) 및 로컬 SQLite 환경 모두에 신규 컬럼이 무중단 자동 추가되도록 DDL 마이그레이션을 반영했습니다.
+* **가용재고 예약 전용 REST API 3종 및 자동 만료·알림 엔진 구축 (`main.py`, `scheduler.py`)**:
+  * `PATCH /api/orders/{order_id}/reserve` (예약 설정 및 기간 수정), `PATCH /api/orders/{order_id}/cancel-reservation` (예약 취소 및 판매가능 복구), `PATCH /api/orders/{order_id}/confirm-reservation-sale` (판매완료 확정 및 딜러 발주 전환) 엔드포인트를 신설했습니다.
+  * 만료일(`당일 23:59:59` 기준) 경과 시 API 조회 시점(`auto_release_expired_order_reservations`)과 2시간 주기 백그라운드 스케줄러(`process_expired_promotion_reservations`)에서 자동으로 `판매가능(AVAILABLE)` 상태로 롤백하며, 만료 하루 전(`D-1`) 관리자와 예약 딜러에게 사전 알림 이메일(`check_order_reservation_expiry_alerts`)을 자동 발송합니다.
+
+### 4. 딜러포털(`DealerInventory.jsx`, `DealerDashboard.jsx`), 창고 관리(`AdminDispatch.jsx`) 및 다국어(i18n) 동기화
+* **딜러포털 예약 상태 배지 연동 및 렌더링 안정성 강화**:
+  * 딜러포털 WIA 재고리스트(`DealerInventory.jsx`)에서는 딜러 간 영업 보안을 위해 예약 딜러명은 비노출하고 보라색 **`예약`** 상태 배지 및 만료일(`만료: YYYY.MMM.DD`)만 노출하도록 구현했습니다.
+  * `normalizeStockType` 및 `renderStatusBadge` 정규화 로직과 기본 배지 fallback을 적용하여 상태값 공백/대소문자 차이나 미정의 상태값 유입 시에도 빈칸 렌더링이 발생하지 않도록 보강했습니다.
+  * 딜러 대시보드(`DealerDashboard.jsx`) 가용재고 요약 배너에 `Reserved` 수량 집계를 추가하고, 창고 재고/출고관리(`AdminDispatch.jsx`) 및 한·영 번역 리소스(`ko/translation.json`, `en/translation.json`)에 예약 관련 배지·텍스트를 일괄 반영했습니다.
+
 ## [2026-10-30] 선적 트래킹 지도 선택 모드 '3D 지구본' 전용 파비콘(`Globe-svg.svg`) 적용 및 개발 환경 구성 정비
 
 ### 1. 선적 트래킹 우측 상단 지도 선택 모드 아이콘 고도화 (`TrackingMapboxWidget.jsx`)
