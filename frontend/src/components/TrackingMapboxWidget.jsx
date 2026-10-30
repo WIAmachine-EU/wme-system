@@ -1022,7 +1022,11 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
               if (mapProjection !== 'globe') e.currentTarget.style.backgroundColor = 'transparent';
             }}
           >
-            <span style={{ fontSize: '13px' }}>🌍</span>
+            <img
+              src="/Globe-svg.svg"
+              alt="3D 지구본"
+              style={{ width: '16px', height: '16px', objectFit: 'contain', flexShrink: 0, display: 'block' }}
+            />
             <span>{t('map_controls.globe_3d', '3D 지구본')}</span>
           </button>
 
