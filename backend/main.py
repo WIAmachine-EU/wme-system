@@ -107,6 +107,10 @@ def on_startup():
             f"ALTER TABLE orders ADD COLUMN {if_not_exists}rental_alert_sent BOOLEAN DEFAULT FALSE",
             f"ALTER TABLE orders ADD COLUMN {if_not_exists}warehouse VARCHAR",
             f"ALTER TABLE promotion_inventory ADD COLUMN {if_not_exists}expiry_alert_sent BOOLEAN DEFAULT FALSE",
+            f"ALTER TABLE orders ADD COLUMN {if_not_exists}reserved_dealer_id INTEGER",
+            f"ALTER TABLE orders ADD COLUMN {if_not_exists}reservation_start_date {timestamp_type}",
+            f"ALTER TABLE orders ADD COLUMN {if_not_exists}reservation_expiry_date {timestamp_type}",
+            f"ALTER TABLE orders ADD COLUMN {if_not_exists}reservation_expiry_alert_sent BOOLEAN DEFAULT FALSE",
         ]:
             try:
                 db.execute(text(col_def))
@@ -593,6 +597,36 @@ def sync_orders_serial_numbers(
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+def auto_release_expired_order_reservations(db: Session):
+    """
+    예약 만료일(당일 23:59:59 기준)이 경과한 가용재고(RESERVED) 장비를 확인하여 자동으로 AVAILABLE(판매가능) 상태로 롤백
+    """
+    now = datetime.utcnow()
+    reserved_orders = db.query(models.Order).filter(
+        models.Order.stock_type == "RESERVED",
+        models.Order.reservation_expiry_date.isnot(None)
+    ).all()
+    if not reserved_orders:
+        return
+    released = 0
+    wme_dealer = db.query(models.DealerCompany).filter(models.DealerCompany.name.ilike("WME")).first()
+    for o in reserved_orders:
+        expiry_eod = o.reservation_expiry_date.replace(hour=23, minute=59, second=59)
+        if expiry_eod <= now:
+            dealer_name = o.reserved_dealer.name if o.reserved_dealer else "Unknown"
+            logger.info(f"[가용재고 예약 자동 해제] 발주 {o.reference_no} (딜러: {dealer_name}) 만료일({o.reservation_expiry_date}) 경과 -> AVAILABLE 자동 복구")
+            o.stock_type = "AVAILABLE"
+            o.is_corporate_stock = True
+            o.reserved_dealer_id = None
+            o.reservation_start_date = None
+            o.reservation_expiry_date = None
+            o.reservation_expiry_alert_sent = False
+            if wme_dealer:
+                o.dealer_company_id = wme_dealer.id
+            released += 1
+    if released > 0:
+        db.commit()
+
 @app.get("/api/orders", response_model=List[schemas.OrderOut])
 def get_orders(
     dealer_id: Optional[int] = Query(None, description="DEALER 권한인 경우 본인 회사 ID만 조회"),
@@ -602,7 +636,8 @@ def get_orders(
     exclude_completed: bool = Query(False, description="출고/판매완료된 항목 제외 여부"),
     db: Session = Depends(get_db)
 ):
-    query = db.query(models.Order).join(models.DealerCompany, isouter=True)
+    auto_release_expired_order_reservations(db)
+    query = db.query(models.Order).join(models.DealerCompany, models.Order.dealer_company_id == models.DealerCompany.id, isouter=True)
     if dealer_id:
         query = query.filter(models.Order.dealer_company_id == dealer_id)
     if rsm_id:
@@ -700,7 +735,7 @@ def update_order_info(
 
     if payload.stock_type is not None:
         order.stock_type = payload.stock_type
-        if payload.stock_type in ["AVAILABLE", "RENTAL", "SHOWROOM", "PROMOTION"]:
+        if payload.stock_type in ["AVAILABLE", "RESERVED", "RENTAL", "SHOWROOM", "PROMOTION"]:
             order.is_corporate_stock = True
         elif payload.stock_type == "DEALER_ORDER":
             order.is_corporate_stock = False
@@ -746,6 +781,22 @@ def update_order_info(
     if hasattr(payload, 'rental_expiry_date') and payload.rental_expiry_date is not None:
         order.rental_expiry_date = payload.rental_expiry_date
         order.rental_alert_sent = False
+    if payload.stock_type is not None and payload.stock_type != "RESERVED":
+        order.reserved_dealer_id = None
+        order.reservation_start_date = None
+        order.reservation_expiry_date = None
+        order.reservation_expiry_alert_sent = False
+    if "reserved_dealer_id" in payload.model_fields_set:
+        if payload.reserved_dealer_id is not None:
+            r_dealer = db.query(models.DealerCompany).filter(models.DealerCompany.id == payload.reserved_dealer_id).first()
+            if not r_dealer:
+                raise HTTPException(status_code=404, detail="유효하지 않은 예약 딜러입니다.")
+        order.reserved_dealer_id = payload.reserved_dealer_id
+    if "reservation_start_date" in payload.model_fields_set:
+        order.reservation_start_date = payload.reservation_start_date
+    if "reservation_expiry_date" in payload.model_fields_set:
+        order.reservation_expiry_date = payload.reservation_expiry_date
+        order.reservation_expiry_alert_sent = False
     if "etd" in payload.model_fields_set:
         order.etd = payload.etd
     if "eta" in payload.model_fields_set:
@@ -873,6 +924,10 @@ def assign_order_to_dealer(
 
     order.dealer_company_id = dealer.id
     
+    order.reserved_dealer_id = None
+    order.reservation_start_date = None
+    order.reservation_expiry_date = None
+    order.reservation_expiry_alert_sent = False
     if order.stock_type == 'RENTAL':
         order.is_corporate_stock = True
     elif dealer.name.upper() == 'WME':
@@ -881,6 +936,92 @@ def assign_order_to_dealer(
     else:
         order.is_corporate_stock = False
         order.stock_type = None
+
+    db.commit()
+    db.refresh(order)
+    return order
+
+@app.patch("/api/orders/{order_id}/reserve", response_model=schemas.OrderOut)
+def reserve_inventory_order(
+    order_id: int,
+    payload: schemas.OrderReserveUpdate,
+    db: Session = Depends(get_db)
+):
+    auto_release_expired_order_reservations(db)
+    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="해당 재고 건을 찾을 수 없습니다.")
+
+    dealer = db.query(models.DealerCompany).filter(models.DealerCompany.id == payload.reserved_dealer_id).first()
+    if not dealer:
+        raise HTTPException(status_code=404, detail="유효하지 않은 예약 딜러입니다.")
+
+    order.stock_type = "RESERVED"
+    order.is_corporate_stock = True
+    order.reserved_dealer_id = dealer.id
+    order.reservation_start_date = payload.reservation_start_date
+    order.reservation_expiry_date = payload.reservation_expiry_date
+    order.reservation_expiry_alert_sent = False
+
+    db.commit()
+    db.refresh(order)
+    return order
+
+@app.patch("/api/orders/{order_id}/cancel-reservation", response_model=schemas.OrderOut)
+def cancel_inventory_reservation(
+    order_id: int,
+    db: Session = Depends(get_db)
+):
+    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="해당 재고 건을 찾을 수 없습니다.")
+    if order.stock_type != "RESERVED":
+        raise HTTPException(status_code=400, detail="예약(RESERVED) 상태인 장비만 예약을 취소할 수 있습니다.")
+
+    wme_dealer = db.query(models.DealerCompany).filter(models.DealerCompany.name.ilike("WME")).first()
+    order.stock_type = "AVAILABLE"
+    order.is_corporate_stock = True
+    order.reserved_dealer_id = None
+    order.reservation_start_date = None
+    order.reservation_expiry_date = None
+    order.reservation_expiry_alert_sent = False
+    if wme_dealer:
+        order.dealer_company_id = wme_dealer.id
+
+    db.commit()
+    db.refresh(order)
+    return order
+
+@app.patch("/api/orders/{order_id}/confirm-reservation-sale", response_model=schemas.OrderOut)
+def confirm_inventory_reservation_sale(
+    order_id: int,
+    payload: schemas.OrderReserveSoldUpdate,
+    db: Session = Depends(get_db)
+):
+    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="해당 재고 건을 찾을 수 없습니다.")
+    if order.stock_type != "RESERVED":
+        raise HTTPException(status_code=400, detail="예약(RESERVED) 상태인 장비만 판매완료(주문 전환) 처리할 수 있습니다.")
+
+    buyer = db.query(models.DealerCompany).filter(models.DealerCompany.id == payload.final_buyer_dealer_id).first()
+    if not buyer:
+        raise HTTPException(status_code=404, detail="유효하지 않은 구매 딜러입니다.")
+
+    order.dealer_company_id = buyer.id
+    if buyer.name.upper() == "WME":
+        order.is_corporate_stock = True
+        order.stock_type = "AVAILABLE"
+    else:
+        order.is_corporate_stock = False
+        order.stock_type = None
+        if not order.dealer_order_date:
+            order.dealer_order_date = datetime.utcnow()
+
+    order.reserved_dealer_id = None
+    order.reservation_start_date = None
+    order.reservation_expiry_date = None
+    order.reservation_expiry_alert_sent = False
 
     db.commit()
     db.refresh(order)

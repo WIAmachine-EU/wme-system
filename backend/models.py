@@ -38,7 +38,8 @@ class DealerCompany(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     users = relationship("CustomUser", back_populates="dealer_company")
-    orders = relationship("Order", back_populates="dealer_company")
+    orders = relationship("Order", foreign_keys="[Order.dealer_company_id]", back_populates="dealer_company")
+    reserved_orders = relationship("Order", foreign_keys="[Order.reserved_dealer_id]", back_populates="reserved_dealer")
     reserved_promotions = relationship("PromotionInventory", foreign_keys="[PromotionInventory.reserved_dealer_id]", back_populates="reserved_dealer")
     final_buyer_promotions = relationship("PromotionInventory", foreign_keys="[PromotionInventory.final_buyer_dealer_id]", back_populates="final_buyer_dealer")
 
@@ -193,11 +194,18 @@ class Order(Base):
     rental_expiry_date = Column(DateTime, nullable=True)
     last_delivery_alert_month = Column(String, nullable=True)
     rental_alert_sent = Column(Boolean, default=False, nullable=False)
+
+    # 가용재고 예약(Reservation) 정보
+    reserved_dealer_id = Column(Integer, ForeignKey("dealer_companies.id"), nullable=True)
+    reservation_start_date = Column(DateTime, nullable=True)
+    reservation_expiry_date = Column(DateTime, nullable=True)
+    reservation_expiry_alert_sent = Column(Boolean, default=False, nullable=False)
     
     created_at = Column(DateTime, default=datetime.utcnow)
 
     product_model = relationship("ProductModel", back_populates="orders")
-    dealer_company = relationship("DealerCompany", back_populates="orders")
+    dealer_company = relationship("DealerCompany", foreign_keys=[dealer_company_id], back_populates="orders")
+    reserved_dealer = relationship("DealerCompany", foreign_keys=[reserved_dealer_id], back_populates="reserved_orders")
     rsm_user = relationship("CustomUser", back_populates="rsm_orders")
     shipment = relationship("Shipment", back_populates="orders")
     

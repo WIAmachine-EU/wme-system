@@ -281,6 +281,45 @@ def check_rental_expiry_alerts(db: Session, now: datetime):
             db.commit()
             logger.info(f"[알림 발송] 임대 발주 {order.reference_no} 만료 7일 전(D-7) 사전 공지 발송 완료.")
 
+def check_order_reservation_expiry_alerts(db: Session, now: datetime):
+    """
+    6-1. 가용재고(WIA 재고리스트) 예약 만료: 만료일 하루 전(D-1) 관리자와 예약 딜러에게 사전 알림 발송
+    """
+    config = db.query(models.EmailNotificationConfig).filter_by(stage="PROMOTION_EXPIRY_ALERT").first()
+    if not config or not config.is_active:
+        return
+
+    reserved_orders = db.query(models.Order).filter(
+        models.Order.stock_type == "RESERVED",
+        models.Order.reservation_expiry_date.isnot(None)
+    ).all()
+
+    for order in reserved_orders:
+        if order.reservation_expiry_alert_sent:
+            continue
+
+        expiry_eod = order.reservation_expiry_date.replace(hour=23, minute=59, second=59)
+        delta = expiry_eod - now
+        if 0 < delta.total_seconds() <= 86400:
+            model_name = order.product_model.model_name if order.product_model else "-"
+            dealer_name = order.reserved_dealer.name if order.reserved_dealer else "미지정"
+            expiry_str = order.reservation_expiry_date.strftime('%Y-%m-%d')
+
+            to_email = "jypark@hyundai-wia.de; freelogin3975@gmail.com"
+            if order.reserved_dealer_id:
+                dealers = db.query(models.CustomUser).filter(
+                    models.CustomUser.dealer_company_id == order.reserved_dealer_id,
+                    models.CustomUser.role == models.UserRole.DEALER
+                ).all()
+                dealer_emails = [d.email for d in dealers if d.email and "@example.com" not in d.email]
+                if dealer_emails:
+                    to_email = f"{to_email}; {'; '.join(dealer_emails)}"
+
+            send_promotion_expiry_alert(to_email, order.reference_no, model_name, dealer_name, expiry_str)
+            order.reservation_expiry_alert_sent = True
+            db.commit()
+            logger.info(f"[알림 발송] 가용재고 {order.reference_no} 예약 만료 1일 전(D-1) 사전 알림 발송 완료 ({to_email})")
+
 def process_expired_promotion_reservations():
     """
     Periodic job to:
@@ -311,11 +350,38 @@ def process_expired_promotion_reservations():
             db.commit()
             logger.info(f"Successfully auto-released {len(expired_promotions)} expired promotion reservation(s).")
 
+        # 1-1. 만료된 가용재고(WIA 재고리스트) 예약 자동 해제 (Roll-back)
+        reserved_orders = db.query(models.Order).filter(
+            models.Order.stock_type == "RESERVED",
+            models.Order.reservation_expiry_date.isnot(None)
+        ).all()
+        if reserved_orders:
+            wme_dealer = db.query(models.DealerCompany).filter(models.DealerCompany.name.ilike("WME")).first()
+            released_count = 0
+            for order in reserved_orders:
+                expiry_eod = order.reservation_expiry_date.replace(hour=23, minute=59, second=59)
+                if expiry_eod <= now:
+                    dealer_name = order.reserved_dealer.name if order.reserved_dealer else "Unknown"
+                    logger.info(f"[가용재고 예약 자동 해제] 발주 {order.reference_no} (예약 딜러: {dealer_name}) 만료일({order.reservation_expiry_date}) 도래 -> AVAILABLE 복구")
+                    order.stock_type = "AVAILABLE"
+                    order.is_corporate_stock = True
+                    order.reserved_dealer_id = None
+                    order.reservation_start_date = None
+                    order.reservation_expiry_date = None
+                    order.reservation_expiry_alert_sent = False
+                    if wme_dealer:
+                        order.dealer_company_id = wme_dealer.id
+                    released_count += 1
+            if released_count > 0:
+                db.commit()
+                logger.info(f"Successfully auto-released {released_count} expired inventory reservation(s).")
+
         # 2. 5번 배송요청일 D-Day 월 마지막 주차 알림
         check_delivery_due_alerts(db, now)
 
         # 3. 6번 프로모션 예약 만료 1일 전(D-1) 사전 알림
         check_promotion_expiry_alerts(db, now)
+        check_order_reservation_expiry_alerts(db, now)
 
         # 4. 7번 임대(Rental) 만료 7일 전(D-7) 사전 공지 알림
         check_rental_expiry_alerts(db, now)

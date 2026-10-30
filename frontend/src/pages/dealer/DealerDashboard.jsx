@@ -68,6 +68,7 @@ export default function DealerDashboard({ isMobileView, setActiveTab }) {
   }, []);
 
   const availableCount = corpStock.filter(o => (o.stock_type || 'AVAILABLE') === 'AVAILABLE').length;
+  const reservedCount = corpStock.filter(o => String(o.stock_type || '').trim().toUpperCase() === 'RESERVED').length;
   const rentalCount = corpStock.filter(o => (o.stock_type || 'AVAILABLE') === 'RENTAL').length;
   const showroomCount = corpStock.filter(o => (o.stock_type || 'AVAILABLE') === 'SHOWROOM').length;
   const promotionCount = corpStock.filter(o => (o.stock_type || 'AVAILABLE') === 'PROMOTION').length;
@@ -153,6 +154,10 @@ export default function DealerDashboard({ isMobileView, setActiveTab }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>Available:</span>
                   <span style={{ fontWeight: 'bold', color: 'var(--status-stock)' }}>{availableCount}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Reserved:</span>
+                  <span style={{ fontWeight: 'bold', color: '#7c3aed' }}>{reservedCount}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>Rental:</span>

@@ -128,6 +128,7 @@
     "filter_all": "전체 상태 조회",
     "stat_all": "전체",
     "type_available": "판매가능",
+    "type_reserved": "예약",
     "type_dealer_order": "딜러주문",
     "type_rental": "임대",
     "type_showroom": "전시",
@@ -147,7 +148,19 @@
     "detail_rental_dealer": "임대 딜러",
     "detail_rental_period": "임대 기간",
     "btn_edit_rental_period": "기간수정",
-    "btn_confirm_rental_period": "임대기간 확정"
+    "btn_confirm_rental_period": "임대기간 확정",
+    "btn_reservation_detail": "예약내역",
+    "btn_sold_complete": "판매완료",
+    "btn_cancel_reservation": "예약취소",
+    "label_expire": "만료",
+    "detail_reserved_dealer": "예약 딜러",
+    "detail_reservation_period": "예약 기간",
+    "btn_edit_reservation_period": "기간수정",
+    "btn_confirm_reservation_period": "예약기간 확정",
+    "modal_reserve_title": "예약 기간 설정",
+    "modal_reserve_edit_title": "예약 기간 수정",
+    "modal_reserve_detail_title": "예약 상세 내역",
+    "modal_reserve_sold_title": "예약 장비 판매완료 확정"
   },
   "menu3": {
     "page_title": "WIA 프로모션",

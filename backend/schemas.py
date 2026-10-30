@@ -196,6 +196,9 @@ class OrderBase(BaseModel):
     delivery_request_date: Optional[str] = None
     rental_start_date: Optional[datetime] = None
     rental_expiry_date: Optional[datetime] = None
+    reserved_dealer_id: Optional[int] = None
+    reservation_start_date: Optional[datetime] = None
+    reservation_expiry_date: Optional[datetime] = None
 
 class OrderCreate(BaseModel):
     reference_no: str
@@ -218,6 +221,9 @@ class OrderCreate(BaseModel):
     delivery_request_date: Optional[str] = None
     rental_start_date: Optional[datetime] = None
     rental_expiry_date: Optional[datetime] = None
+    reserved_dealer_id: Optional[int] = None
+    reservation_start_date: Optional[datetime] = None
+    reservation_expiry_date: Optional[datetime] = None
 
 class OrderOut(OrderBase):
     id: int
@@ -225,6 +231,7 @@ class OrderOut(OrderBase):
     created_at: datetime
     product_model: Optional[ProductModelOut] = None
     dealer_company: Optional[DealerCompanyOut] = None
+    reserved_dealer: Optional[DealerCompanyOut] = None
     rsm_user: Optional[CustomUserOut] = None
     shipment: Optional[ShipmentOut] = None
     model_config = ConfigDict(from_attributes=True)
@@ -253,6 +260,9 @@ class OrderUpdate(BaseModel):
     delivery_request_date: Optional[str] = None
     rental_start_date: Optional[datetime] = None
     rental_expiry_date: Optional[datetime] = None
+    reserved_dealer_id: Optional[int] = None
+    reservation_start_date: Optional[datetime] = None
+    reservation_expiry_date: Optional[datetime] = None
     etd: Optional[datetime] = None
     eta: Optional[datetime] = None
 
@@ -267,6 +277,14 @@ class OrderStatusUpdate(BaseModel):
 
 class OrderAssignDealerUpdate(BaseModel):
     dealer_company_id: int
+
+class OrderReserveUpdate(BaseModel):
+    reserved_dealer_id: int
+    reservation_start_date: datetime
+    reservation_expiry_date: datetime
+
+class OrderReserveSoldUpdate(BaseModel):
+    final_buyer_dealer_id: int
 
 # OrderStatusHistory Schemas
 class OrderStatusHistoryBase(BaseModel):

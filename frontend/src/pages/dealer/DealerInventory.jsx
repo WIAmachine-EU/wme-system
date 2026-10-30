@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Search, Package, CheckCircle2 } from 'lucide-react';
+import { Search, Package } from 'lucide-react';
+
+const KNOWN_STOCK_TYPES = ['AVAILABLE', 'RESERVED', 'DEALER_ORDER', 'RENTAL', 'SHOWROOM', 'PROMOTION'];
+
+const normalizeStockType = (rawType) => {
+  const normalized = String(rawType || 'AVAILABLE').trim().toUpperCase();
+  return normalized || 'AVAILABLE';
+};
 
 export default function DealerInventory({ isMobileView }) {
   const { t } = useTranslation();
@@ -33,8 +40,7 @@ export default function DealerInventory({ isMobileView }) {
       ]);
       const data = await ordersRes.json();
       if (Array.isArray(data)) {
-        // 딜러는 '일반 판매용(AVAILABLE)' 또는 임대/전시 목적의 재고를 볼 수 있음
-        // V7 요구사항: "SCM-ADMIN이 관리하는 유럽법인 가용 재고(Stock) 리스트를 딜러들이 열람. 검색창, 재고 스펙 확인."
+        // 딜러는 '일반 판매용(AVAILABLE)' 또는 예약/임대/전시/프로모션 목적의 가용 재고를 열람 가능
         setOrders(data);
       }
       setPortCodes(await portsRes.json());
@@ -48,6 +54,21 @@ export default function DealerInventory({ isMobileView }) {
   useEffect(() => {
     fetchInventory();
   }, []);
+
+  const formatExpiryDateMMM = (dateVal) => {
+    if (!dateVal) return '-';
+    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    const str = String(dateVal);
+    const match = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      const [, yyyy, mm, dd] = match;
+      const mIdx = parseInt(mm, 10) - 1;
+      if (mIdx >= 0 && mIdx < 12) return `${yyyy}.${months[mIdx]}.${dd}`;
+    }
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return '-';
+    return `${d.getFullYear()}.${months[d.getMonth()]}.${String(d.getDate()).padStart(2, '0')}`;
+  };
 
   const getStandardPort = (rawPort) => {
     if (!rawPort) return '-';
@@ -66,9 +87,9 @@ export default function DealerInventory({ isMobileView }) {
                          (o.nc && o.nc.toLowerCase().includes(query)) ||
                          (o.product_model && o.product_model.model_name && o.product_model.model_name.toLowerCase().includes(query)) ||
                          (o.serial_number && o.serial_number.toLowerCase().includes(query));
-    
+
     if (stockTypeFilter !== 'ALL') {
-      const sType = o.stock_type || 'AVAILABLE';
+      const sType = normalizeStockType(o.stock_type);
       if (sType !== stockTypeFilter) return false;
     }
 
@@ -120,8 +141,8 @@ export default function DealerInventory({ isMobileView }) {
         valB = getStandardPort(b.destination_port) || '';
         break;
       case 'stock_type':
-        valA = a.stock_type || 'AVAILABLE';
-        valB = b.stock_type || 'AVAILABLE';
+        valA = normalizeStockType(a.stock_type);
+        valB = normalizeStockType(b.stock_type);
         break;
       default:
         return 0;
@@ -169,6 +190,71 @@ export default function DealerInventory({ isMobileView }) {
     );
   };
 
+  const renderStatusBadge = (order, badgeWidth = '72px', align = 'center') => {
+    const sType = normalizeStockType(order.stock_type);
+
+    if (sType === 'AVAILABLE') {
+      return (
+        <span className="status-badge" style={{ background: 'hsla(142, 76%, 46%, 0.2)', color: 'var(--status-stock)', width: badgeWidth, margin: align === 'center' ? '0 auto' : undefined, justifyContent: 'center', fontSize: '11px' }}>
+          {t('menu2.type_available', '판매가능')}
+        </span>
+      );
+    }
+
+    if (sType === 'RESERVED') {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: align === 'end' ? 'flex-end' : 'center', gap: '2px' }}>
+          <span className="status-badge" style={{ background: 'hsla(262, 83%, 58%, 0.16)', color: '#7c3aed', width: badgeWidth, margin: align === 'center' ? '0 auto' : undefined, justifyContent: 'center', fontSize: '11px' }}>
+            {t('menu2.type_reserved', '예약')}
+          </span>
+          {order.reservation_expiry_date && (
+            <span style={{ fontSize: align === 'end' ? '10px' : '9.5px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+              {t('menu2.label_expire', '만료')}: {formatExpiryDateMMM(order.reservation_expiry_date)}
+            </span>
+          )}
+        </div>
+      );
+    }
+
+    if (sType === 'DEALER_ORDER') {
+      return (
+        <span className="status-badge" style={{ background: 'hsla(200, 76%, 46%, 0.2)', color: 'var(--accent-cyan)', width: badgeWidth, margin: align === 'center' ? '0 auto' : undefined, justifyContent: 'center', fontSize: '11px' }}>
+          {t('menu2.type_dealer_order', '딜러주문')}
+        </span>
+      );
+    }
+
+    if (sType === 'RENTAL') {
+      return (
+        <span className="status-badge" style={{ background: 'hsla(45, 93%, 58%, 0.2)', color: 'var(--status-production)', width: badgeWidth, margin: align === 'center' ? '0 auto' : undefined, justifyContent: 'center', fontSize: '11px' }}>
+          {t('menu2.type_rental', '임대')}
+        </span>
+      );
+    }
+
+    if (sType === 'SHOWROOM') {
+      return (
+        <span className="status-badge" style={{ background: 'hsla(280, 80%, 60%, 0.2)', color: 'var(--accent-purple)', width: badgeWidth, margin: align === 'center' ? '0 auto' : undefined, justifyContent: 'center', fontSize: '11px' }}>
+          {t('menu2.type_showroom', '전시')}
+        </span>
+      );
+    }
+
+    if (sType === 'PROMOTION') {
+      return (
+        <span className="status-badge" style={{ background: 'hsla(340, 82%, 52%, 0.2)', color: 'var(--accent-pink)', width: badgeWidth, margin: align === 'center' ? '0 auto' : undefined, justifyContent: 'center', fontSize: '11px' }}>
+          {t('menu2.type_promotion', '프로모션')}
+        </span>
+      );
+    }
+
+    return (
+      <span className="status-badge" style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)', width: badgeWidth, margin: align === 'center' ? '0 auto' : undefined, justifyContent: 'center', fontSize: '11px' }}>
+        {sType}
+      </span>
+    );
+  };
+
   return (
     <div className="page-body">
       <div style={{ marginBottom: '24px', paddingTop: '4px', paddingLeft: '28px' }}>
@@ -211,6 +297,7 @@ export default function DealerInventory({ isMobileView }) {
             >
               <option value="ALL">{t('menu2.filter_all', '전체 상태 조회')}</option>
               <option value="AVAILABLE">{t('menu2.type_available', '판매가능')}</option>
+              <option value="RESERVED">{t('menu2.type_reserved', '예약')}</option>
               <option value="DEALER_ORDER">{t('menu2.type_dealer_order', '딜러주문')}</option>
               <option value="RENTAL">{t('menu2.type_rental', '임대')}</option>
               <option value="SHOWROOM">{t('menu2.type_showroom', '전시')}</option>
@@ -258,9 +345,9 @@ export default function DealerInventory({ isMobileView }) {
             ) : sortedOrders.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dealer_dashboard.no_atp')}</div>
             ) : (
-              sortedOrders.map((order, index) => {
-                const sType = order.stock_type || 'AVAILABLE';
-                
+              sortedOrders.map((order) => {
+                const sType = normalizeStockType(order.stock_type);
+
                 return (
                   <div key={order.id} className="mobile-order-card" onClick={() => toggleRow(order.id)} style={{ cursor: 'pointer' }}>
                     <div className="mobile-order-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -280,18 +367,14 @@ export default function DealerInventory({ isMobileView }) {
                       <span>ETA: <strong style={{ color: 'var(--text-primary)' }}>{order.eta ? new Date(order.eta).toLocaleDateString() : '-'}</strong></span>
                       <span>PORT: <strong style={{ color: 'var(--text-primary)' }}>{getStandardPort(order.destination_port)}</strong></span>
                     </div>
-                    
+
                     <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.4, padding: '10px', background: 'var(--bg-secondary)', borderRadius: '8px' }}>
                       {order.detail_spec || 'T/F, CC(S-H)+B, 20BAR, B/I, P/C, Q(A)'}
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
                       <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>S/N: {order.serial_number || '-'}</span>
-                      {sType === 'AVAILABLE' && <span className="status-badge" style={{ background: 'hsla(142, 76%, 46%, 0.2)', color: 'var(--status-stock)', width: '80px', justifyContent: 'center', fontSize: '11px' }}>{t('menu2.type_available')}</span>}
-                      {sType === 'DEALER_ORDER' && <span className="status-badge" style={{ background: 'hsla(200, 76%, 46%, 0.2)', color: 'var(--accent-cyan)', width: '80px', justifyContent: 'center', fontSize: '11px' }}>{t('menu2.type_dealer_order')}</span>}
-                      {sType === 'RENTAL' && <span className="status-badge" style={{ background: 'hsla(45, 93%, 58%, 0.2)', color: 'var(--status-production)', width: '80px', justifyContent: 'center', fontSize: '11px' }}>{t('menu2.type_rental')}</span>}
-                      {sType === 'SHOWROOM' && <span className="status-badge" style={{ background: 'hsla(280, 80%, 60%, 0.2)', color: 'var(--accent-purple)', width: '80px', justifyContent: 'center', fontSize: '11px' }}>{t('menu2.type_showroom')}</span>}
-                      {sType === 'PROMOTION' && <span className="status-badge" style={{ background: 'hsla(340, 82%, 52%, 0.2)', color: 'var(--accent-pink)', width: '80px', justifyContent: 'center', fontSize: '11px' }}>{t('menu2.type_promotion')}</span>}
+                      {renderStatusBadge(order, '80px', 'end')}
                     </div>
 
                     {expandedRows.has(order.id) && (
@@ -304,6 +387,9 @@ export default function DealerInventory({ isMobileView }) {
                         <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>{t('menu2.detail_port', 'PORT')}:</strong> <span>{getStandardPort(order.destination_port)}</span></div>
                         <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>{t('menu2.detail_incoterms', 'INCOTERMS')}:</strong> <span>{order.incoterms || '-'}</span></div>
                         <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>{t('menu2.detail_vessel', 'VESSEL')}:</strong> <span>{order.vessel || '-'}</span></div>
+                        {sType === 'RESERVED' && order.reservation_expiry_date && (
+                          <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>{t('menu2.label_expire', '만료')}:</strong> <span style={{ color: '#7c3aed', fontWeight: 600 }}>{formatExpiryDateMMM(order.reservation_expiry_date)}</span></div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -313,10 +399,10 @@ export default function DealerInventory({ isMobileView }) {
           </div>
         ) : (
           <div className="data-table-container full-bleed">
-          <table className="data-table">
+            <table className="data-table">
               <thead>
                 <tr>
-                  <th 
+                  <th
                     style={{ width: '5%', textAlign: 'center', fontWeight: 'bold', cursor: 'pointer', userSelect: 'none' }}
                     onClick={() => setSortConfig({ key: null, direction: 'asc' })}
                     title="기본 순서로 리셋"
@@ -332,93 +418,92 @@ export default function DealerInventory({ isMobileView }) {
                   {renderSortHeader('stock_type', t('menu2.header_status', '상태'), '15%', 'center')}
                 </tr>
               </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('navbar.init_seed_loading')}</td></tr>
-              ) : sortedOrders.length === 0 ? (
-                <tr><td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dealer_dashboard.no_atp')}</td></tr>
-              ) : (
-                sortedOrders.map((order, index) => {
-                  const sType = order.stock_type || 'AVAILABLE';
-                  return (
-                    <React.Fragment key={order.id}>
-                      <tr 
-                        onClick={() => toggleRow(order.id)} 
-                        style={{ cursor: 'pointer', transition: 'background-color 0.2s' }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-secondary)'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                      >
-                        <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
-                          <div style={{ fontWeight: 500, fontSize: '12px' }}>{index + 1}</div>
-                        </td>
-                        <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
-                          <div style={{ fontWeight: 600, fontSize: '12px' }}>{order.product_model ? order.product_model.model_name : 'Unknown Model'}</div>
-                        </td>
-                        <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
-                          <div style={{ fontSize: '10px' }}>{order.nc || 'F0iP'}</div>
-                        </td>
-                        <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
-                          <div style={{ fontWeight: 700, color: 'var(--accent-cyan)', fontSize: '12px' }}>{order.reference_no}</div>
-                        </td>
-                        <td style={{ textAlign: 'left', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
-                          <div style={{ fontSize: '10px' }}>{order.detail_spec || 'T/F, CC(S-H)+B, 20BAR, B/I, P/C, Q(A)'}</div>
-                        </td>
-                        <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
-                          <div style={{ fontSize: '10px' }}>{order.eta ? new Date(order.eta).toLocaleDateString() : '-'}</div>
-                        </td>
-                        <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
-                          <div style={{ fontSize: '10px' }}>{getStandardPort(order.destination_port)}</div>
-                        </td>
-                        <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
-                          {sType === 'AVAILABLE' && <span className="status-badge" style={{ background: 'hsla(142, 76%, 46%, 0.2)', color: 'var(--status-stock)', width: '72px', margin: '0 auto', justifyContent: 'center', fontSize: '11px' }}>{t('menu2.type_available')}</span>}
-                          {sType === 'DEALER_ORDER' && <span className="status-badge" style={{ background: 'hsla(200, 76%, 46%, 0.2)', color: 'var(--accent-cyan)', width: '72px', margin: '0 auto', justifyContent: 'center', fontSize: '11px' }}>{t('menu2.type_dealer_order')}</span>}
-                          {sType === 'RENTAL' && <span className="status-badge" style={{ background: 'hsla(45, 93%, 58%, 0.2)', color: 'var(--status-production)', width: '72px', margin: '0 auto', justifyContent: 'center', fontSize: '11px' }}>{t('menu2.type_rental')}</span>}
-                          {sType === 'SHOWROOM' && <span className="status-badge" style={{ background: 'hsla(280, 80%, 60%, 0.2)', color: 'var(--accent-purple)', width: '72px', margin: '0 auto', justifyContent: 'center', fontSize: '11px' }}>{t('menu2.type_showroom')}</span>}
-                          {sType === 'PROMOTION' && <span className="status-badge" style={{ background: 'hsla(340, 82%, 52%, 0.2)', color: 'var(--accent-pink)', width: '72px', margin: '0 auto', justifyContent: 'center', fontSize: '11px' }}>{t('menu2.type_promotion')}</span>}
-                        </td>
-                      </tr>
-                      {expandedRows.has(order.id) && (
-                        <tr>
-                          <td colSpan={8} style={{ backgroundColor: 'var(--bg-card)', paddingTop: '12px', borderTop: '1px dashed var(--border-color)', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', paddingLeft: '8px' }}>
-                              <div style={{
-                                fontSize: '12px',
-                                color: 'var(--text-secondary)',
-                                lineHeight: '1.8',
-                                textAlign: 'left',
-                                paddingLeft: '16px',
-                                borderLeft: '3px solid var(--wia-blue)',
-                              }}>
-                                <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu2.detail_status', '진행상태')}:</span> {order.current_status ? t(`stepbar.${order.current_status.toLowerCase()}`, order.current_status) : '-'}</div>
-                                <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu2.detail_sn', 'S/N')}:</span> {order.serial_number || '-'}</div>
-                                <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu2.detail_so', 'S/O')}:</span> {order.so_no || '-'}</div>
-                                <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu2.detail_remark', 'REMARK')}:</span> {order.remark || '-'}</div>
-                              </div>
-
-                              <div style={{
-                                fontSize: '12px',
-                                color: 'var(--text-secondary)',
-                                lineHeight: '1.8',
-                                textAlign: 'left',
-                                paddingLeft: '16px',
-                                borderLeft: '3px solid var(--wia-blue)',
-                              }}>
-                                <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu2.detail_etd_eta', 'ETD / ETA')}:</span> {order.etd ? new Date(order.etd).toLocaleDateString() : '-'} / {order.eta ? new Date(order.eta).toLocaleDateString() : '-'}</div>
-                                <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu2.detail_port', 'PORT')}:</span> {getStandardPort(order.destination_port)}</div>
-                                <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu2.detail_incoterms', 'INCOTERMS')}:</span> {order.incoterms || '-'}</div>
-                                <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu2.detail_vessel', 'VESSEL')}:</span> {order.vessel || '-'}</div>
-                              </div>
-                            </div>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('navbar.init_seed_loading')}</td></tr>
+                ) : sortedOrders.length === 0 ? (
+                  <tr><td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dealer_dashboard.no_atp')}</td></tr>
+                ) : (
+                  sortedOrders.map((order, index) => {
+                    const sType = normalizeStockType(order.stock_type);
+                    return (
+                      <React.Fragment key={order.id}>
+                        <tr
+                          onClick={() => toggleRow(order.id)}
+                          style={{ cursor: 'pointer', transition: 'background-color 0.2s' }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-secondary)'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
+                            <div style={{ fontWeight: 500, fontSize: '12px' }}>{index + 1}</div>
+                          </td>
+                          <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
+                            <div style={{ fontWeight: 600, fontSize: '12px' }}>{order.product_model ? order.product_model.model_name : 'Unknown Model'}</div>
+                          </td>
+                          <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
+                            <div style={{ fontSize: '10px' }}>{order.nc || 'F0iP'}</div>
+                          </td>
+                          <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
+                            <div style={{ fontWeight: 700, color: 'var(--accent-cyan)', fontSize: '12px' }}>{order.reference_no}</div>
+                          </td>
+                          <td style={{ textAlign: 'left', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
+                            <div style={{ fontSize: '10px' }}>{order.detail_spec || 'T/F, CC(S-H)+B, 20BAR, B/I, P/C, Q(A)'}</div>
+                          </td>
+                          <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
+                            <div style={{ fontSize: '10px' }}>{order.eta ? new Date(order.eta).toLocaleDateString() : '-'}</div>
+                          </td>
+                          <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
+                            <div style={{ fontSize: '10px' }}>{getStandardPort(order.destination_port)}</div>
+                          </td>
+                          <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
+                            {renderStatusBadge(order, '72px', 'center')}
                           </td>
                         </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                        {expandedRows.has(order.id) && (
+                          <tr>
+                            <td colSpan={8} style={{ backgroundColor: 'var(--bg-card)', paddingTop: '12px', borderTop: '1px dashed var(--border-color)', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', paddingLeft: '8px' }}>
+                                <div style={{
+                                  fontSize: '12px',
+                                  color: 'var(--text-secondary)',
+                                  lineHeight: '1.8',
+                                  textAlign: 'left',
+                                  paddingLeft: '16px',
+                                  borderLeft: '3px solid var(--wia-blue)',
+                                }}>
+                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu2.detail_status', '진행상태')}:</span> {order.current_status ? t(`stepbar.${order.current_status.toLowerCase()}`, order.current_status) : '-'}</div>
+                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu2.detail_sn', 'S/N')}:</span> {order.serial_number || '-'}</div>
+                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu2.detail_so', 'S/O')}:</span> {order.so_no || '-'}</div>
+                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu2.detail_remark', 'REMARK')}:</span> {order.remark || '-'}</div>
+                                  {sType === 'RESERVED' && order.reservation_expiry_date && (
+                                    <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu2.label_expire', '만료')}:</span> <span style={{ color: '#7c3aed', fontWeight: 600 }}>{formatExpiryDateMMM(order.reservation_expiry_date)}</span></div>
+                                  )}
+                                </div>
+
+                                <div style={{
+                                  fontSize: '12px',
+                                  color: 'var(--text-secondary)',
+                                  lineHeight: '1.8',
+                                  textAlign: 'left',
+                                  paddingLeft: '16px',
+                                  borderLeft: '3px solid var(--wia-blue)',
+                                }}>
+                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu2.detail_etd_eta', 'ETD / ETA')}:</span> {order.etd ? new Date(order.etd).toLocaleDateString() : '-'} / {order.eta ? new Date(order.eta).toLocaleDateString() : '-'}</div>
+                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu2.detail_port', 'PORT')}:</span> {getStandardPort(order.destination_port)}</div>
+                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu2.detail_incoterms', 'INCOTERMS')}:</span> {order.incoterms || '-'}</div>
+                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu2.detail_vessel', 'VESSEL')}:</span> {order.vessel || '-'}</div>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
       <style>{`

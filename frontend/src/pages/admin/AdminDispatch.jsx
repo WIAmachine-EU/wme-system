@@ -145,6 +145,13 @@ export default function AdminDispatch({ isMobileView }) {
           bg: 'hsla(142, 76%, 46%, 0.15)',
           border: 'hsla(142, 76%, 46%, 0.3)'
         };
+      case 'RESERVED':
+        return {
+          label: t('menu2.type_reserved', '예약'),
+          color: '#7c3aed',
+          bg: 'hsla(262, 83%, 58%, 0.15)',
+          border: 'hsla(262, 83%, 58%, 0.3)'
+        };
       case 'RENTAL':
         return {
           label: t('menu2.type_rental', '임대'),
@@ -592,6 +599,7 @@ export default function AdminDispatch({ isMobileView }) {
             >
               <option value="ALL">{t('dispatch.filter_stock_type_all', '전체 상태')}</option>
               <option value="AVAILABLE">{t('menu2.type_available', '판매가능')}</option>
+              <option value="RESERVED">{t('menu2.type_reserved', '예약')}</option>
               <option value="RENTAL">{t('menu2.type_rental', '임대')}</option>
               <option value="SHOWROOM">{t('menu2.type_showroom', '전시')}</option>
               <option value="PROMOTION">{t('menu2.type_promotion', '프로모션')}</option>
@@ -1204,6 +1212,7 @@ export default function AdminDispatch({ isMobileView }) {
                       style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
                     >
                       <option value="AVAILABLE">{t('menu2.type_available', '판매가능')}</option>
+                      <option value="RESERVED">{t('menu2.type_reserved', '예약')}</option>
                       <option value="RENTAL">{t('menu2.type_rental', '임대')}</option>
                       <option value="SHOWROOM">{t('menu2.type_showroom', '전시')}</option>
                       <option value="PROMOTION">{t('menu2.type_promotion', '프로모션')}</option>

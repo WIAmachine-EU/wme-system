@@ -50,6 +50,17 @@ if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
             except sqlite3.OperationalError:
                 pass # Column exists
 
+            for col_name, col_type in [
+                ("reserved_dealer_id", "INTEGER"),
+                ("reservation_start_date", "DATETIME"),
+                ("reservation_expiry_date", "DATETIME"),
+                ("reservation_expiry_alert_sent", "BOOLEAN DEFAULT 0"),
+            ]:
+                try:
+                    c.execute(f"ALTER TABLE orders ADD COLUMN {col_name} {col_type}")
+                except sqlite3.OperationalError:
+                    pass
+
             # [v3.0] shipments 테이블 해상 AIS 경로 및 선박 제원 컬럼 신설
             for col_name, col_type in [
                 ("vessel_name", "VARCHAR"),

@@ -128,6 +128,7 @@
     "filter_all": "All type",
     "stat_all": "All",
     "type_available": "Available",
+    "type_reserved": "Reserved",
     "type_dealer_order": "Order",
     "type_rental": "Rental",
     "type_showroom": "Showroom",
@@ -147,7 +148,19 @@
     "detail_rental_dealer": "Rental to",
     "detail_rental_period": "Rental Period",
     "btn_edit_rental_period": "Edit Period",
-    "btn_confirm_rental_period": "Confirm Rental Period"
+    "btn_confirm_rental_period": "Confirm Rental Period",
+    "btn_reservation_detail": "Details",
+    "btn_sold_complete": "Sold",
+    "btn_cancel_reservation": "Cancel Reservation",
+    "label_expire": "Expire",
+    "detail_reserved_dealer": "Reserved to",
+    "detail_reservation_period": "Reservation Period",
+    "btn_edit_reservation_period": "Edit Period",
+    "btn_confirm_reservation_period": "Confirm Reservation",
+    "modal_reserve_title": "Set Reservation Period",
+    "modal_reserve_edit_title": "Edit Reservation Period",
+    "modal_reserve_detail_title": "Reservation Details",
+    "modal_reserve_sold_title": "Confirm Sale of Reserved Stock"
   },
   "menu3": {
     "page_title": "WIA Promotion",
