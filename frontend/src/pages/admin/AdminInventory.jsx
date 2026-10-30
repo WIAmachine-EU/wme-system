@@ -1113,7 +1113,7 @@ export default function AdminInventory({ isMobileView }) {
                               onChange={(e) => handlePendingChange(order.id, 'stockType', e.target.value)}
                               style={{
                                 background: typeBgColor, border: `1px solid ${typeBgColor}`, color: typeColor,
-                                padding: '4px 8px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', width: '85px',
+                                padding: '4px 8px', borderRadius: '6px', fontSize: '10px', cursor: 'pointer', width: '90px',
                                 fontWeight: 600, textAlign: 'center'
                               }}
                             >

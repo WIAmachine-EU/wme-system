@@ -70,6 +70,15 @@ export default function DealerInventory({ isMobileView }) {
     return `${d.getFullYear()}.${months[d.getMonth()]}.${String(d.getDate()).padStart(2, '0')}`;
   };
 
+  const formatReservationPeriod = (startDate, endDate) => {
+    if (!startDate && !endDate) return '-';
+    const startStr = startDate ? formatExpiryDateMMM(startDate) : '';
+    const endStr = endDate ? formatExpiryDateMMM(endDate) : '';
+    if (startStr && endStr) return `${startStr} ~ ${endStr}`;
+    if (endStr) return `~ ${endStr}`;
+    return `${startStr} ~`;
+  };
+
   const getStandardPort = (rawPort) => {
     if (!rawPort) return '-';
     if (!portCodes || portCodes.length === 0) return rawPort;
@@ -387,8 +396,13 @@ export default function DealerInventory({ isMobileView }) {
                         <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>{t('menu2.detail_port', 'PORT')}:</strong> <span>{getStandardPort(order.destination_port)}</span></div>
                         <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>{t('menu2.detail_incoterms', 'INCOTERMS')}:</strong> <span>{order.incoterms || '-'}</span></div>
                         <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>{t('menu2.detail_vessel', 'VESSEL')}:</strong> <span>{order.vessel || '-'}</span></div>
-                        {sType === 'RESERVED' && order.reservation_expiry_date && (
-                          <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>{t('menu2.label_expire', '만료')}:</strong> <span style={{ color: '#7c3aed', fontWeight: 600 }}>{formatExpiryDateMMM(order.reservation_expiry_date)}</span></div>
+                        {sType === 'RESERVED' && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <strong style={{ color: 'var(--text-primary)', width: '90px' }}>{t('menu2.detail_reservation_period', '예약 기간')}:</strong>
+                            <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
+                              {formatReservationPeriod(order.reservation_start_date, order.reservation_expiry_date)}
+                            </span>
+                          </div>
                         )}
                       </div>
                     )}
@@ -462,7 +476,7 @@ export default function DealerInventory({ isMobileView }) {
                         {expandedRows.has(order.id) && (
                           <tr>
                             <td colSpan={8} style={{ backgroundColor: 'var(--bg-card)', paddingTop: '12px', borderTop: '1px dashed var(--border-color)', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', paddingLeft: '8px' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '24px', paddingLeft: '8px' }}>
                                 <div style={{
                                   fontSize: '12px',
                                   color: 'var(--text-secondary)',
@@ -475,9 +489,6 @@ export default function DealerInventory({ isMobileView }) {
                                   <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu2.detail_sn', 'S/N')}:</span> {order.serial_number || '-'}</div>
                                   <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu2.detail_so', 'S/O')}:</span> {order.so_no || '-'}</div>
                                   <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu2.detail_remark', 'REMARK')}:</span> {order.remark || '-'}</div>
-                                  {sType === 'RESERVED' && order.reservation_expiry_date && (
-                                    <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu2.label_expire', '만료')}:</span> <span style={{ color: '#7c3aed', fontWeight: 600 }}>{formatExpiryDateMMM(order.reservation_expiry_date)}</span></div>
-                                  )}
                                 </div>
 
                                 <div style={{
@@ -492,6 +503,23 @@ export default function DealerInventory({ isMobileView }) {
                                   <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu2.detail_port', 'PORT')}:</span> {getStandardPort(order.destination_port)}</div>
                                   <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu2.detail_incoterms', 'INCOTERMS')}:</span> {order.incoterms || '-'}</div>
                                   <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu2.detail_vessel', 'VESSEL')}:</span> {order.vessel || '-'}</div>
+                                </div>
+
+                                <div style={{
+                                  fontSize: '12px',
+                                  color: 'var(--text-secondary)',
+                                  lineHeight: '1.8',
+                                  textAlign: 'left',
+                                  paddingLeft: '16px',
+                                }}>
+                                  {sType === 'RESERVED' && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                      <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{t('menu2.detail_reservation_period', '예약 기간')}: </span>
+                                      <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
+                                        {formatReservationPeriod(order.reservation_start_date, order.reservation_expiry_date)}
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </td>
