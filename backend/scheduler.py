@@ -220,6 +220,8 @@ def check_promotion_expiry_alerts(db: Session, now: datetime):
     for promo in reserved_promos:
         if promo.expiry_alert_sent:
             continue
+        if promo.order and promo.order.stock_type == "RESERVED":
+            continue
         
         delta = promo.reservation_expiry - now
         # 만료 24시간 이내(D-1) 도래 확인
@@ -339,7 +341,10 @@ def process_expired_promotion_reservations():
         ).all()
         
         if expired_promotions:
+            promo_released = 0
             for promo in expired_promotions:
+                if promo.order and promo.order.stock_type == "RESERVED":
+                    continue
                 order_ref = promo.order.reference_no if promo.order else f"ID {promo.order_id}"
                 dealer_name = promo.reserved_dealer.name if promo.reserved_dealer else "Unknown"
                 logger.info(f"[프로모션 예약 자동 해제] 발주 {order_ref} (예약 딜러: {dealer_name}) 만료일({promo.reservation_expiry}) 도래 -> AVAILABLE 복구")
@@ -347,8 +352,10 @@ def process_expired_promotion_reservations():
                 promo.reserved_dealer_id = None
                 promo.reservation_expiry = None
                 promo.expiry_alert_sent = False
-            db.commit()
-            logger.info(f"Successfully auto-released {len(expired_promotions)} expired promotion reservation(s).")
+                promo_released += 1
+            if promo_released > 0:
+                db.commit()
+                logger.info(f"Successfully auto-released {promo_released} expired promotion reservation(s).")
 
         # 1-1. 만료된 가용재고(WIA 재고리스트) 예약 자동 해제 (Roll-back)
         reserved_orders = db.query(models.Order).filter(
@@ -362,13 +369,20 @@ def process_expired_promotion_reservations():
                 expiry_eod = order.reservation_expiry_date.replace(hour=23, minute=59, second=59)
                 if expiry_eod <= now:
                     dealer_name = order.reserved_dealer.name if order.reserved_dealer else "Unknown"
-                    logger.info(f"[가용재고 예약 자동 해제] 발주 {order.reference_no} (예약 딜러: {dealer_name}) 만료일({order.reservation_expiry_date}) 도래 -> AVAILABLE 복구")
-                    order.stock_type = "AVAILABLE"
+                    existing_promo = db.query(models.PromotionInventory).filter(models.PromotionInventory.order_id == order.id).first()
+                    restored_type = "PROMOTION" if existing_promo else "AVAILABLE"
+                    logger.info(f"[가용재고 예약 자동 해제] 발주 {order.reference_no} (예약 딜러: {dealer_name}) 만료일({order.reservation_expiry_date}) 도래 -> {restored_type} 복구")
+                    order.stock_type = restored_type
                     order.is_corporate_stock = True
                     order.reserved_dealer_id = None
                     order.reservation_start_date = None
                     order.reservation_expiry_date = None
                     order.reservation_expiry_alert_sent = False
+                    if existing_promo:
+                        existing_promo.status = models.PromotionStatus.AVAILABLE
+                        existing_promo.reserved_dealer_id = None
+                        existing_promo.reservation_expiry = None
+                        existing_promo.expiry_alert_sent = False
                     if wme_dealer:
                         order.dealer_company_id = wme_dealer.id
                     released_count += 1

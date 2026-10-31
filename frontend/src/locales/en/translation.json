@@ -176,6 +176,8 @@
     "header_detailspec": "DETAIL SPEC",
     "header_eta": "ETA",
     "header_promotion_status": "STATUS",
+    "header_progress": "STATUS",
+    "header_stock_status": "TYPE",
     "status_available": "Available",
     "status_reserved": "Reservation",
     "status_sold": "Sold",
@@ -323,6 +325,7 @@
     "no_promo": "No active promotions at the moment.",
     "btn_inquiry": "Reserve & Order",
     "no_apply": "Unavailable",
+    "header_reservation": "RESERVATION",
     "header_request": "REQUEST",
     "alert_msg": "Your reservation/purchase request for [{{modelName}}] has been sent to the EU Sales Team. A representative will contact you shortly."
   },

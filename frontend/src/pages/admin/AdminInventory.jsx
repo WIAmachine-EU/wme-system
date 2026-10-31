@@ -517,7 +517,7 @@ export default function AdminInventory({ isMobileView }) {
   // 상세 내역 팝업 내 [예약취소] 클릭
   const handleCancelReservation = async (order) => {
     if (!order) return;
-    if (!window.confirm("정말로 예약을 취소하시겠습니까?\n예약 취소 시 해당 장비는 다시 '판매가능(AVAILABLE)' 상태로 복귀합니다.")) {
+    if (!window.confirm("정말로 예약을 취소하시겠습니까?\n예약 취소 시 프로모션 등록 장비는 '프로모션'으로, 일반 재고는 '판매가능' 상태로 복귀합니다.")) {
       return;
     }
 
@@ -527,7 +527,12 @@ export default function AdminInventory({ isMobileView }) {
         method: 'PATCH'
       });
       if (res.ok) {
-        alert("예약이 취소되어 판매가능 상태로 복귀되었습니다.");
+        const updatedOrder = await res.json();
+        alert(
+          updatedOrder.stock_type === 'PROMOTION'
+            ? "예약이 취소되어 프로모션 상태로 복귀되었습니다."
+            : "예약이 취소되어 판매가능 상태로 복귀되었습니다."
+        );
         setReserveDetailModalOpen(false);
         setReserveDetailOrder(null);
         setPendingChanges(prev => {

@@ -614,13 +614,20 @@ def auto_release_expired_order_reservations(db: Session):
         expiry_eod = o.reservation_expiry_date.replace(hour=23, minute=59, second=59)
         if expiry_eod <= now:
             dealer_name = o.reserved_dealer.name if o.reserved_dealer else "Unknown"
-            logger.info(f"[가용재고 예약 자동 해제] 발주 {o.reference_no} (딜러: {dealer_name}) 만료일({o.reservation_expiry_date}) 경과 -> AVAILABLE 자동 복구")
-            o.stock_type = "AVAILABLE"
+            existing_promo = db.query(models.PromotionInventory).filter(models.PromotionInventory.order_id == o.id).first()
+            restored_type = "PROMOTION" if existing_promo else "AVAILABLE"
+            logger.info(f"[가용재고 예약 자동 해제] 발주 {o.reference_no} (딜러: {dealer_name}) 만료일({o.reservation_expiry_date}) 경과 -> {restored_type} 자동 복구")
+            o.stock_type = restored_type
             o.is_corporate_stock = True
             o.reserved_dealer_id = None
             o.reservation_start_date = None
             o.reservation_expiry_date = None
             o.reservation_expiry_alert_sent = False
+            if existing_promo:
+                existing_promo.status = models.PromotionStatus.AVAILABLE
+                existing_promo.reserved_dealer_id = None
+                existing_promo.reservation_expiry = None
+                existing_promo.expiry_alert_sent = False
             if wme_dealer:
                 o.dealer_company_id = wme_dealer.id
             released += 1
@@ -740,11 +747,20 @@ def update_order_info(
         elif payload.stock_type == "DEALER_ORDER":
             order.is_corporate_stock = False
 
+        existing_promo = db.query(models.PromotionInventory).filter(models.PromotionInventory.order_id == order.id).first()
         if payload.stock_type == "PROMOTION":
-            existing_promo = db.query(models.PromotionInventory).filter(models.PromotionInventory.order_id == order.id).first()
             if not existing_promo:
                 new_promo = models.PromotionInventory(order_id=order.id, status=models.PromotionStatus.AVAILABLE)
                 db.add(new_promo)
+            else:
+                existing_promo.status = models.PromotionStatus.AVAILABLE
+                existing_promo.reserved_dealer_id = None
+                existing_promo.reservation_expiry = None
+                existing_promo.final_buyer_dealer_id = None
+                existing_promo.expiry_alert_sent = False
+        elif payload.stock_type != "RESERVED":
+            if existing_promo:
+                db.delete(existing_promo)
 
     if payload.reference_no is not None:
         order.reference_no = payload.reference_no
@@ -937,6 +953,10 @@ def assign_order_to_dealer(
         order.is_corporate_stock = False
         order.stock_type = None
 
+    existing_promo = db.query(models.PromotionInventory).filter(models.PromotionInventory.order_id == order.id).first()
+    if existing_promo:
+        db.delete(existing_promo)
+
     db.commit()
     db.refresh(order)
     return order
@@ -963,6 +983,13 @@ def reserve_inventory_order(
     order.reservation_expiry_date = payload.reservation_expiry_date
     order.reservation_expiry_alert_sent = False
 
+    existing_promo = db.query(models.PromotionInventory).filter(models.PromotionInventory.order_id == order.id).first()
+    if existing_promo:
+        existing_promo.status = models.PromotionStatus.RESERVED
+        existing_promo.reserved_dealer_id = dealer.id
+        existing_promo.reservation_expiry = payload.reservation_expiry_date
+        existing_promo.expiry_alert_sent = False
+
     db.commit()
     db.refresh(order)
     return order
@@ -979,12 +1006,18 @@ def cancel_inventory_reservation(
         raise HTTPException(status_code=400, detail="예약(RESERVED) 상태인 장비만 예약을 취소할 수 있습니다.")
 
     wme_dealer = db.query(models.DealerCompany).filter(models.DealerCompany.name.ilike("WME")).first()
-    order.stock_type = "AVAILABLE"
+    existing_promo = db.query(models.PromotionInventory).filter(models.PromotionInventory.order_id == order.id).first()
+    order.stock_type = "PROMOTION" if existing_promo else "AVAILABLE"
     order.is_corporate_stock = True
     order.reserved_dealer_id = None
     order.reservation_start_date = None
     order.reservation_expiry_date = None
     order.reservation_expiry_alert_sent = False
+    if existing_promo:
+        existing_promo.status = models.PromotionStatus.AVAILABLE
+        existing_promo.reserved_dealer_id = None
+        existing_promo.reservation_expiry = None
+        existing_promo.expiry_alert_sent = False
     if wme_dealer:
         order.dealer_company_id = wme_dealer.id
 
@@ -1022,6 +1055,10 @@ def confirm_inventory_reservation_sale(
     order.reservation_start_date = None
     order.reservation_expiry_date = None
     order.reservation_expiry_alert_sent = False
+
+    existing_promo = db.query(models.PromotionInventory).filter(models.PromotionInventory.order_id == order.id).first()
+    if existing_promo:
+        db.delete(existing_promo)
 
     db.commit()
     db.refresh(order)
@@ -1119,14 +1156,66 @@ def auto_release_expired_promotions(db: Session):
         models.PromotionInventory.reservation_expiry.isnot(None),
         models.PromotionInventory.reservation_expiry <= now
     ).all()
+    released_any = False
     if expired:
         for p in expired:
+            if p.order and p.order.stock_type == "RESERVED":
+                continue
             order_ref = p.order.reference_no if p.order else f"ID {p.order_id}"
             dealer_name = p.reserved_dealer.name if p.reserved_dealer else "Unknown"
             logger.info(f"[프로모션 예약 자동 해제] 발주 {order_ref} (딜러: {dealer_name}) 만료일({p.reservation_expiry}) 도래 -> AVAILABLE 자동 복구")
             p.status = models.PromotionStatus.AVAILABLE
             p.reserved_dealer_id = None
             p.reservation_expiry = None
+            released_any = True
+        if released_any:
+            db.commit()
+
+def sync_promotion_inventory_with_orders(db: Session):
+    """
+    WIA 재고리스트(Order)의 상태(PROMOTION / RESERVED / 기타)와 프로모션 목록(PromotionInventory)을 동기화
+    - Order가 PROMOTION 또는 RESERVED인 법인 가용재고일 때만 리스트 유지
+    - 그 외 상태(AVAILABLE, RENTAL, SHOWROOM, DEALER_ORDER, 판매/출고완료 등)로 변경된 항목은 프로모션에서 제외
+    """
+    promos = db.query(models.PromotionInventory).all()
+    dirty = False
+    for p in promos:
+        o = p.order
+        is_wme_corp = o and (o.is_corporate_stock or (o.dealer_company and o.dealer_company.name.upper() == "WME"))
+        if (
+            not o
+            or not is_wme_corp
+            or o.current_status in (models.OrderStatus.DISPATCHED, models.OrderStatus.SOLD)
+            or o.stock_type not in ("PROMOTION", "RESERVED")
+        ):
+            db.delete(p)
+            dirty = True
+            continue
+
+        if o.stock_type == "RESERVED":
+            if (
+                p.status != models.PromotionStatus.RESERVED
+                or p.reserved_dealer_id != o.reserved_dealer_id
+                or p.reservation_expiry != o.reservation_expiry_date
+            ):
+                p.status = models.PromotionStatus.RESERVED
+                p.reserved_dealer_id = o.reserved_dealer_id
+                p.reservation_expiry = o.reservation_expiry_date
+                dirty = True
+        elif o.stock_type == "PROMOTION":
+            if (
+                p.status != models.PromotionStatus.AVAILABLE
+                or p.reserved_dealer_id is not None
+                or p.reservation_expiry is not None
+                or p.final_buyer_dealer_id is not None
+            ):
+                p.status = models.PromotionStatus.AVAILABLE
+                p.reserved_dealer_id = None
+                p.reservation_expiry = None
+                p.final_buyer_dealer_id = None
+                dirty = True
+
+    if dirty:
         db.commit()
 
 @app.get("/api/promotions", response_model=List[schemas.PromotionOut])
@@ -1134,7 +1223,9 @@ def get_promotions(
     status_filter: Optional[models.PromotionStatus] = Query(None),
     db: Session = Depends(get_db)
 ):
+    auto_release_expired_order_reservations(db)
     auto_release_expired_promotions(db)
+    sync_promotion_inventory_with_orders(db)
     query = db.query(models.PromotionInventory)
     if status_filter:
         query = query.filter(models.PromotionInventory.status == status_filter)
@@ -1257,7 +1348,8 @@ async def upload_promotion_prices(file: UploadFile = File(...), db: Session = De
             errors.append(f"{index+2}행: MODEL({m_name}) 및 P/O({ref_no})에 해당하는 주문을 찾을 수 없습니다.")
             continue
             
-        if order.stock_type != "PROMOTION":
+        order.is_corporate_stock = True
+        if order.stock_type != "RESERVED":
             order.stock_type = "PROMOTION"
             
         promo = db.query(models.PromotionInventory).filter(models.PromotionInventory.order_id == order.id).first()
