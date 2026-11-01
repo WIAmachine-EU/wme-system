@@ -460,10 +460,39 @@ export default function DealerPromotion({ isMobileView }) {
                         {(promo.order && promo.order.reference_no) || '-'}
                       </div>
                     </div>
-                    <div className="mobile-order-meta">
-                      <span>PRICE: <strong style={{ color: 'var(--text-primary)' }}>{formatPromotionPrice(promo.promotion_price)}</strong></span>
-                      <span>ETA: <strong style={{ color: 'var(--text-primary)' }}>{promo.order && promo.order.eta ? new Date(promo.order.eta).toLocaleDateString() : '-'}</strong></span>
-                      <span>PORT: <strong style={{ color: 'var(--text-primary)' }}>{getStandardPort(promo.order?.destination_port)}</strong></span>
+                    <div className="mobile-order-meta" style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px 14px', marginBottom: '12px' }}>
+                      {/* 첫줄 >> 판매가: */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                          {t('menu3.label_sale_price', '판매가')}:
+                        </span>
+                        <strong style={{ color: 'var(--text-primary)', fontSize: '0.94rem' }}>
+                          {promo.promotion_price ? (!isNaN(promo.promotion_price) ? Number(promo.promotion_price).toLocaleString() + ' €' : promo.promotion_price) : '-'}
+                        </strong>
+                      </div>
+
+                      {/* 다음줄 >> ETA:    도착지: */}
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        paddingTop: '6px',
+                        borderTop: '1px dashed var(--border-color)',
+                        fontSize: '0.84rem'
+                      }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>ETA:</span>
+                          <strong style={{ color: 'var(--text-primary)' }}>
+                            {promo.order && promo.order.eta ? new Date(promo.order.eta).toLocaleDateString() : '-'}
+                          </strong>
+                        </div>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>{t('menu2.header_port', '도착지')}:</span>
+                          <strong style={{ color: 'var(--text-primary)' }}>
+                            {getStandardPort(promo.order?.destination_port)}
+                          </strong>
+                        </div>
+                      </div>
                     </div>
 
                     <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.4, padding: '10px', background: 'var(--bg-secondary)', borderRadius: '8px', marginBottom: '12px' }}>

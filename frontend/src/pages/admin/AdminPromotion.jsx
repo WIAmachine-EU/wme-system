@@ -511,28 +511,60 @@ export default function AdminPromotion({ isMobileView }) {
                       </div>
                     </div>
 
-                    <div className="mobile-order-meta">
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                        PRICE:
-                        {editingPriceId === promo.id ? (
-                          <>
-                            <input
-                              type="text"
-                              value={editPriceValue}
-                              onChange={(e) => setEditPriceValue(e.target.value)}
-                              style={{ width: '70px', padding: '2px 4px', fontSize: '0.8rem', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
-                            />
-                            <button onClick={() => handleSavePrice(promo.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--status-stock)', padding: 0, display: 'inline-flex' }}><Check size={14} /></button>
-                          </>
-                        ) : (
-                          <>
-                            <strong style={{ color: 'var(--text-primary)' }}>{promo.promotion_price || '-'}</strong>
-                            <button onClick={() => handleEditPrice(promo)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0, display: 'inline-flex' }}><Edit2 size={12} /></button>
-                          </>
-                        )}
-                      </span>
-                      <span>ETA: <strong style={{ color: 'var(--text-primary)' }}>{promo.order && promo.order.eta ? new Date(promo.order.eta).toLocaleDateString() : '-'}</strong></span>
-                      <span>PORT: <strong style={{ color: 'var(--text-primary)' }}>{getStandardPort(promo.order?.destination_port)}</strong></span>
+                    <div className="mobile-order-meta" style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px 14px', marginBottom: '12px' }}>
+                      {/* 첫줄 >> 판매가: */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                          {t('menu3.label_sale_price', '판매가')}:
+                        </span>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          {editingPriceId === promo.id ? (
+                            <>
+                              <input
+                                type="text"
+                                value={editPriceValue}
+                                onChange={(e) => setEditPriceValue(e.target.value)}
+                                style={{ width: '84px', padding: '2px 6px', fontSize: '0.85rem', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)', textAlign: 'right' }}
+                              />
+                              <button onClick={() => handleSavePrice(promo.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--status-stock)', padding: '2px', display: 'inline-flex' }}>
+                                <Check size={16} />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <strong style={{ color: 'var(--text-primary)', fontSize: '0.94rem' }}>
+                                {promo.promotion_price ? (!isNaN(promo.promotion_price) ? Number(promo.promotion_price).toLocaleString() + ' €' : promo.promotion_price) : '-'}
+                              </strong>
+                              <button onClick={() => handleEditPrice(promo)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px', display: 'inline-flex' }} title="판매가 수정">
+                                <Edit2 size={13} />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 다음줄 >> ETA:    도착지: */}
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        paddingTop: '6px',
+                        borderTop: '1px dashed var(--border-color)',
+                        fontSize: '0.84rem'
+                      }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>ETA:</span>
+                          <strong style={{ color: 'var(--text-primary)' }}>
+                            {promo.order && promo.order.eta ? new Date(promo.order.eta).toLocaleDateString() : '-'}
+                          </strong>
+                        </div>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>{t('menu2.header_port', '도착지')}:</span>
+                          <strong style={{ color: 'var(--text-primary)' }}>
+                            {getStandardPort(promo.order?.destination_port)}
+                          </strong>
+                        </div>
+                      </div>
                     </div>
 
                     <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.4, padding: '10px', background: 'var(--bg-secondary)', borderRadius: '8px', marginBottom: '12px' }}>

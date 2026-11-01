@@ -196,7 +196,8 @@
     "btn_cancel_popup": "cancell",
     "btn_upload": "Promotion Upload",
     "upload_success": "Upload Success",
-    "upload_fail": "Upload Failed"
+    "upload_fail": "Upload Failed",
+    "label_sale_price": "Price"
   },
   "management": {
     "page_title": "Upload / Setting",

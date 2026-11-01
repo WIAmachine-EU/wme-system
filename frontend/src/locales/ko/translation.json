@@ -196,7 +196,8 @@
     "btn_cancel_popup": "취소",
     "btn_upload": "프로모션 업로드",
     "upload_success": "업로드 성공",
-    "upload_fail": "업로드 실패"
+    "upload_fail": "업로드 실패",
+    "label_sale_price": "판매가"
   },
   "management": {
     "page_title": "업로드 / 설정관리",
