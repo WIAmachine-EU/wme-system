@@ -1309,20 +1309,23 @@ export default function AdminInventory({ isMobileView }) {
         <div
           style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            width: '100%', height: '100%',
             backgroundColor: 'rgba(0, 0, 0, 0.65)',
             backdropFilter: 'blur(5px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            zIndex: 9999, padding: isMobileView ? 0 : '20px'
+            zIndex: 9999, padding: isMobileView ? 0 : '20px',
+            overflow: 'hidden',
+            touchAction: 'none'
           }}
           onClick={() => setReserveModalOpen(false)}
         >
           <div
-            className="glass-card no-hover-bg"
+            className="clean-card no-hover-bg"
             style={{
-              width: isMobileView ? '100vw' : '100%',
-              maxWidth: isMobileView ? '100vw' : '520px',
-              height: isMobileView ? '100vh' : 'auto',
-              maxHeight: isMobileView ? '100vh' : '90vh',
+              width: isMobileView ? '100%' : '100%',
+              maxWidth: isMobileView ? '100%' : '520px',
+              height: isMobileView ? '100%' : 'auto',
+              maxHeight: isMobileView ? '100%' : '90vh',
               backgroundColor: 'var(--bg-card, #ffffff)',
               border: isMobileView ? 'none' : '1px solid var(--border-color)',
               borderRadius: isMobileView ? 0 : '16px',
@@ -1330,6 +1333,10 @@ export default function AdminInventory({ isMobileView }) {
               overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
+              padding: '0 !important',
+              margin: 0,
+              boxSizing: 'border-box',
+              transition: 'none',
               animation: 'modalFadeIn 0.2s ease-out'
             }}
             onClick={e => e.stopPropagation()}
@@ -1376,15 +1383,23 @@ export default function AdminInventory({ isMobileView }) {
 
             {/* 모달 바디 */}
             <div style={{
+              width: '100%',
+              maxWidth: '100%',
+              boxSizing: 'border-box',
               padding: isMobileView ? '16px 12px' : '24px',
               display: 'flex', flexDirection: 'column',
               gap: isMobileView ? '14px' : '18px',
               flex: 1,
               overflowY: 'auto',
+              overflowX: 'hidden',
+              overscrollBehavior: 'contain',
+              touchAction: 'pan-y',
               WebkitOverflowScrolling: 'touch'
             }}>
               {/* 공지 내용 텍스트 박스 */}
               <div style={{
+                width: '100%',
+                boxSizing: 'border-box',
                 backgroundColor: 'rgba(59, 130, 246, 0.08)',
                 border: '1px solid rgba(59, 130, 246, 0.25)',
                 borderRadius: '10px',
@@ -1392,7 +1407,7 @@ export default function AdminInventory({ isMobileView }) {
                 display: 'flex', gap: '12px', alignItems: 'flex-start'
               }}>
                 <AlertCircle size={20} color="var(--wia-blue, #2563eb)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', lineHeight: 1.5 }}>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', lineHeight: 1.5, minWidth: 0, flex: 1 }}>
                   <div style={{ fontWeight: 700, marginBottom: '2px', color: 'var(--wia-blue, #2563eb)' }}>
                     [공지] 예약 기간을 입력해 주시기 바랍니다.
                   </div>
@@ -1404,28 +1419,37 @@ export default function AdminInventory({ isMobileView }) {
 
               {/* 장비 & 딜러 정보 카드 */}
               <div style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                overflow: 'hidden',
                 background: 'var(--bg-secondary)',
                 border: '1px solid var(--border-color)',
                 borderRadius: '10px',
-                padding: '12px 16px',
-                display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px',
+                padding: '12px 14px',
+                display: 'grid', gridTemplateColumns: isMobileView ? 'repeat(3, minmax(0, 1fr))' : 'repeat(3, 1fr)', gap: isMobileView ? '6px' : '10px',
                 fontSize: '0.85rem', alignItems: 'center'
               }}>
-                <div>
-                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px' }}>모델</span>
-                  <strong style={{ color: 'var(--text-primary)' }}>{reserveOrder.product_model?.model_name || '-'}</strong>
+                <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px', whiteSpace: 'nowrap' }}>모델</span>
+                  <strong style={{ color: 'var(--text-primary)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {reserveOrder.product_model?.model_name || '-'}
+                  </strong>
                 </div>
-                <div>
-                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px' }}>발주번호</span>
-                  <strong style={{ color: 'var(--accent-cyan)' }}>{reserveOrder.reference_no || '-'}</strong>
+                <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px', whiteSpace: 'nowrap' }}>발주번호</span>
+                  <strong style={{ color: 'var(--accent-cyan)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {reserveOrder.reference_no || '-'}
+                  </strong>
                 </div>
-                <div>
-                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px' }}>예약 딜러</span>
+                <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px', whiteSpace: 'nowrap' }}>예약 딜러</span>
                   <select
                     value={reserveDealerId}
                     onChange={e => setReserveDealerId(e.target.value)}
                     style={{
                       width: '100%',
+                      maxWidth: '100%',
+                      boxSizing: 'border-box',
                       background: 'transparent',
                       border: 'none',
                       padding: 0,
@@ -1433,7 +1457,10 @@ export default function AdminInventory({ isMobileView }) {
                       fontSize: '0.86rem',
                       color: 'var(--status-production, #CDAA7D)',
                       cursor: 'pointer',
-                      outline: 'none'
+                      outline: 'none',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
                     }}
                     title="예약 딜러사 변경 가능"
                   >
@@ -1447,10 +1474,16 @@ export default function AdminInventory({ isMobileView }) {
               </div>
 
               {/* 날짜 선택 달력 입력란 */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', boxSizing: 'border-box' }}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                  gap: isMobileView ? '8px' : '14px',
+                  width: '100%',
+                  boxSizing: 'border-box'
+                }}>
+                  <div style={{ minWidth: 0, overflow: 'hidden', boxSizing: 'border-box' }}>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       예약 시작일
                     </label>
                     <input
@@ -1459,20 +1492,22 @@ export default function AdminInventory({ isMobileView }) {
                       onChange={e => setReserveStartDate(e.target.value)}
                       style={{
                         width: '100%',
+                        maxWidth: '100%',
+                        minWidth: 0,
                         background: 'var(--bg-input)',
                         border: '1px solid var(--border-color)',
                         color: 'var(--text-primary)',
-                        padding: '10px 12px',
+                        padding: isMobileView ? '8px 6px' : '10px 12px',
                         borderRadius: '8px',
-                        fontSize: '0.9rem',
+                        fontSize: isMobileView ? '0.82rem' : '0.9rem',
                         cursor: 'pointer',
                         boxSizing: 'border-box'
                       }}
                     />
                   </div>
 
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                  <div style={{ minWidth: 0, overflow: 'hidden', boxSizing: 'border-box' }}>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       예약 종료일 (만료일)
                     </label>
                     <input
@@ -1481,12 +1516,14 @@ export default function AdminInventory({ isMobileView }) {
                       onChange={e => setReserveEndDate(e.target.value)}
                       style={{
                         width: '100%',
+                        maxWidth: '100%',
+                        minWidth: 0,
                         background: 'var(--bg-input)',
                         border: '1px solid var(--border-color)',
                         color: 'var(--text-primary)',
-                        padding: '10px 12px',
+                        padding: isMobileView ? '8px 6px' : '10px 12px',
                         borderRadius: '8px',
-                        fontSize: '0.9rem',
+                        fontSize: isMobileView ? '0.82rem' : '0.9rem',
                         cursor: 'pointer',
                         boxSizing: 'border-box'
                       }}
@@ -1585,20 +1622,23 @@ export default function AdminInventory({ isMobileView }) {
         <div
           style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            width: '100%', height: '100%',
             backgroundColor: 'rgba(0, 0, 0, 0.65)',
             backdropFilter: 'blur(5px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            zIndex: 9999, padding: isMobileView ? 0 : '20px'
+            zIndex: 9999, padding: isMobileView ? 0 : '20px',
+            overflow: 'hidden',
+            touchAction: 'none'
           }}
           onClick={() => setReserveDetailModalOpen(false)}
         >
           <div
-            className="glass-card no-hover-bg"
+            className="clean-card no-hover-bg"
             style={{
-              width: isMobileView ? '100vw' : '100%',
-              maxWidth: isMobileView ? '100vw' : '540px',
-              height: isMobileView ? '100vh' : 'auto',
-              maxHeight: isMobileView ? '100vh' : '90vh',
+              width: isMobileView ? '100%' : '100%',
+              maxWidth: isMobileView ? '100%' : '540px',
+              height: isMobileView ? '100%' : 'auto',
+              maxHeight: isMobileView ? '100%' : '90vh',
               backgroundColor: 'var(--bg-card, #ffffff)',
               border: isMobileView ? 'none' : '1px solid var(--border-color)',
               borderRadius: isMobileView ? 0 : '16px',
@@ -1606,6 +1646,10 @@ export default function AdminInventory({ isMobileView }) {
               overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
+              padding: '0 !important',
+              margin: 0,
+              boxSizing: 'border-box',
+              transition: 'none',
               animation: 'modalFadeIn 0.2s ease-out'
             }}
             onClick={e => e.stopPropagation()}
@@ -1650,11 +1694,17 @@ export default function AdminInventory({ isMobileView }) {
 
             {/* 바디 */}
             <div style={{
+              width: '100%',
+              maxWidth: '100%',
+              boxSizing: 'border-box',
               padding: isMobileView ? '12px 10px' : '24px',
               display: 'flex', flexDirection: 'column',
               gap: isMobileView ? '12px' : '16px',
               flex: 1,
               overflowY: 'auto',
+              overflowX: 'hidden',
+              overscrollBehavior: 'contain',
+              touchAction: 'pan-y',
               WebkitOverflowScrolling: 'touch'
             }}>
               {/* 예약 요약 카드 */}
@@ -1699,8 +1749,8 @@ export default function AdminInventory({ isMobileView }) {
                 </div>
 
                 <div style={{
-                  display: 'grid', gridTemplateColumns: '1fr 1fr', gap: isMobileView ? '8px' : '12px',
-                  paddingTop: '12px', borderTop: '1px dashed rgba(45, 99, 255, 0.2)'
+                  display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: isMobileView ? '8px' : '12px',
+                  paddingTop: '12px', borderTop: '1px dashed rgba(45, 99, 255, 0.2)', width: '100%', boxSizing: 'border-box'
                 }}>
                   <div>
                     <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>예약 시작일</span>
@@ -1748,12 +1798,15 @@ export default function AdminInventory({ isMobileView }) {
                 padding: isMobileView ? '12px 12px' : '16px',
                 display: 'flex', flexDirection: 'column',
                 gap: isMobileView ? '8px' : '10px',
-                fontSize: '0.84rem'
+                fontSize: '0.84rem',
+                width: '100%',
+                boxSizing: 'border-box',
+                overflow: 'hidden'
               }}>
                 <div style={{ fontWeight: 700, fontSize: '0.86rem', color: 'var(--text-primary)', marginBottom: '2px' }}>
                   예약 장비 상세 정보
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: isMobileView ? '8px' : '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: isMobileView ? '8px' : '10px', width: '100%', boxSizing: 'border-box' }}>
                   <div>
                     <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem', display: 'block' }}>모델 / NC</span>
                     <strong style={{ color: 'var(--text-primary)', fontSize: isMobileView ? '0.82rem' : '0.85rem', wordBreak: 'break-word' }}>
@@ -1884,20 +1937,23 @@ export default function AdminInventory({ isMobileView }) {
         <div
           style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            width: '100%', height: '100%',
             backgroundColor: 'rgba(0, 0, 0, 0.65)',
             backdropFilter: 'blur(5px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            zIndex: 9999, padding: isMobileView ? 0 : '20px'
+            zIndex: 9999, padding: isMobileView ? 0 : '20px',
+            overflow: 'hidden',
+            touchAction: 'none'
           }}
           onClick={() => setReserveSaleModalOpen(false)}
         >
           <div
-            className="glass-card no-hover-bg"
+            className="clean-card no-hover-bg"
             style={{
-              width: isMobileView ? '100vw' : '100%',
-              maxWidth: isMobileView ? '100vw' : '480px',
-              height: isMobileView ? '100vh' : 'auto',
-              maxHeight: isMobileView ? '100vh' : '90vh',
+              width: isMobileView ? '100%' : '100%',
+              maxWidth: isMobileView ? '100%' : '480px',
+              height: isMobileView ? '100%' : 'auto',
+              maxHeight: isMobileView ? '100%' : '90vh',
               backgroundColor: 'var(--bg-card, #ffffff)',
               border: isMobileView ? 'none' : '1px solid var(--border-color)',
               borderRadius: isMobileView ? 0 : '16px',
@@ -1905,6 +1961,10 @@ export default function AdminInventory({ isMobileView }) {
               overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
+              padding: '0 !important',
+              margin: 0,
+              boxSizing: 'border-box',
+              transition: 'none',
               animation: 'modalFadeIn 0.2s ease-out'
             }}
             onClick={e => e.stopPropagation()}
@@ -1947,11 +2007,17 @@ export default function AdminInventory({ isMobileView }) {
             </div>
 
             <div style={{
+              width: '100%',
+              maxWidth: '100%',
+              boxSizing: 'border-box',
               padding: isMobileView ? '16px 12px' : '24px',
               display: 'flex', flexDirection: 'column',
               gap: isMobileView ? '14px' : '16px',
               flex: 1,
               overflowY: 'auto',
+              overflowX: 'hidden',
+              overscrollBehavior: 'contain',
+              touchAction: 'pan-y',
               WebkitOverflowScrolling: 'touch'
             }}>
               <div style={{
@@ -2068,20 +2134,23 @@ export default function AdminInventory({ isMobileView }) {
         <div
           style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            width: '100%', height: '100%',
             backgroundColor: 'rgba(0, 0, 0, 0.65)',
             backdropFilter: 'blur(5px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            zIndex: 9999, padding: isMobileView ? 0 : '20px'
+            zIndex: 9999, padding: isMobileView ? 0 : '20px',
+            overflow: 'hidden',
+            touchAction: 'none'
           }}
           onClick={() => setRentalModalOpen(false)}
         >
           <div
-            className="glass-card no-hover-bg"
+            className="clean-card no-hover-bg"
             style={{
-              width: isMobileView ? '100vw' : '100%',
-              maxWidth: isMobileView ? '100vw' : '520px',
-              height: isMobileView ? '100vh' : 'auto',
-              maxHeight: isMobileView ? '100vh' : '90vh',
+              width: isMobileView ? '100%' : '100%',
+              maxWidth: isMobileView ? '100%' : '520px',
+              height: isMobileView ? '100%' : 'auto',
+              maxHeight: isMobileView ? '100%' : '90vh',
               backgroundColor: 'var(--bg-card, #1a202c)',
               border: isMobileView ? 'none' : '1px solid var(--border-color, rgba(255, 255, 255, 0.12))',
               borderRadius: isMobileView ? 0 : '16px',
@@ -2089,6 +2158,10 @@ export default function AdminInventory({ isMobileView }) {
               overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
+              padding: '0 !important',
+              margin: 0,
+              boxSizing: 'border-box',
+              transition: 'none',
               animation: 'modalFadeIn 0.2s ease-out'
             }}
             onClick={e => e.stopPropagation()}
@@ -2133,16 +2206,24 @@ export default function AdminInventory({ isMobileView }) {
 
             {/* 모달 바디 */}
             <div style={{
+              width: '100%',
+              maxWidth: '100%',
+              boxSizing: 'border-box',
               padding: isMobileView ? '16px 12px' : '24px',
               display: 'flex', flexDirection: 'column',
               gap: isMobileView ? '14px' : '18px',
               flex: 1,
               overflowY: 'auto',
+              overflowX: 'hidden',
+              overscrollBehavior: 'contain',
+              touchAction: 'pan-y',
               WebkitOverflowScrolling: 'touch'
             }}>
               
               {/* 공지 내용 텍스트 박스 */}
               <div style={{
+                width: '100%',
+                boxSizing: 'border-box',
                 backgroundColor: 'rgba(59, 130, 246, 0.08)',
                 border: '1px solid rgba(59, 130, 246, 0.25)',
                 borderRadius: '10px',
@@ -2150,7 +2231,7 @@ export default function AdminInventory({ isMobileView }) {
                 display: 'flex', gap: '12px', alignItems: 'flex-start'
               }}>
                 <AlertCircle size={20} color="var(--wia-blue, #2563eb)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', lineHeight: 1.5 }}>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', lineHeight: 1.5, minWidth: 0, flex: 1 }}>
                   <div style={{ fontWeight: 700, marginBottom: '2px', color: 'var(--wia-blue, #2563eb)' }}>
                     [공지] 임대 기간을 입력해 주시기 바랍니다.
                   </div>
@@ -2162,34 +2243,47 @@ export default function AdminInventory({ isMobileView }) {
 
               {/* 장비 & 딜러 정보 카드 */}
               <div style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                overflow: 'hidden',
                 background: 'var(--bg-secondary)',
                 border: '1px solid var(--border-color)',
                 borderRadius: '10px',
-                padding: '12px 16px',
-                display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px',
+                padding: '12px 14px',
+                display: 'grid', gridTemplateColumns: isMobileView ? 'repeat(3, minmax(0, 1fr))' : 'repeat(3, 1fr)', gap: isMobileView ? '6px' : '10px',
                 fontSize: '0.85rem'
               }}>
-                <div>
-                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px' }}>모델</span>
-                  <strong style={{ color: 'var(--text-primary)' }}>{rentalOrder.product_model?.model_name || '-'}</strong>
+                <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px', whiteSpace: 'nowrap' }}>모델</span>
+                  <strong style={{ color: 'var(--text-primary)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {rentalOrder.product_model?.model_name || '-'}
+                  </strong>
                 </div>
-                <div>
-                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px' }}>발주번호</span>
-                  <strong style={{ color: 'var(--accent-cyan)' }}>{rentalOrder.reference_no || '-'}</strong>
+                <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px', whiteSpace: 'nowrap' }}>발주번호</span>
+                  <strong style={{ color: 'var(--accent-cyan)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {rentalOrder.reference_no || '-'}
+                  </strong>
                 </div>
-                <div>
-                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px' }}>임대 딜러</span>
-                  <strong style={{ color: 'var(--status-production, #eab308)' }}>
+                <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px', whiteSpace: 'nowrap' }}>임대 딜러</span>
+                  <strong style={{ color: 'var(--status-production, #eab308)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {dealers.find(d => d.id === parseInt(rentalDealerId))?.name || rentalOrder.dealer_company?.name || '딜러 선택'}
                   </strong>
                 </div>
               </div>
 
               {/* 날짜 선택 달력 입력란 */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', boxSizing: 'border-box' }}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                  gap: isMobileView ? '8px' : '14px',
+                  width: '100%',
+                  boxSizing: 'border-box'
+                }}>
+                  <div style={{ minWidth: 0, overflow: 'hidden', boxSizing: 'border-box' }}>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       임대 시작일
                     </label>
                     <input
@@ -2198,20 +2292,22 @@ export default function AdminInventory({ isMobileView }) {
                       onChange={e => setRentalStartDate(e.target.value)}
                       style={{
                         width: '100%',
+                        maxWidth: '100%',
+                        minWidth: 0,
                         background: 'var(--bg-input)',
                         border: '1px solid var(--border-color)',
                         color: 'var(--text-primary)',
-                        padding: '10px 12px',
+                        padding: isMobileView ? '8px 6px' : '10px 12px',
                         borderRadius: '8px',
-                        fontSize: '0.9rem',
+                        fontSize: isMobileView ? '0.82rem' : '0.9rem',
                         cursor: 'pointer',
                         boxSizing: 'border-box'
                       }}
                     />
                   </div>
 
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                  <div style={{ minWidth: 0, overflow: 'hidden', boxSizing: 'border-box' }}>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       임대 종료일 (만료일)
                     </label>
                     <input
@@ -2220,12 +2316,14 @@ export default function AdminInventory({ isMobileView }) {
                       onChange={e => setRentalEndDate(e.target.value)}
                       style={{
                         width: '100%',
+                        maxWidth: '100%',
+                        minWidth: 0,
                         background: 'var(--bg-input)',
                         border: '1px solid var(--border-color)',
                         color: 'var(--text-primary)',
-                        padding: '10px 12px',
+                        padding: isMobileView ? '8px 6px' : '10px 12px',
                         borderRadius: '8px',
-                        fontSize: '0.9rem',
+                        fontSize: isMobileView ? '0.82rem' : '0.9rem',
                         cursor: 'pointer',
                         boxSizing: 'border-box'
                       }}
