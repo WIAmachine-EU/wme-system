@@ -44,7 +44,7 @@ def process_periodic_eta_notifications():
                     
                 # If it doesn't have an order_id yet, try to register it first
                 if not shipment.trackcargo_order_id:
-                    new_order_id = create_sea_tracking_sync(shipment.mbl_no)
+                    new_order_id = create_sea_tracking_sync(shipment.mbl_no, getattr(shipment, 'carrier', None))
                     if new_order_id:
                         shipment.trackcargo_order_id = new_order_id
                         db.commit()

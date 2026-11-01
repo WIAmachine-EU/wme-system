@@ -30,6 +30,14 @@
   * `route`가 `list`인 경우 각 구간에서 선박명(`vessel_name`), IMO, MMSI, 운항 속도(`speed`), 침로(`course`), 그리고 실시간 AIS 위치(`positions` 위경도) 목록을 Mapbox 좌표 형식(`[lng, lat]`)으로 안전하게 추출하도록 파서를 전면 개편했습니다.
   * `trackcargo_api.py` 및 `route_service.py` 내 `milestones`, `containers`/`container_details`, `active_vessel` 등 다중 중첩 구조에 대한 타입 안전성(Defensive Handling)을 강화하여 예외 발생 위험을 원천 차단했습니다.
 
+### 5. TrackCargo 신규 B/L 자동 등록 시 SCAC 선사 코드 지능형 자동 보정 적용
+* **원인 및 배경 (`Carrier not found for scac code ...`)**:
+  * 선사 고유 식별코드(SCAC: `HDMU`, `YMLU` 등)가 생략된 B/L 번호(예: `SELE22174500`, `N360205129`)가 신규 등록될 때, 시스템이 앞 4자리 영숫자를 그대로 선사 코드로 전송하여 TrackCargo에서 `CARRIER-NOT-FOUND` 에러가 발생하는 현상을 방지했습니다.
+* **지능형 SCAC 매핑 및 Tracking ID 정규화**:
+  * **B/L 접두사 기반 자동 매핑**: `SELE...`, `PUS...` 등 HMM 고유 부킹/B/L 접두사는 현대상선 공식 SCAC인 `HDMU`로, `N360...`, `N36...` 등은 양밍해운 공식 SCAC인 `YMLU`로 자동 보정 매핑(`BL_PREFIX_TO_SCAC`)을 적용했습니다.
+  * **선사명 텍스트 기반 보정**: 발주/선적 데이터의 선사명(`carrier`)을 교차 검증하여 선사 코드를 자동 식별하도록 강화했습니다.
+  * **Tracking ID 정규화(`normalize_tracking_id`)**: `HDMUSELE22174500`과 같이 SCAC과 B/L이 결합된 형태에서도 순수 화물 B/L 식별자(`SELE22174500`)를 지능적으로 분리 전송하도록 구현했습니다.
+
 ## [2026-10-31] WIA 프로모션(관리자·딜러포털) 리스트 개편, 재고리스트 예약 라이프사이클 연동 및 UI 최적화
 
 ### 1. 관리자포털 WIA 프로모션(`AdminPromotion.jsx`) 컬럼·UI 개편 및 예약 관리 일원화

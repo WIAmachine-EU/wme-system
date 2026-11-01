@@ -39,16 +39,136 @@ SCAC_MAPPING = {
     "TRKU": "Turkon Line"
 }
 
-def get_scac_code(mbl_no: str) -> str:
-    import re
-    scac_match = re.match(r'^[A-Za-z0-9]{4}', mbl_no)
-    return scac_match.group(0).upper() if scac_match else ""
+# B/L 번호 접두사 기반 SCAC 자동 매핑 (선사 코드가 생략된 B/L 번호 대응)
+BL_PREFIX_TO_SCAC = {
+    # Hyundai Merchant Marine (HMM) - SELE, PUS 등 지점/부킹 접두사
+    "SELE": "HDMU",
+    "PUSN": "HDMU",
+    "PUS": "HDMU",
+    "HDMU": "HDMU",
+    "HDM": "HDMU",
+    
+    # Yang Ming Line - N360 등 접두사
+    "N360": "YMLU",
+    "N36": "YMLU",
+    "YMLU": "YMLU",
+    "YML": "YMLU",
+    
+    # Ocean Network Express (ONE)
+    "ONEY": "ONEY",
+    "ONE": "ONEY",
+    
+    # Maersk
+    "MAEU": "MAEU",
+    "MSKU": "MAEU",
+    "SEAU": "MAEU",
+    
+    # MSC (TrackCargo 공식 SCAC은 MEDU)
+    "MEDU": "MEDU",
+    "MSCU": "MEDU",
+    
+    # CMA-CGM
+    "CMDU": "CMDU",
+    "CMAU": "CMDU",
+    
+    # COSCO
+    "COSU": "COSU",
+    
+    # Evergreen
+    "EGLV": "EGLV",
+    
+    # Hapag-Lloyd
+    "HLCU": "HLCU",
+    
+    # SM Line
+    "SMLM": "SMLM",
+    "SMCU": "SMLM",
+    
+    # KMTC
+    "KMTC": "KMTC",
+    "KMTU": "KMTC",
+    
+    # Wan Hai
+    "WHLC": "22AA",
+    "WHLU": "22AA",
+}
 
-def get_carrier_name(mbl_no: str) -> str:
-    scac = get_scac_code(mbl_no)
+# 선사명 텍스트 기반 SCAC 보정 매핑
+CARRIER_NAME_TO_SCAC = {
+    "HMM": "HDMU",
+    "HYUNDAI": "HDMU",
+    "YANG MING": "YMLU",
+    "YANGMING": "YMLU",
+    "YML": "YMLU",
+    "ONE": "ONEY",
+    "OCEAN NETWORK": "ONEY",
+    "MAERSK": "MAEU",
+    "MSC": "MEDU",
+    "CMA": "CMDU",
+    "COSCO": "COSU",
+    "EVERGREEN": "EGLV",
+    "HAPAG": "HLCU",
+    "SM LINE": "SMLM",
+    "KMTC": "KMTC",
+    "WAN HAI": "22AA",
+    "ZIM": "ZIMU"
+}
+
+def get_scac_code(mbl_no: str, carrier: Optional[str] = None) -> str:
+    """
+    B/L 번호 접두사 및 선사명을 지능적으로 분석하여 TrackCargo 표준 4자리 SCAC 코드를 반환합니다.
+    예: SELE22174500 -> HDMU (HMM)
+        N360205129  -> YMLU (Yang Ming)
+    """
+    if not mbl_no:
+        return ""
+    mbl_upper = mbl_no.strip().upper()
+
+    # 1. carrier 선사명이 주어진 경우 우선 확인
+    if carrier:
+        c_upper = carrier.strip().upper()
+        for k, scac in CARRIER_NAME_TO_SCAC.items():
+            if k in c_upper:
+                return scac
+
+    # 2. 앞 4자리가 공식 SCAC_MAPPING에 존재하는지 확인
+    prefix_4 = mbl_upper[:4]
+    if prefix_4 in SCAC_MAPPING:
+        if prefix_4 == "MSCU":
+            return "MEDU"
+        return prefix_4
+
+    # 3. 선사별 B/L 고유 접두사 사전 매핑 검사 (길이 긴 순서대로 검사)
+    for prefix, scac in sorted(BL_PREFIX_TO_SCAC.items(), key=lambda x: len(x[0]), reverse=True):
+        if mbl_upper.startswith(prefix):
+            return scac
+
+    # 4. Fallback: 기존 정규식 영숫자 4자리
+    import re
+    scac_match = re.match(r'^[A-Za-z0-9]{4}', mbl_upper)
+    return scac_match.group(0) if scac_match else ""
+
+def normalize_tracking_id(mbl_no: str, scac_code: str) -> str:
+    """
+    B/L 번호에서 중복된 SCAC 선사 코드를 분리하여 순수 B/L 번호(trackingId)를 추출합니다.
+    예: HDMUSELE22174500 -> SELE22174500
+        YMLUN360205129   -> N360205129
+        SELE22174500     -> SELE22174500
+    """
+    if not mbl_no:
+        return ""
+    mbl_upper = mbl_no.strip().upper()
+    if scac_code and mbl_upper.startswith(scac_code):
+        remainder = mbl_upper[len(scac_code):]
+        if remainder and remainder[0].isalpha() and len(remainder) >= 8:
+            return remainder
+    return mbl_upper
+
+def get_carrier_name(mbl_no: str, carrier: Optional[str] = None) -> str:
+    scac = get_scac_code(mbl_no, carrier)
     return SCAC_MAPPING.get(scac, "")
 
-async def create_sea_tracking(mbl_no: str) -> Optional[str]:
+async def create_sea_tracking(mbl_no: str, carrier: Optional[str] = None) -> Optional[str]:
     """
     Creates a new tracking order in TrackCargo for a given MBL.
     Returns the trackcargo_order_id if successful, None otherwise.
@@ -58,17 +178,18 @@ async def create_sea_tracking(mbl_no: str) -> Optional[str]:
         "x-api-key": TRACKCARGO_API_KEY,
         "Content-Type": "application/json"
     }
-    scac_code = get_scac_code(mbl_no)
+    scac_code = get_scac_code(mbl_no, carrier)
+    clean_tracking_id = normalize_tracking_id(mbl_no, scac_code)
 
     logger.info(f"[TrackCargo API Key Debug] Key length: {len(TRACKCARGO_API_KEY)}, starts with: {TRACKCARGO_API_KEY[:5]}***")
 
     payload = {
-        "trackingId": mbl_no,
+        "trackingId": clean_tracking_id,
         "seaShipmentTrackingType": "bill_of_lading",
         "scacCode": scac_code
     }
     
-    logger.info(f"[TrackCargo API] Requesting create tracking for MBL: {mbl_no}")
+    logger.info(f"[TrackCargo API] Requesting create tracking for MBL: {clean_tracking_id} (SCAC: {scac_code})")
     
     
         
@@ -113,10 +234,12 @@ async def create_bulk_sea_tracking(mbl_nos: list) -> dict:
     
     payload = []
     for mbl in mbl_nos:
+        scac = get_scac_code(mbl)
+        clean_id = normalize_tracking_id(mbl, scac)
         payload.append({
-            "trackingId": mbl,
+            "trackingId": clean_id,
             "seaShipmentTrackingType": "bill_of_lading",
-            "scacCode": get_scac_code(mbl)
+            "scacCode": scac
         })
         
     logger.info(f"[TrackCargo API] Requesting bulk create tracking for {len(mbl_nos)} MBLs")
@@ -259,11 +382,11 @@ def fetch_tracking_data_sync(order_id: str) -> Optional[Dict[str, Any]]:
         asyncio.set_event_loop(loop)
     return loop.run_until_complete(fetch_tracking_data(order_id))
 
-def create_sea_tracking_sync(mbl_no: str) -> Optional[str]:
+def create_sea_tracking_sync(mbl_no: str, carrier: Optional[str] = None) -> Optional[str]:
     import asyncio
     try:
         loop = asyncio.get_event_loop()
     except RuntimeError:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-    return loop.run_until_complete(create_sea_tracking(mbl_no))
+    return loop.run_until_complete(create_sea_tracking(mbl_no, carrier))
