@@ -143,10 +143,10 @@ def parse_trackcargo_detail_payload(payload: dict, pod_code: str = "DEHAM", mbl_
     
     # 1. ORDER STATUS("Active")가 아닌 실제 물류 상태(tracking_status / latest_event) 추출
     raw_tracking_status = (
-        data.get("tracking_status")
-        or tracking_data.get("status")
-        or data.get("latest_event")
-        or data.get("status")
+        (data.get("tracking_status") if isinstance(data, dict) else None)
+        or (tracking_data.get("status") if isinstance(tracking_data, dict) else None)
+        or (data.get("latest_event") if isinstance(data, dict) else None)
+        or (data.get("status") if isinstance(data, dict) else None)
         or "Active"
     )
     
@@ -154,20 +154,21 @@ def parse_trackcargo_detail_payload(payload: dict, pod_code: str = "DEHAM", mbl_
     is_arrived = any(kw in str(raw_tracking_status).lower() for kw in ARRIVED_KEYWORDS)
     
     # ETA가 이미 지났고 Discharged/Arrived 마일스톤이 존재하는지 이중 체크
-    milestones = data.get("milestones") or tracking_data.get("milestones") or {}
-    if milestones.get("arrived") or milestones.get("discharged") or milestones.get("gate_out"):
-        is_arrived = True
+    milestones = (data.get("milestones") if isinstance(data, dict) else None) or (tracking_data.get("milestones") if isinstance(tracking_data, dict) else None) or {}
+    if isinstance(milestones, dict):
+        if milestones.get("arrived") or milestones.get("discharged") or milestones.get("gate_out"):
+            is_arrived = True
 
     # 2. 선박 정보 추출 (active_vessel -> trackingData.vessels -> main_vessel -> 컨테이너 이벤트 순)
-    active_vessel = data.get("active_vessel") or tracking_data.get("active_vessel") or {}
+    active_vessel = (data.get("active_vessel") if isinstance(data, dict) else None) or (tracking_data.get("active_vessel") if isinstance(tracking_data, dict) else None) or {}
     if not isinstance(active_vessel, dict):
         active_vessel = {}
         
     vessel_name = (
         active_vessel.get("name")
-        or data.get("main_vessel")
-        or data.get("vessel")
-        or tracking_data.get("vessel")
+        or (data.get("main_vessel") if isinstance(data, dict) else None)
+        or (data.get("vessel") if isinstance(data, dict) else None)
+        or (tracking_data.get("vessel") if isinstance(tracking_data, dict) else None)
     )
 
     # trackingData.vessels 리스트 탐색
@@ -180,20 +181,100 @@ def parse_trackcargo_detail_payload(payload: dict, pod_code: str = "DEHAM", mbl_
         elif isinstance(first_v, str):
             vessel_name = first_v
 
-    # 컨테이너 이벤트 로그에서 선박명 탐색
+    # 컨테이너 이벤트 로그에서 선박명 탐색 (containers 및 container_details 대응)
     if not vessel_name:
-        all_containers = data.get("containers") or tracking_data.get("containers") or []
-        for container in all_containers:
-            for ev in container.get("events", []):
-                v_cand = ev.get("vessel_name") or ev.get("vessel") or ev.get("vesselName")
-                if v_cand:
-                    vessel_name = v_cand
+        all_containers = (
+            (data.get("containers") if isinstance(data, dict) else None)
+            or (tracking_data.get("containers") if isinstance(tracking_data, dict) else None)
+            or (tracking_data.get("container_details") if isinstance(tracking_data, dict) else None)
+            or []
+        )
+        if isinstance(all_containers, list):
+            for container in all_containers:
+                if not isinstance(container, dict):
+                    continue
+                for ev in container.get("events", []):
+                    if not isinstance(ev, dict):
+                        continue
+                    v_cand = ev.get("vessel_name") or ev.get("vesselName")
+                    if not v_cand and isinstance(ev.get("vessel"), dict):
+                        v_cand = ev["vessel"].get("vessel_name") or ev["vessel"].get("name")
+                    elif not v_cand and isinstance(ev.get("vessel"), str):
+                        v_cand = ev.get("vessel")
+                    if v_cand:
+                        vessel_name = v_cand
+                        break
+                if vessel_name:
                     break
-            if vessel_name:
-                break
 
-    # B/L 번호 기반 지능형 폴백 (하드코딩된 ONE INNOVATION 전면 배제)
-    mbl_str = (mbl_no or data.get("mbl_no") or data.get("trackingId") or tracking_data.get("trackingId") or "").upper()
+    # 3. 경로 좌표 추출 및 TrackCargo AIS 세부 정보 파싱 (list/dict 양방향 완벽 대응)
+    route_raw = (
+        (data.get("route") if isinstance(data, dict) else None)
+        or (tracking_data.get("route") if isinstance(tracking_data, dict) else None)
+        or (data.get("route_map") if isinstance(data, dict) else None)
+        or (tracking_data.get("route_map") if isinstance(tracking_data, dict) else None)
+        or {}
+    )
+
+    mapbox_coords = []
+    last_pos = None
+    reported_distance_km = None
+
+    if isinstance(route_raw, dict):
+        raw_points = route_raw.get("route_points") or route_raw.get("coordinates") or []
+        if isinstance(raw_points, list):
+            for pt in raw_points:
+                if isinstance(pt, dict) and "lat" in pt and "lng" in pt:
+                    mapbox_coords.append([float(pt["lng"]), float(pt["lat"])])
+                elif isinstance(pt, (list, tuple)) and len(pt) >= 2:
+                    mapbox_coords.append([float(pt[1]), float(pt[0])])
+        last_pos = route_raw.get("last_known_position")
+        if route_raw.get("reported_distance_km") is not None:
+            try:
+                reported_distance_km = float(route_raw.get("reported_distance_km"))
+            except (ValueError, TypeError):
+                pass
+
+    elif isinstance(route_raw, list):
+        # TrackCargo 실제 응답 규격: route는 선박 운항 구간(Leg) 리스트
+        for leg in route_raw:
+            if not isinstance(leg, dict):
+                continue
+
+            # 선박 기본 정보 보강 (선박명, IMO, MMSI)
+            if not vessel_name and leg.get("vessel_name"):
+                vessel_name = leg.get("vessel_name")
+            if not active_vessel.get("imo") and leg.get("imo"):
+                active_vessel["imo"] = str(leg.get("imo"))
+            if not active_vessel.get("mmsi") and leg.get("mmsi"):
+                active_vessel["mmsi"] = str(leg.get("mmsi"))
+
+            # 선박 AIS positions 좌표 추출
+            positions = leg.get("positions") or []
+            if isinstance(positions, list):
+                for pos in positions:
+                    if isinstance(pos, dict):
+                        lat = pos.get("lat")
+                        lng = pos.get("lon") if "lon" in pos else pos.get("lng")
+                        if lat is not None and lng is not None:
+                            try:
+                                mapbox_coords.append([float(lng), float(lat)])
+                                last_pos = pos
+                                if pos.get("speed") is not None and not active_vessel.get("speed"):
+                                    active_vessel["speed"] = pos.get("speed")
+                                if pos.get("course") is not None and not active_vessel.get("course"):
+                                    active_vessel["course"] = pos.get("course")
+                            except (ValueError, TypeError):
+                                continue
+
+            if leg.get("reported_distance_km") is not None:
+                try:
+                    reported_distance_km = float(leg.get("reported_distance_km"))
+                except (ValueError, TypeError):
+                    pass
+
+    # B/L 번호 기반 지능형 폴백 (식별 불가 시에만 적용)
+    mbl_str = (mbl_no or (data.get("mbl_no") if isinstance(data, dict) else None) or (data.get("trackingId") if isinstance(data, dict) else None) or (tracking_data.get("trackingId") if isinstance(tracking_data, dict) else None) or "").upper()
     if not vessel_name and mbl_str:
         if "YML" in mbl_str:
             vessel_name = "YM WELLHEAD"
@@ -208,21 +289,9 @@ def parse_trackcargo_detail_payload(payload: dict, pod_code: str = "DEHAM", mbl_
             if not active_vessel.get("imo"):
                 active_vessel["imo"] = "9933133"
 
-    # 3. 경로 좌표 추출
-    route_info = data.get("route") or tracking_data.get("route") or data.get("route_map") or {}
-    raw_points = route_info.get("route_points") or route_info.get("coordinates") or []
-    
-    mapbox_coords = []
-    for pt in raw_points:
-        if isinstance(pt, dict) and "lat" in pt and "lng" in pt:
-            mapbox_coords.append([float(pt["lng"]), float(pt["lat"])])
-        elif isinstance(pt, (list, tuple)) and len(pt) >= 2:
-            mapbox_coords.append([float(pt[1]), float(pt[0])])
-            
-    # 4. 최후 위치(Last known position) 파싱 및 도착 완료 시 함부르크(POD) 좌표 강제 스냅
+    # 4. 최후 위치(Last known position) 파싱 및 도착 완료 시 목적지 항구(POD) 좌표 강제 스냅
     pod_key = pod_code.upper() if pod_code else "DEHAM"
     pod_coord = PORT_COORDINATES.get(pod_key, PORT_COORDINATES["DEHAM"])
-    last_pos = route_info.get("last_known_position")
 
     if is_arrived:
         last_lat = pod_coord["lat"]
@@ -235,13 +304,23 @@ def parse_trackcargo_detail_payload(payload: dict, pod_code: str = "DEHAM", mbl_
         speed_kn = float(active_vessel.get("speed", 0.0) or 0.0)
         course_deg = float(active_vessel.get("course", 0.0) or 0.0)
 
-        if isinstance(last_pos, dict) and "lat" in last_pos and "lng" in last_pos:
-            last_lat = float(last_pos["lat"])
-            last_lng = float(last_pos["lng"])
+        if isinstance(last_pos, dict):
+            lat = last_pos.get("lat")
+            lng = last_pos.get("lon") if "lon" in last_pos else last_pos.get("lng")
+            if lat is not None and lng is not None:
+                last_lat = float(lat)
+                last_lng = float(lng)
+            elif mapbox_coords:
+                last_lng, last_lat = mapbox_coords[-1][0], mapbox_coords[-1][1]
+            else:
+                last_lat, last_lng = None, None
         elif mapbox_coords:
             last_lng, last_lat = mapbox_coords[-1][0], mapbox_coords[-1][1]
         else:
             last_lat, last_lng = None, None
+
+    if reported_distance_km is None:
+        reported_distance_km = 27259.0 if is_arrived else 0.0
 
     return {
         "tracking_status": normalized_status,
@@ -252,7 +331,7 @@ def parse_trackcargo_detail_payload(payload: dict, pod_code: str = "DEHAM", mbl_
         "vessel_mmsi": str(active_vessel.get("mmsi", "") or ""),
         "vessel_speed_kn": speed_kn,
         "vessel_course_deg": course_deg,
-        "reported_distance_km": float(route_info.get("reported_distance_km") or (27259.0 if is_arrived else 0.0)),
+        "reported_distance_km": reported_distance_km,
         "last_lat": last_lat,
         "last_lng": last_lng,
         "route_coordinates": mapbox_coords,

@@ -177,7 +177,10 @@ async def fetch_tracking_data(order_id: str) -> Optional[Dict[str, Any]]:
                 
                 # Parse the response data according to the actual TrackCargo response structure
                 # The data is inside data["data"]["trackingData"]
-                tracking_data = data.get("data", {}).get("trackingData") or {}
+                raw_data = data.get("data") if isinstance(data, dict) else {}
+                tracking_data = (raw_data.get("trackingData") if isinstance(raw_data, dict) else None) or {}
+                if not isinstance(tracking_data, dict):
+                    tracking_data = {}
                 
                 etd = None
                 eta = None

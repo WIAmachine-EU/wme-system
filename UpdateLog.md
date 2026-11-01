@@ -22,6 +22,14 @@
   * 타이틀 하단의 불필요한 `⚡ 2시간 주기 스마트 Diff 감지 (v4.0)` 안내 텍스트를 삭제했습니다.
   * 해당 화면에서 쓰이지 않는 `[선적 업로드]` 버튼 및 미사용 import(`UploadCloud`)를 제거하여, `[Diff 갱신]` 버튼과 `[총 N 건]` 배지만 직관적으로 표시되도록 헤더 UI를 간결화했습니다.
 
+### 4. TrackCargo 선박 AIS 경로(`route`) 데이터 파싱 버그 수정 및 실시간 항로 방어 로직 강화
+* **원인 및 에러 해결 (`'list' object has no attribute 'get'`)**:
+  * TrackCargo API에서 선박 운항 경로(`route`) 데이터를 반환할 때, 단일 딕셔너리가 아닌 운항 구간(Leg) 정보와 실시간 AIS 이동 위치(`positions`) 배열을 담은 **리스트(`list[dict]`)** 형태로 제공됩니다.
+  * 기존 파서(`route_service.py`)에서 `route`를 딕셔너리로 간주하고 `.get()`을 호출하여 발생했던 `AttributeError: 'list' object has no attribute 'get'` 예외를 완벽히 해결했습니다.
+* **실시간 선박 및 항로 데이터 추출 지원 강화**:
+  * `route`가 `list`인 경우 각 구간에서 선박명(`vessel_name`), IMO, MMSI, 운항 속도(`speed`), 침로(`course`), 그리고 실시간 AIS 위치(`positions` 위경도) 목록을 Mapbox 좌표 형식(`[lng, lat]`)으로 안전하게 추출하도록 파서를 전면 개편했습니다.
+  * `trackcargo_api.py` 및 `route_service.py` 내 `milestones`, `containers`/`container_details`, `active_vessel` 등 다중 중첩 구조에 대한 타입 안전성(Defensive Handling)을 강화하여 예외 발생 위험을 원천 차단했습니다.
+
 ## [2026-10-31] WIA 프로모션(관리자·딜러포털) 리스트 개편, 재고리스트 예약 라이프사이클 연동 및 UI 최적화
 
 ### 1. 관리자포털 WIA 프로모션(`AdminPromotion.jsx`) 컬럼·UI 개편 및 예약 관리 일원화
