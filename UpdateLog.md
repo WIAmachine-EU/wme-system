@@ -1,6 +1,6 @@
 # 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
-## [2026-11-01] WIA 재고리스트 모바일 모달 풀스크린 및 예약상세 UI/UX 개편, WIA 창고 상태 배지 규격화, 선적 트래킹 UI 정제
+## [2026-11-01] WIA 재고리스트 모바일 풀스크린 모달 및 UI/UX 개편, 창고 상태 배지 규격화, 선적 트래킹 UI 정제, TrackCargo AIS 경로 파싱 및 SCAC 보정
 
 ### 1. WIA 재고리스트(`AdminInventory.jsx`) 모바일 모달 풀스크린(Full-Screen) 및 UI/UX 전면 개편
 * **모바일 전체 화면 팝업 모달 전환**:
