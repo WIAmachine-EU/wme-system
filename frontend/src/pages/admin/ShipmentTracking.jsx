@@ -16,8 +16,7 @@ import {
   CheckCircle2, 
   RefreshCw, 
   Zap, 
-  ShieldCheck,
-  UploadCloud
+  ShieldCheck
 } from 'lucide-react';
 import { DelayRateWidget } from '../../components/ShipmentWidgets';
 import TrackingMapboxWidget from '../../components/TrackingMapboxWidget';
@@ -190,34 +189,8 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
                 <h2 style={{ fontSize: isMobile ? '1.05rem' : '1.125rem', fontWeight: 'bold', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                   <Ship size={20} color="#2563eb" /> 선적 트래킹
                 </h2>
-                <span style={{ fontSize: '11px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
-                  <Zap size={11} color="#f59e0b" /> 2시간 주기 스마트 Diff 감지 (v4.0)
-                </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                {onNavigateUpload && (
-                  <button
-                    onClick={onNavigateUpload}
-                    title="선적정보 엑셀 일괄 업로드 페이지로 이동"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      padding: '4px 8px',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      color: '#0284c7',
-                      backgroundColor: '#f0f9ff',
-                      border: '1px solid #bae6fd',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    <UploadCloud size={12} />
-                    선적 업로드
-                  </button>
-                )}
                 <button
                   onClick={handleTriggerManualSync}
                   disabled={isManualSyncing}

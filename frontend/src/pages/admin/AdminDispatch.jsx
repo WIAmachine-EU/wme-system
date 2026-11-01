@@ -699,14 +699,20 @@ export default function AdminDispatch({ isMobileView }) {
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                         {t('dispatch.header_status', '상태')}: 
                         <span style={{
-                          display: 'inline-block',
-                          padding: '2px 8px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '76px',
+                          padding: '2px 0',
                           borderRadius: '12px',
                           fontSize: '10px',
                           fontWeight: 600,
                           color: stockBadge.color,
                           background: stockBadge.bg,
-                          border: `1px solid ${stockBadge.border}`
+                          border: `1px solid ${stockBadge.border}`,
+                          textAlign: 'center',
+                          whiteSpace: 'nowrap',
+                          boxSizing: 'border-box'
                         }}>
                           {stockBadge.label}
                         </span>
@@ -844,14 +850,20 @@ export default function AdminDispatch({ isMobileView }) {
                           {/* 6. 상태 */}
                           <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px', textAlign: 'center' }}>
                             <span style={{
-                              display: 'inline-block',
-                              padding: '4px 8px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '80px',
+                              padding: '4px 0',
                               borderRadius: '12px',
                               fontSize: '11px',
                               fontWeight: 600,
                               color: stockBadge.color,
                               background: stockBadge.bg,
-                              border: `1px solid ${stockBadge.border}`
+                              border: `1px solid ${stockBadge.border}`,
+                              textAlign: 'center',
+                              whiteSpace: 'nowrap',
+                              boxSizing: 'border-box'
                             }}>
                               {stockBadge.label}
                             </span>

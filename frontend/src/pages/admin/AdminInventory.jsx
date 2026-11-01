@@ -1312,19 +1312,24 @@ export default function AdminInventory({ isMobileView }) {
             backgroundColor: 'rgba(0, 0, 0, 0.65)',
             backdropFilter: 'blur(5px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            zIndex: 9999, padding: '20px'
+            zIndex: 9999, padding: isMobileView ? 0 : '20px'
           }}
           onClick={() => setReserveModalOpen(false)}
         >
           <div
             className="glass-card no-hover-bg"
             style={{
-              width: '100%', maxWidth: '520px',
+              width: isMobileView ? '100vw' : '100%',
+              maxWidth: isMobileView ? '100vw' : '520px',
+              height: isMobileView ? '100vh' : 'auto',
+              maxHeight: isMobileView ? '100vh' : '90vh',
               backgroundColor: 'var(--bg-card, #ffffff)',
-              border: '1px solid var(--border-color)',
-              borderRadius: '16px',
-              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.45)',
+              border: isMobileView ? 'none' : '1px solid var(--border-color)',
+              borderRadius: isMobileView ? 0 : '16px',
+              boxShadow: isMobileView ? 'none' : '0 20px 40px rgba(0, 0, 0, 0.45)',
               overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
               animation: 'modalFadeIn 0.2s ease-out'
             }}
             onClick={e => e.stopPropagation()}
@@ -1332,9 +1337,10 @@ export default function AdminInventory({ isMobileView }) {
             {/* 모달 헤더 */}
             <div style={{
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              padding: '18px 24px',
+              padding: isMobileView ? '14px 16px' : '18px 24px',
               borderBottom: '1px solid var(--border-color)',
-              background: 'linear-gradient(to right, rgba(0, 51, 153, 0.12), transparent)'
+              background: 'linear-gradient(to right, rgba(0, 51, 153, 0.12), transparent)',
+              flexShrink: 0
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{
@@ -1369,7 +1375,14 @@ export default function AdminInventory({ isMobileView }) {
             </div>
 
             {/* 모달 바디 */}
-            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div style={{
+              padding: isMobileView ? '16px 12px' : '24px',
+              display: 'flex', flexDirection: 'column',
+              gap: isMobileView ? '14px' : '18px',
+              flex: 1,
+              overflowY: 'auto',
+              WebkitOverflowScrolling: 'touch'
+            }}>
               {/* 공지 내용 텍스트 박스 */}
               <div style={{
                 backgroundColor: 'rgba(59, 130, 246, 0.08)',
@@ -1515,22 +1528,28 @@ export default function AdminInventory({ isMobileView }) {
 
             {/* 모달 푸터 버튼 */}
             <div style={{
-              padding: '16px 24px',
+              padding: isMobileView ? '12px 14px' : '16px 24px',
               borderTop: '1px solid var(--border-color)',
-              display: 'flex', justifyContent: 'flex-end', gap: '10px',
-              backgroundColor: 'var(--bg-card)'
+              display: 'flex', justifyContent: isMobileView ? 'stretch' : 'flex-end',
+              gap: isMobileView ? '8px' : '10px',
+              backgroundColor: 'var(--bg-card)',
+              flexShrink: 0
             }}>
               <button
                 type="button"
                 onClick={() => setReserveModalOpen(false)}
                 style={{
-                  padding: '9px 18px',
+                  flex: isMobileView ? 1 : 'none',
+                  padding: isMobileView ? '11px 14px' : '9px 18px',
                   borderRadius: '8px',
                   border: '1px solid var(--border-color)',
                   background: 'transparent',
                   color: 'var(--text-secondary)',
                   fontSize: '0.85rem',
-                  cursor: 'pointer'
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  justifyContent: 'center'
                 }}
               >
                 취소
@@ -1541,13 +1560,16 @@ export default function AdminInventory({ isMobileView }) {
                 disabled={savingReserve}
                 className="btn btn-primary"
                 style={{
-                  padding: '9px 20px',
+                  flex: isMobileView ? 1.5 : 'none',
+                  padding: isMobileView ? '11px 14px' : '9px 20px',
                   fontSize: '0.88rem',
                   fontWeight: 600,
                   display: 'inline-flex',
                   alignItems: 'center',
+                  justifyContent: 'center',
                   gap: '6px',
-                  cursor: savingReserve ? 'not-allowed' : 'pointer'
+                  cursor: savingReserve ? 'not-allowed' : 'pointer',
+                  whiteSpace: 'nowrap'
                 }}
               >
                 <CheckCircle2 size={16} />
@@ -1566,19 +1588,24 @@ export default function AdminInventory({ isMobileView }) {
             backgroundColor: 'rgba(0, 0, 0, 0.65)',
             backdropFilter: 'blur(5px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            zIndex: 9999, padding: '20px'
+            zIndex: 9999, padding: isMobileView ? 0 : '20px'
           }}
           onClick={() => setReserveDetailModalOpen(false)}
         >
           <div
             className="glass-card no-hover-bg"
             style={{
-              width: '100%', maxWidth: '540px',
+              width: isMobileView ? '100vw' : '100%',
+              maxWidth: isMobileView ? '100vw' : '540px',
+              height: isMobileView ? '100vh' : 'auto',
+              maxHeight: isMobileView ? '100vh' : '90vh',
               backgroundColor: 'var(--bg-card, #ffffff)',
-              border: '1px solid var(--border-color)',
-              borderRadius: '16px',
-              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.45)',
+              border: isMobileView ? 'none' : '1px solid var(--border-color)',
+              borderRadius: isMobileView ? 0 : '16px',
+              boxShadow: isMobileView ? 'none' : '0 20px 40px rgba(0, 0, 0, 0.45)',
               overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
               animation: 'modalFadeIn 0.2s ease-out'
             }}
             onClick={e => e.stopPropagation()}
@@ -1586,9 +1613,10 @@ export default function AdminInventory({ isMobileView }) {
             {/* 헤더 */}
             <div style={{
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              padding: '18px 24px',
+              padding: isMobileView ? '14px 16px' : '18px 24px',
               borderBottom: '1px solid var(--border-color)',
-              background: 'linear-gradient(to right, rgba(124, 58, 237, 0.12), transparent)'
+              background: 'linear-gradient(to right, rgba(124, 58, 237, 0.12), transparent)',
+              flexShrink: 0
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{
@@ -1621,26 +1649,33 @@ export default function AdminInventory({ isMobileView }) {
             </div>
 
             {/* 바디 */}
-            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{
+              padding: isMobileView ? '12px 10px' : '24px',
+              display: 'flex', flexDirection: 'column',
+              gap: isMobileView ? '12px' : '16px',
+              flex: 1,
+              overflowY: 'auto',
+              WebkitOverflowScrolling: 'touch'
+            }}>
               {/* 예약 요약 카드 */}
               <div style={{
                 background: 'rgba(45, 99, 255, 0.05)',
                 border: '1px solid rgba(45, 99, 255, 0.2)',
                 borderRadius: '12px',
-                padding: '16px',
+                padding: isMobileView ? '12px 12px' : '16px',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '12px'
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                   <div>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>예약 딜러사</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <strong style={{ fontSize: '1.08rem', color: 'var(--accent-cyan)' }}>
+                    <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>예약 딜러사</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <strong style={{ fontSize: isMobileView ? '1.02rem' : '1.08rem', color: 'var(--accent-cyan)' }}>
                         {reserveDetailOrder.reserved_dealer?.name || reserveDetailOrder.dealer_company?.name || '-'}
                       </strong>
                       {reserveDetailOrder.reserved_dealer?.country && (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', background: 'var(--bg-card)', padding: '2px 8px', borderRadius: '999px', border: '1px solid var(--border-color)' }}>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', background: 'var(--bg-card)', padding: '2px 8px', borderRadius: '999px', border: '1px solid var(--border-color)' }}>
                           {reserveDetailOrder.reserved_dealer.country}
                         </span>
                       )}
@@ -1652,7 +1687,7 @@ export default function AdminInventory({ isMobileView }) {
                     return (
                       <span style={{
                         display: 'inline-flex', alignItems: 'center', gap: '5px',
-                        padding: '4px 10px', borderRadius: '999px', fontSize: '0.78rem', fontWeight: 700,
+                        padding: '4px 10px', borderRadius: '999px', fontSize: '0.76rem', fontWeight: 700,
                         backgroundColor: rem.urgent ? 'rgba(230, 0, 18, 0.1)' : 'rgba(124, 58, 237, 0.12)',
                         color: rem.urgent ? 'var(--wia-red)' : '#7c3aed'
                       }}>
@@ -1664,42 +1699,42 @@ export default function AdminInventory({ isMobileView }) {
                 </div>
 
                 <div style={{
-                  display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px',
+                  display: 'grid', gridTemplateColumns: '1fr 1fr', gap: isMobileView ? '8px' : '12px',
                   paddingTop: '12px', borderTop: '1px dashed rgba(45, 99, 255, 0.2)'
                 }}>
                   <div>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>예약 시작일</span>
-                    <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                    <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>예약 시작일</span>
+                    <div style={{ fontSize: isMobileView ? '0.86rem' : '0.92rem', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
                       {formatExpiryDateMMM(reserveDetailOrder.reservation_start_date)}
-                    </strong>
+                    </div>
                     {reserveDetailOrder.reservation_start_date && (
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '6px' }}>
-                        ({formatDateToYYYYMMDD(reserveDetailOrder.reservation_start_date)})
-                      </span>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px', whiteSpace: 'nowrap' }}>
+                        {formatDateToYYYYMMDD(reserveDetailOrder.reservation_start_date)}
+                      </div>
                     )}
                   </div>
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>예약 만료일</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
+                      <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>예약 만료일</span>
                       <button
                         type="button"
                         onClick={() => handleOpenReserveModalForEdit(reserveDetailOrder)}
                         style={{
                           background: 'transparent', border: 'none', color: 'var(--wia-blue)',
-                          fontSize: '0.74rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px', padding: 0
+                          fontSize: '0.74rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '2px', padding: 0
                         }}
                       >
                         <Edit2 size={11} />
                         {t('menu2.btn_edit_reservation_period', '기간수정')}
                       </button>
                     </div>
-                    <strong style={{ fontSize: '0.9rem', color: 'var(--wia-red)' }}>
+                    <div style={{ fontSize: isMobileView ? '0.86rem' : '0.92rem', fontWeight: 700, color: 'var(--wia-red)', whiteSpace: 'nowrap' }}>
                       {formatExpiryDateMMM(reserveDetailOrder.reservation_expiry_date)}
-                    </strong>
+                    </div>
                     {reserveDetailOrder.reservation_expiry_date && (
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '6px' }}>
-                        ({formatDateToYYYYMMDD(reserveDetailOrder.reservation_expiry_date)})
-                      </span>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px', whiteSpace: 'nowrap' }}>
+                        {formatDateToYYYYMMDD(reserveDetailOrder.reservation_expiry_date)}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -1710,49 +1745,50 @@ export default function AdminInventory({ isMobileView }) {
                 background: 'var(--bg-secondary)',
                 border: '1px solid var(--border-color)',
                 borderRadius: '12px',
-                padding: '16px',
-                display: 'flex', flexDirection: 'column', gap: '10px',
+                padding: isMobileView ? '12px 12px' : '16px',
+                display: 'flex', flexDirection: 'column',
+                gap: isMobileView ? '8px' : '10px',
                 fontSize: '0.84rem'
               }}>
                 <div style={{ fontWeight: 700, fontSize: '0.86rem', color: 'var(--text-primary)', marginBottom: '2px' }}>
                   예약 장비 상세 정보
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: isMobileView ? '8px' : '10px' }}>
                   <div>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', display: 'block' }}>모델 / NC</span>
-                    <strong style={{ color: 'var(--text-primary)' }}>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem', display: 'block' }}>모델 / NC</span>
+                    <strong style={{ color: 'var(--text-primary)', fontSize: isMobileView ? '0.82rem' : '0.85rem', wordBreak: 'break-word' }}>
                       {reserveDetailOrder.product_model?.model_name || '-'} / {reserveDetailOrder.nc || 'F0iP'}
                     </strong>
                   </div>
                   <div>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', display: 'block' }}>발주번호 (P/O)</span>
-                    <strong style={{ color: 'var(--accent-cyan)' }}>{reserveDetailOrder.reference_no || '-'}</strong>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem', display: 'block' }}>발주번호 (P/O)</span>
+                    <strong style={{ color: 'var(--accent-cyan)', fontSize: isMobileView ? '0.82rem' : '0.85rem' }}>{reserveDetailOrder.reference_no || '-'}</strong>
                   </div>
                   <div>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', display: 'block' }}>시리얼 번호 (S/N)</span>
-                    <strong style={{ color: 'var(--text-primary)' }}>{reserveDetailOrder.serial_number || '-'}</strong>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem', display: 'block' }}>시리얼 번호 (S/N)</span>
+                    <strong style={{ color: 'var(--text-primary)', fontSize: isMobileView ? '0.82rem' : '0.85rem' }}>{reserveDetailOrder.serial_number || '-'}</strong>
                   </div>
                   <div>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', display: 'block' }}>구매가 (€)</span>
-                    <strong style={{ color: 'var(--text-primary)' }}>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem', display: 'block' }}>구매가 (€)</span>
+                    <strong style={{ color: 'var(--text-primary)', fontSize: isMobileView ? '0.82rem' : '0.85rem' }}>
                       {reserveDetailOrder.price ? (!isNaN(reserveDetailOrder.price) ? Number(reserveDetailOrder.price).toLocaleString() : reserveDetailOrder.price) : '-'}
                     </strong>
                   </div>
                   <div>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', display: 'block' }}>진행 상태</span>
-                    <strong style={{ color: 'var(--text-primary)' }}>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem', display: 'block' }}>진행 상태</span>
+                    <strong style={{ color: 'var(--text-primary)', fontSize: isMobileView ? '0.82rem' : '0.85rem' }}>
                       {reserveDetailOrder.current_status ? t(`stepbar.${reserveDetailOrder.current_status.toLowerCase()}`, reserveDetailOrder.current_status) : '-'}
                     </strong>
                   </div>
                   <div>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', display: 'block' }}>도착지 / ETA</span>
-                    <strong style={{ color: 'var(--text-primary)' }}>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem', display: 'block' }}>도착지 / ETA</span>
+                    <strong style={{ color: 'var(--text-primary)', fontSize: isMobileView ? '0.82rem' : '0.85rem' }}>
                       {getStandardPort(reserveDetailOrder.destination_port)} / {reserveDetailOrder.eta ? new Date(reserveDetailOrder.eta).toLocaleDateString() : '-'}
                     </strong>
                   </div>
                 </div>
                 <div style={{ paddingTop: '8px', borderTop: '1px solid var(--border-color)' }}>
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', display: 'block', marginBottom: '2px' }}>옵션 상세 (DETAIL SPEC)</span>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem', display: 'block', marginBottom: '2px' }}>옵션 상세 (DETAIL SPEC)</span>
                   <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', lineHeight: 1.45 }}>
                     {reserveDetailOrder.detail_spec || 'T/F, CC(S-H)+B, 20BAR, B/I, P/C, Q(A)'}
                   </div>
@@ -1760,65 +1796,79 @@ export default function AdminInventory({ isMobileView }) {
               </div>
             </div>
 
-            {/* 푸터: 좌측 [예약취소], 우측 [판매완료] & [닫기] */}
+            {/* 푸터: [예약취소], [판매완료], [닫기] 3개 버튼 나란히 배치 */}
             <div style={{
-              padding: '16px 24px',
+              padding: isMobileView ? '12px 10px' : '16px 24px',
               borderTop: '1px solid var(--border-color)',
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px',
-              backgroundColor: 'var(--bg-card)', flexWrap: 'wrap'
+              display: 'flex', alignItems: 'center',
+              gap: isMobileView ? '6px' : '10px',
+              backgroundColor: 'var(--bg-card)',
+              flexShrink: 0
             }}>
               <button
                 type="button"
                 onClick={() => handleCancelReservation(reserveDetailOrder)}
                 disabled={cancellingReserve}
                 style={{
-                  padding: '9px 16px',
+                  flex: isMobileView ? 1 : 'none',
+                  padding: isMobileView ? '10px 4px' : '9px 16px',
                   borderRadius: '8px',
                   border: '1px solid var(--wia-red)',
                   background: 'rgba(230, 0, 18, 0.04)',
                   color: 'var(--wia-red)',
-                  fontSize: '0.85rem',
+                  fontSize: isMobileView ? '0.8rem' : '0.85rem',
                   fontWeight: 600,
                   cursor: cancellingReserve ? 'not-allowed' : 'pointer',
-                  display: 'inline-flex', alignItems: 'center', gap: '6px',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                  whiteSpace: 'nowrap',
                   transition: 'all 0.15s'
                 }}
               >
-                <Trash2 size={15} />
-                {cancellingReserve ? '취소 처리 중...' : t('menu2.btn_cancel_reservation', '예약취소')}
+                <Trash2 size={isMobileView ? 14 : 15} />
+                {cancellingReserve ? '취소 중..' : t('menu2.btn_cancel_reservation', '예약취소')}
               </button>
 
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{
+                display: 'flex',
+                gap: isMobileView ? '6px' : '8px',
+                flex: isMobileView ? 2 : 'none',
+                alignItems: 'center'
+              }}>
                 <button
                   type="button"
                   onClick={() => handleOpenReserveSaleModal(reserveDetailOrder)}
                   style={{
-                    padding: '9px 16px',
+                    flex: isMobileView ? 1.1 : 'none',
+                    padding: isMobileView ? '10px 4px' : '9px 16px',
                     borderRadius: '8px',
                     border: '1px solid var(--status-stock)',
                     background: 'hsla(142, 76%, 46%, 0.1)',
                     color: 'var(--status-stock)',
-                    fontSize: '0.85rem',
+                    fontSize: isMobileView ? '0.8rem' : '0.85rem',
                     fontWeight: 600,
                     cursor: 'pointer',
-                    display: 'inline-flex', alignItems: 'center', gap: '6px'
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                    whiteSpace: 'nowrap'
                   }}
                 >
-                  <CheckCircle2 size={15} />
+                  <CheckCircle2 size={isMobileView ? 14 : 15} />
                   {t('menu2.btn_sold_complete', '판매완료')}
                 </button>
                 <button
                   type="button"
                   onClick={() => setReserveDetailModalOpen(false)}
                   style={{
-                    padding: '9px 18px',
+                    flex: isMobileView ? 0.9 : 'none',
+                    padding: isMobileView ? '10px 4px' : '9px 18px',
                     borderRadius: '8px',
                     border: '1px solid var(--border-color)',
                     background: 'transparent',
                     color: 'var(--text-secondary)',
-                    fontSize: '0.85rem',
+                    fontSize: isMobileView ? '0.8rem' : '0.85rem',
                     fontWeight: 600,
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    whiteSpace: 'nowrap'
                   }}
                 >
                   닫기
@@ -1837,28 +1887,34 @@ export default function AdminInventory({ isMobileView }) {
             backgroundColor: 'rgba(0, 0, 0, 0.65)',
             backdropFilter: 'blur(5px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            zIndex: 9999, padding: '20px'
+            zIndex: 9999, padding: isMobileView ? 0 : '20px'
           }}
           onClick={() => setReserveSaleModalOpen(false)}
         >
           <div
             className="glass-card no-hover-bg"
             style={{
-              width: '100%', maxWidth: '480px',
+              width: isMobileView ? '100vw' : '100%',
+              maxWidth: isMobileView ? '100vw' : '480px',
+              height: isMobileView ? '100vh' : 'auto',
+              maxHeight: isMobileView ? '100vh' : '90vh',
               backgroundColor: 'var(--bg-card, #ffffff)',
-              border: '1px solid var(--border-color)',
-              borderRadius: '16px',
-              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.45)',
+              border: isMobileView ? 'none' : '1px solid var(--border-color)',
+              borderRadius: isMobileView ? 0 : '16px',
+              boxShadow: isMobileView ? 'none' : '0 20px 40px rgba(0, 0, 0, 0.45)',
               overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
               animation: 'modalFadeIn 0.2s ease-out'
             }}
             onClick={e => e.stopPropagation()}
           >
             <div style={{
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              padding: '18px 24px',
+              padding: isMobileView ? '14px 16px' : '18px 24px',
               borderBottom: '1px solid var(--border-color)',
-              background: 'linear-gradient(to right, rgba(22, 196, 127, 0.14), transparent)'
+              background: 'linear-gradient(to right, rgba(22, 196, 127, 0.14), transparent)',
+              flexShrink: 0
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{
@@ -1890,7 +1946,14 @@ export default function AdminInventory({ isMobileView }) {
               </button>
             </div>
 
-            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{
+              padding: isMobileView ? '16px 12px' : '24px',
+              display: 'flex', flexDirection: 'column',
+              gap: isMobileView ? '14px' : '16px',
+              flex: 1,
+              overflowY: 'auto',
+              WebkitOverflowScrolling: 'touch'
+            }}>
               <div style={{
                 backgroundColor: 'rgba(22, 196, 127, 0.08)',
                 border: '1px solid rgba(22, 196, 127, 0.28)',
@@ -1953,10 +2016,12 @@ export default function AdminInventory({ isMobileView }) {
             </div>
 
             <div style={{
-              padding: '16px 24px',
+              padding: isMobileView ? '12px 14px' : '16px 24px',
               borderTop: '1px solid var(--border-color)',
-              display: 'flex', justifyContent: 'flex-end', gap: '10px',
-              backgroundColor: 'var(--bg-card)'
+              display: 'flex', justifyContent: isMobileView ? 'stretch' : 'flex-end',
+              gap: isMobileView ? '8px' : '10px',
+              backgroundColor: 'var(--bg-card)',
+              flexShrink: 0
             }}>
               <button
                 type="button"
@@ -2006,19 +2071,24 @@ export default function AdminInventory({ isMobileView }) {
             backgroundColor: 'rgba(0, 0, 0, 0.65)',
             backdropFilter: 'blur(5px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            zIndex: 9999, padding: '20px'
+            zIndex: 9999, padding: isMobileView ? 0 : '20px'
           }}
           onClick={() => setRentalModalOpen(false)}
         >
           <div
             className="glass-card no-hover-bg"
             style={{
-              width: '100%', maxWidth: '520px',
+              width: isMobileView ? '100vw' : '100%',
+              maxWidth: isMobileView ? '100vw' : '520px',
+              height: isMobileView ? '100vh' : 'auto',
+              maxHeight: isMobileView ? '100vh' : '90vh',
               backgroundColor: 'var(--bg-card, #1a202c)',
-              border: '1px solid var(--border-color, rgba(255, 255, 255, 0.12))',
-              borderRadius: '16px',
-              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.45)',
+              border: isMobileView ? 'none' : '1px solid var(--border-color, rgba(255, 255, 255, 0.12))',
+              borderRadius: isMobileView ? 0 : '16px',
+              boxShadow: isMobileView ? 'none' : '0 20px 40px rgba(0, 0, 0, 0.45)',
               overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
               animation: 'modalFadeIn 0.2s ease-out'
             }}
             onClick={e => e.stopPropagation()}
@@ -2026,9 +2096,10 @@ export default function AdminInventory({ isMobileView }) {
             {/* 모달 헤더 */}
             <div style={{
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              padding: '18px 24px',
+              padding: isMobileView ? '14px 16px' : '18px 24px',
               borderBottom: '1px solid var(--border-color)',
-              background: 'linear-gradient(to right, rgba(0, 51, 153, 0.15), transparent)'
+              background: 'linear-gradient(to right, rgba(0, 51, 153, 0.15), transparent)',
+              flexShrink: 0
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{
@@ -2061,7 +2132,14 @@ export default function AdminInventory({ isMobileView }) {
             </div>
 
             {/* 모달 바디 */}
-            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div style={{
+              padding: isMobileView ? '16px 12px' : '24px',
+              display: 'flex', flexDirection: 'column',
+              gap: isMobileView ? '14px' : '18px',
+              flex: 1,
+              overflowY: 'auto',
+              WebkitOverflowScrolling: 'touch'
+            }}>
               
               {/* 공지 내용 텍스트 박스 */}
               <div style={{
@@ -2192,22 +2270,28 @@ export default function AdminInventory({ isMobileView }) {
 
             {/* 모달 푸터 버튼 */}
             <div style={{
-              padding: '16px 24px',
+              padding: isMobileView ? '12px 14px' : '16px 24px',
               borderTop: '1px solid var(--border-color)',
-              display: 'flex', justifyContent: 'flex-end', gap: '10px',
-              backgroundColor: 'var(--bg-card)'
+              display: 'flex', justifyContent: isMobileView ? 'stretch' : 'flex-end',
+              gap: isMobileView ? '8px' : '10px',
+              backgroundColor: 'var(--bg-card)',
+              flexShrink: 0
             }}>
               <button
                 type="button"
                 onClick={() => setRentalModalOpen(false)}
                 style={{
-                  padding: '9px 18px',
+                  flex: isMobileView ? 1 : 'none',
+                  padding: isMobileView ? '11px 14px' : '9px 18px',
                   borderRadius: '8px',
                   border: '1px solid var(--border-color)',
                   background: 'transparent',
                   color: 'var(--text-secondary)',
                   fontSize: '0.85rem',
-                  cursor: 'pointer'
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  justifyContent: 'center'
                 }}
               >
                 취소
@@ -2218,13 +2302,16 @@ export default function AdminInventory({ isMobileView }) {
                 disabled={savingRental}
                 className="btn btn-primary"
                 style={{
-                  padding: '9px 20px',
+                  flex: isMobileView ? 1.5 : 'none',
+                  padding: isMobileView ? '11px 14px' : '9px 20px',
                   fontSize: '0.88rem',
                   fontWeight: 600,
                   display: 'inline-flex',
                   alignItems: 'center',
+                  justifyContent: 'center',
                   gap: '6px',
-                  cursor: savingRental ? 'not-allowed' : 'pointer'
+                  cursor: savingRental ? 'not-allowed' : 'pointer',
+                  whiteSpace: 'nowrap'
                 }}
               >
                 <CheckCircle2 size={16} />
