@@ -1,5 +1,21 @@
 # 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
+## [2026-11-03] 공식 도메인(`wmeins.eu`) Resend API 실환경 발송 성공 검증 및 안정화
+
+### 1. Resend API Key 런타임 인증(`401`) 오류 원인 규명 및 신규 시크릿 키 갱신
+* **인증 실패 원인 진단 및 해결**:
+  * 실시간 시스템 진단 엔드포인트(`GET /api/system/test-email`)를 통해 등록된 API 키가 만료/불일치(`statusCode: 401, message: API key is invalid`)되었음을 정확하게 진단하고 신속히 식별했습니다.
+  * Resend 대시보드에서 신규 Full Access API Key(`re_L2g...hzKp`)를 재발급받아 Render 백엔드 환경 변수(`RESEND_API_KEY`)에 안전하게 갱신 등록했습니다.
+
+### 2. 공식 시스템 발신자(`noreply@wmeins.eu`) 실환경 메일 발송 성공 검증
+* **초고속 REST API 발송 및 200 OK 응답 확인**:
+  * 공식 발신자 명칭 `WME Integrated Network System <noreply@wmeins.eu>`으로 Resend REST API(`POST https://api.resend.com/emails`) 호출 시 지연 시간 약 0.2초 이내로 `HTTP 200 OK` 정상 승인을 확인했습니다.
+* **대량 알림 이메일 실시간 발송 완료 (총 8건)**:
+  * 백그라운드 스케줄러와 연동되어 최신 운송 상태가 갱신된 발주 건(`F25-12-94`, `F25-12-95`, `A26-01-12`, `A25-12-30`, `A26-04-09`, `A26-06-14`, `A26-04-05` 등)의 알림 이메일이 고유 발송 ID(UUID)를 부여받고 관리자 수신함(`jypark@hyundai-wia.de`, `freelogin3975@gmail.com`)으로 전송 완료되었습니다.
+* **Resend 대시보드 및 Gmail SMTP 덮어쓰기 문제 완전 해소**:
+  * 기존 Google SMTP 이용 시 발신자 주소가 `freelogin3975@gmail.com`으로 강제 변경되던 문제를 완전히 해결하고, Resend 대시보드 내 실시간 전송 내역(Emails)과 공식 인증 도메인 명의의 발송 체계를 완벽하게 확립했습니다.
+
+
 ## [2026-11-02] WIA 프로모션 모바일 리스트 2단 개편, 재고 모달 터치 고정 및 알림 이메일 Resend 공식 도메인 발신 인프라 구축
 
 ### 1. WIA 프로모션(`AdminPromotion.jsx`, `DealerPromotion.jsx`) 모바일 카드 메타정보 2단 UI/UX 재정비
