@@ -10,7 +10,8 @@ from email_service import (
     send_eta_update_notification,
     send_delivery_due_alert,
     send_promotion_expiry_alert,
-    send_rental_expiry_alert
+    send_rental_expiry_alert,
+    ADMIN_EMAILS
 )
 
 logger = logging.getLogger(__name__)
@@ -107,7 +108,7 @@ def process_periodic_eta_notifications():
                                         ).all()
                                         dealer_emails = [d.email for d in dealers if d.email and "@example.com" not in d.email]
                                     
-                                    recipients = "jypark@hyundai-wia.de; freelogin3975@gmail.com"
+                                    recipients = ADMIN_EMAILS
                                     if dealer_emails:
                                         recipients = f"{recipients}; {'; '.join(dealer_emails)}"
                                     send_eta_update_notification(order.reference_no, order.vessel, new_eta.strftime('%Y-%m-%d %H:%M'), to_email=recipients)
@@ -141,7 +142,7 @@ def process_periodic_eta_notifications():
                         current_eta = order.eta.strftime('%Y-%m-%d %H:%M') if order.eta else "미정"
                         logger.info(f"Order {order.reference_no}: Sending {days}-day interval notification.")
                         
-                        to_email = "jypark@hyundai-wia.de; freelogin3975@gmail.com"
+                        to_email = ADMIN_EMAILS
                         if order.dealer_company_id:
                             dealers = db.query(models.CustomUser).filter(
                                 models.CustomUser.dealer_company_id == order.dealer_company_id,
@@ -190,7 +191,7 @@ def check_delivery_due_alerts(db: Session, now: datetime):
                     current_month_key = f"{now.year}-{now.month:02d}"
                     if order.last_delivery_alert_month != current_month_key:
                         model_name = order.product_model.model_name if order.product_model else "-"
-                        to_email = "jypark@hyundai-wia.de; freelogin3975@gmail.com"
+                        to_email = ADMIN_EMAILS
                         send_delivery_due_alert(
                             to_email,
                             order.reference_no,
@@ -231,7 +232,7 @@ def check_promotion_expiry_alerts(db: Session, now: datetime):
             dealer_name = promo.reserved_dealer.name if promo.reserved_dealer else "미지정"
             expiry_str = promo.reservation_expiry.strftime('%Y-%m-%d %H:%M')
             
-            to_email = "jypark@hyundai-wia.de; freelogin3975@gmail.com"
+            to_email = ADMIN_EMAILS
             if promo.reserved_dealer_id:
                 dealers = db.query(models.CustomUser).filter(
                     models.CustomUser.dealer_company_id == promo.reserved_dealer_id,
@@ -270,7 +271,7 @@ def check_rental_expiry_alerts(db: Session, now: datetime):
             dealer_name = order.dealer_company.name if order.dealer_company else "미지정"
             expiry_str = order.rental_expiry_date.strftime('%Y-%m-%d')
             
-            to_email = "jypark@hyundai-wia.de; freelogin3975@gmail.com"
+            to_email = ADMIN_EMAILS
             send_rental_expiry_alert(
                 to_email,
                 order.reference_no,
@@ -307,7 +308,7 @@ def check_order_reservation_expiry_alerts(db: Session, now: datetime):
             dealer_name = order.reserved_dealer.name if order.reserved_dealer else "미지정"
             expiry_str = order.reservation_expiry_date.strftime('%Y-%m-%d')
 
-            to_email = "jypark@hyundai-wia.de; freelogin3975@gmail.com"
+            to_email = ADMIN_EMAILS
             if order.reserved_dealer_id:
                 dealers = db.query(models.CustomUser).filter(
                     models.CustomUser.dealer_company_id == order.reserved_dealer_id,

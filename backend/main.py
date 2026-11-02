@@ -15,7 +15,7 @@ import schemas
 from auth_supabase import get_current_user_from_supabase # 👈 이 줄 추가
 from seed import init_seed
 from scheduler import start_scheduler, stop_scheduler
-from email_service import send_etd_notification, send_warehouse_arrival_notification, send_port_arrival_notification
+from email_service import send_etd_notification, send_warehouse_arrival_notification, send_port_arrival_notification, ADMIN_EMAILS
 from storage import default_storage
 
 app = FastAPI(
@@ -850,7 +850,7 @@ def update_order_status(
     # Trigger Notifications based on status change
     if payload.direction == models.OrderDirection.FORWARD:
         def get_notification_recipients(order_obj):
-            recipients = ["jypark@hyundai-wia.de", "freelogin3975@gmail.com"]
+            recipients = [e.strip() for e in ADMIN_EMAILS.split(";") if e.strip()]
             if order_obj.dealer_company_id:
                 dealers = db.query(models.CustomUser).filter(
                     models.CustomUser.dealer_company_id == order_obj.dealer_company_id,

@@ -1,6 +1,6 @@
 # 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
-## [2026-11-02] WIA 프로모션 모바일 리스트 메타정보 2단 개편 및 재고리스트 모달 좌우 흔들림 방지 터치 고정
+## [2026-11-02] WIA 프로모션 모바일 리스트 2단 개편, 재고 모달 터치 고정 및 알림 이메일 Resend 공식 도메인 발신 인프라 구축
 
 ### 1. WIA 프로모션(`AdminPromotion.jsx`, `DealerPromotion.jsx`) 모바일 카드 메타정보 2단 UI/UX 재정비
 * **판매가 / ETA / 도착지 정보 텍스트 겹침 문제 해결**:
@@ -22,6 +22,15 @@
   * **장비 & 딜러사 카드 규격 고정**: 3단 그리드에 `repeat(3, minmax(0, 1fr))` 및 드롭다운 텍스트 말줄임(`textOverflow: 'ellipsis'`)을 적용하여 딜러사 변경 시에도 너비 변동이 생기지 않도록 고정했습니다.
   * **트랜지션 및 패딩 간섭 제거**: `.glass-card` 대신 `clean-card` 및 `padding: 0 !important`, `transition: none`을 적용하여 헤더, 본문, 푸터가 한 화면에 일체화되도록 최적화했습니다.
   * **적용 모달**: '예약 기간 설정', '예약 기간 수정', '예약 상세 내역', '임대 기간 설정' 전체 모달 일괄 적용.
+
+### 3. 알림 이메일 발신 인프라 Resend REST API 연동 및 공식 시스템 도메인(`wmeins.eu`) 발송 체계 구축
+* **Resend 공식 고속 HTTP API 연동 (`backend/email_service.py`)**:
+  * 기존 SMTP(Gmail) 방식은 Render에 `RESEND_API_KEY`를 등록했더라도 코드에서 직접 인식하지 못해 하드코딩된 개인 Gmail 계정(`freelogin3975@gmail.com`)으로 발송되던 한계를 해결했습니다.
+  * 백엔드 환경 변수에 `RESEND_API_KEY`가 감지되면 내장 `httpx`를 통해 **Resend 공식 REST API(`https://api.resend.com/emails`)**를 즉시 호출하도록 지능형 발송 엔진을 구축했습니다.
+  * 네트워크 순단이나 일시적 API 장애 발생 시 기존 SMTP 방식으로 안전하게 폴백(Fallback)하는 이중 안전장치를 탑재했습니다.
+* **공식 시스템 발신자(`FROM_EMAIL`) 및 관리자 수신함(`ADMIN_NOTIFICATION_EMAILS`) 연동**:
+  * Resend에 DNS 인증(DKIM/SPF)이 완료된 공식 도메인(`wmeins.eu`)을 기반으로, 발신자 주소를 `WME Integrated Network System <noreply@wmeins.eu>`로 확정 연동했습니다.
+  * `backend/main.py`와 `backend/scheduler.py`에 산재되어 있던 관리자 수신자 하드코딩을 제거하고 `get_admin_emails()` 함수를 통해 환경 변수(`ADMIN_NOTIFICATION_EMAILS`)를 참조하도록 일원화했습니다.
 
 ## [2026-11-01] WIA 재고리스트 모바일 풀스크린 모달 및 UI/UX 개편, 창고 상태 배지 규격화, 선적 트래킹 UI 정제, TrackCargo AIS 경로 파싱 및 SCAC 보정
 
