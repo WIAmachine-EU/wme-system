@@ -29,46 +29,15 @@
   * 백엔드 환경 변수에 `RESEND_API_KEY`가 감지되면 내장 `httpx`를 통해 **Resend 공식 REST API(`https://api.resend.com/emails`)**를 즉시 호출하도록 지능형 발송 엔진을 구축했습니다.
   * 네트워크 순단이나 일시적 API 장애 발생 시 기존 SMTP 방식으로 안전하게 폴백(Fallback)하는 이중 안전장치를 탑재했습니다.
 * **공식 시스템 발신자(`FROM_EMAIL`) 및 관리자 수신함(`ADMIN_NOTIFICATION_EMAILS`) 연동**:
-  * Resend에 DNS 인증(DKIM/SPF)이 완료된 공식 도메인(`wmeins.eu`)을 기반으로, 발신자 주소를 `WME Integrated Network System <noreply@wmeins.eu>`로 확정 연동했습니다.
-  * `backend/main.py`와 `backend/scheduler.py`에 산재되어 있던 관리자 수신자 하드코딩을 제거하고 `get_admin_emails()` 함수를 통해 환경 변수(`ADMIN_NOTIFICATION_EMAILS`)를 참조하도록 일원화했습니다.
+  * Resend에 DNS 인증(DKIM/SPF)이 완료된 공식 도메인(`wmeins.eu`) 기반 `WME Integrated Network System <noreply@wmeins.eu>`을 기본 발신자로 채택하여 스팸 차단율을 낮추고 대외 신뢰도를 강화했습니다.
+  * 하드코딩되어 있던 알림 수신자 주소를 환경변수 `ADMIN_NOTIFICATION_EMAILS`를 통해 유연하게 관리할 수 있도록 개선했습니다.
 
-## [2026-11-01] WIA 재고리스트 모바일 풀스크린 모달 및 UI/UX 개편, 창고 상태 배지 규격화, 선적 트래킹 UI 정제, TrackCargo AIS 경로 파싱 및 SCAC 보정
-
-### 1. WIA 재고리스트(`AdminInventory.jsx`) 모바일 모달 풀스크린(Full-Screen) 및 UI/UX 전면 개편
-* **모바일 전체 화면 팝업 모달 전환**:
-  * 스마트폰 크기(`isMobileView`)에서 **'예약 기간 설정'**, **'임대 기간 설정'**, **'예약 상세 내역'**, **'예약 장비 판매완료 확정'** 모달이 화면 중앙 카드가 아닌 **모바일 화면 창 전체(Full-Screen, `100vw × 100vh`, `borderRadius: 0`)**로 가득 차게 나오도록 전면 개편했습니다.
-  * 상단 헤더와 하단 푸터 버튼 영역은 상·하단에 고정(`flexShrink: 0`)하고 본문 영역에 스크롤(`flex: 1`, `overflowY: 'auto'`)을 적용하여 스마트폰에 최적화된 앱 스타일의 사용성을 구축했습니다.
-* **'예약 상세 내역' 모바일 화면 레이아웃 및 텍스트 최적화**:
-  * **좌우 너비 극대화**: 모바일 본문 좌우 여백을 축소하여 예약 딜러사 카드 및 예약 장비 상세 정보 카드의 좌우 넓이가 모바일 화면 좌우에 최대한 꽉 차도록 확장했습니다.
-  * **날짜 텍스트 줄바꿈 및 겹침 해결**: 예약 시작일과 만료일의 영문 월 표기(`2026.OCT.30` / `2026.NOV.06`)와 YYYY-MM-DD 표기(`2026-10-30` / `2026-11-06`)를 상·하 2단으로 분리하고 `whiteSpace: 'nowrap'`을 적용하여, 좁은 화면에서 숫자가 중간에 잘려 줄바꿈되거나 우측 `[기간수정]` 버튼과 겹치던 문제를 완벽히 해결했습니다.
-  * **하단 액션 버튼 나란히(1줄) 배치**: 모바일에서 줄바꿈되어 2줄로 나뉘던 **`[예약취소]`**, **`[판매완료]`**, **`[닫기]`** 버튼을 하단에 나란히 1줄로 배치(`display: 'flex'`, 균등 비율 배분, 컴팩트한 패딩/폰트)하여 한눈에 조작할 수 있도록 개선했습니다.
-
-### 2. WIA 창고(`AdminDispatch.jsx`) 리스트 '상태' 항목 배지 너비 규격 통일
-* **상태 컬러 백그라운드 좌우 폭 일원화**:
-  * 데스크톱 테이블 리스트의 '상태' 컬럼 배지에 고정 너비 `width: '80px'`, `display: 'inline-flex'`, `justifyContent: 'center'`, `textAlign: 'center'`를 적용했습니다.
-  * 텍스트 길이 차이(`판매가능`, `프로모션`, `예약`, `임대`, `전시`, `딜러주문` 및 영문 `Promotion`, `Available`)에 관계없이 가장 긴 텍스트 폭을 기준으로 컬러 배경의 좌우 너비가 일정하고 반듯하게 정렬되도록 개선했습니다.
-  * 모바일 카드 뷰 상태 배지 역시 `width: '76px'`로 비례 조정하여 일관성을 확보했습니다.
-
-### 3. 선적 트래킹(`ShipmentTracking.jsx`) 불필요 안내 텍스트 및 버튼 정제
-* **안내 문구 및 업로드 버튼 제거**:
-  * 타이틀 하단의 불필요한 `⚡ 2시간 주기 스마트 Diff 감지 (v4.0)` 안내 텍스트를 삭제했습니다.
-  * 해당 화면에서 쓰이지 않는 `[선적 업로드]` 버튼 및 미사용 import(`UploadCloud`)를 제거하여, `[Diff 갱신]` 버튼과 `[총 N 건]` 배지만 직관적으로 표시되도록 헤더 UI를 간결화했습니다.
-
-### 4. TrackCargo 선박 AIS 경로(`route`) 데이터 파싱 버그 수정 및 실시간 항로 방어 로직 강화
-* **원인 및 에러 해결 (`'list' object has no attribute 'get'`)**:
-  * TrackCargo API에서 선박 운항 경로(`route`) 데이터를 반환할 때, 단일 딕셔너리가 아닌 운항 구간(Leg) 정보와 실시간 AIS 이동 위치(`positions`) 배열을 담은 **리스트(`list[dict]`)** 형태로 제공됩니다.
-  * 기존 파서(`route_service.py`)에서 `route`를 딕셔너리로 간주하고 `.get()`을 호출하여 발생했던 `AttributeError: 'list' object has no attribute 'get'` 예외를 완벽히 해결했습니다.
-* **실시간 선박 및 항로 데이터 추출 지원 강화**:
-  * `route`가 `list`인 경우 각 구간에서 선박명(`vessel_name`), IMO, MMSI, 운항 속도(`speed`), 침로(`course`), 그리고 실시간 AIS 위치(`positions` 위경도) 목록을 Mapbox 좌표 형식(`[lng, lat]`)으로 안전하게 추출하도록 파서를 전면 개편했습니다.
-  * `trackcargo_api.py` 및 `route_service.py` 내 `milestones`, `containers`/`container_details`, `active_vessel` 등 다중 중첩 구조에 대한 타입 안전성(Defensive Handling)을 강화하여 예외 발생 위험을 원천 차단했습니다.
-
-### 5. TrackCargo 신규 B/L 자동 등록 시 SCAC 선사 코드 지능형 자동 보정 적용
-* **원인 및 배경 (`Carrier not found for scac code ...`)**:
-  * 선사 고유 식별코드(SCAC: `HDMU`, `YMLU` 등)가 생략된 B/L 번호(예: `SELE22174500`, `N360205129`)가 신규 등록될 때, 시스템이 앞 4자리 영숫자를 그대로 선사 코드로 전송하여 TrackCargo에서 `CARRIER-NOT-FOUND` 에러가 발생하는 현상을 방지했습니다.
-* **지능형 SCAC 매핑 및 Tracking ID 정규화**:
-  * **B/L 접두사 기반 자동 매핑**: `SELE...`, `PUS...` 등 HMM 고유 부킹/B/L 접두사는 현대상선 공식 SCAC인 `HDMU`로, `N360...`, `N36...` 등은 양밍해운 공식 SCAC인 `YMLU`로 자동 보정 매핑(`BL_PREFIX_TO_SCAC`)을 적용했습니다.
-  * **선사명 텍스트 기반 보정**: 발주/선적 데이터의 선사명(`carrier`)을 교차 검증하여 선사 코드를 자동 식별하도록 강화했습니다.
-  * **Tracking ID 정규화(`normalize_tracking_id`)**: `HDMUSELE22174500`과 같이 SCAC과 B/L이 결합된 형태에서도 순수 화물 B/L 식별자(`SELE22174500`)를 지능적으로 분리 전송하도록 구현했습니다.
+### 4. 이메일 환경변수 자동 정제(따옴표/공백 제거) 및 실시간 진단 API(`GET /api/system/test-email`) 구축
+* **환경 변수 자동 정제(`_clean_env_val`)**:
+  * Render 대시보드 환경 변수 입력 시 발생할 수 있는 따옴표(`"`, `'`)나 앞뒤 여백을 자동으로 제거하여 Resend API 헤더 인증(401) 및 발신자 유효성(422) 검사 오류를 사전에 차단했습니다.
+  * HTML 본문 스타일을 함께 제공하여 텍스트 줄바꿈 유지 및 메일 가독성을 극대화했습니다.
+* **실시간 시스템 진단 엔드포인트(`GET /api/system/test-email`) 제공**:
+  * ERP에서 발주 상태를 번거롭게 변경하지 않아도, 브라우저나 curl에서 엔드포인트 호출 시 Resend API 키 인식 상태, 발송 성공 여부, 또는 실패 시의 상세 HTTP 에러 코드를 즉시 JSON으로 확인할 수 있는 진단 체계를 구축했습니다.
 
 
 ## [2026-10-31] WIA 프로모션(관리자·딜러포털) 리스트 개편, 재고리스트 예약 라이프사이클 연동 및 UI 최적화

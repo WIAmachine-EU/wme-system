@@ -10,8 +10,17 @@ import httpx
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
+def _clean_env_val(val: Optional[str]) -> str:
+    """양 끝 공백 및 큰따옴표/작은따옴표를 깨끗하게 제거합니다."""
+    if not val:
+        return ""
+    s = str(val).strip()
+    while (s.startswith('"') and s.endswith('"')) or (s.startswith("'") and s.endswith("'")):
+        s = s[1:-1].strip()
+    return s
+
 # 1. Resend API 설정 (우선 적용)
-RESEND_API_KEY = os.environ.get("RESEND_API_KEY")
+RESEND_API_KEY = _clean_env_val(os.environ.get("RESEND_API_KEY"))
 
 # 2. SMTP 설정 (폴백 또는 일반 SMTP 사용 시)
 SMTP_SERVER = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
@@ -19,9 +28,9 @@ SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))
 SMTP_USER = os.environ.get("SMTP_USER", "freelogin3975@gmail.com")
 SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "shdbwjbikvgborll")
 
-# 발신자 이메일 (Resend 사용 시 기본값: WME SCM System <noreply@wmeins.eu>)
-DEFAULT_FROM = "WME SCM System <noreply@wmeins.eu>" if RESEND_API_KEY else SMTP_USER
-FROM_EMAIL = os.environ.get("FROM_EMAIL", DEFAULT_FROM)
+# 발신자 이메일 (Resend 사용 시 기본값: WME Integrated Network System <noreply@wmeins.eu>)
+DEFAULT_FROM = "WME Integrated Network System <noreply@wmeins.eu>"
+FROM_EMAIL = _clean_env_val(os.environ.get("FROM_EMAIL")) or DEFAULT_FROM
 
 # 기본 관리자 알림 수신 이메일 목록
 DEFAULT_ADMIN_EMAILS = "jypark@hyundai-wia.de; freelogin3975@gmail.com"
@@ -31,40 +40,63 @@ def get_admin_emails() -> str:
     """런타임 환경변수 ADMIN_NOTIFICATION_EMAILS를 우선 조회합니다."""
     return os.environ.get("ADMIN_NOTIFICATION_EMAILS") or ADMIN_EMAILS
 
-def send_email_via_resend_api(recipients: List[str], subject: str, content: str) -> bool:
+def send_email_via_resend_api(recipients: List[str], subject: str, content: str) -> dict:
     """
     Resend 공식 HTTP API(https://api.resend.com/emails)를 통해 이메일을 발송합니다.
+    반환값: {"success": bool, "id": Optional[str], "status_code": Optional[int], "error": Optional[str]}
     """
-    api_key = os.environ.get("RESEND_API_KEY") or RESEND_API_KEY
+    api_key = _clean_env_val(os.environ.get("RESEND_API_KEY") or RESEND_API_KEY)
     if not api_key:
-        return False
+        logger.warning("[Resend API] RESEND_API_KEY 환경변수가 설정되지 않아 발송을 건너뜁니다.")
+        return {"success": False, "error": "RESEND_API_KEY_EMPTY", "status_code": None}
 
     url = "https://api.resend.com/emails"
     headers = {
-        "Authorization": f"Bearer {api_key.strip()}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
-    from_addr = os.environ.get("FROM_EMAIL") or FROM_EMAIL
+    
+    raw_from = os.environ.get("FROM_EMAIL") or FROM_EMAIL or DEFAULT_FROM
+    from_addr = _clean_env_val(raw_from)
+    if not from_addr:
+        from_addr = DEFAULT_FROM
+
+    # HTML 본문 생성 (텍스트 줄바꿈 보존 및 가독성 향상)
+    escaped_body = content.replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+    html_content = (
+        f"<div style='font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif; "
+        f"font-size: 14px; line-height: 1.6; color: #222; padding: 12px; background-color: #fafbfc; "
+        f"border-left: 4px solid #1a365d; border-radius: 4px;'>"
+        f"{escaped_body}"
+        f"</div>"
+    )
+
     payload = {
         "from": from_addr,
         "to": recipients,
         "subject": subject,
-        "text": content
+        "text": content,
+        "html": html_content
     }
+
+    masked_key = f"{api_key[:6]}...{api_key[-4:]}" if len(api_key) > 10 else "***"
+    logger.info(f"[Resend API] 발송 요청 시작 - From: '{from_addr}', To: {recipients}, API Key: {masked_key}")
 
     try:
         with httpx.Client(timeout=10.0) as client:
             resp = client.post(url, headers=headers, json=payload)
             if resp.status_code in (200, 201):
                 res_json = resp.json()
-                logger.info(f"[Resend API] 이메일 발송 성공 (ID: {res_json.get('id')}): {', '.join(recipients)}")
-                return True
+                msg_id = res_json.get('id')
+                logger.info(f"[Resend API] 이메일 발송 성공 (ID: {msg_id}): {', '.join(recipients)}")
+                return {"success": True, "id": msg_id, "status_code": resp.status_code, "error": None}
             else:
-                logger.error(f"[Resend API] 이메일 발송 실패 ({resp.status_code}): {resp.text}")
-                return False
+                err_text = resp.text
+                logger.error(f"[Resend API] 이메일 발송 실패 - HTTP 상태코드: {resp.status_code}, 본문: {err_text}")
+                return {"success": False, "status_code": resp.status_code, "error": err_text}
     except Exception as e:
-        logger.error(f"[Resend API] 호출 중 예외 발생: {e}")
-        return False
+        logger.error(f"[Resend API] 호출 중 네트워크/시스템 예외 발생: {e}")
+        return {"success": False, "error": str(e), "status_code": None}
 
 def send_email_via_smtp(recipients: List[str], subject: str, content: str) -> bool:
     """
@@ -80,7 +112,8 @@ def send_email_via_smtp(recipients: List[str], subject: str, content: str) -> bo
         return False
 
     try:
-        from_addr = os.environ.get("FROM_EMAIL") or FROM_EMAIL
+        raw_from = os.environ.get("FROM_EMAIL") or FROM_EMAIL or DEFAULT_FROM
+        from_addr = _clean_env_val(raw_from)
         msg = MIMEMultipart()
         msg['From'] = from_addr
         msg['To'] = ", ".join(recipients)
@@ -101,14 +134,14 @@ def send_email_via_smtp(recipients: List[str], subject: str, content: str) -> bo
         logger.error(f"[SMTP] 이메일 발송 실패: {e}")
         return False
 
-def send_email_notification(to_email: str, subject: str, content: str):
+def send_email_notification(to_email: str, subject: str, content: str) -> dict:
     """
     이메일을 발송합니다. RESEND_API_KEY가 있으면 Resend API를 우선 사용하고,
-    실패하거나 없을 경우 SMTP를 통해 발송합니다.
+    실패하거나 없을 경우 SMTP를 통해 안전하게 폴백 발송합니다.
     """
     if not to_email:
         logger.warning("[이메일 발송 건너뜀] 수신자 이메일(to_email)이 비어 있습니다.")
-        return
+        return {"success": False, "reason": "empty_recipient"}
 
     # 수신자가 여러 명일 수 있으므로 세미콜론(;) 기준으로 분리
     raw_recipients = [email.strip() for email in to_email.split(';') if email.strip()]
@@ -117,16 +150,24 @@ def send_email_notification(to_email: str, subject: str, content: str):
 
     if not recipients:
         logger.warning(f"[이메일 발송 건너뜀] 더미 도메인 또는 유효하지 않은 수신 주소입니다: {to_email}")
-        return
+        return {"success": False, "reason": "invalid_recipients"}
 
     # 1. Resend API 시도 (환경 변수에 RESEND_API_KEY가 등록되어 있는 경우)
-    if os.environ.get("RESEND_API_KEY") or RESEND_API_KEY:
-        if send_email_via_resend_api(recipients, subject, content):
-            return
-        logger.warning("[Resend API 발송 실패] SMTP 폴백 방식으로 전환하여 재시도합니다.")
+    api_key = _clean_env_val(os.environ.get("RESEND_API_KEY") or RESEND_API_KEY)
+    if api_key:
+        logger.info(f"[이메일 알림] Resend API 우선 발송 시도 (수신: {', '.join(recipients)})")
+        res = send_email_via_resend_api(recipients, subject, content)
+        if res.get("success"):
+            return {"success": True, "provider": "resend", "id": res.get("id")}
+        
+        logger.warning(f"[Resend API 발송 실패] 사유: {res.get('error')} (HTTP {res.get('status_code')}). SMTP 폴백 방식으로 전환하여 재시도합니다.")
+    else:
+        logger.warning("[이메일 알림] RESEND_API_KEY 환경변수가 존재하지 않아 SMTP 방식으로 발송합니다.")
 
     # 2. SMTP 방식 시도
-    send_email_via_smtp(recipients, subject, content)
+    logger.info(f"[이메일 알림] SMTP 방식으로 발송을 진행합니다. (수신: {', '.join(recipients)})")
+    smtp_ok = send_email_via_smtp(recipients, subject, content)
+    return {"success": smtp_ok, "provider": "smtp"}
 
 def send_etd_notification(to_email: str, order_ref: str, etd: str, initial_eta: str):
     subject = f"[SCM 알림] 발주번호 {order_ref} 장비가 출항(ETD) 하였습니다."

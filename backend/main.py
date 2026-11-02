@@ -1764,6 +1764,41 @@ def toggle_email_config(config_id: int, is_active: bool, db: Session = Depends(g
     db.refresh(config)
     return config
 
+@app.get("/api/system/test-email")
+def test_system_email(to: Optional[str] = None):
+    """
+    Resend API 및 이메일 환경 설정을 즉시 진단하고 테스트 이메일을 발송합니다.
+    브라우저나 curl로 https://<backend-domain>/api/system/test-email 호출 시 바로 진단 결과를 JSON으로 반환합니다.
+    """
+    from email_service import _clean_env_val, RESEND_API_KEY, FROM_EMAIL, SMTP_USER, SMTP_SERVER, send_email_via_resend_api
+    
+    target = to.strip() if to else None
+    if not target:
+        admin_emails = [e.strip() for e in os.environ.get("ADMIN_NOTIFICATION_EMAILS", "freelogin3975@gmail.com").split(";") if e.strip()]
+        target = admin_emails[0] if admin_emails else "freelogin3975@gmail.com"
+
+    curr_resend_key = _clean_env_val(os.environ.get("RESEND_API_KEY") or RESEND_API_KEY)
+    curr_from = _clean_env_val(os.environ.get("FROM_EMAIL") or FROM_EMAIL or "WME Integrated Network System <noreply@wmeins.eu>")
+
+    resend_result = None
+    if curr_resend_key:
+        resend_result = send_email_via_resend_api(
+            [target],
+            "[시스템 진단] Resend API 발송 테스트",
+            f"WME SCM 시스템의 Resend API 연동 상태 검증 테스트 메일입니다.\n발신자: {curr_from}\n수신자: {target}\n시각: {datetime.utcnow().isoformat()}Z"
+        )
+
+    return {
+        "status": "tested",
+        "target_recipient": target,
+        "resend_key_configured": bool(curr_resend_key),
+        "resend_key_prefix": f"{curr_resend_key[:6]}...{curr_resend_key[-4:]}" if len(curr_resend_key) > 10 else ("EMPTY" if not curr_resend_key else "***"),
+        "from_email_configured": curr_from,
+        "resend_api_result": resend_result,
+        "smtp_server": SMTP_SERVER,
+        "smtp_user": SMTP_USER
+    }
+
 
 
 
