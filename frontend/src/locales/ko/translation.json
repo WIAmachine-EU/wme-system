@@ -179,7 +179,7 @@
     "header_progress": "진행상황",
     "header_stock_status": "상태",
     "status_available": "판매가능",
-    "status_reserved": "예약중",
+    "status_reserved": "예약",
     "status_sold": "판매완료",
     "header_reservation": "예약정보",
     "header_settings": "설정",
@@ -201,7 +201,8 @@
     "header_exclude": "제외",
     "tooltip_remove": "리스트 제거",
     "confirm_exclude": "해당 장비({{po}})를 프로모션 리스트에서 제외하고 판매가능 재고로 변경하시겠습니까?",
-    "exclude_failed": "프로모션 제외에 실패했습니다."
+    "exclude_failed": "프로모션 제외에 실패했습니다.",
+    "status_available_reservation": "예약가능"
   },
   "management": {
     "page_title": "업로드 / 설정관리",

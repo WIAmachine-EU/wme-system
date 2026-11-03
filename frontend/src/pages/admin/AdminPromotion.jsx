@@ -55,23 +55,20 @@ export default function AdminPromotion({ isMobileView }) {
     return 'PROMOTION';
   };
 
-  // WIA 재고리스트(AdminInventory)와 동일한 '상태' 색상 및 라벨
+  // WIA 프로모션 '상태' 배지: '예약' 또는 '예약가능'
   const getStockTypeMeta = (sType) => {
-    switch (sType) {
-      case 'AVAILABLE':
-        return { bg: 'hsla(142, 76%, 46%, 0.2)', color: 'var(--status-stock)', label: t('menu2.type_available', '판매가능') };
-      case 'RESERVED':
-        return { bg: 'hsla(262, 83%, 58%, 0.15)', color: '#7c3aed', label: t('menu2.type_reserved', '예약') };
-      case 'DEALER_ORDER':
-        return { bg: 'hsla(200, 76%, 46%, 0.2)', color: 'var(--accent-cyan)', label: t('menu2.type_dealer_order', '딜러주문') };
-      case 'RENTAL':
-        return { bg: 'hsla(45, 93%, 58%, 0.2)', color: 'var(--status-production)', label: t('menu2.type_rental', '임대') };
-      case 'SHOWROOM':
-        return { bg: 'hsla(200, 90%, 60%, 0.2)', color: 'var(--accent-cyan)', label: t('menu2.type_showroom', '전시') };
-      case 'PROMOTION':
-      default:
-        return { bg: 'hsla(340, 82%, 52%, 0.18)', color: '#e11d48', label: t('menu2.type_promotion', '프로모션') };
+    if (sType === 'RESERVED') {
+      return {
+        bg: 'hsla(262, 83%, 58%, 0.15)',
+        color: '#7c3aed',
+        label: t('menu3.status_reserved', '예약')
+      };
     }
+    return {
+      bg: 'hsla(142, 76%, 46%, 0.2)',
+      color: 'var(--status-stock)',
+      label: t('menu3.status_available_reservation', '예약가능')
+    };
   };
 
   // 주문/배송현황(AdminDashboard)의 P/O 기준 '진행상황' 단계 텍스트
@@ -233,7 +230,9 @@ export default function AdminPromotion({ isMobileView }) {
 
   const filteredPromotions = promotions.filter(promo => {
     const sType = getEffectiveStockType(promo);
-    if (statusFilter !== 'ALL' && sType !== statusFilter) return false;
+    const isReserved = sType === 'RESERVED';
+    if (statusFilter === 'RESERVED' && !isReserved) return false;
+    if ((statusFilter === 'AVAILABLE' || statusFilter === 'PROMOTION') && isReserved) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       const o = promo.order;
@@ -298,8 +297,8 @@ export default function AdminPromotion({ isMobileView }) {
         valB = getEffectiveStockType(b) === 'RESERVED' ? (b.order?.reserved_dealer?.name || b.reserved_dealer?.name || '') : '';
         break;
       case 'stock_type':
-        valA = getEffectiveStockType(a);
-        valB = getEffectiveStockType(b);
+        valA = getEffectiveStockType(a) === 'RESERVED' ? '예약' : '예약가능';
+        valB = getEffectiveStockType(b) === 'RESERVED' ? '예약' : '예약가능';
         break;
       default:
         return 0;
@@ -405,8 +404,8 @@ export default function AdminPromotion({ isMobileView }) {
                 }}
               >
                 <option value="ALL">{t('menu3.filter_all', '전체 상태 조회')}</option>
-                <option value="PROMOTION">{t('menu2.type_promotion', '프로모션')}</option>
-                <option value="RESERVED">{t('menu2.type_reserved', '예약')}</option>
+                <option value="AVAILABLE">{t('menu3.status_available_reservation', '예약가능')}</option>
+                <option value="RESERVED">{t('menu3.status_reserved', '예약')}</option>
               </select>
               <select
                 value={sortConfig.key ? `${sortConfig.key}_${sortConfig.direction}` : ""}
@@ -475,8 +474,8 @@ export default function AdminPromotion({ isMobileView }) {
                 }}
               >
                 <option value="ALL">{t('menu3.filter_all', '전체 상태 조회')}</option>
-                <option value="PROMOTION">{t('menu2.type_promotion', '프로모션')}</option>
-                <option value="RESERVED">{t('menu2.type_reserved', '예약')}</option>
+                <option value="AVAILABLE">{t('menu3.status_available_reservation', '예약가능')}</option>
+                <option value="RESERVED">{t('menu3.status_reserved', '예약')}</option>
               </select>
               <select
                 value={sortConfig.key ? `${sortConfig.key}_${sortConfig.direction}` : ""}

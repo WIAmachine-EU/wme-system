@@ -179,7 +179,7 @@
     "header_progress": "STATUS",
     "header_stock_status": "TYPE",
     "status_available": "Available",
-    "status_reserved": "Reservation",
+    "status_reserved": "Reserved",
     "status_sold": "Sold",
     "header_reservation": "DEALER",
     "header_settings": "RESERVATION",
@@ -201,7 +201,8 @@
     "header_exclude": "EXCLUDE",
     "tooltip_remove": "Remove",
     "confirm_exclude": "Do you want to exclude this equipment ({{po}}) from the promotion list and set status to Available?",
-    "exclude_failed": "Failed to exclude from promotion."
+    "exclude_failed": "Failed to exclude from promotion.",
+    "status_available_reservation": "Available"
   },
   "management": {
     "page_title": "Upload / Setting",

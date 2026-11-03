@@ -36,6 +36,19 @@
 * **다국어(i18n) 번역 리소스 등록**:
   * `locales/ko/translation.json` 및 `locales/en/translation.json`에 `header_exclude`, `tooltip_remove`, `confirm_exclude`, `exclude_failed` 다국어 키를 등록하여 글로벌 환경을 완벽 지원합니다.
 
+### 5. WIA 프로모션(`AdminPromotion.jsx`, `DealerPromotion.jsx`) 리스트 [상태] 항목 표기 개편 ('예약' / '예약가능')
+* **[상태] 항목 표기 2단 체계 단일화**:
+  * 기존에 WIA 재고리스트와 혼용되어 노출되던 배지 텍스트('프로모션', '판매가능' 등)를 제거하고, 프로모션 리스트 본연의 목적에 맞게 **'예약'** 및 **'예약가능'** 2개 상태로 완전 일원화했습니다.
+  * **예약된 P/O**: 보라색 배지(`hsla(262, 83%, 58%, 0.15)`, `#7c3aed`)와 함께 **`예약`**으로 명확히 표기.
+  * **예약 가능한 P/O**: 가용 녹색 배지(`hsla(142, 76%, 46%, 0.2)`, `var(--status-stock)`)와 함께 **`예약가능`**으로 표기.
+* **필터 드롭다운 및 정렬 기준 동기화**:
+  * 상태 필터 셀렉트박스의 옵션을 `전체 상태 조회`, `예약가능`, `예약`으로 개편하여, 원하는 상태의 프로모션 장비를 즉시 선별할 수 있도록 필터링 로직을 개선했습니다.
+  * 상태 기준 정렬(`▲` / `▼`) 시에도 '예약'과 '예약가능' 텍스트를 기준으로 정확하게 그룹화되어 정렬되도록 연동했습니다.
+* **딜러 포털(`DealerPromotion.jsx`) 요청(Reserve/Order) 권한 연계**:
+  * '예약가능' 상태인 P/O에 대해서만 딜러의 `Reserve` / `Order` 버튼이 활성화되도록 로직을 일치시켰습니다.
+* **다국어(i18n) 번역 등록**:
+  * `locales/ko/translation.json` 및 `locales/en/translation.json`에 `status_available_reservation`('예약가능' / 'Available') 및 `status_reserved`('예약' / 'Reserved') 키를 추가 및 정비했습니다.
+
 
 ## [2026-11-02] WIA 프로모션 모바일 리스트 2단 개편, 재고 모달 터치 고정 및 알림 이메일 Resend 공식 도메인 발신 인프라 구축
 
