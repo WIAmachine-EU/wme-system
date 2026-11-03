@@ -142,6 +142,32 @@ export default function AdminPromotion({ isMobileView }) {
     }
   };
 
+  const handleExcludePromotion = async (promo) => {
+    const poNumber = promo.order?.reference_no || `ID: ${promo.id}`;
+    const confirmMsg = t(
+      'menu3.confirm_exclude',
+      `해당 장비(${poNumber})를 프로모션 리스트에서 제외하고 판매가능 재고로 변경하시겠습니까?`,
+      { po: poNumber }
+    );
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      const res = await fetch(`/api/promotions/${promo.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (res.ok) {
+        loadData();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.detail || t('menu3.exclude_failed', '프로모션 제외에 실패했습니다.'));
+      }
+    } catch (e) {
+      console.error('Error excluding promotion:', e);
+      alert(t('menu3.exclude_failed', '프로모션 제외 중 오류가 발생했습니다.'));
+    }
+  };
+
   const fileInputRef = React.useRef(null);
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
@@ -578,7 +604,46 @@ export default function AdminPromotion({ isMobileView }) {
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: sType === 'RESERVED' ? '12px' : '0' }}>
                       <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>{t('menu3.header_stock_status', '상태')}</span>
-                      {renderStockTypeBadge(sType, '84px')}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {renderStockTypeBadge(sType, '84px')}
+                        <button
+                          type="button"
+                          onClick={() => handleExcludePromotion(promo)}
+                          title={t('menu3.tooltip_remove', '리스트 제거')}
+                          className="btn-exclude-promo"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '6px',
+                            border: '1px solid var(--border-color)',
+                            background: 'transparent',
+                            color: 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            padding: 0
+                          }}
+                        >
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              width: '16px',
+                              height: '16px',
+                              backgroundColor: 'currentColor',
+                              maskImage: 'url(/assets/icons/unlink.png)',
+                              maskSize: 'contain',
+                              maskRepeat: 'no-repeat',
+                              maskPosition: 'center',
+                              WebkitMaskImage: 'url(/assets/icons/unlink.png)',
+                              WebkitMaskSize: 'contain',
+                              WebkitMaskRepeat: 'no-repeat',
+                              WebkitMaskPosition: 'center'
+                            }}
+                          />
+                        </button>
+                      </div>
                     </div>
 
                     {sType === 'RESERVED' && (
@@ -613,21 +678,24 @@ export default function AdminPromotion({ isMobileView }) {
                       {t('menu3.header_no')}
                     </div>
                   </th>
-                  {renderSortHeader('model', t('menu3.header_model'), '10%', 'center')}
+                  {renderSortHeader('model', t('menu3.header_model'), '9%', 'center')}
                   {renderSortHeader('nc', t('menu3.header_nc'), '5%', 'center')}
-                  {renderSortHeader('price', t('menu3.header_price', 'PRICE(€)'), '8%', 'right')}
-                  {renderSortHeader('po', t('menu3.header_po', 'P/O'), '10%', 'center')}
-                  {renderSortHeader('detail_spec', t('menu3.header_detailspec'), '20%', 'left')}
+                  {renderSortHeader('price', t('menu3.header_price', 'PRICE(€)'), '7%', 'right')}
+                  {renderSortHeader('po', t('menu3.header_po', 'P/O'), '9%', 'center')}
+                  {renderSortHeader('detail_spec', t('menu3.header_detailspec'), '18%', 'left')}
                   {renderSortHeader('port', t('menu2.header_port', 'PORT'), '8%', 'center')}
                   {renderSortHeader('eta', t('menu3.header_eta'), '8%', 'center')}
-                  {renderSortHeader('progress', t('menu3.header_progress', '진행상황'), '9%', 'center')}
-                  {renderSortHeader('dealer', t('menu3.header_reservation'), '10%', 'center')}
-                  {renderSortHeader('stock_type', t('menu3.header_stock_status', '상태'), '9%', 'center')}
+                  {renderSortHeader('progress', t('menu3.header_progress', '진행상황'), '8%', 'center')}
+                  {renderSortHeader('dealer', t('menu3.header_reservation'), '9%', 'center')}
+                  {renderSortHeader('stock_type', t('menu3.header_stock_status', '상태'), '8%', 'center')}
+                  <th style={{ width: '8%', textAlign: 'center', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                    {t('menu3.header_exclude', '제외')}
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {sortedPromotions.length === 0 ? (
-                  <tr><td colSpan={11} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>조건에 맞는 데이터가 없습니다.</td></tr>
+                  <tr><td colSpan={12} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>조건에 맞는 데이터가 없습니다.</td></tr>
                 ) : (
                   sortedPromotions.map((promo, index) => {
                     const sType = getEffectiveStockType(promo);
@@ -717,6 +785,45 @@ export default function AdminPromotion({ isMobileView }) {
                             {renderStockTypeBadge(sType, '84px')}
                           </div>
                         </td>
+                        <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleExcludePromotion(promo)}
+                            title={t('menu3.tooltip_remove', '리스트 제거')}
+                            className="btn-exclude-promo"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '28px',
+                              height: '28px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--border-color)',
+                              background: 'transparent',
+                              color: 'var(--text-secondary)',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                              padding: 0
+                            }}
+                          >
+                            <span
+                              style={{
+                                display: 'inline-block',
+                                width: '16px',
+                                height: '16px',
+                                backgroundColor: 'currentColor',
+                                maskImage: 'url(/assets/icons/unlink.png)',
+                                maskSize: 'contain',
+                                maskRepeat: 'no-repeat',
+                                maskPosition: 'center',
+                                WebkitMaskImage: 'url(/assets/icons/unlink.png)',
+                                WebkitMaskSize: 'contain',
+                                WebkitMaskRepeat: 'no-repeat',
+                                WebkitMaskPosition: 'center'
+                              }}
+                            />
+                          </button>
+                        </td>
                       </tr>
                     );
                   })
@@ -730,6 +837,12 @@ export default function AdminPromotion({ isMobileView }) {
         .sortable-th:hover {
           background-color: var(--bg-secondary) !important;
           color: var(--wia-blue) !important;
+        }
+        .btn-exclude-promo:hover {
+          background-color: rgba(239, 68, 68, 0.1) !important;
+          border-color: rgba(239, 68, 68, 0.4) !important;
+          color: #ef4444 !important;
+          transform: scale(1.08);
         }
       `}</style>
     </div>

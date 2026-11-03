@@ -197,7 +197,11 @@
     "btn_upload": "Promotion Upload",
     "upload_success": "Upload Success",
     "upload_fail": "Upload Failed",
-    "label_sale_price": "Price"
+    "label_sale_price": "Price",
+    "header_exclude": "EXCLUDE",
+    "tooltip_remove": "Remove",
+    "confirm_exclude": "Do you want to exclude this equipment ({{po}}) from the promotion list and set status to Available?",
+    "exclude_failed": "Failed to exclude from promotion."
   },
   "management": {
     "page_title": "Upload / Setting",

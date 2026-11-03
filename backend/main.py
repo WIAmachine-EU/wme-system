@@ -1303,6 +1303,39 @@ def update_promotion_price(
     db.refresh(promo)
     return promo
 
+@app.delete("/api/promotions/{promotion_id}")
+@app.post("/api/promotions/{promotion_id}/exclude")
+def exclude_promotion(
+    promotion_id: int,
+    db: Session = Depends(get_db),
+    current_role: Optional[str] = Depends(get_current_role)
+):
+    """
+    프로모션 리스트에서 해당 P/O를 제외합니다.
+    - 프로모션(PromotionInventory) 레코드 삭제
+    - 연결된 발주(Order)의 stock_type을 'AVAILABLE' (판매가능)로 변경 적용
+    - 예약 정보가 있었던 경우 예약 초기화
+    """
+    if current_role == "RSM":
+        raise HTTPException(status_code=403, detail="접근 권한이 없습니다.")
+    promo = db.query(models.PromotionInventory).filter(models.PromotionInventory.id == promotion_id).first()
+    if not promo:
+        raise HTTPException(status_code=404, detail="프로모션 대상을 찾을 수 없습니다.")
+    
+    order = promo.order
+    if order:
+        order.stock_type = "AVAILABLE"
+        order.is_corporate_stock = True
+        # 예약 정보 초기화
+        order.reserved_dealer_id = None
+        order.reservation_expiry_date = None
+        order.reservation_reason = None
+        order.reservation_memo = None
+    
+    db.delete(promo)
+    db.commit()
+    return {"message": "프로모션에서 제외되었습니다.", "promotion_id": promotion_id, "order_id": order.id if order else None}
+
 @app.post("/api/promotions/upload")
 async def upload_promotion_prices(file: UploadFile = File(...), db: Session = Depends(get_db), current_role: Optional[str] = Depends(get_current_role)):
     if current_role == "RSM":
