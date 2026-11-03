@@ -566,8 +566,8 @@ export default function DealerPromotion({ isMobileView }) {
                   {renderSortHeader('price', t('menu3.header_price', 'PRICE(€)'), '7%', 'right')}
                   {renderSortHeader('po', t('menu3.header_po', 'P/O'), '9%', 'center')}
                   {renderSortHeader('detail_spec', t('menu3.header_detailspec'), '17%', 'left')}
-                  {renderSortHeader('eta', t('menu3.header_eta'), '8%', 'center')}
                   {renderSortHeader('port', t('menu2.header_port', 'PORT'), '7%', 'center')}
+                  {renderSortHeader('eta', t('menu3.header_eta'), '8%', 'center')}
                   {renderSortHeader('progress', t('menu3.header_progress', '진행상황'), '8%', 'center')}
                   {renderSortHeader('reservation', t('dealer_promotion.header_reservation', '예약정보'), '9%', 'center')}
                   {renderSortHeader('stock_type', t('menu3.header_stock_status', '상태'), '7%', 'center')}
@@ -618,12 +618,12 @@ export default function DealerPromotion({ isMobileView }) {
                         </td>
                         <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
                           <div style={{ fontSize: '11px', textAlign: 'center' }}>
-                            {promo.order && promo.order.eta ? new Date(promo.order.eta).toLocaleDateString() : '-'}
+                            {getStandardPort(promo.order?.destination_port)}
                           </div>
                         </td>
                         <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
                           <div style={{ fontSize: '11px', textAlign: 'center' }}>
-                            {getStandardPort(promo.order?.destination_port)}
+                            {promo.order && promo.order.eta ? new Date(promo.order.eta).toLocaleDateString() : '-'}
                           </div>
                         </td>
                         <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
