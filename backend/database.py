@@ -55,6 +55,9 @@ if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
                 ("reservation_start_date", "DATETIME"),
                 ("reservation_expiry_date", "DATETIME"),
                 ("reservation_expiry_alert_sent", "BOOLEAN DEFAULT 0"),
+                ("sales_price", "VARCHAR"),
+                ("sales_month", "VARCHAR"),
+                ("pickup_date", "DATETIME"),
             ]:
                 try:
                     c.execute(f"ALTER TABLE orders ADD COLUMN {col_name} {col_type}")

@@ -111,6 +111,9 @@ def on_startup():
             f"ALTER TABLE orders ADD COLUMN {if_not_exists}reservation_start_date {timestamp_type}",
             f"ALTER TABLE orders ADD COLUMN {if_not_exists}reservation_expiry_date {timestamp_type}",
             f"ALTER TABLE orders ADD COLUMN {if_not_exists}reservation_expiry_alert_sent BOOLEAN DEFAULT FALSE",
+            f"ALTER TABLE orders ADD COLUMN {if_not_exists}sales_price VARCHAR",
+            f"ALTER TABLE orders ADD COLUMN {if_not_exists}sales_month VARCHAR",
+            f"ALTER TABLE orders ADD COLUMN {if_not_exists}pickup_date {timestamp_type}",
         ]:
             try:
                 db.execute(text(col_def))
@@ -788,6 +791,12 @@ def update_order_info(
         order.warehouse = payload.warehouse
     if payload.remark is not None:
         order.remark = payload.remark
+    if "sales_price" in payload.model_fields_set:
+        order.sales_price = payload.sales_price
+    if "sales_month" in payload.model_fields_set:
+        order.sales_month = payload.sales_month
+    if "pickup_date" in payload.model_fields_set:
+        order.pickup_date = payload.pickup_date
     if hasattr(payload, 'dealer_order_date') and payload.dealer_order_date is not None:
         order.dealer_order_date = payload.dealer_order_date
     if hasattr(payload, 'delivery_request_date') and payload.delivery_request_date is not None:
@@ -841,6 +850,13 @@ def update_order_status(
     # 1. 상태 업데이트
     order.current_status = payload.to_status
     order.current_status_changed_at = datetime.utcnow()
+    
+    # 판매완료(SOLD) 전환 시 출고/픽업 및 매출월 기본값 보정 (선매출이 아닌 일반 출고완료인 경우)
+    if payload.to_status == models.OrderStatus.SOLD:
+        if not order.pickup_date:
+            order.pickup_date = datetime.utcnow()
+        if not order.sales_month:
+            order.sales_month = datetime.utcnow().strftime("%Y.%m")
     
     if payload.eta:
         order.eta = payload.eta

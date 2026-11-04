@@ -190,7 +190,10 @@ class OrderBase(BaseModel):
     vessel: Optional[str] = None
     warehouse: Optional[str] = None
     destination_port: Optional[str] = None
-    price: Optional[str] = None
+    price: Optional[str] = None # 구매가
+    sales_price: Optional[str] = None # 판매가
+    sales_month: Optional[str] = None # 매출월
+    pickup_date: Optional[datetime] = None # 출고/픽업일자
     remark: Optional[str] = None
     dealer_order_date: Optional[datetime] = None
     delivery_request_date: Optional[str] = None
@@ -217,6 +220,10 @@ class OrderCreate(BaseModel):
     vessel: Optional[str] = None
     warehouse: Optional[str] = None
     destination_port: Optional[str] = None
+    price: Optional[str] = None
+    sales_price: Optional[str] = None
+    sales_month: Optional[str] = None
+    pickup_date: Optional[datetime] = None
     dealer_order_date: Optional[datetime] = None
     delivery_request_date: Optional[str] = None
     rental_start_date: Optional[datetime] = None
@@ -255,6 +262,9 @@ class OrderUpdate(BaseModel):
     vessel: Optional[str] = None
     warehouse: Optional[str] = None
     price: Optional[str] = None
+    sales_price: Optional[str] = None
+    sales_month: Optional[str] = None
+    pickup_date: Optional[datetime] = None
     remark: Optional[str] = None
     dealer_order_date: Optional[datetime] = None
     delivery_request_date: Optional[str] = None
