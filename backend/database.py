@@ -90,6 +90,11 @@ if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
 # PaaS 제공자(예: Heroku, Render)의 기본 주소가 postgres:// 로 시작할 경우 최신 SQLAlchemy(1.4+)를 위해 postgresql:// 로 변환
 if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
     SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
+if SQLALCHEMY_DATABASE_URL.startswith("postgresql://"):
+    try:
+        import psycopg  # noqa: F401
+    except ImportError:
+        SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
 
 # 2. SQLite는 check_same_thread=False가 필요하지만, PostgreSQL 등은 필요 없습니다.
 if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):

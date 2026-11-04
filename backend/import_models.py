@@ -236,10 +236,7 @@ category_map_name = {
     "5-Axis M/C": "5-Axis Machining Center"
 }
 
-def main():
-    Base.metadata.create_all(bind=engine)
-    db = SessionLocal()
-    
+def sync_product_models(db):
     lines = raw_data.strip().splitlines()
     models_to_insert = []
     
@@ -277,12 +274,13 @@ def main():
 
     added_count = 0
     updated_count = 0
+    existing_by_code = {m.model_code: m for m in db.query(ProductModel).all()}
     
     for item in models_to_insert:
         code = item["code"]
         c_id = category_db_map[item["type"]]
         
-        existing = db.query(ProductModel).filter(ProductModel.model_code == code).first()
+        existing = existing_by_code.get(code)
         if not existing:
             new_model = ProductModel(
                 model_code=code,
@@ -300,8 +298,18 @@ def main():
             updated_count += 1
             
     db.commit()
-    print(f"Update completed. Total processed: {len(models_to_insert)}. Added: {added_count}, Updated: {updated_count}")
-    db.close()
+    return len(models_to_insert), added_count, updated_count
+
+def main():
+    Base.metadata.create_all(bind=engine)
+    db = SessionLocal()
+    try:
+        total, added_count, updated_count = sync_product_models(db)
+        from update_thumbnails import run_migration
+        catalog_updated = run_migration(db)
+        print(f"Update completed. Total processed: {total}. Added: {added_count}, Updated: {updated_count}, Catalogs updated: {catalog_updated}")
+    finally:
+        db.close()
 
 if __name__ == "__main__":
     main()
