@@ -1,5 +1,27 @@
 # 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
+## [2026-11-06] 선적 관리 B/L 엑셀 업로드 시 선적내역 리스트 미표시 오류 해결 및 TrackCargo 실시간 연동 강화
+
+### 1. Render 백엔드 로그 정밀 분석 및 근본 원인 규명
+* **TrackCargo 트래킹 정상 연동 및 데이터 수신 확인**:
+  * 백엔드 로그 확인 결과, 스케줄러(scheduler.py)가 B/L HDMUSELE11765900 등을 TrackCargo API(POST /client-orders/create/tracking/sea)에 등록하고 반환받은 주문 ID(03cb3c5-...)로 선박(ONE INTELLIGENCE), 출항/도착 정보를 정상 수신(HTTP 200 OK)하고 있음을 확인했습니다.
+  * 즉, 업로드된 B/L 데이터는 DB shipments 테이블에 정상적으로 저장되었으나 화면 조회 시 필터링되어 나타나지 않는 현상이었습니다.
+* **선적내역 리스트 조회 API(GET /api/shipments?include_all=true) 쿼리 누락 버그 해결**:
+  * 기존 백엔드 get_shipments 함수가 ilter(models.Shipment.orders.any())로 설정되어 있어, 주문(Order)과 연결된 선적만 조회하도록 강제되어 있었습니다.
+  * 새로 업로드된 B/L 8건의 P/O나 S/N가 시스템 내 주문 테이블에 아직 매핑되지 않았거나 신규인 경우 shipment.orders가 빈 상태가 되어 API 반환 목록에서 누락되는 문제가 발생했습니다.
+  * 관리자가 전체 선적 이력을 조회(include_all=True)할 때는 주문 매핑 여부와 무관하게 업로드된 모든 선적(Shipment)이 리스트에 노출되도록 쿼리 로직을 전면 개편했습니다.
+
+### 2. 선적 업로드 및 TrackCargo 벌크 등록 키 매핑 개선
+* **MBL 번호 정규화 키 불일치 문제 해결**:
+  * create_bulk_sea_tracking 실행 시 SCAC 코드가 제거된 순수 B/L 번호(SELE11765900)로 응답이 반환되어 원본 MBL(HDMUSELE11765900)과 키가 일치하지 않아 업로드 시점에 	rackcargo_order_id와 ETA/ETD가 즉시 저장되지 못하고 스케줄러를 거쳐야 했던 문제를 해결했습니다.
+  * 
+esult_map에 원본 MBL과 정규화 MBL을 모두 매핑하여 업로드 즉시 TrackCargo 주문 ID와 초기 항해 데이터를 실시간 동기화하도록 보강했습니다.
+* **P/O 및 S/N 대소문자/공백 유연 매칭 지원**:
+  * 선적 엑셀 업로드 시 기존 주문과의 매칭률을 극대화하기 위해 unc.lower(func.trim(...))을 적용하여 공백이나 영문 대소문자 차이로 인한 매칭 실패를 원천 방지했습니다.
+
+### 3. 프론트엔드 선적 관리 UI(AdminShipmentUpload.jsx) 안정화
+* 신규 선적 업로드 성공 시, 출항 연도 필터링(selectedYear)으로 인해 새로 등록된 B/L(ETD 미수신 건 등)이 가려지지 않도록 전체보기(ALL)로 자동 전환하고 좌측 선적내역 리스트를 즉시 갱신하도록 처리했습니다.
+
 ## [2026-11-05] 판매목록(AdminSalesArchive.jsx) 리스트 항목구성 및 순서 개편, '매출월'·'출고/픽업' 신규 항목 신설 및 선(先)매출 관리 체계 구축
 
 ### 1. 판매목록 테이블 리스트 항목 구성 및 순서 개편

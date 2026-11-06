@@ -458,6 +458,7 @@ export default function AdminShipmentUpload({ isMobileView }) {
 
       if (res.ok) {
         setUploadStatus('success');
+        setSelectedYear('ALL'); // 신규 업로드된 B/L이 연도 필터링에 걸리지 않도록 전체보기로 자동 전환
         // 업로드 성공 후 좌측 선적내역 리스트 즉시 자동 갱신
         fetchShipmentHistory();
         setTimeout(() => {

@@ -258,16 +258,21 @@ async def create_bulk_sea_tracking(mbl_nos: list) -> dict:
                 
                 for item in results:
                     tracking_id = item.get("trackingId")
+                    order_id = None
                     
                     if not item.get("success") and item.get("error"):
                         error_data = item["error"].get("data", {})
                         if error_data and error_data.get("orderId"):
-                            result_map[tracking_id] = error_data.get("orderId")
-                            continue
+                            order_id = error_data.get("orderId")
+                    else:
+                        order_id = item.get("orderId") or item.get("id") or (item.get("data") and item["data"].get("orderId"))
                     
-                    order_id = item.get("orderId") or item.get("id") or (item.get("data") and item["data"].get("orderId"))
                     if order_id and tracking_id:
                         result_map[tracking_id] = order_id
+                        # 원래 요청했던 mbl_nos 중 tracking_id와 일치하거나 포함되는 원본 MBL도 매핑 (예: HDMUSELE11765900 <-> SELE11765900)
+                        for orig_mbl in mbl_nos:
+                            if tracking_id.upper() in orig_mbl.upper() or orig_mbl.upper() in tracking_id.upper():
+                                result_map[orig_mbl] = order_id
                         
             else:
                 logger.error(f"[TrackCargo API] Bulk create tracking failed: {response.status_code} - {response.text}")

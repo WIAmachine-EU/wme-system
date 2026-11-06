@@ -6,7 +6,7 @@ from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Q
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy import text, func
 import pandas as pd
 
 from database import get_db, engine, Base, SessionLocal
@@ -330,41 +330,51 @@ def get_shipments(
     include_all: bool = Query(False, description="True일 경우 도착 완료된 선적을 포함한 전체 선적 내역(업로드 이력)을 반환"),
     db: Session = Depends(get_db)
 ):
-    # 주문이 존재하는 선적 조회 (최신 출항일/생성일 순 정렬)
-    shipments = db.query(models.Shipment).filter(models.Shipment.orders.any()).order_by(models.Shipment.etd.desc().nullslast(), models.Shipment.id.desc()).all()
-    
-    # [선적내역 리스트용] 전체 선적 내역 조회 모드
+    # [선적내역 리스트용] 전체 선적 내역 조회 모드 (업로드된 선적 이력 전체)
     if include_all:
-        all_shipments = []
-        for s in shipments:
-            if dealer_id:
-                user_orders = [o for o in s.orders if o.dealer_company_id == dealer_id]
-                if not user_orders:
-                    continue
-                s.orders = user_orders
-            all_shipments.append(s)
-        return all_shipments
-
-    # [선적 트래킹용 기본값] 운송 중(In-Transit) 필터링: 모든 주문이 도착(ARRIVED) 이후 상태인 경우는 제외
-    active_shipments = []
-    for s in shipments:
-        # [설계 가이드 v4.0 RBAC] 딜러 격리 필터링
         if dealer_id:
-            user_orders = [o for o in s.orders if o.dealer_company_id == dealer_id]
-            if not user_orders:
-                continue
-            orders_to_check = user_orders
+            # 딜러 권한인 경우 본인 회사 주문이 연결된 선적만 격리 조회
+            shipments = db.query(models.Shipment).filter(
+                models.Shipment.orders.any(models.Order.dealer_company_id == dealer_id)
+            ).order_by(models.Shipment.etd.desc().nullslast(), models.Shipment.id.desc()).all()
+            for s in shipments:
+                s.orders = [o for o in s.orders if o.dealer_company_id == dealer_id]
+            return shipments
         else:
-            orders_to_check = s.orders
+            # 관리자 권한인 경우: 주문 매핑 여부와 무관하게 업로드된 모든 선적(Shipment)을 반환!
+            shipments = db.query(models.Shipment).order_by(
+                models.Shipment.etd.desc().nullslast(), 
+                models.Shipment.id.desc()
+            ).all()
+            return shipments
 
-        active_orders = [o for o in orders_to_check if o.current_status in [models.OrderStatus.SHIPPING, models.OrderStatus.CONFIRMED, models.OrderStatus.IN_PRODUCTION]]
-        if active_orders:
-            # 딜러 권한인 경우 본인 회사 주문만 노출되도록 보장
-            if dealer_id:
+    # [선적 트래킹용 기본값] 운송 중(In-Transit) 필터링
+    if dealer_id:
+        shipments = db.query(models.Shipment).filter(
+            models.Shipment.orders.any(models.Order.dealer_company_id == dealer_id)
+        ).order_by(models.Shipment.etd.desc().nullslast(), models.Shipment.id.desc()).all()
+        active_shipments = []
+        for s in shipments:
+            user_orders = [o for o in s.orders if o.dealer_company_id == dealer_id]
+            active_orders = [o for o in user_orders if o.current_status in [models.OrderStatus.SHIPPING, models.OrderStatus.CONFIRMED, models.OrderStatus.IN_PRODUCTION]]
+            if active_orders:
                 s.orders = user_orders
-            active_shipments.append(s)
-            
-    return active_shipments
+                active_shipments.append(s)
+        return active_shipments
+    else:
+        # 관리자 트래킹: 운송 중(In-Transit)인 선적
+        # (활성 상태 주문이 있거나, 주문이 아직 없더라도 선적 추적 상태가 완료되지 않은 화물)
+        shipments = db.query(models.Shipment).order_by(
+            models.Shipment.etd.desc().nullslast(), 
+            models.Shipment.id.desc()
+        ).all()
+        active_shipments = []
+        for s in shipments:
+            is_completed = (s.trackcargo_status == "Completed")
+            active_orders = [o for o in s.orders if o.current_status in [models.OrderStatus.SHIPPING, models.OrderStatus.CONFIRMED, models.OrderStatus.IN_PRODUCTION]]
+            if active_orders or (not is_completed and len(s.orders) == 0):
+                active_shipments.append(s)
+        return active_shipments
 
 @app.get("/api/v1/tracking/sync-status", summary="2시간 주기 선박 경로 동기화 현황 및 효율 지수 조회")
 def get_tracking_sync_status():
@@ -440,7 +450,13 @@ def get_shipment_route_map(
 @app.post("/api/shipments/upload")
 async def upload_shipments(rows: List[schemas.ShipmentUploadRow], db: Session = Depends(get_db)):
     try:
-        from trackcargo_api import create_bulk_sea_tracking, fetch_tracking_data, get_carrier_name
+        from trackcargo_api import (
+            create_bulk_sea_tracking, 
+            fetch_tracking_data, 
+            get_carrier_name,
+            get_scac_code,
+            normalize_tracking_id
+        )
         
         # 1. Group by MBL
         mbl_groups = {}
@@ -491,11 +507,15 @@ async def upload_shipments(rows: List[schemas.ShipmentUploadRow], db: Session = 
         if mbls_to_register:
             bulk_results = await create_bulk_sea_tracking(mbls_to_register)
             for mbl in mbls_to_register:
-                if mbl in bulk_results:
-                    shipments_dict[mbl].trackcargo_order_id = bulk_results[mbl]
+                scac = get_scac_code(mbl)
+                clean_id = normalize_tracking_id(mbl, scac)
+                order_id = bulk_results.get(mbl) or bulk_results.get(clean_id)
+                
+                if order_id:
+                    shipments_dict[mbl].trackcargo_order_id = order_id
                     
                     # Fetch initial tracking data immediately
-                    tracking_data = await fetch_tracking_data(bulk_results[mbl])
+                    tracking_data = await fetch_tracking_data(order_id)
                     if tracking_data and not tracking_data.get("error"):
                         shipments_dict[mbl].trackcargo_status = tracking_data.get("trackcargo_status")
                         shipments_dict[mbl].trackcargo_last_sync = datetime.utcnow()
@@ -506,17 +526,22 @@ async def upload_shipments(rows: List[schemas.ShipmentUploadRow], db: Session = 
                         shipments_dict[mbl].etd = tracking_data.get("etd")
                         shipments_dict[mbl].eta = tracking_data.get("eta")
             
-        # 4. Update orders (P/O 기준 매칭 및 S/N 동기화)
+        # 4. Update orders (P/O 기준 매칭 및 S/N 동기화 - 대소문자/공백 유연 매칭)
         for mbl, data in mbl_groups.items():
             shipment = shipments_dict[mbl]
             for order_row in data["orders"]:
-                # P/O (reference_no) 기준 우선 매칭, 없으면 S/N (serial_number) 기준 매칭
                 matched_order = None
                 if order_row.reference_no and order_row.reference_no.strip():
-                    matched_order = db.query(models.Order).filter(models.Order.reference_no == order_row.reference_no.strip()).first()
+                    ref_val = order_row.reference_no.strip()
+                    matched_order = db.query(models.Order).filter(
+                        func.lower(func.trim(models.Order.reference_no)) == ref_val.lower()
+                    ).first()
                 
                 if not matched_order and order_row.serial_number and order_row.serial_number.strip():
-                    matched_order = db.query(models.Order).filter(models.Order.serial_number == order_row.serial_number.strip()).first()
+                    sn_val = order_row.serial_number.strip()
+                    matched_order = db.query(models.Order).filter(
+                        func.lower(func.trim(models.Order.serial_number)) == sn_val.lower()
+                    ).first()
                     
                 if matched_order:
                     matched_order.shipment_id = shipment.id
