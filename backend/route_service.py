@@ -116,9 +116,25 @@ def generate_interpolated_route(waypoints: List[List[float]], target_points: int
 PORT_COORDINATES = {
     "KRPUS": {"lat": 35.1028, "lng": 129.0403, "name": "Busan, Korea"},
     "KRBUS": {"lat": 35.1028, "lng": 129.0403, "name": "Busan, Korea"},
+    "BUSAN": {"lat": 35.1028, "lng": 129.0403, "name": "Busan, Korea"},
     "DEHAM": {"lat": 53.5413, "lng": 9.9841, "name": "Hamburg, Germany"},
-    "NLRTM": {"lat": 51.9490, "lng": 4.1450, "name": "Rotterdam, Netherlands"},
-    "BEANR": {"lat": 51.2667, "lng": 4.3833, "name": "Antwerp, Belgium"},
+    "HAMBURG": {"lat": 53.5413, "lng": 9.9841, "name": "Hamburg, Germany"},
+    "NLRTM": {"lat": 51.9244, "lng": 4.4777, "name": "Rotterdam, Netherlands"},
+    "ROTTERDAM": {"lat": 51.9244, "lng": 4.4777, "name": "Rotterdam, Netherlands"},
+    "BEANR": {"lat": 51.2194, "lng": 4.4025, "name": "Antwerp, Belgium"},
+    "ANTWERP": {"lat": 51.2194, "lng": 4.4025, "name": "Antwerp, Belgium"},
+    "DEBRV": {"lat": 53.5396, "lng": 8.5724, "name": "Bremerhaven, Germany"},
+    "BREMERHAVEN": {"lat": 53.5396, "lng": 8.5724, "name": "Bremerhaven, Germany"},
+    "TRIST": {"lat": 41.0082, "lng": 28.9784, "name": "Istanbul, Turkey"},
+    "ISTANBUL": {"lat": 41.0082, "lng": 28.9784, "name": "Istanbul, Turkey"},
+    "NOOSL": {"lat": 59.9139, "lng": 10.7522, "name": "Oslo, Norway"},
+    "OSLO": {"lat": 59.9139, "lng": 10.7522, "name": "Oslo, Norway"},
+    "NOSVG": {"lat": 58.9690, "lng": 5.7331, "name": "Stavanger, Norway"},
+    "STAVANGER": {"lat": 58.9690, "lng": 5.7331, "name": "Stavanger, Norway"},
+    "HRRJK": {"lat": 45.3271, "lng": 14.4422, "name": "Rijeka, Croatia"},
+    "RIJEKA": {"lat": 45.3271, "lng": 14.4422, "name": "Rijeka, Croatia"},
+    "SIKOP": {"lat": 45.5481, "lng": 13.7294, "name": "Koper, Slovenia"},
+    "KOPER": {"lat": 45.5481, "lng": 13.7294, "name": "Koper, Slovenia"},
 }
 
 ARRIVED_KEYWORDS = [
@@ -290,8 +306,15 @@ def parse_trackcargo_detail_payload(payload: dict, pod_code: str = "DEHAM", mbl_
                 active_vessel["imo"] = "9933133"
 
     # 4. 최후 위치(Last known position) 파싱 및 도착 완료 시 목적지 항구(POD) 좌표 강제 스냅
-    pod_key = pod_code.upper() if pod_code else "DEHAM"
-    pod_coord = PORT_COORDINATES.get(pod_key, PORT_COORDINATES["DEHAM"])
+    pod_key = pod_code.upper().strip() if pod_code else "DEHAM"
+    pod_coord = PORT_COORDINATES.get(pod_key)
+    if not pod_coord:
+        for k, v in PORT_COORDINATES.items():
+            if k.upper() in pod_key or pod_key in k.upper():
+                pod_coord = v
+                break
+    if not pod_coord:
+        pod_coord = PORT_COORDINATES["DEHAM"]
 
     if is_arrived:
         last_lat = pod_coord["lat"]

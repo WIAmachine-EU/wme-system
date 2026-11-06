@@ -8,7 +8,8 @@ import {
   calculateDistanceToGo, 
   calculateHeading, 
   checkIsDelayed, 
-  estimateVesselPosition 
+  estimateVesselPosition,
+  getStandardMaritimeRoute
 } from '../utils/geoUtils';
 import { 
   Navigation, 
@@ -164,12 +165,14 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
     const isDischarged = (shipmentData.trackcargo_status === 'Discharged' || shipmentData.status === 'Discharged');
     const isDelayed = isShipmentArrived ? false : (shipmentData.isDelayed !== undefined ? shipmentData.isDelayed : checkIsDelayed(shipmentData));
 
-    // [가이드 v5.0] 희망봉까지만 그려지던 4개 직선 더미 경로를 함부르크 완주 경로로 확장
-    const routeCoordinates = (shipmentData.route_coordinates && shipmentData.route_coordinates.length > 10)
+    // [가이드 v5.1] AIS 궤적 데이터가 충분히(10개 이상) 존재하면 실측 AIS 좌표 사용,
+    // 그렇지 않은 경우 목적지(POD: Istanbul, Oslo, Stavanger, Rotterdam, Hamburg 등)에 맞춘 완주 표준 해상 항로 생성
+    const hasValidAis = shipmentData.route_coordinates && Array.isArray(shipmentData.route_coordinates) && shipmentData.route_coordinates.length >= 10;
+    const routeCoordinates = hasValidAis
       ? shipmentData.route_coordinates
-      : (isShipmentArrived ? COMPLETE_KRPUS_TO_DEHAM_ROUTE : COMPLETE_KRPUS_TO_DEHAM_ROUTE.slice(0, 6));
+      : getStandardMaritimeRoute(polCoords, podCoords, shipmentData.pod);
 
-    // [가이드 v5.0] 도착 완료 시 케이프타운(-34.50, 18.40) 대신 함부르크(POD: 53.5413, 9.9841)로 위치 확정
+    // [가이드 v5.0] 도착 완료 시 목적항(POD)으로 위치 확정
     let currentLng = shipmentData.last_lng ?? shipmentData.currentLng ?? shipmentData.current_lng;
     let currentLat = shipmentData.last_lat ?? shipmentData.currentLat ?? shipmentData.current_lat;
 
@@ -184,7 +187,8 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
           podCoords, 
           shipmentData.etd, 
           shipmentData.eta,
-          routeCoordinates
+          routeCoordinates,
+          shipmentData.pod
         );
       }
     }
@@ -299,14 +303,15 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
     }
   }, [currentShipment?.mbl_no, currentShipment?.currentLng, currentShipment?.currentLat, currentShipment?.isWaitingDeparture]);
 
-  // [v3.0] 단일 선적 해상 항로 GeoJSON LineString (출항 대기 중일 때는 해상 항로선을 그리지 않음)
+  // [v3.0/v5.1] 단일 선적 해상 항로 GeoJSON LineString (출항 대기 중일 때는 해상 항로선을 그리지 않음)
   const singleRouteGeoJSON = useMemo(() => {
     if (!currentShipment || currentShipment.isWaitingDeparture) return null;
     return buildMaritimeRouteGeoJSON(
       currentShipment.polCoords,
       currentShipment.podCoords,
       currentShipment.currentCoord,
-      currentShipment.routeCoordinates
+      currentShipment.routeCoordinates,
+      currentShipment.podName
     );
   }, [currentShipment]);
 
@@ -360,7 +365,7 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
           ? [Number(s.last_lng), Number(s.last_lat)]
           : (isDischarged 
             ? podCoords 
-            : estimateVesselPosition(polCoords, podCoords, s.etd, s.eta, s.route_coordinates)));
+            : estimateVesselPosition(polCoords, podCoords, s.etd, s.eta, s.route_coordinates, s.pod)));
           
       const heading = isShipmentArrived
         ? 0.0
