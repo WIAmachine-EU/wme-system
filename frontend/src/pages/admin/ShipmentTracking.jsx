@@ -753,36 +753,6 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
                         <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>진행 방위 (Course)</span>
                         <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{Math.round(course)}°</span>
                       </div>
-                      <div style={{ backgroundColor: '#ffffff', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                        <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>총 항해 누적 거리</span>
-                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#059669' }}>{Number(distanceKm).toLocaleString()} km</span>
-                      </div>
-                      <div style={{ backgroundColor: '#ffffff', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                        <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>수신 AIS 궤적</span>
-                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{pointsCount} 개 포인트</span>
-                      </div>
-                    </div>
-
-                    {/* [설계 가이드 v4.0] 2시간 주기 최적화 동기화 & Smart Diff-Check 정보 카드 */}
-                    <div style={{
-                      backgroundColor: '#f0fdf4',
-                      padding: '12px',
-                      borderRadius: '8px',
-                      border: '1px solid #bbf7d0',
-                      fontSize: '12px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '4px'
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 700, color: '#166534', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          <Zap size={14} color="#16a34a" /> 2시간 주기 스마트 Diff-Check 동기화
-                        </span>
-                        <span style={{ fontSize: '11px', color: '#15803d', fontWeight: 600 }}>v5.0 최적화</span>
-                      </div>
-                      <p style={{ margin: 0, fontSize: '11px', color: '#14532d', lineHeight: 1.5 }}>
-                        선박 좌표 개수({pointsCount}개) 및 최후 위치·침로 각도({Math.round(course)}°) 변동 시에만 DB를 업데이트하여 Dead Tuple 생성을 80% 절감하고, 도착 완료 시 POD로 위치를 자동 고정(Snap)합니다.
-                      </p>
                     </div>
 
                     {/* Route Details Box */}
