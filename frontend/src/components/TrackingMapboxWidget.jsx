@@ -4,6 +4,8 @@ import Map, { Source, Layer, Marker, Popup, NavigationControl, FullscreenControl
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { 
   getPortCoordinate, 
+  getFriendlyPortName,
+  getTransitPort,
   buildMaritimeRouteGeoJSON, 
   calculateDistanceToGo, 
   calculateHeading, 
@@ -136,6 +138,9 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
         vesselName: shipmentData.vessel_name || '생산완료 후 출항',
         polName: shipmentData.pol || 'KRPUS (Busan)',
         podName: shipmentData.pod || 'POD',
+        polFriendlyName: getFriendlyPortName(shipmentData.pol || 'KRPUS', 'BUSAN, KOREA'),
+        podFriendlyName: getFriendlyPortName(shipmentData.pod || 'POD', 'POD'),
+        transitPort: getTransitPort(shipmentData.pod),
         polCoords,
         podCoords,
         currentCoord: polCoords,
@@ -222,9 +227,12 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
       : (shipmentData.reported_distance_km || (routeCoordinates.length > 500 ? 26281 : null));
     const routeUpdatedAt = shipmentData.route_updated_at || shipmentData.trackcargo_last_sync;
 
-    // 표준 UN/LOCODE 포트명 (KRBUS -> KRPUS 교정)
+    // 표준 UN/LOCODE 포트명 (KRBUS -> KRPUS 교정) 및 친화적 명칭 (도시, 국가)
     const polName = (shipmentData.pol === 'KRBUS' || !shipmentData.pol) ? 'KRPUS' : shipmentData.pol;
     const podName = shipmentData.pod || 'DEHAM';
+    const polFriendlyName = getFriendlyPortName(polName, 'BUSAN, KOREA');
+    const podFriendlyName = getFriendlyPortName(podName, 'POD');
+    const transitPort = getTransitPort(podName);
 
     const status = isShipmentArrived 
       ? 'Arrived (도착 완료)' 
@@ -238,6 +246,9 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
       voyage: shipmentData.voyage || '-',
       polName,
       podName,
+      polFriendlyName,
+      podFriendlyName,
+      transitPort,
       polCoords,
       podCoords,
       currentCoord,
@@ -303,7 +314,7 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
     }
   }, [currentShipment?.mbl_no, currentShipment?.currentLng, currentShipment?.currentLat, currentShipment?.isWaitingDeparture]);
 
-  // [v3.0/v5.1] 단일 선적 해상 항로 GeoJSON LineString (출항 대기 중일 때는 해상 항로선을 그리지 않음)
+  // [v3.0/v6.0] 단일 선적 해상 항로 GeoJSON FeatureCollection (지나온 실선 + 잔여 점선)
   const singleRouteGeoJSON = useMemo(() => {
     if (!currentShipment || currentShipment.isWaitingDeparture) return null;
     return buildMaritimeRouteGeoJSON(
@@ -311,31 +322,45 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
       currentShipment.podCoords,
       currentShipment.currentCoord,
       currentShipment.routeCoordinates,
-      currentShipment.podName
+      currentShipment.podName,
+      currentShipment.isShipmentArrived,
+      currentShipment.isWaitingDeparture
     );
   }, [currentShipment]);
 
-  // [v5.0] GeoJSON 궤적 선 스타일 (도착 완료 시 Green, 정상 실선, 지연 Red)
-  const routeLayerStyle = useMemo(() => {
+  // [v6.0] HMM 공식 스타일: 지나온 길 (실선)
+  const pastRouteLayerStyle = useMemo(() => {
     if (!currentShipment) return null;
-    let lineColor = '#2563eb';
-    if (currentShipment.isShipmentArrived) {
-      lineColor = '#10b981'; // 도착 완료(Arrived): 에메랄드 그린 완주선
-    } else if (currentShipment.isDischarged) {
-      lineColor = '#9ca3af';
-    } else if (currentShipment.isDelayed) {
-      lineColor = '#ef4444';
-    }
-
-    const hasRealRoute = currentShipment.routeCoordinates && currentShipment.routeCoordinates.length > 1;
+    const lineColor = currentShipment.isShipmentArrived 
+      ? '#10b981' 
+      : (currentShipment.isDischarged ? '#6b7280' : '#dc2626');
 
     return {
-      id: 'maritime-route-line',
+      id: 'maritime-route-past',
       type: 'line',
+      filter: ['==', ['get', 'segment'], 'past'],
       paint: {
         'line-color': lineColor,
-        'line-width': hasRealRoute ? 3.8 : 3.2,
-        ...(hasRealRoute ? {} : { 'line-dasharray': [2, 2] }),
+        'line-width': 3.5,
+      },
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round'
+      }
+    };
+  }, [currentShipment]);
+
+  // [v6.0] HMM 공식 스타일: 앞으로 남은 길 (점선 - Dashed Line)
+  const remainingRouteLayerStyle = useMemo(() => {
+    if (!currentShipment) return null;
+    return {
+      id: 'maritime-route-remaining',
+      type: 'line',
+      filter: ['==', ['get', 'segment'], 'remaining'],
+      paint: {
+        'line-color': '#ef4444',
+        'line-width': 2.8,
+        'line-dasharray': [2, 2],
       },
       layout: {
         'line-join': 'round',
@@ -477,14 +502,15 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
         <NavigationControl position="bottom-right" />
         <FullscreenControl position="bottom-right" />
 
-        {/* 1. 단일 선적 활성화 시 경로 렌더링 */}
+        {/* 1. 단일 선적 활성화 시 경로 렌더링 (지나온 실선 + 잔여 점선) */}
         {currentShipment && singleRouteGeoJSON && (
           <Source id="active-shipment-route" type="geojson" data={singleRouteGeoJSON}>
-            <Layer {...routeLayerStyle} />
+            <Layer {...pastRouteLayerStyle} />
+            <Layer {...remainingRouteLayerStyle} />
           </Source>
         )}
 
-        {/* 2. 출발항 (POL) 마커 */}
+        {/* 2. 출발항 (POL) 마커 - HMM 공식 파란색 뱃지 스타일 */}
         {currentShipment && (
           <Marker 
             longitude={currentShipment.polCoords[0]} 
@@ -500,35 +526,83 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
               }}
               onClick={() => setPopupInfo({
                 type: 'port',
-                title: `출발항 (POL): ${currentShipment.polName}`,
+                title: `출발항 (POL): ${currentShipment.polFriendlyName}`,
                 desc: `ETD: ${currentShipment.etd ? new Date(currentShipment.etd).toLocaleDateString() : (currentShipment.isWaitingDeparture ? '출항 대기 중' : '-')}`,
                 coord: currentShipment.polCoords
               })}
             >
               <div style={{
-                width: '14px',
-                height: '14px',
-                backgroundColor: '#1e3a8a',
+                width: '12px',
+                height: '12px',
+                backgroundColor: '#0284c7',
                 border: '2px solid #ffffff',
                 borderRadius: '50%',
                 boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
               }} />
               <span style={{
                 fontSize: '11px',
-                fontWeight: 600,
-                color: '#1e3a8a',
-                backgroundColor: 'rgba(255,255,255,0.92)',
-                padding: '2px 6px',
-                borderRadius: '4px',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                fontWeight: 700,
+                color: '#ffffff',
+                backgroundColor: '#0284c7',
+                padding: '3px 8px',
+                borderRadius: '12px',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+                letterSpacing: '0.02em',
+                whiteSpace: 'nowrap'
               }}>
-                POL: {currentShipment.polName}
+                {currentShipment.polFriendlyName}
               </span>
             </div>
           </Marker>
         )}
 
-        {/* 3. 도착항 (POD) 마커 */}
+        {/* 2-1. [HMM 공식 연계] 중간 환적/경유항 (Transit Port: 독일 함부르크 등) 주황색 마커 */}
+        {currentShipment && currentShipment.transitPort && (
+          <Marker 
+            longitude={currentShipment.transitPort.coord[0]} 
+            latitude={currentShipment.transitPort.coord[1]} 
+            anchor="center"
+          >
+            <div 
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                cursor: 'pointer'
+              }}
+              onClick={() => setPopupInfo({
+                type: 'port',
+                title: `환적/경유항 (Transit Port): ${currentShipment.transitPort.name}`,
+                desc: currentShipment.transitPort.description || '대형 모선 기항 후 피더선(Feeder) 환적 연계 허브',
+                coord: currentShipment.transitPort.coord
+              })}
+            >
+              <div style={{
+                width: '12px',
+                height: '12px',
+                backgroundColor: '#ea580c',
+                border: '2px solid #ffffff',
+                borderRadius: '50%',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+              }} />
+              <span style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                color: '#ffffff',
+                backgroundColor: '#ea580c',
+                padding: '3px 8px',
+                borderRadius: '12px',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+                letterSpacing: '0.02em',
+                whiteSpace: 'nowrap'
+              }}>
+                {currentShipment.transitPort.name}
+              </span>
+            </div>
+          </Marker>
+        )}
+
+        {/* 3. 도착항 (POD) 마커 - HMM 공식 파란색 뱃지 스타일 */}
         {currentShipment && (
           <Marker 
             longitude={currentShipment.podCoords[0]} 
@@ -544,29 +618,31 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
               }}
               onClick={() => setPopupInfo({
                 type: 'port',
-                title: `도착항 (POD): ${currentShipment.podName}`,
+                title: `도착항 (POD): ${currentShipment.podFriendlyName}`,
                 desc: `ETA: ${currentShipment.eta ? new Date(currentShipment.eta).toLocaleDateString() : '-'}`,
                 coord: currentShipment.podCoords
               })}
             >
               <div style={{
-                width: '14px',
-                height: '14px',
-                backgroundColor: '#047857',
+                width: '12px',
+                height: '12px',
+                backgroundColor: '#0284c7',
                 border: '2px solid #ffffff',
                 borderRadius: '50%',
                 boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
               }} />
               <span style={{
                 fontSize: '11px',
-                fontWeight: 600,
-                color: '#065f46',
-                backgroundColor: 'rgba(255,255,255,0.92)',
-                padding: '2px 6px',
-                borderRadius: '4px',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                fontWeight: 700,
+                color: '#ffffff',
+                backgroundColor: '#0284c7',
+                padding: '3px 8px',
+                borderRadius: '12px',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+                letterSpacing: '0.02em',
+                whiteSpace: 'nowrap'
               }}>
-                POD: {currentShipment.podName}
+                {currentShipment.podFriendlyName}
               </span>
             </div>
           </Marker>
