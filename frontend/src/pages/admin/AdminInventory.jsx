@@ -128,7 +128,8 @@ export default function AdminInventory({ isMobileView }) {
       const res = await fetch('/api/orders?is_corporate_stock=true');
       const data = await res.json();
       if (Array.isArray(data)) {
-        setOrders(data);
+        // WIA 재고리스트는 유럽법인에서 재고를 위해 주문한 F번호 주문 상품만 노출 (A번호 주문 제외)
+        setOrders(data.filter(o => String(o.reference_no || '').trim().toUpperCase().startsWith('F')));
       }
     } catch (err) {
       console.error("Failed to fetch inventory:", err);
@@ -585,7 +586,7 @@ export default function AdminInventory({ isMobileView }) {
         })
       });
       if (res.ok) {
-        alert("판매완료 처리되어 선택하신 딜러사의 확정 발주(주문/배송현황)로 이관되었습니다.");
+        alert("판매완료 처리되어 판매목록으로 이관되었습니다.");
         setReserveSaleModalOpen(false);
         setReserveSaleOrder(null);
         setPendingChanges(prev => {

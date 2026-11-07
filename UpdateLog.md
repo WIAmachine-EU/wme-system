@@ -1,4 +1,40 @@
-﻿# 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
+# 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
+
+## [2026-11-08] 주문번호(P/O) 타입(F번호 vs A번호) 관리 체계 전면 개편 및 화면별 노출 프로세스 최적화
+
+### 1. 주문번호(P/O) 2대 유형 분류 및 비즈니스 정책 정립
+* **유럽법인 재고 발주 (F번호 주문, F...)**:
+  * 유럽법인(WME)이 본사로부터 재고 확보를 위해 발주한 장비로 기본 가용 재고(is_corporate_stock = True, stock_type = 'AVAILABLE')로 분류.
+  * '주문/배송현황' 타임라인에서 배송 단계를 추적하고, 'WIA재고리스트'에 노출되어 딜러 판매/할당 대상으로 관리.
+* **현지 딜러 구매 확정 발주 (A번호 주문, A...)**:
+  * 딜러가 구매를 위해 발주한 주문으로 등록 시점부터 이미 판매가 확정된 주문(is_corporate_stock = False, stock_type = 'DEALER_ORDER')으로 분류.
+  * 법인 판매용 재고가 아니므로 'WIA재고리스트'에서는 전면 제외되며, '주문/배송현황' 타임라인과 '판매목록'에 즉시 노출되어 관리.
+
+### 2. 백엔드 데이터베이스 정규화 및 API 로직 개편 (main.py)
+* **서버 구동 시 자동 마이그레이션 및 정규화 (on_startup)**:
+  * 시스템에 등록된 모든 A번호 주문의 is_corporate_stock = FALSE, stock_type = 'DEALER_ORDER' 일괄 보정 및 프로모션 인벤토리에서 원천 제거.
+  * F번호 주문 중 미판매 장비는 is_corporate_stock = TRUE, stock_type = 'AVAILABLE'로 보정.
+* **주문 생성/업로드 파이프라인 P/O 접두어 기준 자동 분류**:
+  * 단건 주문 생성(POST /api/orders), 발주 엑셀 업로드(POST /api/upload/excel), 재고 현황 업로드(POST /api/upload/stock-status), 주문 정보 수정(PATCH /api/orders/{id}) 전체에 P/O 접두어(A% vs F%) 자동 판별 로직 적용.
+* **주문 목록 조회 API (GET /api/orders) 필터 세분화**:
+  * sales_archive=True 신설: A번호 주문 전체 + 판매 완료(SOLD/DISPATCHED)된 F번호 주문을 통합 반환하여 '판매목록'에서 원스톱 관리.
+  * is_corporate_stock=True 보강: 반드시 F번호 주문(
+eference_no LIKE 'F%')이면서 미판매인 법인 가용 재고만 반환하도록 제한 (A번호 주문 원천 배제).
+* **선매출 및 출고/픽업 연동 프로세스 구현**:
+  * '판매목록'에서 선매출 발생 시 sales_month, sales_price만 입력하면 미출고 상태로 유지되어 '주문/배송현황' 타임라인에 계속 표시.
+  * 실물 출고 완료 시 pickup_date를 입력하면 자동으로 current_status = OrderStatus.SOLD, is_timeline_completed = True로 동기화되어 타임라인 완료 이관.
+
+### 3. 프론트엔드 화면별 필터링 및 UI 최적화
+* **WIA재고리스트 (AdminInventory.jsx, DealerInventory.jsx, DealerDashboard.jsx)**:
+  * 백엔드 API 격리에 더해 프론트엔드에서도 F로 시작하는 주문만 노출되도록 2중 안전 필터링 적용. A번호 주문은 재고 목록에서 완벽히 격리.
+* **판매목록 (AdminSalesArchive.jsx)**:
+  * /api/orders?sales_archive=true를 호출하여 시스템에 등록된 모든 A번호 주문과 판매완료된 F번호 주문을 실시간 로드.
+  * 모달을 통한 선매출 및 출고/픽업 일자 등록, 수정 및 현황 통계 연동.
+
+### 4. 로컬 DB 및 백업 데이터 동기화, 프로덕션 빌드 검증
+* 로컬 SQLite DB(scm_erp.db) 및 백업 데이터(ackup_orders_239.json) 내 239건 주문 전체 P/O 타입 기준 정규화 완료.
+* 프론트엔드 최신 프로덕션 빌드(
+pm run build) 무결성 및 배포 호환성 검증 완료.
 
 ## [2026-11-07] 선적 트래킹 B/L 상세정보 및 선박 탭 UI 최적화, 불필요 지표 위젯 제거 및 화면 시인성 극대화
 

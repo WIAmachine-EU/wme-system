@@ -41,7 +41,7 @@ export default function AdminSalesArchive({ isMobileView }) {
     setLoading(true);
     try {
       const [ordersRes, modelsRes, dealersRes, ncRes, incotermRes, portRes] = await Promise.all([
-        fetch('/api/orders?status_filter=SOLD'),
+        fetch('/api/orders?sales_archive=true'),
         fetch('/api/models'),
         fetch('/api/dealers'),
         fetch('/api/master-data/nc-codes'),
@@ -65,7 +65,7 @@ export default function AdminSalesArchive({ isMobileView }) {
 
   const fetchSoldOrdersOnly = async () => {
     try {
-      const res = await fetch('/api/orders?status_filter=SOLD');
+      const res = await fetch('/api/orders?sales_archive=true');
       const data = await res.json();
       if (Array.isArray(data)) {
         setOrders(data);

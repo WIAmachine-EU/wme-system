@@ -40,8 +40,8 @@ export default function DealerInventory({ isMobileView }) {
       ]);
       const data = await ordersRes.json();
       if (Array.isArray(data)) {
-        // 딜러는 '일반 판매용(AVAILABLE)' 또는 예약/임대/전시/프로모션 목적의 가용 재고를 열람 가능
-        setOrders(data);
+        // WIA 재고리스트는 유럽법인 재고 주문인 F번호 주문 상품만 노출 (A번호 주문 제외)
+        setOrders(data.filter(o => String(o.reference_no || '').trim().toUpperCase().startsWith('F')));
       }
       setPortCodes(await portsRes.json());
     } catch (err) {

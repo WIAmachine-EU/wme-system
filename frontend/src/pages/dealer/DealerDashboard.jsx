@@ -58,7 +58,7 @@ export default function DealerDashboard({ isMobileView, setActiveTab }) {
       const res = await fetch('/api/orders?is_corporate_stock=true');
       const data = await res.json();
       if (Array.isArray(data)) {
-        setCorpStock(data);
+        setCorpStock(data.filter(o => String(o.reference_no || '').trim().toUpperCase().startsWith('F')));
       }
     } catch (e) {}
   };

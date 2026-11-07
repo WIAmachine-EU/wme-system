@@ -6,7 +6,7 @@ from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Q
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from sqlalchemy import text, func
+from sqlalchemy import text, func, or_, and_
 import pandas as pd
 
 from database import get_db, engine, Base, SessionLocal
@@ -153,6 +153,37 @@ def on_startup():
             db.execute(text("UPDATE orders SET warehouse = vessel WHERE (warehouse IS NULL OR warehouse = '') AND vessel IS NOT NULL AND vessel != ''"))
             db.commit()
         except Exception:
+            db.rollback()
+
+        # [P/O 타입 정규화]
+        # 1) A번호 주문 (딜러 구매 확정 주문): WIA 재고리스트에서 제외하고 판매목록/타임라인에서 관리
+        try:
+            db.execute(text(
+                "UPDATE orders SET is_corporate_stock = FALSE, "
+                "stock_type = CASE WHEN stock_type IS NULL OR stock_type = '' OR stock_type = 'AVAILABLE' THEN 'DEALER_ORDER' ELSE stock_type END "
+                "WHERE UPPER(TRIM(reference_no)) LIKE 'A%'"
+            ))
+            db.execute(text(
+                "DELETE FROM promotion_inventory WHERE order_id IN (SELECT id FROM orders WHERE UPPER(TRIM(reference_no)) LIKE 'A%')"
+            ))
+            db.commit()
+        except Exception as e:
+            print("Error normalizing A-orders:", e)
+            db.rollback()
+
+        # 2) F번호 주문 (유럽법인 재고 주문): 판매완료(SOLD/DISPATCHED)가 아니고 매출/출고 이관이 안 된 재고는 법인 재고(is_corporate_stock=TRUE)로 보정
+        try:
+            db.execute(text(
+                "UPDATE orders SET is_corporate_stock = TRUE, "
+                "stock_type = CASE WHEN stock_type IS NULL OR stock_type = '' OR stock_type = 'DEALER_ORDER' THEN 'AVAILABLE' ELSE stock_type END "
+                "WHERE UPPER(TRIM(reference_no)) LIKE 'F%' "
+                "AND current_status NOT IN ('SOLD', 'DISPATCHED') "
+                "AND (sales_month IS NULL OR sales_month = '') "
+                "AND pickup_date IS NULL"
+            ))
+            db.commit()
+        except Exception as e:
+            print("Error normalizing F-orders:", e)
             db.rollback()
 
         # Seed new EmailNotificationConfigs
@@ -669,6 +700,7 @@ def get_orders(
     status_filter: Optional[models.OrderStatus] = Query(None, description="상태값 필터"),
     is_corporate_stock: Optional[bool] = Query(None, description="법인 재고 여부 필터"),
     exclude_completed: bool = Query(False, description="출고/판매완료된 항목 제외 여부"),
+    sales_archive: bool = Query(False, description="판매목록 조회 여부 (A번호 주문 전체 + 판매완료된 F번호 주문)"),
     db: Session = Depends(get_db)
 ):
     auto_release_expired_order_reservations(db)
@@ -679,6 +711,17 @@ def get_orders(
         query = query.filter(models.Order.rsm_user_id == rsm_id)
     if status_filter:
         query = query.filter(models.Order.current_status == status_filter)
+    if sales_archive:
+        query = query.filter(
+            or_(
+                func.upper(func.trim(models.Order.reference_no)).like("A%"),
+                models.Order.current_status.in_([models.OrderStatus.DISPATCHED, models.OrderStatus.SOLD]),
+                and_(
+                    func.upper(func.trim(models.Order.reference_no)).like("F%"),
+                    models.Order.is_corporate_stock == False
+                )
+            )
+        )
     if exclude_completed:
         query = query.filter(
             ~models.Order.current_status.in_([models.OrderStatus.DISPATCHED, models.OrderStatus.SOLD]),
@@ -686,14 +729,18 @@ def get_orders(
         )
     if is_corporate_stock is not None:
         if is_corporate_stock:
+            # WIA 재고리스트는 유럽법인이 재고를 위해 주문한 F번호 주문만 노출 (A번호 주문은 제외)
             query = query.filter(
-                (models.Order.is_corporate_stock == True) | 
-                (models.DealerCompany.name.ilike('WME'))
+                func.upper(func.trim(models.Order.reference_no)).like("F%"),
+                models.Order.is_corporate_stock == True,
+                ~models.Order.current_status.in_([models.OrderStatus.DISPATCHED, models.OrderStatus.SOLD])
             )
         else:
             query = query.filter(
-                (models.Order.is_corporate_stock == False) & 
-                (models.DealerCompany.name.notilike('WME'))
+                or_(
+                    func.upper(func.trim(models.Order.reference_no)).like("A%"),
+                    models.Order.is_corporate_stock == False
+                )
             )
     return query.order_by(models.Order.id.desc()).all()
 
@@ -710,8 +757,17 @@ def create_order(
     dealer = db.query(models.DealerCompany).filter(models.DealerCompany.id == payload.dealer_company_id).first()
     is_corp_stock = payload.is_corporate_stock
     stock_type = payload.stock_type
-    
-    if dealer and dealer.name.upper() == 'WME':
+    ref_clean = (payload.reference_no or "").strip().upper()
+
+    # P/O 타입(F번호 vs A번호) 기준 분류
+    if ref_clean.startswith("A"):
+        is_corp_stock = False
+        stock_type = "DEALER_ORDER"
+    elif ref_clean.startswith("F"):
+        is_corp_stock = True
+        if not stock_type or stock_type == "DEALER_ORDER":
+            stock_type = "AVAILABLE"
+    elif dealer and dealer.name.upper() == 'WME':
         is_corp_stock = True
         if not stock_type:
             stock_type = 'AVAILABLE'
@@ -792,6 +848,10 @@ def update_order_info(
 
     if payload.reference_no is not None:
         order.reference_no = payload.reference_no
+        ref_clean = (payload.reference_no or "").strip().upper()
+        if ref_clean.startswith("A"):
+            order.is_corporate_stock = False
+            order.stock_type = "DEALER_ORDER"
     if payload.dealer_company_id is not None:
         dealer = db.query(models.DealerCompany).filter(models.DealerCompany.id == payload.dealer_company_id).first()
         if not dealer:
@@ -822,6 +882,10 @@ def update_order_info(
         order.sales_month = payload.sales_month
     if "pickup_date" in payload.model_fields_set:
         order.pickup_date = payload.pickup_date
+        if payload.pickup_date is not None:
+            order.current_status = models.OrderStatus.SOLD
+            order.is_timeline_completed = True
+            order.is_corporate_stock = False
     if hasattr(payload, 'dealer_order_date') and payload.dealer_order_date is not None:
         order.dealer_order_date = payload.dealer_order_date
     if hasattr(payload, 'delivery_request_date') and payload.delivery_request_date is not None:
@@ -1222,7 +1286,8 @@ def sync_promotion_inventory_with_orders(db: Session):
     dirty = False
     for p in promos:
         o = p.order
-        is_wme_corp = o and (o.is_corporate_stock or (o.dealer_company and o.dealer_company.name.upper() == "WME"))
+        is_f_order = bool(o and o.reference_no and o.reference_no.strip().upper().startswith("F"))
+        is_wme_corp = bool(o and is_f_order and o.is_corporate_stock)
         if (
             not o
             or not is_wme_corp
@@ -1515,7 +1580,16 @@ async def upload_excel_bulk(file: UploadFile = File(...), db: Session = Depends(
         
         existing = db.query(models.Order).filter(models.Order.reference_no == ref_no).first()
         if not existing:
-            is_corp_stock = (d_name.upper() == 'WME')
+            ref_clean = ref_no.strip().upper()
+            if ref_clean.startswith('A'):
+                is_corp_stock = False
+                order_stock_type = 'DEALER_ORDER'
+            elif ref_clean.startswith('F'):
+                is_corp_stock = True
+                order_stock_type = 'AVAILABLE'
+            else:
+                is_corp_stock = (d_name.upper() == 'WME')
+                order_stock_type = 'AVAILABLE' if is_corp_stock else 'DEALER_ORDER'
             
             # 파싱된 ORDER DATE 처리
             parsed_order_date = None
@@ -1535,7 +1609,7 @@ async def upload_excel_bulk(file: UploadFile = File(...), db: Session = Depends(
                 etd=None,
                 eta=None,
                 is_corporate_stock=is_corp_stock,
-                stock_type='AVAILABLE' if is_corp_stock else None,
+                stock_type=order_stock_type,
                 nc=nc_val if nc_val else None,
                 detail_spec=detail_spec_val if detail_spec_val else None,
                 incoterms=incoterms_val if incoterms_val else None,
@@ -1721,6 +1795,18 @@ async def upload_stock_status_excel(
             stock_type = 'SHOWROOM'
         elif 'ORDERED' in status_val:
             stock_type = 'DEALER_ORDER'
+
+        # P/O 타입(F번호 vs A번호) 기준 분류: A번호는 딜러 구매 주문이므로 재고리스트에서 제외
+        po_clean = po_val.strip().upper()
+        if po_clean.startswith('A'):
+            is_corp_stock = False
+            stock_type = 'DEALER_ORDER'
+        elif po_clean.startswith('F'):
+            is_corp_stock = True
+            if stock_type == 'DEALER_ORDER':
+                stock_type = 'AVAILABLE'
+        else:
+            is_corp_stock = (stock_type != 'DEALER_ORDER')
             
         location_val = str(sheet.cell(r, col_map.get('location', 0)).value or '').strip() if 'location' in col_map else None
         location_val = location_val if location_val and location_val.lower() != 'none' else None
@@ -1767,8 +1853,9 @@ async def upload_stock_status_excel(
                 existing_order.remark = remarks_val
             if so_val:
                 existing_order.so_no = so_val
-            existing_order.current_status = models.OrderStatus.IN_STOCK
-            existing_order.is_corporate_stock = True
+            if existing_order.current_status not in (models.OrderStatus.SOLD, models.OrderStatus.DISPATCHED):
+                existing_order.current_status = models.OrderStatus.IN_STOCK
+            existing_order.is_corporate_stock = is_corp_stock
             updated_count += 1
         else:
             new_order = models.Order(
@@ -1780,7 +1867,7 @@ async def upload_stock_status_excel(
                 etd=bl_date,
                 eta=bl_date,
                 actual_date=bl_date,
-                is_corporate_stock=True,
+                is_corporate_stock=is_corp_stock,
                 stock_type=stock_type,
                 nc=nc_val,
                 detail_spec=option_val,
