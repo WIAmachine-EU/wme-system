@@ -573,7 +573,8 @@ export default function AdminShipmentUpload({ isMobileView }) {
           boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.05))',
           overflow: 'hidden',
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          fontFamily: "'SUITE', sans-serif"
         }}>
           {/* 좌측 패널 헤더 */}
           <div style={{
@@ -626,7 +627,8 @@ export default function AdminShipmentUpload({ isMobileView }) {
                     fontSize: '0.8rem',
                     fontWeight: 600,
                     cursor: 'pointer',
-                    outline: 'none'
+                    outline: 'none',
+                    fontFamily: "'SUITE', sans-serif"
                   }}
                   title="출항 년도(ETD) 기준 필터링"
                 >
@@ -696,7 +698,8 @@ export default function AdminShipmentUpload({ isMobileView }) {
                 width: '100%',
                 fontSize: '0.85rem',
                 backgroundColor: 'transparent',
-                color: 'var(--text-primary)'
+                color: 'var(--text-primary)',
+                fontFamily: "'SUITE', sans-serif"
               }}
             />
             {searchQuery && (
@@ -730,32 +733,32 @@ export default function AdminShipmentUpload({ isMobileView }) {
 
           {/* 좌측 선적내역 테이블 본체 (5개 컬럼 구성) */}
           <div style={{ overflowX: 'auto', maxHeight: '680px', overflowY: 'auto' }}>
-            <table className="wia-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-              <thead style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: 'var(--bg-secondary, #f8fafc)' }}>
+            <table className="wia-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', fontFamily: "'SUITE', sans-serif" }}>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: 'var(--bg-secondary, #f8fafc)', fontFamily: "'SUITE', sans-serif" }}>
                 <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <th style={{ width: '45px', textAlign: 'center', padding: '10px 8px', color: 'var(--text-secondary)' }}>번호</th>
-                  <th style={{ textAlign: 'left', padding: '10px 10px', color: 'var(--text-secondary)' }}>B/L 번호</th>
-                  <th style={{ textAlign: 'center', padding: '10px 8px', color: 'var(--text-secondary)' }}>ETD (출항일)</th>
-                  <th style={{ textAlign: 'left', padding: '10px 10px', color: 'var(--text-secondary)' }}>도착지 항구</th>
-                  <th style={{ textAlign: 'center', padding: '10px 10px', color: 'var(--text-secondary)' }}>장비개수 (S/N)</th>
+                  <th style={{ width: '45px', textAlign: 'center', padding: '10px 8px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>번호</th>
+                  <th style={{ textAlign: 'left', padding: '10px 10px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>B/L 번호</th>
+                  <th style={{ textAlign: 'center', padding: '10px 8px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>ETD (출항일)</th>
+                  <th style={{ textAlign: 'left', padding: '10px 10px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>도착지 항구</th>
+                  <th style={{ textAlign: 'center', padding: '10px 10px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>장비개수 (S/N)</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody style={{ fontFamily: "'SUITE', sans-serif" }}>
                 {isLoadingHistory && (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: 'center', padding: '40px 16px', color: '#0284c7' }}>
+                    <td colSpan={5} style={{ textAlign: 'center', padding: '40px 16px', color: '#0284c7', fontFamily: "'SUITE', sans-serif" }}>
                       <Loader2 size={24} className="animate-spin" style={{ margin: '0 auto 8px' }} />
-                      <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>선적내역을 불러오는 중입니다...</div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, fontFamily: "'SUITE', sans-serif" }}>선적내역을 불러오는 중입니다...</div>
                     </td>
                   </tr>
                 )}
 
                 {!isLoadingHistory && filteredHistory.length === 0 && (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: 'center', padding: '48px 16px', color: 'var(--text-secondary)' }}>
+                    <td colSpan={5} style={{ textAlign: 'center', padding: '48px 16px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>
                       <Ship size={32} color="#cbd5e1" style={{ margin: '0 auto 8px' }} />
-                      <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>선적내역이 존재하지 않습니다.</div>
-                      <div style={{ fontSize: '0.75rem', marginTop: '4px' }}>
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontFamily: "'SUITE', sans-serif" }}>선적내역이 존재하지 않습니다.</div>
+                      <div style={{ fontSize: '0.75rem', marginTop: '4px', fontFamily: "'SUITE', sans-serif" }}>
                         {selectedYear !== 'ALL' ? `${selectedYear}년도에 출항한 선적이 없습니다.` : '오른쪽에서 신규 선적정보를 업로드해 보세요.'}
                       </div>
                     </td>
@@ -783,7 +786,8 @@ export default function AdminShipmentUpload({ isMobileView }) {
                           borderBottom: '1px solid var(--border-color)',
                           cursor: 'pointer',
                           backgroundColor: isExpanded ? 'rgba(2, 132, 199, 0.04)' : 'transparent',
-                          transition: 'background-color 0.15s ease'
+                          transition: 'background-color 0.15s ease',
+                          fontFamily: "'SUITE', sans-serif"
                         }}
                         onMouseEnter={(e) => {
                           if (!isExpanded) e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.02)';
@@ -793,14 +797,14 @@ export default function AdminShipmentUpload({ isMobileView }) {
                         }}
                       >
                         {/* 1. 번호 (순차번호) */}
-                        <td style={{ textAlign: 'center', padding: '12px 8px', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                        <td style={{ textAlign: 'center', padding: '12px 8px', color: 'var(--text-secondary)', fontWeight: 600, fontFamily: "'SUITE', sans-serif" }}>
                           {index + 1}
                         </td>
 
                         {/* 2. B/L 번호 */}
-                        <td style={{ padding: '12px 10px' }}>
+                        <td style={{ padding: '12px 10px', fontFamily: "'SUITE', sans-serif" }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ fontWeight: 700, color: '#0369a1', fontFamily: 'monospace', fontSize: '0.9rem' }}>
+                            <span style={{ fontWeight: 700, color: '#0369a1', fontFamily: "'SUITE', sans-serif", fontSize: '0.92rem', letterSpacing: '0.2px' }}>
                               {shipment.mbl_no || '-'}
                             </span>
                             <button
@@ -820,34 +824,34 @@ export default function AdminShipmentUpload({ isMobileView }) {
                             </button>
                           </div>
                           {shipment.vessel && (
-                            <div style={{ fontSize: '0.72rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '3px', marginTop: '2px' }}>
+                            <div style={{ fontSize: '0.74rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '3px', marginTop: '2px', fontFamily: "'SUITE', sans-serif" }}>
                               <Anchor size={10} />
-                              <span>{shipment.vessel}</span>
+                              <span style={{ fontFamily: "'SUITE', sans-serif" }}>{shipment.vessel}</span>
                             </div>
                           )}
                         </td>
 
                         {/* 3. ETD (출항일) */}
-                        <td style={{ textAlign: 'center', padding: '12px 8px', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
-                          <span style={{ fontFamily: 'monospace', fontWeight: 500 }}>
+                        <td style={{ textAlign: 'center', padding: '12px 8px', color: 'var(--text-primary)', whiteSpace: 'nowrap', fontFamily: "'SUITE', sans-serif" }}>
+                          <span style={{ fontFamily: "'SUITE', sans-serif", fontWeight: 600, fontSize: '0.88rem' }}>
                             {etdStr}
                           </span>
                         </td>
 
                         {/* 4. 도착지 항구 */}
-                        <td style={{ padding: '12px 10px', color: 'var(--text-primary)' }}>
+                        <td style={{ padding: '12px 10px', color: 'var(--text-primary)', fontFamily: "'SUITE', sans-serif" }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span style={{ fontWeight: 600 }}>{shipment.pod || '-'}</span>
+                            <span style={{ fontWeight: 600, fontFamily: "'SUITE', sans-serif", fontSize: '0.88rem' }}>{shipment.pod || '-'}</span>
                           </div>
                           {shipment.carrier && (
-                            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                            <span style={{ fontSize: '0.74rem', color: '#64748b', fontFamily: "'SUITE', sans-serif" }}>
                               선사: {shipment.carrier}
                             </span>
                           )}
                         </td>
 
                         {/* 5. 장비개수 (S/N개수 기준) */}
-                        <td style={{ textAlign: 'center', padding: '12px 10px' }}>
+                        <td style={{ textAlign: 'center', padding: '12px 10px', fontFamily: "'SUITE', sans-serif" }}>
                           <span style={{
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -858,7 +862,8 @@ export default function AdminShipmentUpload({ isMobileView }) {
                             padding: '3px 10px',
                             borderRadius: '9999px',
                             fontWeight: 700,
-                            fontSize: '0.8rem'
+                            fontSize: '0.8rem',
+                            fontFamily: "'SUITE', sans-serif"
                           }}>
                             <Package size={12} />
                             {snCount > 0 ? `${snCount}대` : `${totalOrderCount}대`}
@@ -868,13 +873,14 @@ export default function AdminShipmentUpload({ isMobileView }) {
 
                       {/* 행 클릭 시 상세 장비(S/N 및 모델) 목록 아코디언 확장 뷰 */}
                       {isExpanded && (
-                        <tr style={{ backgroundColor: '#f8fafc' }}>
-                          <td colSpan={5} style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color)' }}>
+                        <tr style={{ backgroundColor: '#f8fafc', fontFamily: "'SUITE', sans-serif" }}>
+                          <td colSpan={5} style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color)', fontFamily: "'SUITE', sans-serif" }}>
                             <div style={{
                               backgroundColor: 'white',
                               borderRadius: '8px',
                               border: '1px solid #e2e8f0',
-                              padding: '12px 14px'
+                              padding: '12px 14px',
+                              fontFamily: "'SUITE', sans-serif"
                             }}>
                               <div style={{ 
                                 display: 'flex', 
@@ -882,22 +888,23 @@ export default function AdminShipmentUpload({ isMobileView }) {
                                 alignItems: 'center', 
                                 marginBottom: '8px',
                                 borderBottom: '1px solid #f1f5f9',
-                                paddingBottom: '6px'
+                                paddingBottom: '6px',
+                                fontFamily: "'SUITE', sans-serif"
                               }}>
-                                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>
+                                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155', fontFamily: "'SUITE', sans-serif" }}>
                                   📦 선적 장비 상세 목록 ({shipment.orders?.length || 0}건 / S/N 부여: {snCount}건)
                                 </span>
-                                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                <span style={{ fontSize: '0.75rem', color: '#64748b', fontFamily: "'SUITE', sans-serif" }}>
                                   ETA: {shipment.eta ? String(shipment.eta).slice(0, 10) : '-'} | 상태: {shipment.trackcargo_status || '운송중'}
                                 </span>
                               </div>
 
                               {(!shipment.orders || shipment.orders.length === 0) ? (
-                                <div style={{ fontSize: '0.75rem', color: '#94a3b8', textAlign: 'center', padding: '8px' }}>
+                                <div style={{ fontSize: '0.75rem', color: '#94a3b8', textAlign: 'center', padding: '8px', fontFamily: "'SUITE', sans-serif" }}>
                                   등록된 장비 주문이 없습니다.
                                 </div>
                               ) : (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '8px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '8px', fontFamily: "'SUITE', sans-serif" }}>
                                   {shipment.orders.map((ord, oIdx) => (
                                     <div key={ord.id || oIdx} style={{
                                       padding: '8px 10px',
@@ -907,10 +914,11 @@ export default function AdminShipmentUpload({ isMobileView }) {
                                       fontSize: '0.75rem',
                                       display: 'flex',
                                       flexDirection: 'column',
-                                      gap: '2px'
+                                      gap: '2px',
+                                      fontFamily: "'SUITE', sans-serif"
                                     }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: "'SUITE', sans-serif" }}>
+                                        <span style={{ fontWeight: 700, color: '#0f172a', fontFamily: "'SUITE', sans-serif" }}>
                                           {ord.product_model?.model_name || '장비'}
                                         </span>
                                         <span style={{
@@ -919,15 +927,16 @@ export default function AdminShipmentUpload({ isMobileView }) {
                                           borderRadius: '4px',
                                           backgroundColor: ord.current_status === 'ARRIVED' ? '#dcfce7' : '#e0f2fe',
                                           color: ord.current_status === 'ARRIVED' ? '#15803d' : '#0369a1',
-                                          fontWeight: 600
+                                          fontWeight: 600,
+                                          fontFamily: "'SUITE', sans-serif"
                                         }}>
                                           {ord.current_status}
                                         </span>
                                       </div>
-                                      <div style={{ color: '#475569' }}>
-                                        S/N: <strong style={{ color: ord.serial_number ? '#0284c7' : '#94a3b8' }}>{ord.serial_number || '미부여'}</strong>
+                                      <div style={{ color: '#475569', fontFamily: "'SUITE', sans-serif" }}>
+                                        S/N: <strong style={{ color: ord.serial_number ? '#0284c7' : '#94a3b8', fontFamily: "'SUITE', sans-serif" }}>{ord.serial_number || '미부여'}</strong>
                                       </div>
-                                      <div style={{ color: '#64748b', fontSize: '0.7rem' }}>
+                                      <div style={{ color: '#64748b', fontSize: '0.7rem', fontFamily: "'SUITE', sans-serif" }}>
                                         P/O: {ord.reference_no || '-'}
                                       </div>
                                     </div>
