@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronsRight, Search, CheckCircle2, Smartphone, Monitor, MapPin, Clock, X } from 'lucide-react';
 import StepBar from '../../components/StepBar';
+import DealerVesselTrackingModal from '../../components/DealerVesselTrackingModal';
 import { useTranslation } from 'react-i18next';
 
 const renderTrafficLight = (reqDateStr) => {
@@ -41,6 +42,16 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('ALL');
 
+  // 선박(주문화물) 추적 팝업 상태 (RSM 포털 등)
+  const [trackingModalOpen, setTrackingModalOpen] = useState(false);
+  const [selectedTrackingOrder, setSelectedTrackingOrder] = useState(null);
+  const [shipmentsMap, setShipmentsMap] = useState({});
+
+  const handleOpenTrackingModal = (order) => {
+    setSelectedTrackingOrder(order);
+    setTrackingModalOpen(true);
+  };
+
   const [editingOrder, setEditingOrder] = useState(null);
   const [editForm, setEditForm] = useState({
     product_model_id: '',
@@ -74,13 +85,14 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
   const fetchOrders = async (showLoading = true) => {
     if (showLoading) setLoading(true);
     try {
-      const [ordersRes, modelsRes, dealersRes, ncRes, incotermRes, portRes] = await Promise.all([
+      const [ordersRes, modelsRes, dealersRes, ncRes, incotermRes, portRes, shipmentsRes] = await Promise.all([
         fetch('/api/orders?exclude_completed=true'),
         fetch('/api/models'),
         fetch('/api/dealers'),
         fetch('/api/master-data/nc-codes'),
         fetch('/api/master-data/incoterm-codes'),
-        fetch('/api/master-data/port-codes')
+        fetch('/api/master-data/port-codes'),
+        fetch('/api/shipments?include_all=true').catch(() => null)
       ]);
       const data = await ordersRes.json();
       const modelsData = await modelsRes.json();
@@ -90,6 +102,28 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
       setNcCodes(await ncRes.json());
       setIncotermCodes(await incotermRes.json());
       setPortCodes(await portRes.json());
+
+      if (shipmentsRes && shipmentsRes.ok) {
+        try {
+          const shipmentsData = await shipmentsRes.json();
+          const sMap = {};
+          if (Array.isArray(shipmentsData)) {
+            shipmentsData.forEach(s => {
+              if (s.id) sMap[s.id] = s;
+              if (s.mbl_no) sMap[s.mbl_no] = s;
+              if (s.orders && Array.isArray(s.orders)) {
+                s.orders.forEach(o => {
+                  if (o.id) sMap[o.id] = s;
+                  if (o.reference_no) sMap[o.reference_no] = s;
+                });
+              }
+            });
+          }
+          setShipmentsMap(sMap);
+        } catch (e) {
+          console.warn("Failed to parse shipments data:", e);
+        }
+      }
     } catch (err) {
       console.error("Failed to fetch orders:", err);
     } finally {
@@ -551,7 +585,22 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
                     </div>
                   </div>
 
-                  {currentRole !== 'RSM' && (
+                  {currentRole === 'RSM' ? (
+                    <div style={{ marginTop: '12px' }} onClick={e => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        className="cargo-tracking-btn-mobile"
+                        onClick={() => handleOpenTrackingModal(order)}
+                        title={t('dealer_orders.cargo_tracking_btn', '화물추적')}
+                      >
+                        <img
+                          src="/gemini-svg.svg"
+                          alt="Cargo Tracking"
+                          style={{ width: '22px', height: '22px', display: 'block', objectFit: 'contain' }}
+                        />
+                      </button>
+                    </div>
+                  ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }} onClick={e => e.stopPropagation()}>
                       {order.current_status === 'IN_STOCK' ? (
                         <>
@@ -638,16 +687,22 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
                   {renderSortHeader('dealer', t('menu1.header_dealer'), '10%', 'left')}
                   {renderSortHeader('status', t('menu1.header_status'), '35%', 'center')}
                   {renderSortHeader('port', t('menu1.header_port'), '15%', 'left')}
-                  {currentRole !== 'RSM' && (
-                    <th style={{ width: '10%', textAlign: 'center', fontWeight: 'bold' }}>{t('menu1.header_management')}</th>
+                  {currentRole === 'RSM' ? (
+                    <th style={{ width: '10%', textAlign: 'center', fontWeight: 'bold' }}>
+                      {t('dealer_orders.header_tracking', '화물추적')}
+                    </th>
+                  ) : (
+                    <th style={{ width: '10%', textAlign: 'center', fontWeight: 'bold' }}>
+                      {t('menu1.header_management')}
+                    </th>
                   )}
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={currentRole === 'RSM' ? 6 : 7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>데이터를 불러오는 중입니다...</td></tr>
+                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>데이터를 불러오는 중입니다...</td></tr>
                 ) : sortedOrders.length === 0 ? (
-                  <tr><td colSpan={currentRole === 'RSM' ? 6 : 7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>조회된 주문 내역이 없습니다.</td></tr>
+                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>조회된 주문 내역이 없습니다.</td></tr>
                 ) : (
                   sortedOrders.map((order, index) => {
                     const showSchedule = !['CONFIRMED', 'IN_PRODUCTION'].includes(order.current_status);
@@ -698,7 +753,31 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
                               </>
                             )}
                           </td>
-                          {currentRole !== 'RSM' && (
+                          {currentRole === 'RSM' ? (
+                            <td 
+                              style={{ 
+                                textAlign: 'center', 
+                                verticalAlign: 'middle',
+                                borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', 
+                                paddingBottom: '5px', 
+                                paddingTop: '5px' 
+                              }} 
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                type="button"
+                                className="cargo-tracking-btn"
+                                onClick={() => handleOpenTrackingModal(order)}
+                                title={t('dealer_orders.cargo_tracking_btn', '화물추적')}
+                              >
+                                <img
+                                  src="/gemini-svg.svg"
+                                  alt="Cargo Tracking"
+                                  style={{ width: '22px', height: '22px', display: 'block', objectFit: 'contain' }}
+                                />
+                              </button>
+                            </td>
+                          ) : (
                             <td style={{ verticalAlign: 'middle', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px' }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }} onClick={e => e.stopPropagation()}>
                                 {order.current_status === 'IN_STOCK' ? (
@@ -757,7 +836,7 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
                         </tr>
                         {expandedRows.has(order.id) && (
                           <tr>
-                            <td colSpan={currentRole === 'RSM' ? 6 : 7} style={{ backgroundColor: 'var(--bg-card)', paddingTop: '8px', borderTop: '1px dashed var(--border-color)', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
+                            <td colSpan={7} style={{ backgroundColor: 'var(--bg-card)', paddingTop: '8px', borderTop: '1px dashed var(--border-color)', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', paddingLeft: '8px' }}>
                                 <div style={{
                                   fontSize: '0.8rem',
@@ -936,6 +1015,55 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
           </div>
         </div>
       )}
+
+      {/* 선박(주문화물) 추적 팝업 모달 */}
+      <DealerVesselTrackingModal
+        isOpen={trackingModalOpen}
+        onClose={() => setTrackingModalOpen(false)}
+        selectedOrder={selectedTrackingOrder}
+        timelineOrders={sortedOrders}
+        shipmentsMap={shipmentsMap}
+      />
+
+      <style>{`
+        .cargo-tracking-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 38px;
+          height: 36px;
+          padding: 0;
+          border-radius: 8px;
+          background-color: #ffffff !important;
+          border: 1px solid #d1d5db;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .cargo-tracking-btn:hover {
+          border-color: #000000 !important;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16) !important;
+          transform: translateY(-1px);
+        }
+        .cargo-tracking-btn-mobile {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+          height: 38px;
+          padding: 0;
+          border-radius: 8px;
+          background-color: #ffffff !important;
+          border: 1px solid #d1d5db;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .cargo-tracking-btn-mobile:hover {
+          border-color: #000000 !important;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16) !important;
+        }
+      `}</style>
     </div>
   );
 }

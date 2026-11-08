@@ -146,6 +146,11 @@ export default function Sidebar({ activeTab, setActiveTab, currentRole, currentU
       icon: <Tag size={20} />
     },
     {
+      id: 'admin-sales-archive',
+      label: t('sidebar.rsm_menu.sales_archive'),
+      icon: <FileSpreadsheet size={20} />
+    },
+    {
       id: 'admin-library',
       label: t('sidebar.rsm_menu.library'),
       icon: <FolderOpen size={20} />

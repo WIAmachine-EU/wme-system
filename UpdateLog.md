@@ -1,6 +1,6 @@
 ﻿# 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
-## [2026-11-08] P/O(F/A) 타입 분리, 선적/판매 UI 개편, 사이드바 순서 조정, 가용재고 [요청] 이메일 연동 및 화물추적 버튼 UI 고도화
+## [2026-11-08] P/O(F/A) 타입 분리, 선적/판매 UI 개편, 사이드바 순서 조정, 가용재고 [요청] 이메일 연동, 화물추적 버튼 UI 고도화 및 RSM 포털 Tracking·판매목록 연동
 
 ### 1. 주문번호(P/O) 2대 유형 분류 및 비즈니스 정책 정립
 * **유럽법인 재고 발주 (F번호 주문, F...)**:
@@ -42,7 +42,7 @@
   * 상단 헤더에 인디고 블루 아이콘 배지 및 P/O, S/N, 모델명 칩 태그 표시.
 
 ### 5. 시스템 사이드바 11개 메뉴 순서 재배치 및 메뉴 체계 표준화 (Sidebar.jsx)
-* **사용자 요구 기반 11개 핵심 메뉴 체계 순서 재정렬**:
+* **관리자 포털 11개 핵심 메뉴 체계 순서 재정렬**:
   1. **주문 / 배송현황** (`/admin/dashboard` / `dashboard`)
   2. **선적 트래킹** (`/admin/tracking` / `tracking`)
   3. **WIA 재고리스트** (`/admin/inventory` / `inventory`)
@@ -80,7 +80,28 @@
   * 마우스 오버(Hover) 시 테두리가 블랙(`#000000`)으로 부드럽게 반전되고, 입체적인 그림자 및 마이크로 상향 이동 애니메이션(`translateY(-1px)`) 적용.
   * 데스크탑 테이블 액션 버튼 및 모바일 카드 뷰 하단 버튼에 일관된 UI 클래스(`.cargo-tracking-btn`, `.cargo-tracking-btn-mobile`) 적용.
 
-### 8. 로컬 DB 동기화 및 프론트엔드 프로덕션 빌드 검증
+### 8. RSM 포털 '주문 배송 타임라인' 내 'Tracking'(화물추적) 기능 신설 (AdminDashboard.jsx)
+* **RSM 권한 전용 'Tracking' 액션 컬럼 및 버튼 추가**:
+  * 기존 관리자용 상태 설정(Next/Prev/수정/삭제) 컬럼 대신, RSM 접속 시 딜러포털과 동일한 **[Tracking / 화물추적]** 컬럼(`width: 10%`) 및 화물추적 버튼 노출.
+  * 모바일 뷰 카드 하단에도 원클릭 화물추적 버튼(`.cargo-tracking-btn-mobile`) 일체 적용.
+* **실시간 선적 및 AIS 항로 추적 팝업 모달 연동**:
+  * 화물추적 버튼 클릭 시 선적 데이터(`shipmentsMap`)와 선택 장비 정보를 기반으로 `DealerVesselTrackingModal` 팝업 자동 호출.
+  * B/L 정보, 출항/도착지, 선박명, 실제 AIS 항로 및 진행 상태를 즉시 모니터링 가능하도록 구현.
+
+### 9. RSM 포털 [판매목록] 메뉴 연동 및 사이드바 6개 메뉴 순서 재구성 (App.jsx, Sidebar.jsx)
+* **RSM 권한의 판매목록(AdminSalesArchive.jsx) 접근 라우팅 활성화**:
+  * 관리자 포털의 판매목록 기능을 RSM 포털에서도 동일하게 조회할 수 있도록 라우팅 및 탭 전환 권한 허용.
+* **RSM 사이드바 6개 메뉴 순서 재배치**:
+  1. **주문 / 배송현황** (`admin-dashboard`)
+  2. **WIA 재고리스트** (`admin-inventory`)
+  3. **WIA 프로모션** (`admin-promotion`)
+  4. **판매목록** (`admin-sales-archive`)
+  5. **제품 라이브러리** (`admin-library`)
+  6. **RSM 영업통계** (`rsm-dashboard`)
+* **다국어(ko/en) 번역 등록**:
+  * `sidebar.rsm_menu.sales_archive` 키에 "판매목록" / "Sales Archive" 등록 완료.
+
+### 10. 로컬 DB 동기화 및 프론트엔드 프로덕션 빌드 검증
 * 로컬 SQLite DB(`scm_erp.db`) 및 백업 데이터(`backup_orders_239.json`) 내 239건 주문 전체 P/O 타입 기준 정규화 완료.
 * 프론트엔드 최신 프로덕션 빌드(`npm.cmd run build`) 무결성 및 배포 호환성 검증 완료.
 

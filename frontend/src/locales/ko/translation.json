@@ -42,6 +42,7 @@
       "admin_dashboard": "주문 / 배송현황",
       "inventory": "WIA 재고리스트",
       "promotion": "WIA 프로모션",
+      "sales_archive": "판매목록",
       "library": "제품 라이브러리",
       "dashboard": "RSM 영업통계"
     },
