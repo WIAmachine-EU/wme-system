@@ -27,6 +27,7 @@
     "data_isolation_desc": "Data is securely isolated based on your current <1>{{role}}</1> access. (V7 Isolation Mode Active)",
     "admin_menu": {
       "dashboard": "Order / Delivery Status",
+      "tracking": "Shipment Tracking",
       "inventory": "WIA Stock List",
       "promotion": "WIA Promotion",
       "management": "Upload / Setting",
@@ -153,6 +154,7 @@
     "header_port": "PORT",
     "header_status": "TYPE",
     "header_status_change": "TYPE",
+    "header_request": "REQUEST",
     "header_dealer_order": "ORDER",
     "filter_all": "All type",
     "stat_all": "All",

@@ -1,6 +1,6 @@
-# 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
+﻿# 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
-## [2026-11-08] 주문번호(P/O) F/A타입 관리 개편, 선적내역 리스트 폰트(SUITE) 통일 및 판매목록 수정 팝업창 UI/UX 전면 리뉴얼
+## [2026-11-08] P/O(F/A) 타입 분리, 선적/판매 UI 개편, 사이드바 순서 조정, 가용재고 [요청] 이메일 연동 및 화물추적 버튼 UI 고도화
 
 ### 1. 주문번호(P/O) 2대 유형 분류 및 비즈니스 정책 정립
 * **유럽법인 재고 발주 (F번호 주문, F...)**:
@@ -18,8 +18,7 @@
   * 단건 주문 생성(POST /api/orders), 발주 엑셀 업로드(POST /api/upload/excel), 재고 현황 업로드(POST /api/upload/stock-status), 주문 정보 수정(PATCH /api/orders/{id}) 전체에 P/O 접두어(A% vs F%) 자동 판별 로직 적용.
 * **주문 목록 조회 API (GET /api/orders) 필터 세분화**:
   * sales_archive=True 신설: A번호 주문 전체 + 판매 완료(SOLD/DISPATCHED)된 F번호 주문을 통합 반환하여 '판매목록'에서 원스톱 관리.
-  * is_corporate_stock=True 보강: 반드시 F번호 주문(
-eference_no LIKE 'F%')이면서 미판매인 법인 가용 재고만 반환하도록 제한 (A번호 주문 원천 배제).
+  * is_corporate_stock=True 보강: 반드시 F번호 주문(reference_no LIKE 'F%')이면서 미판매인 법인 가용 재고만 반환하도록 제한 (A번호 주문 원천 배제).
 * **선매출 및 출고/픽업 연동 프로세스 구현**:
   * '판매목록'에서 선매출 발생 시 sales_month, sales_price만 입력하면 미출고 상태로 유지되어 '주문/배송현황' 타임라인에 계속 표시.
   * 실물 출고 완료 시 pickup_date를 입력하면 자동으로 current_status = OrderStatus.SOLD, is_timeline_completed = True로 동기화되어 타임라인 완료 이관.
@@ -39,13 +38,51 @@ eference_no LIKE 'F%')이면서 미판매인 법인 가용 재고만 반환하�
   * **물류 운송 및 상세 스펙**: S/O, 도착항, Incoterms, 선박명, DETAIL SPEC(전체 폭 확장)
   * **비고 (REMARK)**: 여유 있는 비고 메모 텍스트영역
 * **폼 입력 요소 정렬 및 폰트 통일**:
-  * 모든 인풋 및 셀렉트 박스의 높이(38px), 패딩, 둥근 모서리(8px), ox-sizing: border-box를 일치시켜 세로 열 정렬 완성 및 SUITE 폰트 적용.
+  * 모든 인풋 및 셀렉트 박스의 높이(38px), 패딩, 둥근 모서리(8px), box-sizing: border-box를 일치시켜 세로 열 정렬 완성 및 SUITE 폰트 적용.
   * 상단 헤더에 인디고 블루 아이콘 배지 및 P/O, S/N, 모델명 칩 태그 표시.
 
-### 5. 로컬 DB 동기화 및 프론트엔드 프로덕션 빌드 검증
-* 로컬 SQLite DB(scm_erp.db) 및 백업 데이터(ackup_orders_239.json) 내 239건 주문 전체 P/O 타입 기준 정규화 완료.
-* 프론트엔드 최신 프로덕션 빌드(
-pm run build) 무결성 및 배포 호환성 검증 완료.
+### 5. 시스템 사이드바 11개 메뉴 순서 재배치 및 메뉴 체계 표준화 (Sidebar.jsx)
+* **사용자 요구 기반 11개 핵심 메뉴 체계 순서 재정렬**:
+  1. **주문 / 배송현황** (`/admin/dashboard` / `dashboard`)
+  2. **선적 트래킹** (`/admin/tracking` / `tracking`)
+  3. **WIA 재고리스트** (`/admin/inventory` / `inventory`)
+  4. **WIA 프로모션** (`/admin/promotion` / `promotion`)
+  5. **WIA 창고** (`/admin/dispatch` / `dispatch`)
+  6. **판매목록** (`/admin/sales-archive` / `sales_archive`)
+  7. **영업통계 및 분석** (`/admin/analytics` / `analytics`)
+  8. **업로드 / 설정관리** (`/admin/management` / `management`)
+  9. **선적관리 & 업로드** (`/admin/shipment-upload` / `shipment_upload`)
+  10. **제품 라이브러리** (`/admin/library` / `library`)
+  11. **유저 및 보안관리** (`/admin/users` / `users`)
+* **다국어(ko/en) 메뉴 텍스트 및 라우팅 무결성 보강**:
+  * 언어 변경 시에도 11개 메뉴 항목이 일관되게 표시되도록 `ko/translation.json`, `en/translation.json` 내 `sidebar.admin_menu` 키 정비 완료.
+
+### 6. 딜러포털 WIA재고리스트 'WIA 가용재고 목록' 내 [요청] 기능 신설 (DealerInventory.jsx)
+* **프로모션 페이지와 동일한 [요청] (Reserve / Order) 기능 탑재**:
+  * 유럽법인 가용재고(`AVAILABLE`) 장비에 대해 딜러가 즉시 예약 또는 주문 요청을 보낼 수 있는 듀얼 액션 버튼(`Reserve`, `Order`) 신설.
+  * 예약 중(`RESERVED`) 또는 기타 상태 장비는 `해당없음`으로 안전 처리.
+* **표준 영문 이메일 템플릿 자동 발송 연동 (`handleEmailRequest`)**:
+  * 수신처: `jypark@hyundai-wia.de`
+  * 제목: `[Stock {requestType} Request] Model: {modelName}`
+  * 본문: 모델명, NC, P/O(발주번호), S/N 정보가 사전 기재된 메일 작성창 즉시 호출 (`mailto:` 링크).
+  * 아코디언 행 토글과 겹치지 않도록 이벤트 버블링 차단(`stopPropagation`) 적용.
+* **데스크탑 테이블 및 모바일 반응형 카드 뷰 완벽 대응**:
+  * 데스크탑: 테이블 헤더에 [요청] 컬럼 추가 및 9개 컬럼 너비(100%) 균형 재조정, 서브 스펙 토글 시 `colSpan={9}` 확장.
+  * 모바일: 카드 하단에 [Reserve]와 [Order] 버튼을 나란히 배치하여 모바일 발주 편의성 극대화.
+  * 다국어 번역 키(`menu2.header_request`: '요청' / 'REQUEST') 등록.
+
+### 7. 딜러포털 배송 추적 타임라인 화물추적 버튼 UI/UX 전면 개편 (DealerOrders.jsx)
+* **버튼 텍스트 제거 및 커스텀 선박 SVG 아이콘 적용**:
+  * 기존의 `🚢 화물추적` 텍스트와 이모지를 제거하고, 화물선과 파도가 형상화된 공식 벡터 아이콘(`gemini-svg.svg`)으로 교체 적용.
+  * 버튼 툴팁(`title="화물추적"`)을 유지하여 사용자 안내성 확보.
+* **화이트 배경 및 마우스 오버 시 블랙 테두리 인터랙션 구현**:
+  * 기존 파란색 배경을 정갈한 화이트 배경(`#ffffff`)으로 전환하고, 연한 그레이 테두리(`1px solid #d1d5db`) 기본 적용.
+  * 마우스 오버(Hover) 시 테두리가 블랙(`#000000`)으로 부드럽게 반전되고, 입체적인 그림자 및 마이크로 상향 이동 애니메이션(`translateY(-1px)`) 적용.
+  * 데스크탑 테이블 액션 버튼 및 모바일 카드 뷰 하단 버튼에 일관된 UI 클래스(`.cargo-tracking-btn`, `.cargo-tracking-btn-mobile`) 적용.
+
+### 8. 로컬 DB 동기화 및 프론트엔드 프로덕션 빌드 검증
+* 로컬 SQLite DB(`scm_erp.db`) 및 백업 데이터(`backup_orders_239.json`) 내 239건 주문 전체 P/O 타입 기준 정규화 완료.
+* 프론트엔드 최신 프로덕션 빌드(`npm.cmd run build`) 무결성 및 배포 호환성 검증 완료.
 
 ## [2026-11-07] 선적 트래킹 B/L 상세정보 및 선박 탭 UI 최적화, 불필요 지표 위젯 제거 및 화면 시인성 극대화
 

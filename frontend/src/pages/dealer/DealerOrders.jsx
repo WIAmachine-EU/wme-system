@@ -333,26 +333,15 @@ export default function DealerOrders({ isMobileView }) {
                   <div style={{ marginTop: '12px' }} onClick={e => e.stopPropagation()}>
                     <button
                       type="button"
+                      className="cargo-tracking-btn-mobile"
                       onClick={() => handleOpenTrackingModal(order)}
-                      style={{
-                        width: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        padding: '8px 12px',
-                        borderRadius: '8px',
-                        backgroundColor: '#2563eb',
-                        color: '#ffffff',
-                        border: 'none',
-                        fontSize: '0.85rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)'
-                      }}
+                      title={t('dealer_orders.cargo_tracking_btn', '화물추적')}
                     >
-                      <span>🚢</span>
-                      <span>{t('dealer_orders.cargo_tracking_btn', '화물추적')}</span>
+                      <img
+                        src="/gemini-svg.svg"
+                        alt="Cargo Tracking"
+                        style={{ width: '22px', height: '22px', display: 'block', objectFit: 'contain' }}
+                      />
                     </button>
                   </div>
 
@@ -461,35 +450,15 @@ export default function DealerOrders({ isMobileView }) {
                           >
                             <button
                               type="button"
+                              className="cargo-tracking-btn"
                               onClick={() => handleOpenTrackingModal(order)}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '6px',
-                                padding: '6px 12px',
-                                borderRadius: '8px',
-                                backgroundColor: '#2563eb',
-                                color: '#ffffff',
-                                border: 'none',
-                                fontSize: '0.8rem',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)',
-                                transition: 'all 0.15s ease',
-                                whiteSpace: 'nowrap'
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = '#1d4ed8';
-                                e.currentTarget.style.transform = 'translateY(-1px)';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = '#2563eb';
-                                e.currentTarget.style.transform = 'translateY(0)';
-                              }}
+                              title={t('dealer_orders.cargo_tracking_btn', '화물추적')}
                             >
-                              <span>🚢</span>
-                              <span>{t('dealer_orders.cargo_tracking_btn', '화물추적')}</span>
+                              <img
+                                src="/gemini-svg.svg"
+                                alt="Cargo Tracking"
+                                style={{ width: '22px', height: '22px', display: 'block', objectFit: 'contain' }}
+                              />
                             </button>
                           </td>
                         </tr>
@@ -547,6 +516,45 @@ export default function DealerOrders({ isMobileView }) {
         shipmentsMap={shipmentsMap}
       />
 
+      <style>{`
+        .cargo-tracking-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 38px;
+          height: 36px;
+          padding: 0;
+          border-radius: 8px;
+          background-color: #ffffff !important;
+          border: 1px solid #d1d5db;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .cargo-tracking-btn:hover {
+          border-color: #000000 !important;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16) !important;
+          transform: translateY(-1px);
+        }
+        .cargo-tracking-btn-mobile {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+          height: 38px;
+          padding: 0;
+          border-radius: 8px;
+          background-color: #ffffff !important;
+          border: 1px solid #d1d5db;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .cargo-tracking-btn-mobile:hover {
+          border-color: #000000 !important;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16) !important;
+        }
+      `}</style>
     </div>
   );
 }

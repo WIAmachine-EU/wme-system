@@ -43,6 +43,11 @@ export default function Sidebar({ activeTab, setActiveTab, currentRole, currentU
       icon: <LayoutDashboard size={20} />
     },
     {
+      id: 'admin-tracking',
+      label: t('sidebar.admin_menu.tracking', '선적 트래킹'),
+      icon: <Ship size={20} />
+    },
+    {
       id: 'admin-inventory',
       label: t('sidebar.admin_menu.inventory'),
       icon: <Package size={20} />
@@ -51,21 +56,6 @@ export default function Sidebar({ activeTab, setActiveTab, currentRole, currentU
       id: 'admin-promotion',
       label: t('sidebar.admin_menu.promotion'),
       icon: <Tag size={20} />
-    },
-    {
-      id: 'management',
-      label: t('sidebar.admin_menu.management'),
-      icon: <FileSpreadsheet size={20} />
-    },
-    {
-      id: 'admin-shipment-upload',
-      label: t('sidebar.admin_menu.shipment_upload'),
-      icon: <UploadCloud size={20} />
-    },
-    {
-      id: 'admin-tracking',
-      label: '선적 트래킹', // i18n에 아직 추가되지 않았으므로 임시로 하드코딩
-      icon: <Ship size={20} />
     },
     {
       id: 'admin-dispatch',
@@ -81,6 +71,16 @@ export default function Sidebar({ activeTab, setActiveTab, currentRole, currentU
       id: 'analytics',
       label: t('sidebar.admin_menu.analytics'),
       icon: <BarChart3 size={20} />
+    },
+    {
+      id: 'management',
+      label: t('sidebar.admin_menu.management'),
+      icon: <FileSpreadsheet size={20} />
+    },
+    {
+      id: 'admin-shipment-upload',
+      label: t('sidebar.admin_menu.shipment_upload'),
+      icon: <UploadCloud size={20} />
     },
     {
       id: 'admin-library',

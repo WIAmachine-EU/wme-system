@@ -55,6 +55,20 @@ export default function DealerInventory({ isMobileView }) {
     fetchInventory();
   }, []);
 
+  const handleEmailRequest = (e, order, requestType) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    const modelName = order.product_model ? order.product_model.model_name : 'Unknown';
+    const nc = order.nc || 'F0iP';
+    const po = order.reference_no || '-';
+    const sn = order.serial_number || 'N/A';
+    const email = "jypark@hyundai-wia.de";
+
+    const subject = `[Stock ${requestType} Request] Model: ${modelName}`;
+    const body = `Hello,\n\nI would like to request a ${requestType} for the following inventory machine:\n\n- Model: ${modelName}\n- NC: ${nc}\n- P/O: ${po}\n- S/N: ${sn}\n\nPlease let me know the next steps.\n\nThank you.`;
+
+    window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+
   const formatExpiryDateMMM = (dateVal) => {
     if (!dateVal) return '-';
     const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
@@ -356,6 +370,7 @@ export default function DealerInventory({ isMobileView }) {
             ) : (
               sortedOrders.map((order) => {
                 const sType = normalizeStockType(order.stock_type);
+                const canRequest = sType === 'AVAILABLE';
 
                 return (
                   <div key={order.id} className="mobile-order-card" onClick={() => toggleRow(order.id)} style={{ cursor: 'pointer' }}>
@@ -384,6 +399,31 @@ export default function DealerInventory({ isMobileView }) {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
                       <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>S/N: {order.serial_number || '-'}</span>
                       {renderStatusBadge(order, '80px', 'end')}
+                    </div>
+
+                    <div style={{ marginTop: '12px' }} onClick={(e) => e.stopPropagation()}>
+                      {canRequest ? (
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            onClick={(e) => handleEmailRequest(e, order, 'Reserve')}
+                            className="btn btn-outline"
+                            style={{ padding: '8px', fontSize: '0.85rem', flex: 1, borderColor: 'var(--accent-cyan)', color: 'var(--accent-cyan)', fontWeight: 600, textAlign: 'center', justifyContent: 'center' }}
+                          >
+                            Reserve
+                          </button>
+                          <button
+                            onClick={(e) => handleEmailRequest(e, order, 'Order')}
+                            className="btn btn-primary btn-request"
+                            style={{ padding: '8px', fontSize: '0.85rem', flex: 1, fontWeight: 600, textAlign: 'center', justifyContent: 'center', background: 'rgb(10, 28, 143)', borderColor: 'rgb(10, 28, 143)', color: '#fff' }}
+                          >
+                            Order
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ textAlign: 'center', padding: '8px', background: 'var(--bg-secondary)', borderRadius: '8px', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 }}>
+                          {t('dealer_promotion.no_apply', '해당없음')}
+                        </div>
+                      )}
                     </div>
 
                     {expandedRows.has(order.id) && (
@@ -417,29 +457,33 @@ export default function DealerInventory({ isMobileView }) {
               <thead>
                 <tr>
                   <th
-                    style={{ width: '5%', textAlign: 'center', fontWeight: 'bold', cursor: 'pointer', userSelect: 'none' }}
+                    style={{ width: '4%', textAlign: 'center', fontWeight: 'bold', cursor: 'pointer', userSelect: 'none' }}
                     onClick={() => setSortConfig({ key: null, direction: 'asc' })}
                     title="기본 순서로 리셋"
                   >
                     {t('menu2.header_no')}
                   </th>
-                  {renderSortHeader('model', t('menu2.header_model'), '15%', 'center')}
-                  {renderSortHeader('nc', t('menu2.header_nc'), '10%', 'center')}
-                  {renderSortHeader('po', t('menu2.header_po'), '15%', 'center')}
-                  {renderSortHeader('detail_spec', t('menu2.header_detailspec'), '20%', 'left')}
-                  {renderSortHeader('eta', t('menu2.header_eta'), '10%', 'center')}
-                  {renderSortHeader('port', t('menu2.header_port'), '10%', 'center')}
-                  {renderSortHeader('stock_type', t('menu2.header_status', '상태'), '15%', 'center')}
+                  {renderSortHeader('model', t('menu2.header_model'), '13%', 'center')}
+                  {renderSortHeader('nc', t('menu2.header_nc'), '7%', 'center')}
+                  {renderSortHeader('po', t('menu2.header_po'), '13%', 'center')}
+                  {renderSortHeader('detail_spec', t('menu2.header_detailspec'), '18%', 'left')}
+                  {renderSortHeader('eta', t('menu2.header_eta'), '9%', 'center')}
+                  {renderSortHeader('port', t('menu2.header_port'), '9%', 'center')}
+                  {renderSortHeader('stock_type', t('menu2.header_status', '상태'), '13%', 'center')}
+                  <th style={{ width: '14%', textAlign: 'center', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                    {t('menu2.header_request', '요청')}
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('navbar.init_seed_loading')}</td></tr>
+                  <tr><td colSpan={9} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('navbar.init_seed_loading')}</td></tr>
                 ) : sortedOrders.length === 0 ? (
-                  <tr><td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dealer_dashboard.no_atp')}</td></tr>
+                  <tr><td colSpan={9} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dealer_dashboard.no_atp')}</td></tr>
                 ) : (
                   sortedOrders.map((order, index) => {
                     const sType = normalizeStockType(order.stock_type);
+                    const canRequest = sType === 'AVAILABLE';
                     return (
                       <React.Fragment key={order.id}>
                         <tr
@@ -472,10 +516,32 @@ export default function DealerInventory({ isMobileView }) {
                           <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
                             {renderStatusBadge(order, '72px', 'center')}
                           </td>
+                          <td style={{ fontSize: '11px', textAlign: 'center', verticalAlign: 'middle', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
+                            {canRequest ? (
+                              <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center' }}>
+                                <button
+                                  onClick={(e) => handleEmailRequest(e, order, 'Reserve')}
+                                  className="btn btn-outline"
+                                  style={{ padding: '5px 0', fontSize: '10.5px', width: '62px', borderColor: 'var(--accent-cyan)', color: 'var(--accent-cyan)', textAlign: 'center', justifyContent: 'center', borderRadius: '20px', whiteSpace: 'nowrap' }}
+                                >
+                                  Reserve
+                                </button>
+                                <button
+                                  onClick={(e) => handleEmailRequest(e, order, 'Order')}
+                                  className="btn btn-primary btn-request"
+                                  style={{ padding: '5px 0', fontSize: '10.5px', width: '62px', textAlign: 'center', justifyContent: 'center', borderRadius: '20px', background: 'rgb(10, 28, 143)', borderColor: 'rgb(10, 28, 143)', color: '#fff', whiteSpace: 'nowrap' }}
+                                >
+                                  Order
+                                </button>
+                              </div>
+                            ) : (
+                              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{t('dealer_promotion.no_apply', '해당없음')}</span>
+                            )}
+                          </td>
                         </tr>
                         {expandedRows.has(order.id) && (
                           <tr>
-                            <td colSpan={8} style={{ backgroundColor: 'var(--bg-card)', paddingTop: '12px', borderTop: '1px dashed var(--border-color)', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
+                            <td colSpan={9} style={{ backgroundColor: 'var(--bg-card)', paddingTop: '12px', borderTop: '1px dashed var(--border-color)', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '24px', paddingLeft: '8px' }}>
                                 <div style={{
                                   fontSize: '12px',

@@ -27,6 +27,7 @@
     "data_isolation_desc": "현재 접속하신 <1>{{role}}</1> 권한에 맞춰 데이터가 안전하게 격리 조회됩니다. (V7 격리 모드 활성화)",
     "admin_menu": {
       "dashboard": "주문 / 배송현황",
+      "tracking": "선적 트래킹",
       "inventory": "WIA 재고리스트",
       "promotion": "WIA 프로모션",
       "management": "업로드 / 설정관리",
@@ -153,6 +154,7 @@
     "header_port": "도착지",
     "header_status": "상태",
     "header_status_change": "상태",
+    "header_request": "요청",
     "header_dealer_order": "주문선택",
     "filter_all": "전체 상태 조회",
     "stat_all": "전체",
