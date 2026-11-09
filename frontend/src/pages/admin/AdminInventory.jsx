@@ -104,10 +104,10 @@ export default function AdminInventory({ isMobileView }) {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
     const diffDays = Math.round((new Date(y, m - 1, d, 0, 0, 0) - todayStart) / (1000 * 60 * 60 * 24));
-    if (endDay < now) return { text: '만료됨', urgent: true };
-    if (diffDays === 0) return { text: '오늘 만료 (D-Day)', urgent: true };
-    if (diffDays <= 2) return { text: `D-${diffDays}일 남음`, urgent: true };
-    return { text: `D-${diffDays}일 남음`, urgent: false };
+    if (endDay < now) return { text: t('menu2.badge_expired', '만료됨'), urgent: true };
+    if (diffDays === 0) return { text: t('menu2.badge_expires_today', '오늘 만료 (D-Day)'), urgent: true };
+    if (diffDays <= 2) return { text: t('menu2.badge_days_left', { count: diffDays, defaultValue: `D-${diffDays}일 남음` }), urgent: true };
+    return { text: t('menu2.badge_days_left', { count: diffDays, defaultValue: `D-${diffDays}일 남음` }), urgent: false };
   };
 
   const toggleRow = (orderId) => {
@@ -369,11 +369,11 @@ export default function AdminInventory({ isMobileView }) {
   const handleSaveRentalPeriod = async () => {
     if (!rentalOrder) return;
     if (!rentalStartDate || !rentalEndDate) {
-      alert("임대 시작일과 종료일을 모두 입력(달력 선택)해 주세요.");
+      alert(t('menu2.msg_select_rental_dates', '임대 시작일과 종료일을 모두 입력(달력 선택)해 주세요.'));
       return;
     }
     if (new Date(rentalStartDate) > new Date(rentalEndDate)) {
-      alert("임대 종료일은 시작일보다 이후여야 합니다.");
+      alert(t('menu2.msg_rental_end_after_start', '임대 종료일은 시작일보다 이후여야 합니다.'));
       return;
     }
 
@@ -395,7 +395,7 @@ export default function AdminInventory({ isMobileView }) {
       });
 
       if (res.ok) {
-        alert(isRentalEditMode ? "임대 기간이 수정되었습니다." : "임대 상태 및 임대 기간 설정이 완료되었습니다.");
+        alert(isRentalEditMode ? t('menu2.msg_rental_edited', '임대 기간이 수정되었습니다.') : t('menu2.msg_rental_saved', '임대 상태 및 임대 기간 설정이 완료되었습니다.'));
         setPendingChanges(prev => {
           const next = { ...prev };
           delete next[rentalOrder.id];
@@ -410,7 +410,7 @@ export default function AdminInventory({ isMobileView }) {
       }
     } catch (err) {
       console.error("Failed to save rental period:", err);
-      alert("임대 기간 저장 중 오류가 발생했습니다.");
+      alert(t('menu2.msg_rental_save_error', '임대 기간 저장 중 오류가 발생했습니다.'));
     } finally {
       setSavingRental(false);
     }
@@ -463,15 +463,15 @@ export default function AdminInventory({ isMobileView }) {
   const handleSaveReservePeriod = async () => {
     if (!reserveOrder) return;
     if (!reserveDealerId) {
-      alert("예약을 진행할 딜러사를 선택해 주세요.");
+      alert(t('menu2.msg_select_reserve_dealer', '예약을 진행할 딜러사를 선택해 주세요.'));
       return;
     }
     if (!reserveStartDate || !reserveEndDate) {
-      alert("예약 시작일과 종료일(만료일)을 모두 선택해 주세요.");
+      alert(t('menu2.msg_select_reserve_dates', '예약 시작일과 종료일(만료일)을 모두 선택해 주세요.'));
       return;
     }
     if (new Date(reserveStartDate) > new Date(reserveEndDate)) {
-      alert("예약 종료일(만료일)은 시작일보다 이후여야 합니다.");
+      alert(t('menu2.msg_reserve_end_after_start', '예약 종료일(만료일)은 시작일보다 이후여야 합니다.'));
       return;
     }
 
@@ -488,7 +488,7 @@ export default function AdminInventory({ isMobileView }) {
       });
 
       if (res.ok) {
-        alert(isReserveEditMode ? "예약 정보 및 기간이 수정되었습니다." : "예약 상태 및 예약 기간 설정이 완료되었습니다.");
+        alert(isReserveEditMode ? t('menu2.msg_reserve_edited', '예약 정보 및 기간이 수정되었습니다.') : t('menu2.msg_reserve_saved', '예약 상태 및 예약 기간 설정이 완료되었습니다.'));
         setPendingChanges(prev => {
           const next = { ...prev };
           delete next[reserveOrder.id];
@@ -503,7 +503,7 @@ export default function AdminInventory({ isMobileView }) {
       }
     } catch (err) {
       console.error("Failed to save reservation:", err);
-      alert("예약 기간 저장 중 오류가 발생했습니다.");
+      alert(t('menu2.msg_reserve_save_error', '예약 기간 저장 중 오류가 발생했습니다.'));
     } finally {
       setSavingReserve(false);
     }
@@ -518,7 +518,7 @@ export default function AdminInventory({ isMobileView }) {
   // 상세 내역 팝업 내 [예약취소] 클릭
   const handleCancelReservation = async (order) => {
     if (!order) return;
-    if (!window.confirm("정말로 예약을 취소하시겠습니까?\n예약 취소 시 프로모션 등록 장비는 '프로모션'으로, 일반 재고는 '판매가능' 상태로 복귀합니다.")) {
+    if (!window.confirm(t('menu2.msg_confirm_cancel_reserve', "정말로 예약을 취소하시겠습니까?\n예약 취소 시 프로모션 등록 장비는 '프로모션'으로, 일반 재고는 '판매가능' 상태로 복귀합니다."))) {
       return;
     }
 
@@ -567,7 +567,7 @@ export default function AdminInventory({ isMobileView }) {
   const handleConfirmReservationSale = async () => {
     if (!reserveSaleOrder) return;
     if (!saleBuyerDealerId) {
-      alert("최종 실 구매 딜러사를 선택해 주세요.");
+      alert(t('menu2.msg_select_buyer_dealer', '최종 실 구매 딜러사를 선택해 주세요.'));
       return;
     }
     const chosenDealer = dealers.find(d => d.id === parseInt(saleBuyerDealerId, 10));
@@ -586,7 +586,7 @@ export default function AdminInventory({ isMobileView }) {
         })
       });
       if (res.ok) {
-        alert("판매완료 처리되어 판매목록으로 이관되었습니다.");
+        alert(t('menu2.msg_sale_confirmed', '판매완료 처리되어 판매목록으로 이관되었습니다.'));
         setReserveSaleModalOpen(false);
         setReserveSaleOrder(null);
         setPendingChanges(prev => {
@@ -1365,8 +1365,8 @@ export default function AdminInventory({ isMobileView }) {
                       ? t('menu2.modal_reserve_edit_title', '예약 기간 수정')
                       : t('menu2.modal_reserve_title', '예약 기간 설정')}
                   </h3>
-                  <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    {reserveOrder.product_model?.model_name || '장비'} ({reserveOrder.reference_no})
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>
+                    {reserveOrder.product_model?.model_name || '-'} &nbsp;&nbsp;/&nbsp;&nbsp; {reserveOrder.serial_number || '-'}
                   </p>
                 </div>
               </div>
@@ -1410,10 +1410,10 @@ export default function AdminInventory({ isMobileView }) {
                 <AlertCircle size={20} color="var(--wia-blue, #2563eb)" style={{ flexShrink: 0, marginTop: '2px' }} />
                 <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', lineHeight: 1.5, minWidth: 0, flex: 1 }}>
                   <div style={{ fontWeight: 700, marginBottom: '2px', color: 'var(--wia-blue, #2563eb)' }}>
-                    [공지] 예약 기간을 입력해 주시기 바랍니다.
+                    {t('menu2.modal_reserve_notice_title', '[공지] 예약 기간을 입력해 주시기 바랍니다.')}
                   </div>
                   <div style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
-                    달력 기능을 사용하여 예약 시작일과 종료일(만료일)을 지정하신 후, 하단의 <strong>'예약기간 확정'</strong> 버튼을 클릭하여 일정을 저장해 주세요.
+                    {t('menu2.modal_reserve_notice_desc', "달력 기능을 사용하여 예약 시작일과 종료일(만료일)을 지정하신 후, 하단의 '예약기간 확정' 버튼을 클릭하여 일정을 저장해 주세요.")}
                   </div>
                 </div>
               </div>
@@ -1431,19 +1431,19 @@ export default function AdminInventory({ isMobileView }) {
                 fontSize: '0.85rem', alignItems: 'center'
               }}>
                 <div style={{ minWidth: 0, overflow: 'hidden' }}>
-                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px', whiteSpace: 'nowrap' }}>모델</span>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px', whiteSpace: 'nowrap' }}>{t('menu2.modal_label_model', '모델')}</span>
                   <strong style={{ color: 'var(--text-primary)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {reserveOrder.product_model?.model_name || '-'}
                   </strong>
                 </div>
                 <div style={{ minWidth: 0, overflow: 'hidden' }}>
-                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px', whiteSpace: 'nowrap' }}>발주번호</span>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px', whiteSpace: 'nowrap' }}>{t('menu2.modal_label_po', '발주번호')}</span>
                   <strong style={{ color: 'var(--accent-cyan)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {reserveOrder.reference_no || '-'}
                   </strong>
                 </div>
                 <div style={{ minWidth: 0, overflow: 'hidden' }}>
-                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px', whiteSpace: 'nowrap' }}>예약 딜러</span>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px', whiteSpace: 'nowrap' }}>{t('menu2.modal_label_reserved_dealer', '예약 딜러')}</span>
                   <select
                     value={reserveDealerId}
                     onChange={e => setReserveDealerId(e.target.value)}
@@ -1463,7 +1463,7 @@ export default function AdminInventory({ isMobileView }) {
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap'
                     }}
-                    title="예약 딜러사 변경 가능"
+                    title={t('menu2.modal_dealer_tooltip', '예약 딜러사 변경 가능')}
                   >
                     {dealers.map(d => (
                       <option key={d.id} value={d.id} style={{ color: 'var(--text-primary)', background: 'var(--bg-card)' }}>
@@ -1484,8 +1484,8 @@ export default function AdminInventory({ isMobileView }) {
                   boxSizing: 'border-box'
                 }}>
                   <div style={{ minWidth: 0, overflow: 'hidden', boxSizing: 'border-box' }}>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      예약 시작일
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: "'SUITE', sans-serif" }}>
+                      {t('menu2.modal_reserve_start_date', '예약 시작일')}
                     </label>
                     <input
                       type="date"
@@ -1501,6 +1501,8 @@ export default function AdminInventory({ isMobileView }) {
                         padding: isMobileView ? '8px 6px' : '10px 12px',
                         borderRadius: '8px',
                         fontSize: isMobileView ? '0.82rem' : '0.9rem',
+                        fontFamily: "'SUITE', sans-serif",
+                        fontWeight: 600,
                         cursor: 'pointer',
                         boxSizing: 'border-box'
                       }}
@@ -1508,8 +1510,8 @@ export default function AdminInventory({ isMobileView }) {
                   </div>
 
                   <div style={{ minWidth: 0, overflow: 'hidden', boxSizing: 'border-box' }}>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      예약 종료일 (만료일)
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: "'SUITE', sans-serif" }}>
+                      {t('menu2.modal_reserve_end_date', '예약 종료일 (만료일)')}
                     </label>
                     <input
                       type="date"
@@ -1525,6 +1527,8 @@ export default function AdminInventory({ isMobileView }) {
                         padding: isMobileView ? '8px 6px' : '10px 12px',
                         borderRadius: '8px',
                         fontSize: isMobileView ? '0.82rem' : '0.9rem',
+                        fontFamily: "'SUITE', sans-serif",
+                        fontWeight: 600,
                         cursor: 'pointer',
                         boxSizing: 'border-box'
                       }}
@@ -1534,13 +1538,13 @@ export default function AdminInventory({ isMobileView }) {
 
                 {/* 빠른 기간 설정 프리셋 버튼 (+1주, +2주) */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginRight: '4px' }}>빠른 기간 선택:</span>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginRight: '4px' }}>{t('menu2.modal_quick_select', '빠른 기간 선택:')}</span>
                   {[
-                    { label: '+1주', days: 7 },
-                    { label: '+2주', days: 14 }
+                    { label: t('menu2.modal_plus_1week', '+1주'), days: 7 },
+                    { label: t('menu2.modal_plus_2weeks', '+2주'), days: 14 }
                   ].map(p => (
                     <button
-                      key={p.label}
+                      key={p.days}
                       type="button"
                       onClick={() => handleQuickReserveDays(p.days)}
                       style={{
@@ -1590,7 +1594,7 @@ export default function AdminInventory({ isMobileView }) {
                   justifyContent: 'center'
                 }}
               >
-                취소
+                {t('menu2.modal_btn_cancel', '취소')}
               </button>
               <button
                 type="button"
@@ -1611,7 +1615,7 @@ export default function AdminInventory({ isMobileView }) {
                 }}
               >
                 <CheckCircle2 size={16} />
-                {savingReserve ? "저장 중..." : t('menu2.btn_confirm_reservation_period', '예약기간 확정')}
+                {savingReserve ? t('menu2.modal_btn_saving', '저장 중...') : t('menu2.btn_confirm_reservation_period', '예약기간 확정')}
               </button>
             </div>
           </div>
@@ -1676,8 +1680,8 @@ export default function AdminInventory({ isMobileView }) {
                   <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                     {t('menu2.modal_reserve_detail_title', '예약 상세 내역')}
                   </h3>
-                  <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    {reserveDetailOrder.product_model?.model_name || '장비'} ({reserveDetailOrder.reference_no})
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>
+                    {reserveDetailOrder.product_model?.model_name || '-'} &nbsp;&nbsp;/&nbsp;&nbsp; {reserveDetailOrder.serial_number || '-'}
                   </p>
                 </div>
               </div>
@@ -1720,7 +1724,7 @@ export default function AdminInventory({ isMobileView }) {
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                   <div>
-                    <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>예약 딜러사</span>
+                    <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>{t('menu2.modal_reserved_dealer_company', '예약 딜러사')}</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <strong style={{ fontSize: isMobileView ? '1.02rem' : '1.08rem', color: 'var(--accent-cyan)' }}>
                         {reserveDetailOrder.reserved_dealer?.name || reserveDetailOrder.dealer_company?.name || '-'}
@@ -1754,7 +1758,7 @@ export default function AdminInventory({ isMobileView }) {
                   paddingTop: '12px', borderTop: '1px dashed rgba(45, 99, 255, 0.2)', width: '100%', boxSizing: 'border-box'
                 }}>
                   <div>
-                    <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>예약 시작일</span>
+                    <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>{t('menu2.modal_reserve_start_date', '예약 시작일')}</span>
                     <div style={{ fontSize: isMobileView ? '0.86rem' : '0.92rem', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
                       {formatExpiryDateMMM(reserveDetailOrder.reservation_start_date)}
                     </div>
@@ -1766,7 +1770,7 @@ export default function AdminInventory({ isMobileView }) {
                   </div>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
-                      <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>예약 만료일</span>
+                      <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>{t('menu2.modal_reserve_expiry_date', '예약 만료일')}</span>
                       <button
                         type="button"
                         onClick={() => handleOpenReserveModalForEdit(reserveDetailOrder)}
@@ -1805,44 +1809,44 @@ export default function AdminInventory({ isMobileView }) {
                 overflow: 'hidden'
               }}>
                 <div style={{ fontWeight: 700, fontSize: '0.86rem', color: 'var(--text-primary)', marginBottom: '2px' }}>
-                  예약 장비 상세 정보
+                  {t('menu2.modal_reserve_equip_info', '예약 장비 상세 정보')}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: isMobileView ? '8px' : '10px', width: '100%', boxSizing: 'border-box' }}>
                   <div>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem', display: 'block' }}>모델 / NC</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem', display: 'block' }}>{t('menu2.modal_label_model_nc', '모델 / NC')}</span>
                     <strong style={{ color: 'var(--text-primary)', fontSize: isMobileView ? '0.82rem' : '0.85rem', wordBreak: 'break-word' }}>
                       {reserveDetailOrder.product_model?.model_name || '-'} / {reserveDetailOrder.nc || 'F0iP'}
                     </strong>
                   </div>
                   <div>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem', display: 'block' }}>발주번호 (P/O)</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem', display: 'block' }}>{t('menu2.modal_label_po_num', '발주번호 (P/O)')}</span>
                     <strong style={{ color: 'var(--accent-cyan)', fontSize: isMobileView ? '0.82rem' : '0.85rem' }}>{reserveDetailOrder.reference_no || '-'}</strong>
                   </div>
                   <div>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem', display: 'block' }}>시리얼 번호 (S/N)</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem', display: 'block' }}>{t('menu2.modal_label_sn', '시리얼 번호 (S/N)')}</span>
                     <strong style={{ color: 'var(--text-primary)', fontSize: isMobileView ? '0.82rem' : '0.85rem' }}>{reserveDetailOrder.serial_number || '-'}</strong>
                   </div>
                   <div>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem', display: 'block' }}>구매가 (€)</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem', display: 'block' }}>{t('menu2.modal_label_price', '구매가 (€)')}</span>
                     <strong style={{ color: 'var(--text-primary)', fontSize: isMobileView ? '0.82rem' : '0.85rem' }}>
                       {reserveDetailOrder.price ? (!isNaN(reserveDetailOrder.price) ? Number(reserveDetailOrder.price).toLocaleString() : reserveDetailOrder.price) : '-'}
                     </strong>
                   </div>
                   <div>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem', display: 'block' }}>진행 상태</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem', display: 'block' }}>{t('menu2.modal_label_status', '진행 상태')}</span>
                     <strong style={{ color: 'var(--text-primary)', fontSize: isMobileView ? '0.82rem' : '0.85rem' }}>
                       {reserveDetailOrder.current_status ? t(`stepbar.${reserveDetailOrder.current_status.toLowerCase()}`, reserveDetailOrder.current_status) : '-'}
                     </strong>
                   </div>
                   <div>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem', display: 'block' }}>도착지 / ETA</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem', display: 'block' }}>{t('menu2.modal_label_dest_eta', '도착지 / ETA')}</span>
                     <strong style={{ color: 'var(--text-primary)', fontSize: isMobileView ? '0.82rem' : '0.85rem' }}>
                       {getStandardPort(reserveDetailOrder.destination_port)} / {reserveDetailOrder.eta ? new Date(reserveDetailOrder.eta).toLocaleDateString() : '-'}
                     </strong>
                   </div>
                 </div>
                 <div style={{ paddingTop: '8px', borderTop: '1px solid var(--border-color)' }}>
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem', display: 'block', marginBottom: '2px' }}>옵션 상세 (DETAIL SPEC)</span>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem', display: 'block', marginBottom: '2px' }}>{t('menu2.modal_label_detail_spec', '옵션 상세 (DETAIL SPEC)')}</span>
                   <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', lineHeight: 1.45 }}>
                     {reserveDetailOrder.detail_spec || 'T/F, CC(S-H)+B, 20BAR, B/I, P/C, Q(A)'}
                   </div>
@@ -1879,7 +1883,7 @@ export default function AdminInventory({ isMobileView }) {
                 }}
               >
                 <Trash2 size={isMobileView ? 14 : 15} />
-                {cancellingReserve ? '취소 중..' : t('menu2.btn_cancel_reservation', '예약취소')}
+                {cancellingReserve ? t('menu2.modal_btn_cancelling', '취소 중..') : t('menu2.btn_cancel_reservation', '예약취소')}
               </button>
 
               <div style={{
@@ -1925,7 +1929,7 @@ export default function AdminInventory({ isMobileView }) {
                     whiteSpace: 'nowrap'
                   }}
                 >
-                  닫기
+                  {t('menu2.modal_btn_close', '닫기')}
                 </button>
               </div>
             </div>
@@ -1990,8 +1994,8 @@ export default function AdminInventory({ isMobileView }) {
                   <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                     {t('menu2.modal_reserve_sold_title', '예약 장비 판매완료 확정')}
                   </h3>
-                  <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    {reserveSaleOrder.product_model?.model_name || '장비'} ({reserveSaleOrder.reference_no})
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>
+                    {reserveSaleOrder.product_model?.model_name || '-'} &nbsp;&nbsp;/&nbsp;&nbsp; {reserveSaleOrder.serial_number || '-'}
                   </p>
                 </div>
               </div>
@@ -2030,7 +2034,7 @@ export default function AdminInventory({ isMobileView }) {
                 color: 'var(--text-secondary)',
                 lineHeight: 1.5
               }}>
-                최종 구매 딜러사를 확인하신 후 <strong>'판매완료 확정'</strong>을 누르시면, 해당 장비는 선택된 딜러사의 확정 발주(주문/배송현황 및 창고 출고 흐름)로 즉시 귀속 전환됩니다.
+                {t('menu2.modal_reserve_sold_notice', "최종 구매 딜러사를 확인하신 후 '판매완료 확정'을 누르시면, 해당 장비는 선택된 딜러사의 확정 발주(주문/배송현황 및 창고 출고 흐름)로 즉시 귀속 전환됩니다.")}
               </div>
 
               <div style={{
@@ -2042,22 +2046,22 @@ export default function AdminInventory({ isMobileView }) {
                 fontSize: '0.84rem'
               }}>
                 <div>
-                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.74rem' }}>모델</span>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.74rem' }}>{t('menu2.modal_label_model', '모델')}</span>
                   <strong style={{ color: 'var(--text-primary)' }}>{reserveSaleOrder.product_model?.model_name || '-'}</strong>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.74rem' }}>발주번호</span>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.74rem' }}>{t('menu2.modal_label_po', '발주번호')}</span>
                   <strong style={{ color: 'var(--accent-cyan)' }}>{reserveSaleOrder.reference_no || '-'}</strong>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.74rem' }}>예약 딜러</span>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.74rem' }}>{t('menu2.modal_label_reserved_dealer', '예약 딜러')}</span>
                   <strong style={{ color: 'var(--text-primary)' }}>{reserveSaleOrder.reserved_dealer?.name || '-'}</strong>
                 </div>
               </div>
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                  최종 구매 딜러사 확인
+                  {t('menu2.modal_sold_buyer_dealer_label', '최종 구매 딜러사 확인')}
                 </label>
                 <select
                   value={saleBuyerDealerId}
@@ -2074,7 +2078,7 @@ export default function AdminInventory({ isMobileView }) {
                     cursor: 'pointer'
                   }}
                 >
-                  <option value="">-- 실 구매 딜러사 선택 --</option>
+                  <option value="">{t('menu2.modal_sold_buyer_dealer_select', '-- 실 구매 딜러사 선택 --')}</option>
                   {dealers.filter(d => d.name.toUpperCase() !== 'WME').map(d => (
                     <option key={d.id} value={d.id}>{d.name} ({d.country})</option>
                   ))}
@@ -2103,7 +2107,7 @@ export default function AdminInventory({ isMobileView }) {
                   cursor: 'pointer'
                 }}
               >
-                취소
+                {t('menu2.modal_btn_cancel', '취소')}
               </button>
               <button
                 type="button"
@@ -2123,7 +2127,7 @@ export default function AdminInventory({ isMobileView }) {
                 }}
               >
                 <CheckCircle2 size={16} />
-                {confirmingSale ? '처리 중...' : '판매완료 확정'}
+                {confirmingSale ? t('menu2.modal_btn_processing', '처리 중...') : t('menu2.modal_btn_confirm_sale', '판매완료 확정')}
               </button>
             </div>
           </div>
@@ -2186,10 +2190,10 @@ export default function AdminInventory({ isMobileView }) {
                 </div>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    {isRentalEditMode ? "임대 기간 수정" : "임대 기간 설정"}
+                    {isRentalEditMode ? t('menu2.modal_rental_edit_title', '임대 기간 수정') : t('menu2.modal_rental_title', '임대 기간 설정')}
                   </h3>
-                  <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    {rentalOrder.product_model?.model_name || '장비'} ({rentalOrder.reference_no})
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>
+                    {rentalOrder.product_model?.model_name || '-'} &nbsp;&nbsp;/&nbsp;&nbsp; {rentalOrder.serial_number || '-'}
                   </p>
                 </div>
               </div>
@@ -2234,10 +2238,10 @@ export default function AdminInventory({ isMobileView }) {
                 <AlertCircle size={20} color="var(--wia-blue, #2563eb)" style={{ flexShrink: 0, marginTop: '2px' }} />
                 <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', lineHeight: 1.5, minWidth: 0, flex: 1 }}>
                   <div style={{ fontWeight: 700, marginBottom: '2px', color: 'var(--wia-blue, #2563eb)' }}>
-                    [공지] 임대 기간을 입력해 주시기 바랍니다.
+                    {t('menu2.modal_rental_notice_title', '[공지] 임대 기간을 입력해 주시기 바랍니다.')}
                   </div>
                   <div style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
-                    달력 기능을 사용하여 임대 시작일과 종료일을 지정하신 후, 하단의 <strong>'임대기간 확정'</strong> 버튼을 클릭하여 일정을 저장해 주세요.
+                    {t('menu2.modal_rental_notice_desc', "달력 기능을 사용하여 임대 시작일과 종료일을 지정하신 후, 하단의 '임대기간 확정' 버튼을 클릭하여 일정을 저장해 주세요.")}
                   </div>
                 </div>
               </div>
@@ -2255,21 +2259,21 @@ export default function AdminInventory({ isMobileView }) {
                 fontSize: '0.85rem'
               }}>
                 <div style={{ minWidth: 0, overflow: 'hidden' }}>
-                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px', whiteSpace: 'nowrap' }}>모델</span>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px', whiteSpace: 'nowrap' }}>{t('menu2.modal_label_model', '모델')}</span>
                   <strong style={{ color: 'var(--text-primary)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {rentalOrder.product_model?.model_name || '-'}
                   </strong>
                 </div>
                 <div style={{ minWidth: 0, overflow: 'hidden' }}>
-                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px', whiteSpace: 'nowrap' }}>발주번호</span>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px', whiteSpace: 'nowrap' }}>{t('menu2.modal_label_po', '발주번호')}</span>
                   <strong style={{ color: 'var(--accent-cyan)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {rentalOrder.reference_no || '-'}
                   </strong>
                 </div>
                 <div style={{ minWidth: 0, overflow: 'hidden' }}>
-                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px', whiteSpace: 'nowrap' }}>임대 딜러</span>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', marginBottom: '2px', whiteSpace: 'nowrap' }}>{t('menu2.modal_label_rental_dealer', '임대 딜러')}</span>
                   <strong style={{ color: 'var(--status-production, #eab308)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {dealers.find(d => d.id === parseInt(rentalDealerId))?.name || rentalOrder.dealer_company?.name || '딜러 선택'}
+                    {dealers.find(d => d.id === parseInt(rentalDealerId))?.name || rentalOrder.dealer_company?.name || t('menu2.modal_select_dealer', '딜러 선택')}
                   </strong>
                 </div>
               </div>
@@ -2284,8 +2288,8 @@ export default function AdminInventory({ isMobileView }) {
                   boxSizing: 'border-box'
                 }}>
                   <div style={{ minWidth: 0, overflow: 'hidden', boxSizing: 'border-box' }}>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      임대 시작일
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: "'SUITE', sans-serif" }}>
+                      {t('menu2.modal_rental_start_date', '임대 시작일')}
                     </label>
                     <input
                       type="date"
@@ -2301,6 +2305,8 @@ export default function AdminInventory({ isMobileView }) {
                         padding: isMobileView ? '8px 6px' : '10px 12px',
                         borderRadius: '8px',
                         fontSize: isMobileView ? '0.82rem' : '0.9rem',
+                        fontFamily: "'SUITE', sans-serif",
+                        fontWeight: 600,
                         cursor: 'pointer',
                         boxSizing: 'border-box'
                       }}
@@ -2308,8 +2314,8 @@ export default function AdminInventory({ isMobileView }) {
                   </div>
 
                   <div style={{ minWidth: 0, overflow: 'hidden', boxSizing: 'border-box' }}>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      임대 종료일 (만료일)
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: "'SUITE', sans-serif" }}>
+                      {t('menu2.modal_rental_end_date', '임대 종료일 (만료일)')}
                     </label>
                     <input
                       type="date"
@@ -2325,6 +2331,8 @@ export default function AdminInventory({ isMobileView }) {
                         padding: isMobileView ? '8px 6px' : '10px 12px',
                         borderRadius: '8px',
                         fontSize: isMobileView ? '0.82rem' : '0.9rem',
+                        fontFamily: "'SUITE', sans-serif",
+                        fontWeight: 600,
                         cursor: 'pointer',
                         boxSizing: 'border-box'
                       }}
@@ -2334,13 +2342,13 @@ export default function AdminInventory({ isMobileView }) {
 
                 {/* 빠른 기간 설정 프리셋 버튼 */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginRight: '4px' }}>빠른 기간 선택:</span>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginRight: '4px' }}>{t('menu2.modal_quick_select', '빠른 기간 선택:')}</span>
                   {[
-                    { label: '+1개월', months: 1 },
-                    { label: '+3개월', months: 3 },
-                    { label: '+6개월', months: 6 },
-                    { label: '+1년', months: 12 },
-                    { label: '+2년', months: 24 }
+                    { label: t('menu2.modal_plus_1month', '+1개월'), months: 1 },
+                    { label: t('menu2.modal_plus_3months', '+3개월'), months: 3 },
+                    { label: t('menu2.modal_plus_6months', '+6개월'), months: 6 },
+                    { label: t('menu2.modal_plus_1year', '+1년'), months: 12 },
+                    { label: t('menu2.modal_plus_2years', '+2년'), months: 24 }
                   ].map(p => (
                     <button
                       key={p.label}
@@ -2393,7 +2401,7 @@ export default function AdminInventory({ isMobileView }) {
                   justifyContent: 'center'
                 }}
               >
-                취소
+                {t('menu2.modal_btn_cancel', '취소')}
               </button>
               <button
                 type="button"
@@ -2414,7 +2422,7 @@ export default function AdminInventory({ isMobileView }) {
                 }}
               >
                 <CheckCircle2 size={16} />
-                {savingRental ? "저장 중..." : (t('menu2.btn_confirm_rental_period', '임대기간 확정'))}
+                {savingRental ? t('menu2.modal_btn_saving', "저장 중...") : (t('menu2.btn_confirm_rental_period', '임대기간 확정'))}
               </button>
             </div>
           </div>
@@ -2422,6 +2430,17 @@ export default function AdminInventory({ isMobileView }) {
       )}
 
       <style>{`
+        input[type="date"] {
+          font-family: 'SUITE', sans-serif !important;
+        }
+        input[type="date"]::-webkit-datetime-edit,
+        input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+        input[type="date"]::-webkit-datetime-edit-text,
+        input[type="date"]::-webkit-datetime-edit-month-field,
+        input[type="date"]::-webkit-datetime-edit-day-field,
+        input[type="date"]::-webkit-datetime-edit-year-field {
+          font-family: 'SUITE', sans-serif !important;
+        }
         .sortable-th:hover {
           background-color: var(--bg-secondary) !important;
           color: var(--wia-blue) !important;

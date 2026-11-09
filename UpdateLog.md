@@ -1,5 +1,57 @@
 ﻿# 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
+## [2026-11-09] WIA 가용재고 예약 모달 정보 개편(모델/시리얼), 날짜 서체 SUITE 적용, 모달 전 영역 다국어(i18n) 영문 지원 및 화물추적 버튼 호버 테두리 UI 고도화
+
+### 1. 관리자포털 WIA 가용재고 목록 '예약 기간 설정' 팝업 모달 정보 개편 (AdminInventory.jsx)
+* **상단 서브 타이틀 정보 구조 개편 (모델명 / 시리얼번호)**:
+  * 기존의 모델명 및 발주번호 표기(`HD2600SY (F26-06-15)`)에서 **모델명 / 시리얼번호**(`HD2600SY   /  G1713-0089`) 구조로 개편.
+  * 시리얼 번호가 미등록된 장비는 `-`로 자동 표기 처리.
+* **서체 굵기 및 전용 폰트 강화**:
+  * 텍스트 굵기를 **`fontWeight: 800` (ExtraBold)**로 상향 지정하여 모달 상단 정보 가독성 및 시인성 극대화.
+  * 현대위아 공식 서체인 **`SUITE`**(`'SUITE', sans-serif`)를 일괄 적용.
+* **연관 팝업 모달 상단 헤더 서식 일체화**:
+  * 일관된 UX 제공을 위해 '예약 상세 내역 모달'(`reserveDetailOrder`), '예약 장비 판매완료 확정 모달'(`reserveSaleOrder`), '임대 기간 설정 모달'(`rentalOrder`)의 상단 서브 타이틀도 동일한 `모델명   /  시리얼번호` (SUITE 800) 구조로 일괄 통일.
+
+### 2. 날짜 입력 필드(`input[type="date"]`) 현대위아 전용 서체(SUITE) 일괄 적용 (AdminInventory.jsx, index.css)
+* **섀도우 DOM 가상 선택자 기반 브라우저 기본 글꼴 오버라이드**:
+  * 크로미움(Chrome, Edge 등) 브라우저 기본 스타일시트로 인해 시스템 고딕으로 강제 렌더링되던 `input[type="date"]` 내부 날짜 텍스트를 현대위아 공식 서체인 **SUITE**(`'SUITE', sans-serif !important;`)로 전환.
+  * `::-webkit-datetime-edit`, `::-webkit-datetime-edit-fields-wrapper`, `::-webkit-datetime-edit-text`, `::-webkit-datetime-edit-month-field`, `::-webkit-datetime-edit-day-field`, `::-webkit-datetime-edit-year-field` 전역 적용.
+* **날짜 입력 필드 및 라벨 스타일 고도화**:
+  * 예약 시작일/종료일 및 임대 시작일/종료일 입력 필드에 `fontFamily: "'SUITE', sans-serif"`, `fontWeight: 600` 적용.
+
+### 3. WIA 가용재고 팝업 모달 4종 전체 영역 다국어(i18n) 시스템 전면 연동 (AdminInventory.jsx, translation.json)
+* **영문 페이지 접속 시 팝업창 100% 영문 전환 구현**:
+  * 기존 한국어로 하드코딩되어 있던 팝업창 내 공지문구, 카드 라벨, 버튼, 알림 메시지 전체를 `useTranslation` (`t()`) 훅으로 연결.
+* **'예약 기간 설정 / 수정' 모달 영문화**:
+  * 모달 제목(`Set Reservation Period` / `Edit Reservation Period`)
+  * 공지사항 박스(`[Notice] Please enter the reservation period.`, `Please select the reservation start and end (expiration) dates using the calendar, then click 'Confirm Reservation' below to save the schedule.`)
+  * 정보 카드 라벨(`Model`, `P/O No.`, `Reserved Dealer`)
+  * 날짜 선택 및 프리셋(`Reservation Start Date`, `Reservation End Date (Expiry)`, `Quick Selection:`, `+1 Week`, `+2 Weeks`)
+  * 액션 버튼(`Cancel`, `Confirm Reservation`, `Saving...`)
+* **'예약 상세 내역' 모달 영문화**:
+  * 모달 제목(`Reservation Details`), 요약 정보(`Reserved Dealer`, `Reservation Start Date`, `Expiration Date`, `Edit Period`)
+  * 잔여일 실시간 배지(`Expired`, `Expires Today (D-Day)`, `D-N Left`)
+  * 장비 상세 스펙(`Reserved Equipment Details`, `Model / NC`, `P/O No.`, `Serial No. (S/N)`, `Price (€)`, `Status`, `Destination / ETA`, `Detail Spec (OPTION)`)
+  * 푸터 버튼(`Cancel Reservation`, `Cancelling..`, `Sold`, `Close`)
+* **'예약 장비 판매완료 확정' 모달 영문화**:
+  * 모달 제목(`Confirm Sale of Reserved Stock`)
+  * 안내문(`After verifying the purchasing dealer, click 'Confirm Sale' to transfer this equipment directly to the selected dealer's confirmed order (Order/Delivery Timeline & Warehouse Dispatch flow).`)
+  * 딜러 선택 드롭다운(`Confirm Purchasing Dealer`, `-- Select Purchasing Dealer --`)
+  * 푸터 버튼(`Cancel`, `Confirm Sale`, `Processing...`)
+* **'임대 기간 설정 / 수정' 모달 영문화**:
+  * 모달 제목(`Set Rental Period` / `Edit Rental Period`), 공지문, 정보 라벨(`Rental Dealer`), 날짜 선택(`Rental Start Date`, `Rental End Date (Expiry)`), 프리셋(`+1 Month`, `+3 Months`, `+6 Months`, `+1 Year`, `+2 Years`), 푸터 버튼
+* **시스템 안내 팝업(Alert / Confirm) 다국어화**:
+  * 예약 취소 확인 confirm창, 날짜 선택 유효성 검증 alert, 판매완료 처리 결과 alert 등 다국어 사전 키 매핑 완료.
+
+### 4. 딜러포털 & RSM포털 화물추적 버튼 마우스 오버 테두리 UI 고도화 (DealerOrders.jsx, AdminDashboard.jsx)
+* **테두리 두께 2px 확장 및 현대위아 네이비 블루 컬러 적용**:
+  * 마우스 오버(Hover) 시 테두리 두께를 `2px`로 확장(`border: 2px solid rgb(10, 28, 143) !important;`).
+  * 현대위아 브랜드 전용 색상인 네이비 블루 `rgb(10, 28, 143)` (`#0A1C8F`)로 테두리 색상 통일.
+  * `box-sizing: border-box;` 적용으로 두께 증가에 따른 레이아웃 흔들림 및 버튼 크기 변경 방지.
+
+### 5. 프론트엔드 프로덕션 빌드 검증
+* 프론트엔드 최신 프로덕션 빌드(`npm.cmd run build`) 무결성 및 배포 호환성 검증 완료 (`built in 10.35s`).
+
 ## [2026-11-08] P/O(F/A) 타입 분리, 선적/판매 UI 개편, 사이드바 순서 조정, 가용재고 [요청] 이메일 연동, 화물추적 버튼 UI 고도화 및 RSM 포털 Tracking·판매목록 연동
 
 ### 1. 주문번호(P/O) 2대 유형 분류 및 비즈니스 정책 정립

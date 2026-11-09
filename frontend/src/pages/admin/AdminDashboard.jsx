@@ -1039,10 +1039,11 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
           cursor: pointer;
           transition: all 0.2s ease;
+          box-sizing: border-box;
         }
         .cargo-tracking-btn:hover {
-          border-color: #000000 !important;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16) !important;
+          border: 2px solid rgb(10, 28, 143) !important;
+          box-shadow: 0 2px 8px rgba(10, 28, 143, 0.2) !important;
           transform: translateY(-1px);
         }
         .cargo-tracking-btn-mobile {
@@ -1058,10 +1059,11 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
           cursor: pointer;
           transition: all 0.2s ease;
+          box-sizing: border-box;
         }
         .cargo-tracking-btn-mobile:hover {
-          border-color: #000000 !important;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16) !important;
+          border: 2px solid rgb(10, 28, 143) !important;
+          box-shadow: 0 2px 8px rgba(10, 28, 143, 0.2) !important;
         }
       `}</style>
     </div>
