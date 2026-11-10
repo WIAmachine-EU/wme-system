@@ -147,7 +147,7 @@ export default function App() {
     if (currentRole === 'DEALER') {
       if (!activeTab.startsWith('dealer-')) setActiveTab('dealer-dashboard');
     } else if (currentRole === 'RSM') {
-      if (!['rsm-dashboard', 'admin-inventory', 'admin-promotion', 'admin-sales-archive', 'admin-library', 'admin-dashboard'].includes(activeTab)) {
+      if (!['rsm-dashboard', 'admin-inventory', 'admin-promotion', 'admin-sales-archive', 'admin-tracking', 'admin-library', 'admin-dashboard'].includes(activeTab)) {
         setActiveTab('admin-dashboard');
       }
     } else {
@@ -225,7 +225,7 @@ export default function App() {
           {activeTab === 'analytics' && currentRole !== 'RSM' && <SalesAnalytics isMobileView={isMobileView} isDesktopOptimized={isDesktopOptimized} />}
           {activeTab === 'admin-promotion' && (currentRole === 'SCM_ADMIN' || currentRole === 'RSM') && <AdminPromotion isMobileView={isMobileView} />}
           {activeTab === 'admin-shipment-upload' && currentRole !== 'RSM' && <AdminShipmentUpload isMobileView={isMobileView} />}
-          {activeTab === 'admin-tracking' && currentRole !== 'RSM' && (
+          {activeTab === 'admin-tracking' && (currentRole === 'SCM_ADMIN' || currentRole === 'RSM') && (
             <ShipmentTracking 
               isMobileView={isMobileView} 
               onNavigateUpload={() => setActiveTab('admin-shipment-upload')} 

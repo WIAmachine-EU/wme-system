@@ -264,21 +264,21 @@ export default function DealerOrders({ isMobileView }) {
                 padding: '8px 14px', borderRadius: '10px', fontSize: '0.85rem', cursor: 'pointer', outline: 'none',
                 flex: isMobileView ? 1 : 'none'
               }}
-              title="정렬 기준"
+              title={t('common.sort_by', '정렬 기준')}
             >
-              <option value="">기본 정렬</option>
-              <option value="model_asc">{t('dealer_orders.header_model')} ▲ (오름차순)</option>
-              <option value="model_desc">{t('dealer_orders.header_model')} ▼ (내림차순)</option>
+              <option value="">{t('common.sort_default', '기본 정렬')}</option>
+              <option value="model_asc">{t('dealer_orders.header_model')} ▲ {t('common.sort_asc', '(오름차순)')}</option>
+              <option value="model_desc">{t('dealer_orders.header_model')} ▼ {t('common.sort_desc', '(내림차순)')}</option>
               <option value="po_asc">{t('dealer_orders.header_po_sn')} ▲</option>
               <option value="po_desc">{t('dealer_orders.header_po_sn')} ▼</option>
               <option value="dealer_asc">{t('dealer_orders.header_dealer')} ▲</option>
               <option value="dealer_desc">{t('dealer_orders.header_dealer')} ▼</option>
-              <option value="status_asc">{t('dealer_orders.header_status')} ▲ (초기단계순)</option>
-              <option value="status_desc">{t('dealer_orders.header_status')} ▼ (완료단계순)</option>
+              <option value="status_asc">{t('dealer_orders.header_status')} ▲ {t('common.sort_stage_early', '(초기단계순)')}</option>
+              <option value="status_desc">{t('dealer_orders.header_status')} ▼ {t('common.sort_stage_late', '(완료단계순)')}</option>
               <option value="port_asc">{t('dealer_orders.header_port')} ▲</option>
               <option value="port_desc">{t('dealer_orders.header_port')} ▼</option>
-              <option value="eta_asc">ETA ▲ (빠른순)</option>
-              <option value="eta_desc">ETA ▼ (늦은순)</option>
+              <option value="eta_asc">ETA ▲ {t('common.sort_earliest', '(빠른순)')}</option>
+              <option value="eta_desc">ETA ▼ {t('common.sort_latest', '(늦은순)')}</option>
             </select>
           </div>
         </div>

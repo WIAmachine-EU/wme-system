@@ -414,15 +414,15 @@ export default function AdminPromotion({ isMobileView }) {
                   background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)',
                   padding: '8px 12px', borderRadius: '10px', fontSize: '0.85rem', cursor: 'pointer', outline: 'none'
                 }}
-                title="정렬 기준"
+                title={t('common.sort_by', '정렬 기준')}
               >
-                <option value="">기본 정렬</option>
-                <option value="model_asc">{t('menu3.header_model', '모델')} ▲ (오름차순)</option>
-                <option value="model_desc">{t('menu3.header_model', '모델')} ▼ (내림차순)</option>
-                <option value="price_asc">{t('menu3.header_price', 'PRICE')} ▲ (낮은순)</option>
-                <option value="price_desc">{t('menu3.header_price', 'PRICE')} ▼ (높은순)</option>
-                <option value="eta_asc">{t('menu3.header_eta', 'ETA')} ▲ (빠른순)</option>
-                <option value="eta_desc">{t('menu3.header_eta', 'ETA')} ▼ (늦은순)</option>
+                <option value="">{t('common.sort_default', '기본 정렬')}</option>
+                <option value="model_asc">{t('menu3.header_model', '모델')} ▲ {t('common.sort_asc', '(오름차순)')}</option>
+                <option value="model_desc">{t('menu3.header_model', '모델')} ▼ {t('common.sort_desc', '(내림차순)')}</option>
+                <option value="price_asc">{t('menu3.header_price', 'PRICE')} ▲ {t('common.sort_lowest', '(낮은순)')}</option>
+                <option value="price_desc">{t('menu3.header_price', 'PRICE')} ▼ {t('common.sort_highest', '(높은순)')}</option>
+                <option value="eta_asc">{t('menu3.header_eta', 'ETA')} ▲ {t('common.sort_earliest', '(빠른순)')}</option>
+                <option value="eta_desc">{t('menu3.header_eta', 'ETA')} ▼ {t('common.sort_latest', '(늦은순)')}</option>
                 <option value="po_asc">{t('menu3.header_po', 'P/O')} ▲</option>
                 <option value="po_desc">{t('menu3.header_po', 'P/O')} ▼</option>
                 <option value="nc_asc">{t('menu3.header_nc', 'NC')} ▲</option>
@@ -484,15 +484,15 @@ export default function AdminPromotion({ isMobileView }) {
                   background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)',
                   padding: '8px 14px', borderRadius: '10px', fontSize: '0.85rem', cursor: 'pointer', outline: 'none'
                 }}
-                title="정렬 기준"
+                title={t('common.sort_by', '정렬 기준')}
               >
-                <option value="">기본 정렬</option>
-                <option value="model_asc">{t('menu3.header_model', '모델')} ▲ (오름차순)</option>
-                <option value="model_desc">{t('menu3.header_model', '모델')} ▼ (내림차순)</option>
-                <option value="price_asc">{t('menu3.header_price', 'PRICE')} ▲ (낮은순)</option>
-                <option value="price_desc">{t('menu3.header_price', 'PRICE')} ▼ (높은순)</option>
-                <option value="eta_asc">{t('menu3.header_eta', 'ETA')} ▲ (빠른순)</option>
-                <option value="eta_desc">{t('menu3.header_eta', 'ETA')} ▼ (늦은순)</option>
+                <option value="">{t('common.sort_default', '기본 정렬')}</option>
+                <option value="model_asc">{t('menu3.header_model', '모델')} ▲ {t('common.sort_asc', '(오름차순)')}</option>
+                <option value="model_desc">{t('menu3.header_model', '모델')} ▼ {t('common.sort_desc', '(내림차순)')}</option>
+                <option value="price_asc">{t('menu3.header_price', 'PRICE')} ▲ {t('common.sort_lowest', '(낮은순)')}</option>
+                <option value="price_desc">{t('menu3.header_price', 'PRICE')} ▼ {t('common.sort_highest', '(높은순)')}</option>
+                <option value="eta_asc">{t('menu3.header_eta', 'ETA')} ▲ {t('common.sort_earliest', '(빠른순)')}</option>
+                <option value="eta_desc">{t('menu3.header_eta', 'ETA')} ▼ {t('common.sort_latest', '(늦은순)')}</option>
                 <option value="po_asc">{t('menu3.header_po', 'P/O')} ▲</option>
                 <option value="po_desc">{t('menu3.header_po', 'P/O')} ▼</option>
                 <option value="nc_asc">{t('menu3.header_nc', 'NC')} ▲</option>

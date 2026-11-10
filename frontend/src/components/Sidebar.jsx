@@ -151,6 +151,11 @@ export default function Sidebar({ activeTab, setActiveTab, currentRole, currentU
       icon: <FileSpreadsheet size={20} />
     },
     {
+      id: 'admin-tracking',
+      label: t('sidebar.rsm_menu.tracking', '선적 트래킹'),
+      icon: <Ship size={20} />
+    },
+    {
       id: 'admin-library',
       label: t('sidebar.rsm_menu.library'),
       icon: <FolderOpen size={20} />

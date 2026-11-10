@@ -1,5 +1,50 @@
 ﻿# 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
+## [2026-11-10] RSM 포털 선적 트래킹 메뉴/페이지 연동, 가용재고 S/N 항목 신설, 전 페이지 정렬 드롭다운 다국어(i18n) 영문화, 판매목록 수량 표기 최적화
+
+### 1. RSM 포털 [선적 트래킹] 메뉴 신설 및 사이드바 메뉴 구조 개편 (Sidebar.jsx, App.jsx)
+* **RSM 포털 선적 트래킹 연동 및 라우팅 권한 확장**:
+  * 관리자 포털의 선적 트래킹(`ShipmentTracking`) 기능을 RSM 포털에서도 동일하게 조회할 수 있도록 라우팅(`App.jsx`) 및 사이드바(`Sidebar.jsx`) 메뉴 연동.
+  * RSM 포털 탭 검증 로직에 `'admin-tracking'`을 포함하여 메뉴 클릭 시 메인 대시보드로 리디렉션되던 현상 해결.
+* **RSM 포털 사이드바 메뉴 순서 표준화**:
+  * 지정된 업무 흐름에 맞춰 사이드바 순서 재배치:
+    1. 주문 / 배송현황 (`admin_dashboard`)
+    2. WIA 재고리스트 (`inventory`)
+    3. WIA 프로모션 (`promotion`)
+    4. 판매목록 (`sales_archive`)
+    5. 선적 트래킹 (`tracking`)
+    6. 제품 라이브러리 (`library`)
+    7. RSM 영업통계 (`dashboard`)
+
+### 2. WIA 가용재고 목록 신규 'S/N' (시리얼 번호) 컬럼 추가 (AdminInventory.jsx, DealerInventory.jsx)
+* **'NC' 우측 'S/N' 필드 신설 및 시스템 시리얼 연동**:
+  * 가용재고 테이블에서 'NC' 항목 우측에 'S/N' 컬럼을 추가하고, 기존 시스템의 `order.serial_number` 데이터를 공유 연동.
+  * 시리얼 번호가 없을 경우 `-`로 깔끔하게 처리.
+* **헤더 클릭 정렬 및 모바일 드롭다운 정렬 지원**:
+  * S/N 기준 오름차순/내림차순 정렬 기능 완벽 구현.
+  * 테이블 너비 비율(100%) 및 반응형 레이아웃 일관성 유지.
+
+### 3. 전 페이지 '기본 정렬' 드롭다운 메뉴 및 정렬 옵션 다국어(i18n) 전면 영문화 (translation.json 및 8개 컴포넌트)
+* **정렬 공통 다국어 사전 키(`common`) 구축**:
+  * `sort_default` ("기본 정렬" / "Default Sort")
+  * `sort_asc`, `sort_desc` ("(오름차순)" / "(Ascending)", "(내림차순)" / "(Descending)")
+  * `sort_lowest`, `sort_highest` ("(낮은순)" / "(Lowest)", "(높은순)" / "(Highest)")
+  * `sort_earliest`, `sort_latest` ("(빠른순)" / "(Earliest)", "(늦은순)" / "(Latest)")
+  * `sort_oldest`, `sort_newest` ("(과거순)" / "(Oldest)", "(최신순)" / "(Newest)")
+  * `sort_stage_early`, `sort_stage_late` ("(초기단계순)" / "(Initial stage)", "(완료단계순)" / "(Final stage)")
+* **대상 페이지 11개 영역 일괄 적용**:
+  * WIA 재고리스트 (`AdminInventory`, `DealerInventory`)
+  * WIA 프로모션 (`AdminPromotion`, `DealerPromotion` - 모바일/데스크탑 전 영역)
+  * 판매 목록 (`AdminSalesArchive`, `DealerSalesArchive`)
+  * 주문 / 배송현황 (`AdminDashboard`, `DealerOrders`)
+  * 영문 페이지 접속 시 정렬 드롭다운과 모든 옵션 라벨이 완전한 영문으로 렌더링되도록 개편.
+
+### 4. 판매 목록 매출 확정 장비 통계 수량 표기 최적화 (AdminSalesArchive.jsx)
+* **수량 단위 텍스트('대') 제거 및 숫자 단독 표기**:
+  * 상단 통계 바의 `전체: 40대`, `픽업 완료: 0대`, `픽업 대기(선매출): 40대` 표기에서 '대' 단위를 제거하고 숫자만 명확히 노출되도록 개선 (`40`, `0`, `40`).
+  * 한국어 및 영문 페이지 환경 모두에서 깔끔하고 일관된 숫자 뷰 제공.
+
+
 ## [2026-11-09] WIA 가용재고 예약 모달 정보 개편(모델/시리얼), 날짜 서체 SUITE 적용, 모달 전 영역 다국어(i18n) 영문 지원 및 화물추적 버튼 호버 테두리 UI 고도화
 
 ### 1. 관리자포털 WIA 가용재고 목록 '예약 기간 설정' 팝업 모달 정보 개편 (AdminInventory.jsx)

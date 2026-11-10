@@ -146,6 +146,10 @@ export default function DealerInventory({ isMobileView }) {
         valA = a.nc || '';
         valB = b.nc || '';
         break;
+      case 'sn':
+        valA = a.serial_number || '';
+        valB = b.serial_number || '';
+        break;
       case 'po':
         valA = a.reference_no || '';
         valB = b.reference_no || '';
@@ -340,19 +344,21 @@ export default function DealerInventory({ isMobileView }) {
                 background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)',
                 padding: '8px 14px', borderRadius: '10px', fontSize: '0.85rem', cursor: 'pointer'
               }}
-              title="정렬 기준"
+              title={t('common.sort_by', '정렬 기준')}
             >
-              <option value="">기본 정렬</option>
-              <option value="model_asc">{t('menu2.header_model', '모델')} ▲ (오름차순)</option>
-              <option value="model_desc">{t('menu2.header_model', '모델')} ▼ (내림차순)</option>
+              <option value="">{t('common.sort_default', '기본 정렬')}</option>
+              <option value="model_asc">{t('menu2.header_model', '모델')} ▲ {t('common.sort_asc', '(오름차순)')}</option>
+              <option value="model_desc">{t('menu2.header_model', '모델')} ▼ {t('common.sort_desc', '(내림차순)')}</option>
               <option value="nc_asc">{t('menu2.header_nc', 'NC')} ▲</option>
               <option value="nc_desc">{t('menu2.header_nc', 'NC')} ▼</option>
+              <option value="sn_asc">{t('menu2.header_sn', 'S/N')} ▲</option>
+              <option value="sn_desc">{t('menu2.header_sn', 'S/N')} ▼</option>
               <option value="po_asc">{t('menu2.header_po', '발주번호')} ▲</option>
               <option value="po_desc">{t('menu2.header_po', '발주번호')} ▼</option>
               <option value="detail_spec_asc">{t('menu2.header_detailspec', '옵션 상세')} ▲</option>
               <option value="detail_spec_desc">{t('menu2.header_detailspec', '옵션 상세')} ▼</option>
-              <option value="eta_asc">{t('menu2.header_eta', '도착일정')} ▲ (빠른순)</option>
-              <option value="eta_desc">{t('menu2.header_eta', '도착일정')} ▼ (늦은순)</option>
+              <option value="eta_asc">{t('menu2.header_eta', '도착일정')} ▲ {t('common.sort_earliest', '(빠른순)')}</option>
+              <option value="eta_desc">{t('menu2.header_eta', '도착일정')} ▼ {t('common.sort_latest', '(늦은순)')}</option>
               <option value="port_asc">{t('menu2.header_port', '도착지')} ▲</option>
               <option value="port_desc">{t('menu2.header_port', '도착지')} ▼</option>
               <option value="stock_type_asc">{t('menu2.header_status', '상태')} ▲</option>
@@ -457,19 +463,20 @@ export default function DealerInventory({ isMobileView }) {
               <thead>
                 <tr>
                   <th
-                    style={{ width: '4%', textAlign: 'center', fontWeight: 'bold', cursor: 'pointer', userSelect: 'none' }}
+                    style={{ width: '3%', textAlign: 'center', fontWeight: 'bold', cursor: 'pointer', userSelect: 'none' }}
                     onClick={() => setSortConfig({ key: null, direction: 'asc' })}
                     title="기본 순서로 리셋"
                   >
                     {t('menu2.header_no')}
                   </th>
-                  {renderSortHeader('model', t('menu2.header_model'), '13%', 'center')}
-                  {renderSortHeader('nc', t('menu2.header_nc'), '7%', 'center')}
-                  {renderSortHeader('po', t('menu2.header_po'), '13%', 'center')}
-                  {renderSortHeader('detail_spec', t('menu2.header_detailspec'), '18%', 'left')}
-                  {renderSortHeader('eta', t('menu2.header_eta'), '9%', 'center')}
-                  {renderSortHeader('port', t('menu2.header_port'), '9%', 'center')}
-                  {renderSortHeader('stock_type', t('menu2.header_status', '상태'), '13%', 'center')}
+                  {renderSortHeader('model', t('menu2.header_model'), '12%', 'center')}
+                  {renderSortHeader('nc', t('menu2.header_nc'), '6%', 'center')}
+                  {renderSortHeader('sn', t('menu2.header_sn', 'S/N'), '10%', 'center')}
+                  {renderSortHeader('po', t('menu2.header_po'), '12%', 'center')}
+                  {renderSortHeader('detail_spec', t('menu2.header_detailspec'), '16%', 'left')}
+                  {renderSortHeader('eta', t('menu2.header_eta'), '8%', 'center')}
+                  {renderSortHeader('port', t('menu2.header_port'), '8%', 'center')}
+                  {renderSortHeader('stock_type', t('menu2.header_status', '상태'), '11%', 'center')}
                   <th style={{ width: '14%', textAlign: 'center', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
                     {t('menu2.header_request', '요청')}
                   </th>
@@ -477,9 +484,9 @@ export default function DealerInventory({ isMobileView }) {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={9} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('navbar.init_seed_loading')}</td></tr>
+                  <tr><td colSpan={10} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('navbar.init_seed_loading')}</td></tr>
                 ) : sortedOrders.length === 0 ? (
-                  <tr><td colSpan={9} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dealer_dashboard.no_atp')}</td></tr>
+                  <tr><td colSpan={10} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dealer_dashboard.no_atp')}</td></tr>
                 ) : (
                   sortedOrders.map((order, index) => {
                     const sType = normalizeStockType(order.stock_type);
@@ -500,6 +507,9 @@ export default function DealerInventory({ isMobileView }) {
                           </td>
                           <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
                             <div style={{ fontSize: '10px' }}>{order.nc || 'F0iP'}</div>
+                          </td>
+                          <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
+                            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>{order.serial_number || '-'}</div>
                           </td>
                           <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
                             <div style={{ fontWeight: 700, color: 'var(--accent-cyan)', fontSize: '12px' }}>{order.reference_no}</div>
@@ -541,7 +551,7 @@ export default function DealerInventory({ isMobileView }) {
                         </tr>
                         {expandedRows.has(order.id) && (
                           <tr>
-                            <td colSpan={9} style={{ backgroundColor: 'var(--bg-card)', paddingTop: '12px', borderTop: '1px dashed var(--border-color)', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
+                            <td colSpan={10} style={{ backgroundColor: 'var(--bg-card)', paddingTop: '12px', borderTop: '1px dashed var(--border-color)', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '24px', paddingLeft: '8px' }}>
                                 <div style={{
                                   fontSize: '12px',

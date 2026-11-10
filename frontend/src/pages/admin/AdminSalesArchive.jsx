@@ -418,25 +418,25 @@ export default function AdminSalesArchive({ isMobileView }) {
                 background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)',
                 padding: '8px 14px', borderRadius: '10px', fontSize: '0.85rem', cursor: 'pointer', outline: 'none'
               }}
-              title="정렬 기준"
+              title={t('common.sort_by', '정렬 기준')}
             >
-              <option value="">기본 정렬</option>
+              <option value="">{t('common.sort_default', '기본 정렬')}</option>
               <option value="dealer_asc">{t('menu4.header_dealer', '딜러')} ▲</option>
               <option value="dealer_desc">{t('menu4.header_dealer', '딜러')} ▼</option>
-              <option value="model_asc">{t('menu4.header_model', '모델')} ▲ (오름차순)</option>
-              <option value="model_desc">{t('menu4.header_model', '모델')} ▼ (내림차순)</option>
+              <option value="model_asc">{t('menu4.header_model', '모델')} ▲ {t('common.sort_asc', '(오름차순)')}</option>
+              <option value="model_desc">{t('menu4.header_model', '모델')} ▼ {t('common.sort_desc', '(내림차순)')}</option>
               <option value="sn_asc">{t('menu4.header_sn', 'S/N')} ▲</option>
               <option value="sn_desc">{t('menu4.header_sn', 'S/N')} ▼</option>
               <option value="po_asc">{t('menu4.header_po', 'P/O')} ▲</option>
               <option value="po_desc">{t('menu4.header_po', 'P/O')} ▼</option>
               <option value="nc_asc">{t('menu4.header_nc', 'NC')} ▲</option>
               <option value="nc_desc">{t('menu4.header_nc', 'NC')} ▼</option>
-              <option value="order_date_asc">{t('menu4.header_order_date', '주문일자')} ▲ (과거순)</option>
-              <option value="order_date_desc">{t('menu4.header_order_date', '주문일자')} ▼ (최신순)</option>
-              <option value="sales_price_asc">{t('menu4.header_sales_price', '판매가')} ▲ (낮은순)</option>
-              <option value="sales_price_desc">{t('menu4.header_sales_price', '판매가')} ▼ (높은순)</option>
-              <option value="buying_price_asc">{t('menu4.header_buying_price', '구매가')} ▲ (낮은순)</option>
-              <option value="buying_price_desc">{t('menu4.header_buying_price', '구매가')} ▼ (높은순)</option>
+              <option value="order_date_asc">{t('menu4.header_order_date', '주문일자')} ▲ {t('common.sort_oldest', '(과거순)')}</option>
+              <option value="order_date_desc">{t('menu4.header_order_date', '주문일자')} ▼ {t('common.sort_newest', '(최신순)')}</option>
+              <option value="sales_price_asc">{t('menu4.header_sales_price', '판매가')} ▲ {t('common.sort_lowest', '(낮은순)')}</option>
+              <option value="sales_price_desc">{t('menu4.header_sales_price', '판매가')} ▼ {t('common.sort_highest', '(높은순)')}</option>
+              <option value="buying_price_asc">{t('menu4.header_buying_price', '구매가')} ▲ {t('common.sort_lowest', '(낮은순)')}</option>
+              <option value="buying_price_desc">{t('menu4.header_buying_price', '구매가')} ▼ {t('common.sort_highest', '(높은순)')}</option>
               <option value="sales_month_asc">{t('menu4.header_sales_month', '매출월')} ▲</option>
               <option value="sales_month_desc">{t('menu4.header_sales_month', '매출월')} ▼</option>
               <option value="pickup_asc">{t('menu4.header_pickup', '출고/픽업')} ▲</option>
@@ -459,15 +459,15 @@ export default function AdminSalesArchive({ isMobileView }) {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>{t('menu4.stat_total', '전체')}:</span>
-            <span style={{ fontSize: '1.05rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>{totalCount}대</span>
+            <span style={{ fontSize: '1.05rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>{totalCount}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>{t('menu4.stat_picked_up', '픽업 완료')}:</span>
-            <span style={{ fontSize: '1.05rem', fontWeight: 'bold', color: 'var(--status-stock, #10b981)' }}>{pickedUpCount}대</span>
+            <span style={{ fontSize: '1.05rem', fontWeight: 'bold', color: 'var(--status-stock, #10b981)' }}>{pickedUpCount}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>{t('menu4.stat_pending_pickup', '픽업 대기(선매출)')}:</span>
-            <span style={{ fontSize: '1.05rem', fontWeight: 'bold', color: 'var(--accent-amber, #f59e0b)' }}>{pendingPickupCount}대</span>
+            <span style={{ fontSize: '1.05rem', fontWeight: 'bold', color: 'var(--accent-amber, #f59e0b)' }}>{pendingPickupCount}</span>
           </div>
         </div>
 

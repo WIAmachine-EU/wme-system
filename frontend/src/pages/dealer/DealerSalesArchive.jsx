@@ -391,25 +391,25 @@ export default function DealerSalesArchive({ isMobileView }) {
                 background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)',
                 padding: '8px 14px', borderRadius: '10px', fontSize: '0.85rem', cursor: 'pointer', outline: 'none'
               }}
-              title="정렬 기준"
+              title={t('common.sort_by', '정렬 기준')}
             >
-              <option value="">기본 정렬</option>
-              <option value="order_date_asc">Order Date ▲ (과거순)</option>
-              <option value="order_date_desc">Order Date ▼ (최신순)</option>
-              <option value="model_asc">Model ▲ (오름차순)</option>
-              <option value="model_desc">Model ▼ (내림차순)</option>
-              <option value="nc_asc">NC ▲</option>
-              <option value="nc_desc">NC ▼</option>
-              <option value="sn_asc">S/N ▲</option>
-              <option value="sn_desc">S/N ▼</option>
-              <option value="po_asc">P/O ▲</option>
-              <option value="po_desc">P/O ▼</option>
-              <option value="status_asc">Status ▲</option>
-              <option value="status_desc">Status ▼</option>
-              <option value="port_asc">PORT ▲</option>
-              <option value="port_desc">PORT ▼</option>
-              <option value="pickup_asc">Pick up ▲</option>
-              <option value="pickup_desc">Pick up ▼</option>
+              <option value="">{t('common.sort_default', '기본 정렬')}</option>
+              <option value="order_date_asc">{t('menu4.header_order_date', '주문일자')} ▲ {t('common.sort_oldest', '(과거순)')}</option>
+              <option value="order_date_desc">{t('menu4.header_order_date', '주문일자')} ▼ {t('common.sort_newest', '(최신순)')}</option>
+              <option value="model_asc">{t('menu4.header_model', '모델')} ▲ {t('common.sort_asc', '(오름차순)')}</option>
+              <option value="model_desc">{t('menu4.header_model', '모델')} ▼ {t('common.sort_desc', '(내림차순)')}</option>
+              <option value="nc_asc">{t('menu4.header_nc', 'NC')} ▲</option>
+              <option value="nc_desc">{t('menu4.header_nc', 'NC')} ▼</option>
+              <option value="sn_asc">{t('menu4.header_sn', 'S/N')} ▲</option>
+              <option value="sn_desc">{t('menu4.header_sn', 'S/N')} ▼</option>
+              <option value="po_asc">{t('menu4.header_po', 'P/O')} ▲</option>
+              <option value="po_desc">{t('menu4.header_po', 'P/O')} ▼</option>
+              <option value="status_asc">{t('menu4.header_status', '상태')} ▲</option>
+              <option value="status_desc">{t('menu4.header_status', '상태')} ▼</option>
+              <option value="port_asc">{t('menu2.header_port', '도착지')} ▲</option>
+              <option value="port_desc">{t('menu2.header_port', '도착지')} ▼</option>
+              <option value="pickup_asc">{t('menu4.header_pickup', '출고/픽업')} ▲</option>
+              <option value="pickup_desc">{t('menu4.header_pickup', '출고/픽업')} ▼</option>
             </select>
             <button onClick={handleExportCSV} className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', fontSize: '0.85rem' }}>
               <Download size={16} /> Export

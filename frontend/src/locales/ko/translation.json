@@ -43,6 +43,7 @@
       "inventory": "WIA 재고리스트",
       "promotion": "WIA 프로모션",
       "sales_archive": "판매목록",
+      "tracking": "선적 트래킹",
       "library": "제품 라이브러리",
       "dashboard": "RSM 영업통계"
     },
@@ -126,6 +127,7 @@
     "header_buying_price": "구매가",
     "header_sales_month": "매출월",
     "header_pickup": "출고/픽업",
+    "header_status": "상태",
     "filter_pickup_all": "전체 출고/픽업 상태",
     "filter_picked_up": "출고/픽업 완료",
     "filter_pending_pickup": "출고/픽업 대기 (선매출)",
@@ -148,6 +150,7 @@
     "header_no": "*",
     "header_model": "모델",
     "header_nc": "NC",
+    "header_sn": "S/N",
     "header_buying": "구매가(€)",
     "header_po": "발주번호",
     "header_detailspec": "옵션 상세",
@@ -500,5 +503,21 @@
     "detail_remark": "REMARK",
     "detail_rental_dealer": "임대 딜러",
     "detail_rental_period": "임대 기간"
+  },
+  "common": {
+    "sort_by": "정렬 기준",
+    "sort_default": "기본 정렬",
+    "sort_asc": "(오름차순)",
+    "sort_desc": "(내림차순)",
+    "sort_lowest": "(낮은순)",
+    "sort_highest": "(높은순)",
+    "sort_earliest": "(빠른순)",
+    "sort_latest": "(늦은순)",
+    "sort_oldest": "(과거순)",
+    "sort_newest": "(최신순)",
+    "sort_stage_early": "(초기단계순)",
+    "sort_stage_late": "(완료단계순)",
+    "sort_normal": "(일반순)",
+    "sort_aging": "(장기순)"
   }
 }

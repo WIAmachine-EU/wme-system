@@ -43,6 +43,7 @@
       "inventory": "WIA Stock List",
       "promotion": "WIA Promotion",
       "sales_archive": "Sales Archive",
+      "tracking": "Shipment Tracking",
       "library": "Product Library",
       "dashboard": "RSM Sales Stats"
     },
@@ -126,6 +127,7 @@
     "header_buying_price": "BUYING PRICE",
     "header_sales_month": "SALES MONTH",
     "header_pickup": "DISPATCH / PICKUP",
+    "header_status": "STATUS",
     "filter_pickup_all": "All Pickup Status",
     "filter_picked_up": "Picked Up",
     "filter_pending_pickup": "Pending Pickup (Pre-sale)",
@@ -148,6 +150,7 @@
     "header_no": "*",
     "header_model": "MODEL",
     "header_nc": "NC",
+    "header_sn": "S/N",
     "header_buying": "BUYING(€)",
     "header_po": "P/O",
     "header_detailspec": "DETAIL SPEC",
@@ -500,5 +503,21 @@
     "detail_remark": "REMARK",
     "detail_rental_dealer": "Rental to",
     "detail_rental_period": "Rental Period"
+  },
+  "common": {
+    "sort_by": "Sort by",
+    "sort_default": "Default Sort",
+    "sort_asc": "(Ascending)",
+    "sort_desc": "(Descending)",
+    "sort_lowest": "(Lowest)",
+    "sort_highest": "(Highest)",
+    "sort_earliest": "(Earliest)",
+    "sort_latest": "(Latest)",
+    "sort_oldest": "(Oldest)",
+    "sort_newest": "(Newest)",
+    "sort_stage_early": "(Initial stage)",
+    "sort_stage_late": "(Final stage)",
+    "sort_normal": "(Normal first)",
+    "sort_aging": "(Aging first)"
   }
 }
