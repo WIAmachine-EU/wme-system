@@ -16,19 +16,29 @@ class DealerCompanyOut(DealerCompanyBase):
 
 # CustomUser Schemas
 class CustomUserBase(BaseModel):
-    username: str
+    username: Optional[str] = None
+    email: str
+    role: UserRole
+    dealer_company_id: Optional[int] = None
+    region: Optional[str] = None
+    department: Optional[str] = None
+    is_active: Optional[bool] = True
+
+class CustomUserCreate(BaseModel):
+    username: Optional[str] = ""
     email: str
     role: UserRole
     dealer_company_id: Optional[int] = None
     region: Optional[str] = None
     department: Optional[str] = None
 
-class CustomUserCreate(BaseModel):
-    username: str
-    email: str
-    role: UserRole
-    dealer_company_id: Optional[int] = None
-    department: Optional[str] = None
+class CreateInvitedUserRequest(CustomUserCreate):
+    pass
+
+class AcceptInviteRequest(BaseModel):
+    invite_token: str
+    new_password: str
+    username: Optional[str] = None # 초대 수락 화면에서 바로 이름을 함께 입력받을 수도 있음
 
 class UserUpdate(BaseModel):
     username: Optional[str] = None
@@ -42,19 +52,52 @@ class AdminUserUpdate(BaseModel):
     dealer_company_id: Optional[int] = None
     department: Optional[str] = None
     status: Optional[str] = None # Added for future status toggling if needed
+    is_active: Optional[bool] = None
+    reset_passkey: Optional[bool] = None
 
 
 class PasswordChange(BaseModel):
     current_password: str
     new_password: str
-    confirm_password: str
+    confirm_password: Optional[str] = None
 
 class UserLogin(BaseModel):
-    username: str
+    email: Optional[str] = None
+    username: Optional[str] = None
     password: str
+
+class EmailLoginRequest(BaseModel):
+    email: str
+    password: str
+
+class Verify2FARequest(BaseModel):
+    pre_auth_token: str
+    supabase_access_token: str
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+    confirm_password: Optional[str] = None
+
+class UpdateProfileRequest(BaseModel):
+    username: str # 개인정보 설정 페이지에서 기입하는 사용자 성명
+    department: Optional[str] = None
+    email: Optional[str] = None
 
 class CustomUserOut(CustomUserBase):
     id: int
+    supabase_uid: Optional[str] = None
+    has_password: Optional[bool] = False
+    onboarding_status: Optional[str] = None
+    invite_status: Optional[str] = None
+    message: Optional[str] = None
     created_at: datetime
     dealer_company: Optional[DealerCompanyOut] = None
     model_config = ConfigDict(from_attributes=True)

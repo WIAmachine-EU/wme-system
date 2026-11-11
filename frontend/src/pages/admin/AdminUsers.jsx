@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ShieldAlert, Users, Key, Activity, UserPlus, Search, Edit2, Trash2, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { ShieldAlert, Users, Key, Activity, UserPlus, Search, Edit2, Trash2, CheckCircle2, XCircle, Clock, Send } from 'lucide-react';
 import { getAuditLogs } from '../../utils/auditLogger';
 
 export default function AdminUsers({ isMobileView }) {
@@ -29,9 +29,35 @@ export default function AdminUsers({ isMobileView }) {
     email: '',
     role: 'RSM',
     department: '',
-    dealer_company_id: ''
+    dealer_company_id: '',
+    is_active: true,
+    reset_passkey: false
   });
   const [updatingUser, setUpdatingUser] = useState(false);
+  const [resendingUserId, setResendingUserId] = useState(null);
+
+  const mapUserToRow = (u) => {
+    const isActive = u.is_active !== false;
+    const hasPassword = u.has_password !== undefined ? Boolean(u.has_password) : true;
+    const hasPasskey = Boolean(u.supabase_uid);
+    const onboardingStatus = u.onboarding_status || (
+      !isActive ? 'INACTIVE' : (!hasPassword ? 'INVITE_PENDING' : (!hasPasskey ? 'PASSKEY_PENDING' : 'ACTIVE_AAL2'))
+    );
+    return {
+      id: u.id,
+      name: u.username || '(미설정)',
+      rawUsername: u.username || '',
+      email: u.email,
+      role: u.role,
+      is_active: isActive,
+      hasPassword,
+      hasPasskey,
+      onboardingStatus,
+      status: isActive ? 'Active' : 'Inactive',
+      lastLogin: '-',
+      company: u.dealer_company ? u.dealer_company.name : (u.department || 'WIA HQ')
+    };
+  };
 
   useEffect(() => {
     // Fetch logs always so KPIs work
@@ -44,16 +70,7 @@ export default function AdminUsers({ isMobileView }) {
         const res = await fetch('/api/users');
         if (res.ok) {
           const data = await res.json();
-          const transformedUsers = data.map(u => ({
-            id: u.id,
-            name: u.username,
-            email: u.email,
-            role: u.role,
-            status: 'Active', 
-            lastLogin: '-',
-            company: u.dealer_company ? u.dealer_company.name : (u.department || 'WIA HQ')
-          }));
-          setUsers(transformedUsers);
+          setUsers(data.map(mapUserToRow));
         }
       } catch (err) {
         console.error("Failed to fetch users", err);
@@ -83,8 +100,8 @@ export default function AdminUsers({ isMobileView }) {
     setCreatingUser(true);
     
     const payload = {
-      username: newUserForm.username,
-      email: newUserForm.email,
+      username: newUserForm.username ? newUserForm.username.trim() : "",
+      email: newUserForm.email.trim(),
       role: newUserForm.role,
       department: ['SCM_ADMIN', 'RSM'].includes(newUserForm.role) ? newUserForm.department : null,
       dealer_company_id: newUserForm.role === 'DEALER' ? (newUserForm.dealer_company_id ? Number(newUserForm.dealer_company_id) : null) : null
@@ -98,18 +115,10 @@ export default function AdminUsers({ isMobileView }) {
       });
       if (res.ok) {
         const created = await res.json();
-        // UI에 새 유저 추가
-        setUsers([...users, {
-          id: created.id,
-          name: created.username,
-          email: created.email,
-          role: created.role,
-          status: 'Active',
-          lastLogin: '-',
-          company: created.dealer_company ? created.dealer_company.name : (created.department || 'WIA HQ')
-        }]);
+        setUsers([...users, mapUserToRow(created)]);
         setShowCreateModal(false);
         setNewUserForm({ username: '', email: '', role: 'RSM', department: '', dealer_company_id: '' });
+        alert(created.message || `${created.email} 주소로 초기 비밀번호 설정 초대 링크가 발송되었습니다.`);
       } else {
         const err = await res.json();
         alert(`생성 실패: ${err.detail || '알 수 없는 오류'}`);
@@ -121,14 +130,35 @@ export default function AdminUsers({ isMobileView }) {
     }
   };
 
+  const handleResendInvite = async (user) => {
+    setResendingUserId(user.id);
+    try {
+      const res = await fetch(`/api/users/${user.id}/resend-invite`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.message || `${user.email} 주소로 초대 링크를 재발송했습니다.`);
+      } else {
+        alert(`재발송 실패: ${data.detail || '알 수 없는 오류'}`);
+      }
+    } catch (err) {
+      alert("서버 통신 오류가 발생했습니다.");
+    } finally {
+      setResendingUserId(null);
+    }
+  };
+
   const openEditModal = (user) => {
     setEditingUserId(user.id);
     setEditUserForm({
-      username: user.name,
+      username: user.rawUsername !== undefined ? user.rawUsername : (user.name === '(미설정)' ? '' : user.name),
       email: user.email,
       role: user.role,
       department: user.company !== 'WIA HQ' && !dealers.find(d => d.name === user.company) ? user.company : '',
-      dealer_company_id: dealers.find(d => d.name === user.company)?.id || ''
+      dealer_company_id: dealers.find(d => d.name === user.company)?.id || '',
+      is_active: user.is_active !== false,
+      reset_passkey: false
     });
     setShowEditModal(true);
   };
@@ -138,11 +168,13 @@ export default function AdminUsers({ isMobileView }) {
     setUpdatingUser(true);
     
     const payload = {
-      username: editUserForm.username,
-      email: editUserForm.email,
+      username: editUserForm.username ? editUserForm.username.trim() : null,
+      email: editUserForm.email.trim(),
       role: editUserForm.role,
       department: ['SCM_ADMIN', 'RSM'].includes(editUserForm.role) ? editUserForm.department : null,
-      dealer_company_id: editUserForm.role === 'DEALER' ? (editUserForm.dealer_company_id ? Number(editUserForm.dealer_company_id) : null) : null
+      dealer_company_id: editUserForm.role === 'DEALER' ? (editUserForm.dealer_company_id ? Number(editUserForm.dealer_company_id) : null) : null,
+      is_active: Boolean(editUserForm.is_active),
+      reset_passkey: Boolean(editUserForm.reset_passkey)
     };
 
     try {
@@ -155,13 +187,8 @@ export default function AdminUsers({ isMobileView }) {
         const updated = await res.json();
         // UI에 새 유저 업데이트
         setUsers(users.map(u => u.id === editingUserId ? {
-          id: updated.id,
-          name: updated.username,
-          email: updated.email,
-          role: updated.role,
-          status: 'Active',
-          lastLogin: u.lastLogin,
-          company: updated.dealer_company ? updated.dealer_company.name : (updated.department || 'WIA HQ')
+          ...mapUserToRow(updated),
+          lastLogin: u.lastLogin
         } : u));
         setShowEditModal(false);
       } else {
@@ -192,8 +219,8 @@ export default function AdminUsers({ isMobileView }) {
   };
 
   // Compute KPI values
-  const activeUsersCount = users.length;
-  const pendingUsersCount = 0; // Default pending invitations
+  const activeUsersCount = users.filter(u => u.is_active !== false).length;
+  const pendingUsersCount = users.filter(u => u.onboardingStatus === 'INVITE_PENDING').length;
   
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -207,13 +234,56 @@ export default function AdminUsers({ isMobileView }) {
     return (log.status === 'Warning' || log.status === 'Failed') && logDate >= sevenDaysAgo;
   }).length;
 
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'Active': return <span style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(22, 196, 127, 0.1)', color: '#16C47F', fontSize: '0.8rem', fontWeight: 600 }}>{t('menu6.badge_active')}</span>;
-      case 'Inactive': return <span style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(128, 130, 133, 0.1)', color: '#808285', fontSize: '0.8rem', fontWeight: 600 }}>{t('menu6.badge_inactive')}</span>;
-      case 'Locked': return <span style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(230, 0, 18, 0.1)', color: '#E60012', fontSize: '0.8rem', fontWeight: 600 }}>{t('menu6.badge_locked')}</span>;
-      default: return null;
+  const getStatusBadge = (user) => {
+    if (user.onboardingStatus === 'INACTIVE' || user.is_active === false) {
+      return (
+        <span style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(128, 130, 133, 0.12)', color: '#808285', fontSize: '0.8rem', fontWeight: 600 }}>
+          비활성 (퇴사/정지)
+        </span>
+      );
     }
+    if (user.onboardingStatus === 'INVITE_PENDING') {
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <span style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(245, 158, 11, 0.14)', color: '#D97706', fontSize: '0.8rem', fontWeight: 600 }}>
+            초대 발송됨
+          </span>
+          <button
+            type="button"
+            onClick={() => handleResendInvite(user)}
+            disabled={resendingUserId === user.id}
+            style={{
+              padding: '3px 8px',
+              borderRadius: '4px',
+              border: '1px solid rgba(10, 28, 143, 0.3)',
+              background: '#fff',
+              color: 'var(--wia-blue)',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <Send size={11} />
+            {resendingUserId === user.id ? '발송 중...' : '초대 재발송'}
+          </button>
+        </div>
+      );
+    }
+    if (user.onboardingStatus === 'PASSKEY_PENDING') {
+      return (
+        <span style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(59, 130, 246, 0.12)', color: '#2563EB', fontSize: '0.8rem', fontWeight: 600 }}>
+          패스키 등록 대기
+        </span>
+      );
+    }
+    return (
+      <span style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(22, 196, 127, 0.1)', color: '#16C47F', fontSize: '0.8rem', fontWeight: 600 }}>
+        정상 활성 (AAL2)
+      </span>
+    );
   };
 
   const getLogStatusBadge = (status) => {
@@ -346,7 +416,7 @@ export default function AdminUsers({ isMobileView }) {
                       <span style={{ background: 'var(--bg-secondary)', padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 600 }}>{user.role}</span>
                     </td>
                     <td style={{ padding: '16px', fontSize: '0.9rem' }}>{user.company}</td>
-                    <td style={{ padding: '16px' }}>{getStatusBadge(user.status)}</td>
+                    <td style={{ padding: '16px' }}>{getStatusBadge(user)}</td>
                     <td style={{ padding: '16px', fontSize: '0.9rem', color: 'var(--text-muted)' }}><Clock size={14} style={{display:'inline', marginRight:'4px'}}/>{user.lastLogin}</td>
                     <td style={{ padding: '16px', textAlign: 'center' }}>
                       <button onClick={() => openEditModal(user)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', marginRight: '8px' }}><Edit2 size={16} /></button>
@@ -414,24 +484,27 @@ export default function AdminUsers({ isMobileView }) {
 
             <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('menu6.label_username')} *</label>
-                <input
-                  type="text"
-                  required
-                  value={newUserForm.username}
-                  onChange={e => setNewUserForm({ ...newUserForm, username: e.target.value })}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
-                />
+              <div style={{
+                padding: '12px 14px',
+                borderRadius: '8px',
+                backgroundColor: 'rgba(10, 28, 143, 0.06)',
+                border: '1px solid rgba(10, 28, 143, 0.18)',
+                fontSize: '0.83rem',
+                color: 'var(--text-primary)',
+                lineHeight: 1.5
+              }}>
+                <strong>제로터치 온보딩(Zero-Touch Onboarding) 안내:</strong><br />
+                보안을 위해 관리자는 초기 비밀번호를 지정하지 않습니다. 계정 생성 즉시 대상 이메일로 <strong>48시간 유효한 1회용 초기 비밀번호 설정 초대 링크</strong>가 자동 발송되며, 성명(Username)은 첫 로그인 후 개인정보 설정에서 본인이 직접 입력합니다.
               </div>
 
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('menu6.label_email')} *</label>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('menu6.label_email')} (로그인 ID) *</label>
                 <input
                   type="email"
                   required
                   value={newUserForm.email}
                   onChange={e => setNewUserForm({ ...newUserForm, email: e.target.value })}
+                  placeholder="user@company.com"
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
                 />
               </div>
@@ -510,23 +583,23 @@ export default function AdminUsers({ isMobileView }) {
             <form onSubmit={handleUpdateUser} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('menu6.label_username')} *</label>
-                <input
-                  type="text"
-                  required
-                  value={editUserForm.username}
-                  onChange={e => setEditUserForm({ ...editUserForm, username: e.target.value })}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('menu6.label_email')} *</label>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('menu6.label_email')} (로그인 ID) *</label>
                 <input
                   type="email"
                   required
                   value={editUserForm.email}
                   onChange={e => setEditUserForm({ ...editUserForm, email: e.target.value })}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('menu6.label_username')} (표시 이름/성명)</label>
+                <input
+                  type="text"
+                  value={editUserForm.username}
+                  onChange={e => setEditUserForm({ ...editUserForm, username: e.target.value })}
+                  placeholder="표시 이름(성명) 입력"
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
                 />
               </div>
@@ -573,6 +646,30 @@ export default function AdminUsers({ isMobileView }) {
                   />
                 </div>
               )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', paddingTop: '8px', borderTop: '1px solid var(--border-color)' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>계정 상태</label>
+                  <select
+                    value={editUserForm.is_active ? 'active' : 'inactive'}
+                    onChange={e => setEditUserForm({ ...editUserForm, is_active: e.target.value === 'active' })}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                  >
+                    <option value="active">Active (정상 활성)</option>
+                    <option value="inactive">Inactive (로그인 차단)</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', fontSize: '0.83rem', cursor: 'pointer', fontWeight: 600 }}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(editUserForm.reset_passkey)}
+                      onChange={e => setEditUserForm({ ...editUserForm, reset_passkey: e.target.checked })}
+                    />
+                    <span>패스키(2FA) 등록 초기화</span>
+                  </label>
+                </div>
+              </div>
 
               </div>
 

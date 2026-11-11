@@ -240,3 +240,45 @@ def send_rental_expiry_alert(to_email: str, order_ref: str, model_name: str, ser
     )
     target_email = to_email if to_email else get_admin_emails()
     send_email_notification(target_email, subject, content)
+
+
+def send_email(to_email: str, subject: str, body: str) -> dict:
+    """
+    공통 이메일 발송 래퍼 함수 (Resend API 우선 발송 및 SMTP 폴백)
+    """
+    return send_email_notification(to_email=to_email, subject=subject, content=body)
+
+
+def send_account_invitation_email(to_email: str, role: str, invite_link: str, dealer_name: str = ""):
+    """
+    관리자가 신규 계정 생성 시 대상 이메일로 '초기 비밀번호 설정 초대 링크'를 자동 발송합니다.
+    """
+    subject = "[WMEINS ERP] 계정 생성 안내 및 초기 비밀번호 설정 초대"
+    org_info = f" ({dealer_name})" if dealer_name else ""
+    body = f"""안녕하세요, 현대위아 유럽법인 글로벌 SCM ERP (WMEINS) 시스템입니다.
+
+귀하의 이메일({to_email})로 WMEINS 시스템 계정[권한: {role}{org_info}]이 생성되었습니다.
+보안을 위해 관리자는 초기 비밀번호를 지정하지 않으며, 아래 초대 링크를 클릭하여 직접 초기 비밀번호를 설정하신 후 2단계 패스키(Passkey)를 등록해 주시기 바랍니다.
+
+▶ 초기 비밀번호 설정 링크 (48시간 유효, 1회용):
+{invite_link}
+
+※ 로그인 완료 후 우측 상단 [개인정보 설정(Profile)] 메뉴에서 표시될 사용자 성명(Username)을 기입해 주세요."""
+    return send_email(to_email=to_email, subject=subject, body=body)
+
+
+def send_password_reset_email(to_email: str, username: str, reset_link: str):
+    """
+    비밀번호 분실 시 15분 유효한 일회용 재설정 링크를 발송합니다.
+    """
+    subject = "[WMEINS ERP] 비밀번호 재설정 안내"
+    body = f"""안녕하세요 {username}님,
+
+WMEINS 시스템 비밀번호 재설정이 요청되었습니다.
+아래 링크를 클릭하여 15분 이내에 새 비밀번호를 설정해 주세요.
+
+▶ 비밀번호 재설정 링크 (15분 유효, 1회용):
+{reset_link}"""
+    return send_email(to_email=to_email, subject=subject, body=body)
+
+

@@ -54,6 +54,8 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(authState ? true : false);
   const [currentRole, setCurrentRole] = useState(authState?.currentRole || 'SCM_ADMIN');
   const [currentUserId, setCurrentUserId] = useState(authState?.currentUserId || '');
+  const [currentUserEmail, setCurrentUserEmail] = useState(authState?.currentUserEmail || '');
+  const [needsProfileSetup, setNeedsProfileSetup] = useState(authState?.needsProfileSetup || false);
   // Default tabs based on role
   const [activeTab, setActiveTab] = useState(authState?.activeTab || 'admin-dashboard');
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -65,13 +67,15 @@ export default function App() {
       localStorage.setItem('erp_auth', JSON.stringify({
         currentRole,
         currentUserId,
+        currentUserEmail,
+        needsProfileSetup,
         activeTab,
         lastActivity: Date.now()
       }));
     } else {
       localStorage.removeItem('erp_auth');
     }
-  }, [isAuthenticated, currentRole, activeTab]);
+  }, [isAuthenticated, currentRole, currentUserId, currentUserEmail, needsProfileSetup, activeTab]);
 
   // Handle inactivity auto-logout
   useEffect(() => {
@@ -90,6 +94,7 @@ export default function App() {
           try {
             const parsed = JSON.parse(stored);
             if (now - parsed.lastActivity >= INACTIVITY_TIME) {
+              localStorage.removeItem('wme_access_token');
               setIsAuthenticated(false);
               alert('30분 동안 활동이 없어 자동으로 로그아웃 되었습니다.');
               return;
@@ -108,6 +113,7 @@ export default function App() {
           try {
             const parsed = JSON.parse(stored);
             if (Date.now() - parsed.lastActivity >= INACTIVITY_TIME) {
+              localStorage.removeItem('wme_access_token');
               setIsAuthenticated(false);
               alert('30분 동안 활동이 없어 자동으로 로그아웃 되었습니다.');
             }
@@ -162,13 +168,20 @@ export default function App() {
   const isMobileView = isActualMobileView || simulateMobile;
   const isDesktopOptimized = windowWidth >= 1024;
 
-  const handleLogin = (role, userId) => {
+  const handleLogin = (role, userId, profileSetupNeeded = false, email = '') => {
     setCurrentRole(role);
     setCurrentUserId(userId);
+    setCurrentUserEmail(email || userId);
+    setNeedsProfileSetup(Boolean(profileSetupNeeded));
     setIsAuthenticated(true);
+    if (profileSetupNeeded) {
+      setActiveTab('profile');
+    }
   };
 
   const handleLogout = () => {
+    localStorage.removeItem('wme_access_token');
+    localStorage.removeItem('erp_auth');
     setIsAuthenticated(false);
   };
 
@@ -210,8 +223,60 @@ export default function App() {
         />
 
         <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          {needsProfileSetup && activeTab !== 'profile' && (
+            <div style={{
+              margin: '16px 24px 0',
+              padding: '12px 16px',
+              borderRadius: '10px',
+              backgroundColor: 'rgba(245, 158, 11, 0.12)',
+              border: '1px solid rgba(245, 158, 11, 0.35)',
+              color: '#92400E',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '12px',
+              flexWrap: 'wrap',
+              fontSize: '0.9rem',
+              fontWeight: 600
+            }}>
+              <span>아직 시스템에 표시될 성명(사용자명)이 설정되지 않았습니다. 개인정보 설정에서 성명을 등록해 주세요.</span>
+              <button
+                onClick={() => setActiveTab('profile')}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: '#D97706',
+                  color: '#fff',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontSize: '0.82rem'
+                }}
+              >
+                개인정보 설정 바로가기
+              </button>
+            </div>
+          )}
+
           {/* Common Routing */}
-          {activeTab === 'profile' && <UserProfile currentUserId={currentUserId} isMobileView={isMobileView} onClose={handleHomeClick} />}
+          {activeTab === 'profile' && (
+            <UserProfile
+              currentUserId={currentUserId}
+              currentUserEmail={currentUserEmail}
+              needsProfileSetup={needsProfileSetup}
+              onUpdateProfile={(updatedUser) => {
+                if (updatedUser?.username) {
+                  setCurrentUserId(updatedUser.username);
+                  setNeedsProfileSetup(false);
+                }
+                if (updatedUser?.email) {
+                  setCurrentUserEmail(updatedUser.email);
+                }
+              }}
+              isMobileView={isMobileView}
+              onClose={handleHomeClick}
+            />
+          )}
 
           {/* RSM Routing */}
           {activeTab === 'rsm-dashboard' && currentRole === 'RSM' && <RsmDashboard isMobileView={isMobileView} currentUserId={currentUserId} />}

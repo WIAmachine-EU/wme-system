@@ -1,5 +1,54 @@
 ﻿# 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
+## [2026-11-12] 표준 프로토콜 기반 직렬 2단계 인증(AAL2), 제로터치 온보딩(초대 링크 발송), 비밀번호 분실/재설정 및 사용자명(실명) 분리 아키텍처 전면 구축
+
+### 1. 로그인 식별자 이메일(email) 단일화 및 사용자 성명(username) 역할 분리
+* **models.CustomUser 데이터베이스 모델 구조 개편**:
+  * email: 시스템 내 유일한 로그인 고유 식별자(ID)로 단일화 (unique=True, index=True, nullable=False).
+  * username: 로그인 ID가 아닌 개인정보 표시 이름(실명) 전용으로 역할 분리. 동명이인 등록 허용(unique=False) 및 신규 계정 초기 미기입(nullable=True) 지원.
+  * is_active: 계정 활성화 상태 제어 컬럼(Boolean, default=True) 추가 및 서버 구동 시(on_startup) SQLite/PostgreSQL 무중단 자동 마이그레이션 적용.
+* **사용자 성명(실명) 온보딩 플래그 및 프로필 연동 (UserProfile.jsx, App.jsx)**:
+  * 최초 로그인 시 username이 비어있거나 이메일 형식인 경우 needs_profile_setup: true 플래그를 반환하고, 상단 안내 배너 노출 및 개인정보 설정 화면으로 자동 유도.
+  * UserProfile.jsx에서 email 필드는 로그인 고유 ID로 읽기 전용 보호, username(성명)과 department(부서)를 저장(PATCH /api/v1/users/me) 시 네비게이션/사이드바에 실시간 반영.
+
+### 2. 표준 프로토콜(NIST SP 800-63B AAL2) 기반 직렬 2단계 인증(Serial 2FA) 구축
+* **[1단계] 이메일 & 비밀번호 검증 (POST /api/v1/auth/login)**:
+  * 텍스트 아이디 조회를 배제하고 오직 email로만 계정을 식별하여 비밀번호 해시 검증.
+  * 1단계 통과 시 시스템 접근 권한을 부여하지 않고, 3분 유효기간의 제한된 임시 토큰(pre_auth_token, scope="mfa_pending", aal="aal1")만 발급.
+* **[2단계] WebAuthn/Passkey 교차 검증 및 최종 세션 발급 (POST /api/v1/auth/verify-2fa)**:
+  * 1단계 임시 토큰(aal1)과 Supabase Passkey 토큰을 동시 검증.
+  * 1단계 로그인 계정과 2단계 패스키 소유자 이메일(supabase_uid) 일치 여부를 교차 검증하여 본인 인증 통과 시에만 최종 AAL2 세션 토큰(access_token, scope="authenticated", aal="aal2", 8시간 유효) 및 역할 권한 부여.
+  * 기존 단독 로그인(POST /api/v1/auth/supabase-login) 우회 차단(403 반환).
+* **프론트엔드 직렬 로그인 UI 전면 개편 (Login.jsx)**:
+  * 테스트용 하드코딩 계정 및 1단계 단독 로그인 버튼 완전 삭제.
+  * STEP1_EMAIL_PW -> STEP2_PASSKEY 직렬 상태 머신 UI 및 단계별 가이드 배너 적용.
+
+### 3. 제로터치 온보딩(Zero-Touch Onboarding) 및 초기 비밀번호 설정 초대 링크(Invitation Link) 자동 발송
+* **관리자 수기 임시 비밀번호 지정 배제 및 원천 차단 (AdminUsers.jsx, POST /api/users)**:
+  * 관리자가 신규 계정 생성 시 비밀번호를 수기로 입력하지 않고 email(로그인 ID), role, dealer_company_id/department만 입력하여 password_hash = None 상태로 계정 생성.
+* **무상태 동적 서명(Stateless Dynamic HMAC) 기반 48시간 일회용 초대 링크 (email_service.py, main.py)**:
+  * dynamic_secret = f"{JWT_SECRET}:{user.password_hash or 'INVITE_PENDING'}" 기반 48시간 유효 일회용 초대 토큰(scope="account_invite") 생성.
+  * 신규 계정 생성 시 send_account_invitation_email을 통해 초대 링크 자동 발송.
+  * POST /api/users/{user_id}/resend-invite: 초기 비밀번호 미설정 계정에 대한 관리자 원클릭 초대 링크 재발송 엔드포인트 및 UI 버튼 구현.
+* **원스톱 초대 수락 및 2단계 패스키 등록 연동 (Login.jsx, POST /api/v1/auth/accept-invite)**:
+  * 사용자가 이메일의 초대 링크(?invite_token=...) 클릭 시 Login.jsx에서 '초기 비밀번호 설정' 화면 자동 진입.
+  * 비밀번호 설정 즉시 password_hash가 암호화 해시로 저장되면서 기존 초대 링크는 영구 자동 폐기(1회용 보장).
+  * 비밀번호 저장과 동시에 반환된 pre_auth_token(aal1)을 통해 곧바로 2단계 패스키 기기 등록(PASSKEY_ENROLL)으로 전환되어 원스톱으로 AAL2 최종 로그인 및 프로필 실명 설정까지 완료.
+* **계정 4대 상태 라이프사이클 및 관리자 UI 고도화 (AdminUsers.jsx, models.CustomUser)**:
+  * onboarding_status: 초대 대기중(INVITE_PENDING) -> 패스키 등록 대기(PASSKEY_PENDING) -> 정상 활성(ACTIVE_AAL2) / 비활성(INACTIVE).
+  * 사용자 관리 화면에서 초대 대기 상태 계정에 대해 '초대 발송됨' 배지 및 [초대 재발송] 버튼 제공, 상단 대기 중인 초대(Pending) KPI 실시간 집계.
+
+### 4. 무상태 동적 서명 기반 비밀번호 분실(찾기) 및 재설정 아키텍처
+* **비로그인 비밀번호 분실 및 1회용 자동 무효화 링크 (POST /api/v1/auth/forgot-password, POST /api/v1/auth/reset-password)**:
+  * dynamic_secret = f"{JWT_SECRET}:{user.password_hash}" 서명을 적용하여 15분 유효 일회용 재설정 링크 이메일 발송.
+  * 비밀번호 재설정 완료 즉시 password_hash가 변경되므로 이전 링크는 즉시 무효화되어 중복 사용 방지.
+* **로그인 상태 비밀번호 변경 (POST /api/v1/users/me/change-password)**:
+  * 현재 비밀번호 확인 후 8자 이상 새 비밀번호로 안전하게 변경.
+
+### 5. 시스템 아키텍처 문서 및 명세서 동기화 (WMEINS_CONTEXT.md)
+* models.CustomUser 스키마 및 REST API 엔드포인트 목록 테이블 갱신 (AAL2 직렬 2FA, 제로터치 초대 링크, 비밀번호 분실/재설정 API 6종 명세 반영).
+
+
 ## [2026-11-11] Google Antigravity 기반 코끼리-금붕어 모델(EGM, Elephant-Goldfish Model) 아키텍처 및 무상태 코드 감사 자동화 체계 전면 도입
 
 ### 1. 코끼리-금붕어 모델(EGM) 상시 아키텍처 규칙 파일 구축 (.antigravityrules, AGENTS.md)

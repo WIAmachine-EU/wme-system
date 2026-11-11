@@ -1,14 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { User, Shield, Edit2, Save, X, Lock } from 'lucide-react';
+import { User, Shield, Edit2, Save, X, Lock, Fingerprint, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-export default function UserProfile({ currentUserId, isMobileView, onClose }) {
+export default function UserProfile({
+  currentUserId,
+  currentUserEmail,
+  needsProfileSetup = false,
+  onUpdateProfile,
+  isMobileView,
+  onClose
+}) {
   const { t } = useTranslation();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   
   // Edit state
-  const [editMode, setEditMode] = useState(false);
+  const [editMode, setEditMode] = useState(Boolean(needsProfileSetup));
   const [editForm, setEditForm] = useState({
     username: '',
     email: '',
@@ -25,10 +32,22 @@ export default function UserProfile({ currentUserId, isMobileView, onClose }) {
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
 
+  const getAuthHeaders = (includeJson = false) => {
+    const headers = {};
+    if (includeJson) headers['Content-Type'] = 'application/json';
+    const token = localStorage.getItem('wme_access_token');
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    return headers;
+  };
+
+  const queryIdentifier = encodeURIComponent(currentUserEmail || currentUserId || '');
+
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/v1/users/me?username=${currentUserId}`);
+      const res = await fetch(`/api/v1/users/me?username=${queryIdentifier}`, {
+        headers: getAuthHeaders(false)
+      });
       if (!res.ok) throw new Error('프로필을 불러올 수 없습니다.');
       const data = await res.json();
       setProfile(data);
@@ -37,6 +56,9 @@ export default function UserProfile({ currentUserId, isMobileView, onClose }) {
         email: data.email || '',
         department: data.department || ''
       });
+      if (!data.username || needsProfileSetup) {
+        setEditMode(true);
+      }
     } catch (error) {
       alert(error.message);
     } finally {
@@ -45,17 +67,25 @@ export default function UserProfile({ currentUserId, isMobileView, onClose }) {
   };
 
   useEffect(() => {
-    if (currentUserId) {
+    if (currentUserEmail || currentUserId || localStorage.getItem('wme_access_token')) {
       fetchProfile();
     }
-  }, [currentUserId]);
+  }, [currentUserId, currentUserEmail]);
 
   const handleSaveProfile = async () => {
+    if (!editForm.username || !editForm.username.trim()) {
+      alert('표시 이름(성명)을 입력해 주세요.');
+      return;
+    }
+
     try {
-      const res = await fetch(`/api/v1/users/me?username=${currentUserId}`, {
+      const res = await fetch(`/api/v1/users/me?username=${queryIdentifier}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editForm)
+        headers: getAuthHeaders(true),
+        body: JSON.stringify({
+          username: editForm.username.trim(),
+          department: editForm.department
+        })
       });
       if (!res.ok) {
         const err = await res.json();
@@ -64,6 +94,9 @@ export default function UserProfile({ currentUserId, isMobileView, onClose }) {
       const data = await res.json();
       setProfile(data);
       setEditMode(false);
+      if (onUpdateProfile) {
+        onUpdateProfile(data);
+      }
       alert('프로필이 성공적으로 업데이트되었습니다.');
     } catch (error) {
       alert(error.message);
@@ -85,9 +118,9 @@ export default function UserProfile({ currentUserId, isMobileView, onClose }) {
     }
 
     try {
-      const res = await fetch(`/api/v1/users/me/change-password?username=${currentUserId}`, {
+      const res = await fetch(`/api/v1/users/me/change-password?username=${queryIdentifier}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(true),
         body: JSON.stringify(passwordForm)
       });
       
@@ -133,6 +166,24 @@ export default function UserProfile({ currentUserId, isMobileView, onClose }) {
           </button>
         </div>
 
+        {(!profile.username || needsProfileSetup) && (
+          <div style={{
+            padding: '14px 18px',
+            borderRadius: '10px',
+            backgroundColor: 'rgba(245, 158, 11, 0.12)',
+            border: '1px solid rgba(245, 158, 11, 0.35)',
+            color: '#92400E',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            fontSize: '0.9rem',
+            fontWeight: 600
+          }}>
+            <AlertCircle size={18} />
+            <span>최초 로그인 설정: 시스템 내에 표시될 성명(사용자명)과 소속 부서를 입력 후 [저장]을 눌러주세요.</span>
+          </div>
+        )}
+
         {/* Card 1: Basic Profile */}
         <div style={{ backgroundColor: '#fff', borderRadius: '12px', padding: '24px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
@@ -168,19 +219,22 @@ export default function UserProfile({ currentUserId, isMobileView, onClose }) {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns, gap: '20px' }}>
-            {/* User Name */}
+            {/* User Name (Display Name) */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>{t('profile.username')}</label>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                {t('profile.username')} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--wia-blue)' }}>(표시 이름 / 성명)</span>
+              </label>
               {editMode ? (
                 <input 
                   type="text" 
                   value={editForm.username} 
                   onChange={e => setEditForm({...editForm, username: e.target.value})}
+                  placeholder="시스템에 표시될 성명 입력 (동명이인 허용)"
                   style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', outline: 'none' }}
                 />
               ) : (
                 <div style={{ padding: '10px', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid transparent' }}>
-                  {profile.username}
+                  {profile.username || <span style={{ color: '#D97706', fontWeight: 600 }}>미설정 (편집 버튼을 눌러 입력해 주세요)</span>}
                 </div>
               )}
             </div>
@@ -212,21 +266,15 @@ export default function UserProfile({ currentUserId, isMobileView, onClose }) {
               )}
             </div>
 
-            {/* Email Address */}
+            {/* Email Address (Immutable Login ID) */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>{t('profile.email')}</label>
-              {editMode ? (
-                <input 
-                  type="email" 
-                  value={editForm.email} 
-                  onChange={e => setEditForm({...editForm, email: e.target.value})}
-                  style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', outline: 'none' }}
-                />
-              ) : (
-                <div style={{ padding: '10px', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid transparent' }}>
-                  {profile.email}
-                </div>
-              )}
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                {t('profile.email')} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)' }}>(로그인 고유 ID)</span>
+              </label>
+              <div style={{ padding: '10px', backgroundColor: '#f0f0f0', color: '#666', borderRadius: '8px', border: '1px solid #e0e0e0', cursor: 'not-allowed' }}>
+                {profile.email}
+              </div>
+              {editMode && <span style={{ fontSize: '0.75rem', color: 'var(--wia-red)' }}>* 로그인 고유 식별자(이메일)는 변경할 수 없습니다.</span>}
             </div>
           </div>
         </div>
@@ -244,7 +292,7 @@ export default function UserProfile({ currentUserId, isMobileView, onClose }) {
 
           <div style={{ display: 'grid', gridTemplateColumns, gap: '20px', alignItems: 'center' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>{t('profile.password')}</label>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>1단계: {t('profile.password')}</label>
               <div style={{ padding: '10px', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid transparent', letterSpacing: '2px', fontSize: '1.2rem', display: 'flex', alignItems: 'center' }}>
                 ••••••••
               </div>
@@ -256,6 +304,34 @@ export default function UserProfile({ currentUserId, isMobileView, onClose }) {
               >
                 <Lock size={16} /> {t('profile.password_reset')}
               </button>
+            </div>
+          </div>
+
+          <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid var(--border-color)', display: 'grid', gridTemplateColumns, gap: '20px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>2단계: 생체인증 / 패스키 (WebAuthn AAL2)</label>
+              <div style={{
+                padding: '10px 12px',
+                backgroundColor: profile.supabase_uid ? 'rgba(22, 196, 127, 0.08)' : 'rgba(245, 158, 11, 0.1)',
+                color: profile.supabase_uid ? '#0F9D58' : '#B45309',
+                borderRadius: '8px',
+                border: profile.supabase_uid ? '1px solid rgba(22, 196, 127, 0.25)' : '1px solid rgba(245, 158, 11, 0.25)',
+                fontSize: '0.9rem',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <Fingerprint size={18} />
+                {profile.supabase_uid ? (
+                  <span>패스키 연동 완료 (NIST AAL2 직렬 2단계 인증 보호 중)</span>
+                ) : (
+                  <span>다음 로그인 2단계에서 패스키가 자동 연동됩니다</span>
+                )}
+              </div>
+            </div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              기기 분실 또는 교체로 패스키 재등록이 필요한 경우 시스템 관리자에게 패스키 초기화를 요청하세요.
             </div>
           </div>
         </div>

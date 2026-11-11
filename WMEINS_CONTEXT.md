@@ -227,8 +227,9 @@ WMEINS ERP/
 | `POST` | `/api/seed` | `run_seed_data` | 초기 테스트 데이터 및 마스터 코드 시딩 |
 | `GET` | `/api/dealers` | `get_dealers` | 등록된 딜러사 목록 조회 |
 | `GET` | `/api/users` | `get_users` | 사용자(관리자, RSM, 딜러) 목록 조회 |
-| `POST` | `/api/users` | `create_user` | 신규 사용자 계정 생성 (관리자 권한) |
-| `PATCH` | `/api/users/{user_id}` | `update_user_admin` | 사용자 계정 정보/권한 수정 |
+| `POST` | `/api/users` | `create_user` | 신규 사용자 계정 생성 (`password_hash=None`) 및 48시간 일회용 초기 비밀번호 설정 초대 링크 이메일 발송 |
+| `POST` | `/api/users/{user_id}/resend-invite` | `resend_user_invitation` | 아직 초기 비밀번호를 설정하지 않은 계정(`INVITE_PENDING`)에 초대 링크 재발송 |
+| `PATCH` | `/api/users/{user_id}` | `update_user_admin` | 사용자 계정 정보/권한/활성상태/패스키초기화 수정 |
 | `DELETE` | `/api/users/{user_id}` | `delete_user_admin` | 사용자 계정 삭제 |
 | `GET` | `/api/models` | `get_product_models` | 공작기계 기종(제품 모델) 마스터 목록 조회 |
 | `GET` | `/api/categories` | `get_product_categories` | 기종 카테고리 목록 조회 |
@@ -257,11 +258,15 @@ WMEINS ERP/
 | `PATCH` | `/api/email-configs/{config_id}` | `toggle_email_config` | 이메일 알림 엔진 On/Off 토글 및 주기 설정 |
 | `GET` | `/api/business-plans` | `get_business_plans` | 연간/월별 사업계획 및 실적 데이터 조회 |
 | `PUT` | `/api/business-plans/{year}` | `update_business_plans` | 특정 연도의 사업계획 및 실적 업데이트 |
-| `GET` | `/api/v1/users/me` | `get_user_me` | 현재 로그인한 사용자 프로필 조회 |
-| `PATCH` | `/api/v1/users/me` | `update_user_me` | 현재 사용자 정보 수정 |
-| `POST` | `/api/v1/users/me/change-password` | `change_password` | 현재 사용자 비밀번호 변경 |
-| `POST` | `/api/v1/auth/supabase-login` | `supabase_login` | Supabase 패스키(Passkey/WebAuthn) JWT 토큰 기반 ERP 로그인 및 역할 권한 부여 |
-| `POST` | `/api/v1/auth/login` | `login` | 아이디/비밀번호 기반 표준 ERP 로그인 |
+| `GET` | `/api/v1/users/me` | `get_user_me` | 현재 로그인한 사용자 프로필 조회 (AAL2 Bearer 토큰 또는 식별자) |
+| `PATCH` | `/api/v1/users/me` | `update_user_me` | 현재 사용자 표시 이름(`username`) 및 부서(`department`) 수정 |
+| `POST` | `/api/v1/users/me/change-password` | `change_password` | 로그인 상태에서 현재 비밀번호 검증 후 새 비밀번호로 변경 |
+| `POST` | `/api/v1/auth/accept-invite` | `accept_invite_and_set_initial_password` | 초대 링크(`?invite_token=...`) 수락 및 초기 비밀번호 확정 즉시 2단계 패스키 등록용 `pre_auth_token`(`aal1`) 발급 |
+| `POST` | `/api/v1/auth/login` | `step1_email_password_login` | 직렬 2단계 인증 [1단계]: 이메일/비밀번호 검증 및 3분 유효 `pre_auth_token`(`aal1`) 발급 |
+| `POST` | `/api/v1/auth/verify-2fa` | `step2_verify_passkey_and_issue_session` | 직렬 2단계 인증 [2단계]: `pre_auth_token` + Supabase Passkey 교차 검증 및 최종 `access_token`(`aal2`) 발급 |
+| `POST` | `/api/v1/auth/forgot-password` | `forgot_password` | 비로그인 비밀번호 분실 시 일회용 동적 서명(`dynamic_secret`) 재설정 링크 이메일 발송 |
+| `POST` | `/api/v1/auth/reset-password` | `reset_password` | 일회용 재설정 토큰 검증 및 신규 비밀번호 해시 저장 (즉시 토큰 무효화) |
+| `POST` | `/api/v1/auth/supabase-login` | `supabase_login` | 레거시 호환용 엔드포인트 (`403` 직렬 2단계 인증 안내 반환) |
 | `GET` | `/api/documents/{filename}/download` | `download_document` | 카탈로그/첨부 문서 다운로드 |
 | `GET` | `/api/cargo-details/{serial_number}` | `get_cargo_detail` | 특정 호기(S/N)의 포장 화물(치수, 중량, CBM, 박스수) 상세 조회 |
 
@@ -316,7 +321,9 @@ class CustomUser(Base):
     __tablename__ = "custom_users"
 
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, index=True, nullable=False)
+    # 표시 이름(성명): 동명이인 허용(unique=False), 최초 가입 시 미설정(nullable=True) 가능
+    username = Column(String, unique=False, index=True, nullable=True)
+    # 로그인 고유 식별자(ID): 이메일 단일화(unique=True, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     role = Column(Enum(UserRole), nullable=False)
     
@@ -324,7 +331,8 @@ class CustomUser(Base):
     region = Column(String, nullable=True) # assigned region for RSM
     department = Column(String, nullable=True)
     password_hash = Column(String, nullable=True)
-    supabase_uid = Column(String, unique=True, index=True, nullable=True) # 매핑을 위한 컬럼 추가
+    supabase_uid = Column(String, unique=True, index=True, nullable=True) # 2단계 패스키(WebAuthn) 소유자 UID 매핑
+    is_active = Column(Boolean, default=True) # 계정 활성화 여부
     created_at = Column(DateTime, default=datetime.utcnow)
 
     dealer_company = relationship("DealerCompany", back_populates="users")

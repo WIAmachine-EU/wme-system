@@ -1,8 +1,13 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+import hashlib
+import hmac
 import io
 import logging
+import secrets
 from typing import List, Optional
-from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Query, Header
+import jwt
+from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Query, Header, Security
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -12,10 +17,17 @@ import pandas as pd
 from database import get_db, engine, Base, SessionLocal
 import models
 import schemas
-from auth_supabase import get_current_user_from_supabase # 👈 이 줄 추가
+from auth_supabase import get_current_user_from_supabase, verify_supabase_token
 from seed import init_seed
 from scheduler import start_scheduler, stop_scheduler
-from email_service import send_etd_notification, send_warehouse_arrival_notification, send_port_arrival_notification, ADMIN_EMAILS
+from email_service import (
+    send_etd_notification,
+    send_warehouse_arrival_notification,
+    send_port_arrival_notification,
+    send_password_reset_email,
+    send_account_invitation_email,
+    ADMIN_EMAILS
+)
 from storage import default_storage
 
 app = FastAPI(
@@ -36,6 +48,89 @@ app.add_middleware(
 
 import os
 
+
+class _HybridPasswordContext:
+    """
+    표준 PBKDF2-HMAC-SHA256 / Bcrypt 암호화 해시를 지원하며,
+    기존 DB의 레거시 평문 비밀번호 검증 및 자동 업그레이드와 호환되는 검증기입니다.
+    """
+    def hash(self, password: str) -> str:
+        salt = secrets.token_hex(16)
+        dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 260000)
+        return f"pbkdf2_sha256$260000${salt}${dk.hex()}"
+
+    def verify(self, plain_password: str, hashed_password: str) -> bool:
+        if not plain_password or not hashed_password:
+            return False
+        if hashed_password.startswith("pbkdf2_sha256$"):
+            try:
+                _, iterations_str, salt, stored_hex = hashed_password.split("$", 3)
+                dk = hashlib.pbkdf2_hmac(
+                    "sha256",
+                    plain_password.encode("utf-8"),
+                    salt.encode("utf-8"),
+                    int(iterations_str)
+                )
+                return hmac.compare_digest(dk.hex(), stored_hex)
+            except Exception:
+                return False
+        if hashed_password.startswith(("$2a$", "$2b$", "$2y$")):
+            try:
+                import bcrypt
+                return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+            except Exception:
+                pass
+        return hmac.compare_digest(str(plain_password), str(hashed_password))
+
+
+pwd_context = _HybridPasswordContext()
+security = HTTPBearer(auto_error=False)
+
+JWT_SECRET = os.environ.get("JWT_SECRET", "WMEINS_AAL2_PRODUCTION_SECRET_KEY")
+ALGORITHM = "HS256"
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "https://www.wmeins.eu")
+
+
+def create_jwt_token(data: dict, expires_delta: timedelta, scope: str, aal: str) -> str:
+    payload = data.copy()
+    payload.update({
+        "scope": scope,  # "mfa_pending" 또는 "authenticated"
+        "aal": aal,      # "aal1" (1단계 통과) 또는 "aal2" (2단계 패스키 통과)
+        "exp": datetime.now(timezone.utc) + expires_delta,
+        "iat": datetime.now(timezone.utc)
+    })
+    return jwt.encode(payload, JWT_SECRET, algorithm=ALGORITHM)
+
+
+def get_current_aal2_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(security),
+    db: Session = Depends(get_db)
+) -> models.CustomUser:
+    """
+    [표준 프로토콜 AAL2 가드] 1단계와 2단계(패스키)를 모두 통과한 최종 토큰만 API 접근 허용
+    """
+    if not credentials or not credentials.credentials:
+        raise HTTPException(status_code=401, detail="인증 토큰이 제공되지 않았습니다.")
+    try:
+        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[ALGORITHM])
+        if payload.get("scope") != "authenticated" or payload.get("aal") != "aal2":
+            raise HTTPException(status_code=403, detail="2단계 패스키 인증(AAL2)이 완료되지 않았습니다.")
+        user_id = int(payload.get("sub"))
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="로그인 세션이 만료되었습니다. 다시 로그인해 주세요.")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=401, detail="유효하지 않은 인증 토큰입니다.")
+
+    user = db.query(models.CustomUser).filter(models.CustomUser.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="존재하지 않는 사용자 계정입니다.")
+    if hasattr(user, "is_active") and user.is_active is False:
+        raise HTTPException(status_code=403, detail="비활성화된 계정입니다. 시스템 관리자에게 문의하세요.")
+    return user
+
+
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
@@ -48,7 +143,7 @@ def on_startup():
         if config:
             config.interval_days = 10
 
-        # Schema Migration for custom_users (add department, password_hash)
+        # Schema Migration for custom_users (add department, password_hash, supabase_uid, is_active)
         try:
             db.execute(text("ALTER TABLE custom_users ADD COLUMN department VARCHAR"))
             db.commit()
@@ -63,6 +158,38 @@ def on_startup():
             
         try:
             db.execute(text("ALTER TABLE custom_users ADD COLUMN supabase_uid VARCHAR"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        try:
+            db.execute(text("ALTER TABLE custom_users ADD COLUMN is_active BOOLEAN DEFAULT TRUE"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        try:
+            db.execute(text("UPDATE custom_users SET is_active = TRUE WHERE is_active IS NULL"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        # PostgreSQL에서 custom_users.username의 unique 제약 해제 및 nullable 허용 마이그레이션
+        try:
+            db.execute(text("ALTER TABLE custom_users DROP CONSTRAINT IF EXISTS custom_users_username_key"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        try:
+            db.execute(text("DROP INDEX IF EXISTS ix_custom_users_username"))
+            db.execute(text("CREATE INDEX IF NOT EXISTS ix_custom_users_username ON custom_users (username)"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        try:
+            db.execute(text("ALTER TABLE custom_users ALTER COLUMN username DROP NOT NULL"))
             db.commit()
         except Exception:
             db.rollback()
@@ -254,29 +381,103 @@ def get_users(role: Optional[models.UserRole] = None, db: Session = Depends(get_
         query = query.filter(models.CustomUser.role == role)
     return query.all()
 
+def generate_invite_token(user: models.CustomUser) -> str:
+    """
+    password_hash가 None인 초기 상태에서 유효한 48시간 일회용 초대 토큰 생성.
+    사용자가 초기 비밀번호를 설정하는 순간 password_hash가 변경되어 토큰은 자동 폐기됨.
+    """
+    dynamic_secret = f"{JWT_SECRET}:{user.password_hash or 'INVITE_PENDING'}"
+    return jwt.encode(
+        {
+            "sub": str(user.id),
+            "email": user.email,
+            "scope": "account_invite",
+            "exp": datetime.now(timezone.utc) + timedelta(hours=48)
+        },
+        dynamic_secret,
+        algorithm=ALGORITHM
+    )
+
 @app.post("/api/users", response_model=schemas.CustomUserOut)
-def create_user(payload: schemas.CustomUserCreate, db: Session = Depends(get_db), current_role: Optional[str] = Depends(get_current_role)):
+def create_user(
+    payload: schemas.CustomUserCreate,
+    db: Session = Depends(get_db),
+    current_role: Optional[str] = Depends(get_current_role)
+):
     if current_role == "RSM":
-        raise HTTPException(status_code=403, detail="접근 권한이 없습니다.")
+        raise HTTPException(status_code=403, detail="관리자(SCM_ADMIN)만 계정을 생성할 수 있습니다.")
+    email_clean = payload.email.strip().lower()
     existing = db.query(models.CustomUser).filter(
-        (models.CustomUser.username == payload.username) | 
-        (models.CustomUser.email == payload.email)
+        func.lower(models.CustomUser.email) == email_clean
     ).first()
     if existing:
-        raise HTTPException(status_code=400, detail="이미 사용 중인 사용자 이름 또는 이메일입니다.")
+        raise HTTPException(status_code=400, detail="이미 등록된 이메일 주소입니다.")
     
+    # 초기 비밀번호 없이(password_hash=None) 계정 레코드 생성 -> 제로터치 온보딩(초대 링크 발송)
     new_user = models.CustomUser(
-        username=payload.username,
-        email=payload.email,
+        username=payload.username.strip() if payload.username and payload.username.strip() else None,
+        email=email_clean,
         role=payload.role,
         dealer_company_id=payload.dealer_company_id,
+        region=getattr(payload, "region", None),
         department=payload.department,
-        password_hash="1234"  # 신규 계정 생성 시 기본 비밀번호 1234 할당
+        password_hash=None,
+        supabase_uid=None,
+        is_active=True
     )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+
+    # 48시간 유효 일회용 초대 링크 생성 및 이메일 자동 발송
+    invite_token = generate_invite_token(new_user)
+    invite_link = f"{FRONTEND_URL}/login?invite_token={invite_token}"
+    dealer_name = new_user.dealer_company.name if new_user.dealer_company else ""
+    role_str = new_user.role.value if hasattr(new_user.role, "value") else str(new_user.role)
+
+    send_account_invitation_email(
+        to_email=new_user.email,
+        role=role_str,
+        invite_link=invite_link,
+        dealer_name=dealer_name
+    )
+
+    new_user.invite_status = "INVITE_SENT"
+    new_user.message = f"{new_user.email} 주소로 초기 비밀번호 설정 초대 링크가 발송되었습니다."
     return new_user
+
+@app.post("/api/users/{user_id}/resend-invite")
+def resend_user_invitation(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_role: Optional[str] = Depends(get_current_role)
+):
+    if current_role == "RSM":
+        raise HTTPException(status_code=403, detail="관리자 권한이 필요합니다.")
+
+    user = db.query(models.CustomUser).filter(models.CustomUser.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    if getattr(user, "is_active", True) is False:
+        raise HTTPException(status_code=400, detail="비활성화된 계정에는 초대 링크를 재발송할 수 없습니다.")
+    if user.password_hash is not None:
+        raise HTTPException(status_code=400, detail="이미 초기 비밀번호 설정을 완료한 계정입니다.")
+
+    invite_token = generate_invite_token(user)
+    invite_link = f"{FRONTEND_URL}/login?invite_token={invite_token}"
+    dealer_name = user.dealer_company.name if user.dealer_company else ""
+    role_str = user.role.value if hasattr(user.role, "value") else str(user.role)
+
+    send_account_invitation_email(
+        to_email=user.email,
+        role=role_str,
+        invite_link=invite_link,
+        dealer_name=dealer_name
+    )
+    return {
+        "invite_status": "INVITE_SENT",
+        "message": f"{user.email} 주소로 초대 링크를 재발송했습니다."
+    }
 
 @app.patch("/api/users/{user_id}", response_model=schemas.CustomUserOut)
 def update_user_admin(user_id: int, payload: schemas.AdminUserUpdate, db: Session = Depends(get_db), current_role: Optional[str] = Depends(get_current_role)):
@@ -286,17 +487,18 @@ def update_user_admin(user_id: int, payload: schemas.AdminUserUpdate, db: Sessio
     if not user:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
     
-    if payload.username is not None and payload.username != user.username:
-        exists = db.query(models.CustomUser).filter(models.CustomUser.username == payload.username).first()
-        if exists:
-            raise HTTPException(status_code=400, detail="이미 사용 중인 사용자 이름입니다.")
-        user.username = payload.username
+    if payload.username is not None:
+        user.username = payload.username.strip() if payload.username else None
 
-    if payload.email is not None and payload.email != user.email:
-        exists = db.query(models.CustomUser).filter(models.CustomUser.email == payload.email).first()
+    if payload.email is not None and payload.email.strip().lower() != (user.email or "").strip().lower():
+        email_clean = payload.email.strip().lower()
+        exists = db.query(models.CustomUser).filter(
+            func.lower(models.CustomUser.email) == email_clean,
+            models.CustomUser.id != user_id
+        ).first()
         if exists:
             raise HTTPException(status_code=400, detail="이미 사용 중인 이메일입니다.")
-        user.email = payload.email
+        user.email = email_clean
 
     if payload.role is not None:
         user.role = payload.role
@@ -307,8 +509,11 @@ def update_user_admin(user_id: int, payload: schemas.AdminUserUpdate, db: Sessio
     if payload.dealer_company_id is not None:
         user.dealer_company_id = payload.dealer_company_id
 
-    # If role changed to DEALER, department shouldn't be relevant. Similarly, if it's SCM_ADMIN/RSM, dealer_company_id shouldn't be relevant.
-    # We will enforce this on the frontend, but here we just update what's given.
+    if payload.is_active is not None:
+        user.is_active = payload.is_active
+
+    if payload.reset_passkey:
+        user.supabase_uid = None
 
     db.commit()
     db.refresh(user)
@@ -2018,84 +2223,323 @@ def update_business_plans(year: int, plans_data: List[schemas.BusinessPlanCreate
 # ==========================================
 # 8. 사용자 프로필 API (My Data)
 # ==========================================
-@app.get("/api/v1/users/me", response_model=schemas.CustomUserOut)
-def get_user_me(username: str = Query(..., description="임시 로그인 식별자"), db: Session = Depends(get_db)):
-    user = db.query(models.CustomUser).filter(models.CustomUser.username == username).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
-    return user
+def _resolve_profile_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(security),
+    username: Optional[str] = Query(None, description="사용자명 또는 이메일 폴백 식별자"),
+    db: Session = Depends(get_db)
+) -> models.CustomUser:
+    """
+    AAL2 Bearer JWT 토큰이 제공되면 표준 AAL2 가드로 검증하고,
+    미제공 시 쿼리 파라미터(이메일 또는 사용자명)로 조회합니다.
+    """
+    if credentials and credentials.credentials:
+        return get_current_aal2_user(credentials=credentials, db=db)
+    if username:
+        clean_id = username.strip()
+        user = db.query(models.CustomUser).filter(
+            or_(
+                func.lower(models.CustomUser.email) == clean_id.lower(),
+                models.CustomUser.username == clean_id
+            )
+        ).first()
+        if user:
+            return user
+    raise HTTPException(status_code=401, detail="인증 정보가 유효하지 않습니다. 다시 로그인해 주세요.")
 
-@app.patch("/api/v1/users/me", response_model=schemas.CustomUserOut)
-def update_user_me(payload: schemas.UserUpdate, username: str = Query(..., description="임시 로그인 식별자"), db: Session = Depends(get_db)):
-    user = db.query(models.CustomUser).filter(models.CustomUser.username == username).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
-    
-    if payload.username is not None:
-        if payload.username != user.username:
-            exists = db.query(models.CustomUser).filter(models.CustomUser.username == payload.username).first()
-            if exists:
-                raise HTTPException(status_code=400, detail="이미 사용중인 이름입니다.")
-        user.username = payload.username
-    if payload.email is not None:
-        user.email = payload.email
+
+@app.get("/api/v1/users/me", response_model=schemas.CustomUserOut)
+def get_user_me(
+    current_user: models.CustomUser = Depends(_resolve_profile_user)
+):
+    return current_user
+
+
+@app.patch("/api/v1/users/me")
+def update_user_me(
+    payload: schemas.UpdateProfileRequest,
+    current_user: models.CustomUser = Depends(_resolve_profile_user),
+    db: Session = Depends(get_db)
+):
+    clean_name = (payload.username or "").strip()
+    if len(clean_name) < 2:
+        raise HTTPException(status_code=400, detail="사용자명은 최소 2자 이상 입력해 주세요.")
+
+    current_user.username = clean_name
     if payload.department is not None:
-        user.department = payload.department
-        
+        current_user.department = payload.department.strip()
+
     db.commit()
-    db.refresh(user)
-    return user
+    db.refresh(current_user)
+    return {
+        "id": current_user.id,
+        "message": "개인정보(사용자명)가 성공적으로 저장되었습니다.",
+        "email": current_user.email,
+        "username": current_user.username,
+        "role": current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role),
+        "department": current_user.department,
+        "dealer_company_id": current_user.dealer_company_id,
+        "dealer_company": current_user.dealer_company
+    }
+
 
 @app.post("/api/v1/users/me/change-password")
-def change_password(payload: schemas.PasswordChange, username: str = Query(..., description="임시 로그인 식별자"), db: Session = Depends(get_db)):
-    user = db.query(models.CustomUser).filter(models.CustomUser.username == username).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
-    
-    # 1. 기존 비밀번호 확인 (DB에 해시가 있는 경우만 비교)
-    if user.password_hash and user.password_hash != payload.current_password:
-        raise HTTPException(status_code=400, detail="기존 비밀번호가 일치하지 않습니다.")
-        
-    # 2. 새 비밀번호 일치 확인
-    if payload.new_password != payload.confirm_password:
+def change_password(
+    payload: schemas.ChangePasswordRequest,
+    current_user: models.CustomUser = Depends(_resolve_profile_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.password_hash or not pwd_context.verify(payload.current_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="현재 비밀번호가 일치하지 않습니다.")
+
+    if payload.confirm_password is not None and payload.new_password != payload.confirm_password:
         raise HTTPException(status_code=400, detail="새 비밀번호가 일치하지 않습니다.")
-        
-    # 3. 비밀번호 정책 검증 (8자리 이상)
+
     if len(payload.new_password) < 8:
-        raise HTTPException(status_code=400, detail="비밀번호는 최소 8자리 이상이어야 합니다.")
-        
-    # 패스워드 업데이트 (현재는 평문 저장, 추후 passlib 도입 시 변경)
-    user.password_hash = payload.new_password
+        raise HTTPException(status_code=400, detail="새 비밀번호는 최소 8자 이상이어야 합니다.")
+
+    current_user.password_hash = pwd_context.hash(payload.new_password)
     db.commit()
-    
-    return {"status": "success", "message": "비밀번호가 성공적으로 변경되었습니다."}
+    return {"status": "success", "message": "비밀번호가 안전하게 변경되었습니다."}
+
 
 # ==========================================
-# 9. 로그인 인증 (Auth) API
+# 9. 표준 프로토콜 직렬 2단계 인증(AAL1 -> AAL2), 초대 수락 및 비밀번호 분실·재설정 API
 # ==========================================
-@app.post("/api/v1/auth/supabase-login")
-def supabase_login(user: models.CustomUser = Depends(get_current_user_from_supabase)):
-    # JWT가 검증되고 사용자 매핑이 완료되면 ERP 접속 권한을 내려줍니다.
+@app.post("/api/v1/auth/accept-invite")
+def accept_invite_and_set_initial_password(
+    payload: schemas.AcceptInviteRequest,
+    db: Session = Depends(get_db)
+):
+    if len(payload.new_password) < 8:
+        raise HTTPException(status_code=400, detail="비밀번호는 최소 8자 이상이어야 합니다.")
+
+    try:
+        unverified = jwt.decode(payload.invite_token, options={"verify_signature": False})
+        user_id = int(unverified.get("sub", 0))
+    except Exception:
+        raise HTTPException(status_code=400, detail="유효하지 않은 초대 링크입니다.")
+
+    user = db.query(models.CustomUser).filter(models.CustomUser.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="계정을 찾을 수 없습니다.")
+
+    if hasattr(user, "is_active") and user.is_active is False:
+        raise HTTPException(status_code=403, detail="비활성화된 계정입니다. 시스템 관리자에게 문의하세요.")
+
+    if user.password_hash is not None:
+        raise HTTPException(status_code=400, detail="이미 초기 비밀번호 설정이 완료된 초대 링크입니다.")
+
+    # 서명 및 48시간 유효기간 검증 (Stateless Dynamic HMAC)
+    dynamic_secret = f"{JWT_SECRET}:INVITE_PENDING"
+    try:
+        verified = jwt.decode(payload.invite_token, dynamic_secret, algorithms=[ALGORITHM])
+        if verified.get("scope") != "account_invite":
+            raise HTTPException(status_code=400, detail="잘못된 초대 토큰입니다.")
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=400, detail="초대 링크 유효기간(48시간)이 만료되었습니다. 관리자에게 재발송을 요청해 주세요.")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=400, detail="유효하지 않은 초대 링크입니다.")
+
+    # 초기 비밀번호 해싱 저장 (이 순간 dynamic_secret이 바뀌어 초대 링크는 즉시 자동 폐기됨)
+    user.password_hash = pwd_context.hash(payload.new_password)
+    if payload.username and payload.username.strip():
+        user.username = payload.username.strip()
+    db.commit()
+
+    # 초기 비밀번호 설정 완료 즉시 2단계 패스키 등록으로 넘어갈 수 있도록 AAL1 pre_auth_token(5분 유효) 발급
+    pre_auth_token = create_jwt_token(
+        data={"sub": str(user.id), "email": user.email},
+        expires_delta=timedelta(minutes=5),
+        scope="mfa_pending",
+        aal="aal1"
+    )
+
     return {
-        "status": "success",
-        "username": user.username,
-        "role": user.role.value
+        "status": "INITIAL_PASSWORD_SET",
+        "next_step": "PASSKEY_ENROLL",
+        "pre_auth_token": pre_auth_token,
+        "email": user.email,
+        "message": "초기 비밀번호가 설정되었습니다. 이어서 2단계 패스키 기기 등록을 진행해 주세요."
     }
+
 
 @app.post("/api/v1/auth/login")
-def login(payload: schemas.UserLogin, db: Session = Depends(get_db)):
-    user = db.query(models.CustomUser).filter(models.CustomUser.username == payload.username).first()
+def step1_email_password_login(payload: schemas.EmailLoginRequest, db: Session = Depends(get_db)):
+    email_clean = payload.email.strip().lower()
+
+    # 텍스트 아이디 조회를 완전히 배제하고 오직 이메일(email)로만 계정 식별
+    user = db.query(models.CustomUser).filter(
+        func.lower(models.CustomUser.email) == email_clean
+    ).first()
+
     if not user:
-        raise HTTPException(status_code=401, detail="아이디 또는 비밀번호가 올바르지 않습니다.")
-    
-    if user.password_hash != payload.password:
-        raise HTTPException(status_code=401, detail="아이디 또는 비밀번호가 올바르지 않습니다.")
-        
+        raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 올바르지 않습니다.")
+
+    if hasattr(user, "is_active") and user.is_active is False:
+        raise HTTPException(status_code=403, detail="비활성화된 계정입니다. 시스템 관리자에게 문의하세요.")
+
+    if not user.password_hash:
+        raise HTTPException(
+            status_code=403,
+            detail="초대 대기 중인 계정입니다. 이메일로 발송된 '초기 비밀번호 설정 초대 링크'를 통해 먼저 비밀번호를 설정해 주세요."
+        )
+
+    if not pwd_context.verify(payload.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 올바르지 않습니다.")
+
+    # 기존 평문 비밀번호였던 경우 자동으로 암호화 해시로 업그레이드
+    if not user.password_hash.startswith(("pbkdf2_sha256$", "$2a$", "$2b$", "$2y$")):
+        user.password_hash = pwd_context.hash(payload.password)
+        db.commit()
+
+    # 최종 권한을 부여하지 않고 3분 유효기간의 1단계 임시 토큰(mfa_pending / aal1)만 발급
+    pre_auth_token = create_jwt_token(
+        data={"sub": str(user.id), "email": user.email},
+        expires_delta=timedelta(minutes=3),
+        scope="mfa_pending",
+        aal="aal1"
+    )
+
     return {
-        "status": "success",
-        "username": user.username,
-        "role": user.role.value
+        "status": "MFA_REQUIRED",
+        "next_step": "PASSKEY_VERIFY" if user.supabase_uid else "PASSKEY_ENROLL",
+        "pre_auth_token": pre_auth_token,
+        "email": user.email,
+        "has_passkey": bool(user.supabase_uid)
     }
+
+
+@app.post("/api/v1/auth/verify-2fa")
+def step2_verify_passkey_and_issue_session(payload: schemas.Verify2FARequest, db: Session = Depends(get_db)):
+    # 1. 1단계 Pre-Auth 토큰 검증
+    try:
+        pre_payload = jwt.decode(payload.pre_auth_token, JWT_SECRET, algorithms=[ALGORITHM])
+        if pre_payload.get("scope") != "mfa_pending" or pre_payload.get("aal") != "aal1":
+            raise HTTPException(status_code=403, detail="잘못된 1단계 인증 토큰입니다.")
+        user_id = int(pre_payload.get("sub"))
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="1단계 인증 유효시간(3분)이 만료되었습니다. 처음부터 다시 로그인해 주세요.")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=401, detail="유효하지 않은 1단계 인증 토큰입니다.")
+
+    user = db.query(models.CustomUser).filter(models.CustomUser.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+
+    if hasattr(user, "is_active") and user.is_active is False:
+        raise HTTPException(status_code=403, detail="비활성화된 계정입니다. 시스템 관리자에게 문의하세요.")
+
+    # 2. 2단계 Supabase WebAuthn/Passkey JWT 검증 (auth_supabase 모듈 활용)
+    supa_payload = verify_supabase_token(payload.supabase_access_token)
+    supa_uid = supa_payload.get("sub")
+    supa_email = (supa_payload.get("email") or "").strip().lower()
+
+    # 3. [핵심 보안] 1단계 로그인 이메일과 2단계 패스키 소유자 계정 일치 여부 교차 검증
+    if supa_email and supa_email != user.email.strip().lower():
+        raise HTTPException(
+            status_code=403,
+            detail="1단계 로그인 계정(이메일)과 2단계 패스키 소유자 계정이 일치하지 않습니다."
+        )
+
+    if user.supabase_uid and user.supabase_uid != supa_uid:
+        raise HTTPException(status_code=403, detail="등록된 본인의 패스키 기기가 아닙니다.")
+
+    # 최초 패스키 등록자인 경우 supabase_uid 바인딩 저장
+    if not user.supabase_uid and supa_uid:
+        user.supabase_uid = supa_uid
+        db.commit()
+
+    role_str = user.role.value if hasattr(user.role, "value") else str(user.role)
+
+    # 4. 1·2단계 모두 통과 -> 최종 AAL2 Access Token 발급 (8시간 유효)
+    access_token = create_jwt_token(
+        data={
+            "sub": str(user.id),
+            "email": user.email,
+            "role": role_str,
+            "dealer_company_id": user.dealer_company_id
+        },
+        expires_delta=timedelta(hours=8),
+        scope="authenticated",
+        aal="aal2"
+    )
+
+    # 사용자명(username)이 아직 기입되지 않았거나 이메일과 동일한 경우 프로필 설정 유도 플래그 전달
+    needs_profile_name = not user.username or ("@" in user.username)
+
+    return {
+        "status": "AUTHENTICATED",
+        "access_token": access_token,
+        "email": user.email,
+        "username": user.username or "",
+        "role": role_str,
+        "dealer_company_id": user.dealer_company_id,
+        "needs_profile_setup": needs_profile_name
+    }
+
+
+@app.post("/api/v1/auth/forgot-password")
+def forgot_password(payload: schemas.ForgotPasswordRequest, db: Session = Depends(get_db)):
+    user = db.query(models.CustomUser).filter(
+        func.lower(models.CustomUser.email) == payload.email.strip().lower()
+    ).first()
+
+    if user and getattr(user, "is_active", True):
+        # 현재 password_hash를 서명 키에 결합 -> 비밀번호 변경 즉시 토큰 자동 무효화(1회용 보장)
+        dynamic_secret = f"{JWT_SECRET}:{user.password_hash}"
+        reset_token = jwt.encode(
+            {
+                "sub": str(user.id),
+                "email": user.email,
+                "scope": "password_reset",
+                "exp": datetime.now(timezone.utc) + timedelta(minutes=15)
+            },
+            dynamic_secret,
+            algorithm=ALGORITHM
+        )
+        reset_link = f"{FRONTEND_URL}/login?reset_token={reset_token}"
+        send_password_reset_email(
+            to_email=user.email,
+            username=user.username or user.email,
+            reset_link=reset_link
+        )
+
+    return {"message": "등록된 이메일인 경우 비밀번호 재설정 링크가 발송되었습니다. (유효시간 15분)"}
+
+
+@app.post("/api/v1/auth/reset-password")
+def reset_password(payload: schemas.ResetPasswordRequest, db: Session = Depends(get_db)):
+    if len(payload.new_password) < 8:
+        raise HTTPException(status_code=400, detail="새 비밀번호는 최소 8자 이상이어야 합니다.")
+
+    try:
+        unverified = jwt.decode(payload.token, options={"verify_signature": False})
+        user_id = int(unverified.get("sub", 0))
+    except Exception:
+        raise HTTPException(status_code=400, detail="유효하지 않은 재설정 링크입니다.")
+
+    user = db.query(models.CustomUser).filter(models.CustomUser.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="계정을 찾을 수 없습니다.")
+
+    if hasattr(user, "is_active") and user.is_active is False:
+        raise HTTPException(status_code=403, detail="비활성화된 계정입니다. 시스템 관리자에게 문의하세요.")
+
+    dynamic_secret = f"{JWT_SECRET}:{user.password_hash}"
+    try:
+        verified = jwt.decode(payload.token, dynamic_secret, algorithms=[ALGORITHM])
+        if verified.get("scope") != "password_reset":
+            raise HTTPException(status_code=400, detail="잘못된 토큰 용도입니다.")
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=400, detail="재설정 링크 유효시간(15분)이 만료되었습니다.")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=400, detail="이미 사용되었거나 만료된 재설정 링크입니다.")
+
+    user.password_hash = pwd_context.hash(payload.new_password)
+    db.commit()
+    return {"message": "비밀번호가 재설정되었습니다. 이메일과 새 비밀번호로 1단계 로그인을 진행해 주세요."}
 
 # ==========================================
 # 10. 문서 다운로드 API

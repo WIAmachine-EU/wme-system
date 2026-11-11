@@ -47,7 +47,7 @@ class CustomUser(Base):
     __tablename__ = "custom_users"
 
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, index=True, nullable=False)
+    username = Column(String, unique=False, index=True, nullable=True)
     email = Column(String, unique=True, index=True, nullable=False)
     role = Column(Enum(UserRole), nullable=False)
     
@@ -56,11 +56,26 @@ class CustomUser(Base):
     department = Column(String, nullable=True)
     password_hash = Column(String, nullable=True)
     supabase_uid = Column(String, unique=True, index=True, nullable=True) # 매핑을 위한 컬럼 추가
+    is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     dealer_company = relationship("DealerCompany", back_populates="users")
     rsm_orders = relationship("Order", back_populates="rsm_user")
     status_changes = relationship("OrderStatusHistory", back_populates="changed_by")
+
+    @property
+    def has_password(self) -> bool:
+        return bool(self.password_hash)
+
+    @property
+    def onboarding_status(self) -> str:
+        if self.is_active is False:
+            return "INACTIVE"
+        if not self.password_hash:
+            return "INVITE_PENDING"
+        if not self.supabase_uid:
+            return "PASSKEY_PENDING"
+        return "ACTIVE_AAL2"
 
 class Shipment(Base):
     __tablename__ = "shipments"
