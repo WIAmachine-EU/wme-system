@@ -512,34 +512,39 @@ export default function Login({ onLogin }) {
 
               {/* 2차 인증 수단 전환 탭: 기기 생체/패스키 vs 모든 브라우저(구글앱·크롬·엣지·PC) 공용 숫자 패스키 */}
               <div style={{
-                display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', width: '92%',
-                padding: '4px', borderRadius: '10px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)'
+                display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', width: '100%',
+                boxSizing: 'border-box', padding: '4px', borderRadius: '10px',
+                backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)'
               }}>
                 <button
                   type="button"
                   onClick={() => { setError(''); setStep2Mode('WEBAUTHN'); }}
                   style={{
-                    padding: '8px 6px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                    fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
+                    padding: '9px 4px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                    fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                    whiteSpace: 'nowrap',
                     backgroundColor: step2Mode === 'WEBAUTHN' ? 'var(--wia-blue)' : 'transparent',
                     color: step2Mode === 'WEBAUTHN' ? '#ffffff' : 'var(--text-secondary)',
                     transition: 'all 0.15s'
                   }}
                 >
-                  <Smartphone size={14} /> 생체 / 기기 패스키
+                  <Smartphone size={14} style={{ flexShrink: 0 }} />
+                  <span>생체 / 기기 패스키</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => { setError(''); setStep2Mode('PIN'); }}
                   style={{
-                    padding: '8px 6px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                    fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
+                    padding: '9px 4px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                    fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                    whiteSpace: 'nowrap',
                     backgroundColor: step2Mode === 'PIN' ? 'var(--wia-blue)' : 'transparent',
                     color: step2Mode === 'PIN' ? '#ffffff' : 'var(--text-secondary)',
                     transition: 'all 0.15s'
                   }}
                 >
-                  <Hash size={14} /> 숫자 패스키 (PIN)
+                  <Hash size={14} style={{ flexShrink: 0 }} />
+                  <span>숫자 패스키 (PIN)</span>
                 </button>
               </div>
 
