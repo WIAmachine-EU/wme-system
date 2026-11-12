@@ -75,10 +75,10 @@ def get_current_user_from_supabase(credentials: HTTPAuthorizationCredentials = S
     try:
         user = db.query(models.CustomUser).filter(models.CustomUser.supabase_uid == supabase_uid).first()
         
-        # [자동 연동] uid로 못 찾았다면, 이메일로 기존 ERP 사용자를 찾아서 uid를 덮어씌움
+        # [자동 연동] uid로 못 찾았다면, 이메일로 기존 ERP 사용자를 찾아서 uid를 연동
         if user is None and email:
             user = db.query(models.CustomUser).filter(models.CustomUser.email == email).first()
-            if user:
+            if user and not user.supabase_uid:
                 user.supabase_uid = supabase_uid
                 db.commit()
                 db.refresh(user)

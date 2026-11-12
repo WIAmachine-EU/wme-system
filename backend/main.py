@@ -2305,6 +2305,48 @@ def change_password(
 # ==========================================
 # 9. 표준 프로토콜 직렬 2단계 인증(AAL1 -> AAL2), 초대 수락 및 비밀번호 분실·재설정 API
 # ==========================================
+import base64
+import json
+
+
+def _parse_user_mfa_binding(raw_uid: Optional[str]) -> dict:
+    """
+    CustomUser.supabase_uid 컬럼에서 다중 기기 WebAuthn Credential ID 목록(creds),
+    Supabase UID 목록(su) 및 브라우저 호환 2차 숫자 패스키 해시(pin)를 파싱합니다.
+    기존 단일 문자열(Supabase UUID)과도 100% 하위 호환됩니다.
+    """
+    default_data = {"su": [], "creds": [], "pin": None}
+    if not raw_uid or not str(raw_uid).strip():
+        return default_data
+    text_val = str(raw_uid).strip()
+    if text_val.startswith("wme_mfa:"):
+        try:
+            parsed = json.loads(text_val[len("wme_mfa:"):])
+            return {
+                "su": list(parsed.get("su") or []),
+                "creds": list(parsed.get("creds") or []),
+                "pin": parsed.get("pin")
+            }
+        except Exception:
+            return default_data
+    return {"su": [text_val], "creds": [text_val], "pin": None}
+
+
+def _serialize_user_mfa_binding(user_id: int, mfa_data: dict) -> Optional[str]:
+    su_list = list(dict.fromkeys([str(x) for x in (mfa_data.get("su") or []) if x]))[:10]
+    creds_list = list(dict.fromkeys([str(x) for x in (mfa_data.get("creds") or []) if x]))[:20]
+    pin_val = mfa_data.get("pin")
+    if not su_list and not creds_list and not pin_val:
+        return None
+    payload = {
+        "u": user_id,
+        "su": su_list,
+        "creds": creds_list,
+        "pin": pin_val
+    }
+    return "wme_mfa:" + json.dumps(payload, separators=(",", ":"))
+
+
 @app.post("/api/v1/auth/accept-invite")
 def accept_invite_and_set_initial_password(
     payload: schemas.AcceptInviteRequest,
@@ -2346,9 +2388,10 @@ def accept_invite_and_set_initial_password(
         user.username = payload.username.strip()
     db.commit()
 
-    # 초기 비밀번호 설정 완료 즉시 2단계 패스키 등록으로 넘어갈 수 있도록 AAL1 pre_auth_token(5분 유효) 발급
+    # 모바일 제스처 만료 방지를 위해 1단계에서 WebAuthn 챌린지를 사전 발급(Pre-fetch)
+    webauthn_challenge = secrets.token_urlsafe(32)
     pre_auth_token = create_jwt_token(
-        data={"sub": str(user.id), "email": user.email},
+        data={"sub": str(user.id), "email": user.email, "challenge": webauthn_challenge},
         expires_delta=timedelta(minutes=5),
         scope="mfa_pending",
         aal="aal1"
@@ -2359,6 +2402,13 @@ def accept_invite_and_set_initial_password(
         "next_step": "PASSKEY_ENROLL",
         "pre_auth_token": pre_auth_token,
         "email": user.email,
+        "user_id": str(user.id),
+        "display_name": user.username or user.email.split("@")[0],
+        "webauthn_challenge": webauthn_challenge,
+        "registered_credential_ids": [],
+        "has_passkey": False,
+        "has_webauthn_cred": False,
+        "has_pin_passkey": False,
         "message": "초기 비밀번호가 설정되었습니다. 이어서 2단계 패스키 기기 등록을 진행해 주세요."
     }
 
@@ -2392,20 +2442,30 @@ def step1_email_password_login(payload: schemas.EmailLoginRequest, db: Session =
         user.password_hash = pwd_context.hash(payload.password)
         db.commit()
 
-    # 최종 권한을 부여하지 않고 3분 유효기간의 1단계 임시 토큰(mfa_pending / aal1)만 발급
+    mfa_data = _parse_user_mfa_binding(user.supabase_uid)
+    has_any_passkey = bool(mfa_data["creds"] or mfa_data["su"] or mfa_data["pin"])
+
+    # 모바일 브라우저(iOS WebKit 등) 터치 제스처 만료 방지를 위해 1단계 완료 즉시 WebAuthn 챌린지 사전 발급
+    webauthn_challenge = secrets.token_urlsafe(32)
     pre_auth_token = create_jwt_token(
-        data={"sub": str(user.id), "email": user.email},
-        expires_delta=timedelta(minutes=3),
+        data={"sub": str(user.id), "email": user.email, "challenge": webauthn_challenge},
+        expires_delta=timedelta(minutes=5),
         scope="mfa_pending",
         aal="aal1"
     )
 
     return {
         "status": "MFA_REQUIRED",
-        "next_step": "PASSKEY_VERIFY" if user.supabase_uid else "PASSKEY_ENROLL",
+        "next_step": "PASSKEY_VERIFY" if has_any_passkey else "PASSKEY_ENROLL",
         "pre_auth_token": pre_auth_token,
         "email": user.email,
-        "has_passkey": bool(user.supabase_uid)
+        "user_id": str(user.id),
+        "display_name": user.username or user.email.split("@")[0],
+        "webauthn_challenge": webauthn_challenge,
+        "registered_credential_ids": mfa_data["creds"],
+        "has_passkey": has_any_passkey,
+        "has_webauthn_cred": len(mfa_data["creds"]) > 0,
+        "has_pin_passkey": bool(mfa_data["pin"])
     }
 
 
@@ -2417,8 +2477,9 @@ def step2_verify_passkey_and_issue_session(payload: schemas.Verify2FARequest, db
         if pre_payload.get("scope") != "mfa_pending" or pre_payload.get("aal") != "aal1":
             raise HTTPException(status_code=403, detail="잘못된 1단계 인증 토큰입니다.")
         user_id = int(pre_payload.get("sub"))
+        expected_challenge = pre_payload.get("challenge")
     except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="1단계 인증 유효시간(3분)이 만료되었습니다. 처음부터 다시 로그인해 주세요.")
+        raise HTTPException(status_code=401, detail="1단계 인증 유효시간(5분)이 만료되었습니다. 처음부터 다시 로그인해 주세요.")
     except HTTPException:
         raise
     except Exception:
@@ -2431,29 +2492,94 @@ def step2_verify_passkey_and_issue_session(payload: schemas.Verify2FARequest, db
     if hasattr(user, "is_active") and user.is_active is False:
         raise HTTPException(status_code=403, detail="비활성화된 계정입니다. 시스템 관리자에게 문의하세요.")
 
-    # 2. 2단계 Supabase WebAuthn/Passkey JWT 검증 (auth_supabase 모듈 활용)
-    supa_payload = verify_supabase_token(payload.supabase_access_token)
-    supa_uid = supa_payload.get("sub")
-    supa_email = (supa_payload.get("email") or "").strip().lower()
+    mfa_data = _parse_user_mfa_binding(user.supabase_uid)
+    verified_2fa = False
 
-    # 3. [핵심 보안] 1단계 로그인 이메일과 2단계 패스키 소유자 계정 일치 여부 교차 검증
-    if supa_email and supa_email != user.email.strip().lower():
-        raise HTTPException(
-            status_code=403,
-            detail="1단계 로그인 계정(이메일)과 2단계 패스키 소유자 계정이 일치하지 않습니다."
-        )
+    # 2-A. 표준 W3C WebAuthn 생체/기기 패스키 검증 (PC Windows Hello, 모바일 Face ID / 지문 / 기기 암호)
+    if payload.webauthn_credential:
+        cred = payload.webauthn_credential
+        cred_id = str(cred.get("id") or cred.get("rawId") or "").strip()
+        resp_obj = cred.get("response") or {}
+        client_data_b64 = str(cred.get("clientDataJSON") or resp_obj.get("clientDataJSON") or "").strip()
 
-    if user.supabase_uid and user.supabase_uid != supa_uid:
-        raise HTTPException(status_code=403, detail="등록된 본인의 패스키 기기가 아닙니다.")
+        if not cred_id or not client_data_b64:
+            raise HTTPException(status_code=400, detail="유효하지 않은 기기 패스키 응답 데이터입니다.")
 
-    # 최초 패스키 등록자인 경우 supabase_uid 바인딩 저장
-    if not user.supabase_uid and supa_uid:
-        user.supabase_uid = supa_uid
+        try:
+            padded = client_data_b64 + "=" * ((4 - len(client_data_b64) % 4) % 4)
+            client_data_raw = base64.urlsafe_b64decode(padded.encode("ascii"))
+            client_data = json.loads(client_data_raw.decode("utf-8"))
+        except Exception:
+            raise HTTPException(status_code=400, detail="패스키 clientDataJSON 파싱에 실패했습니다.")
+
+        ceremony_type = client_data.get("type")
+        if ceremony_type not in ("webauthn.create", "webauthn.get"):
+            raise HTTPException(status_code=401, detail="유효하지 않은 WebAuthn 인증 타입입니다.")
+
+        if expected_challenge:
+            received_challenge = str(client_data.get("challenge") or "").rstrip("=")
+            expected_norm = str(expected_challenge).rstrip("=")
+            if received_challenge != expected_norm:
+                raise HTTPException(status_code=401, detail="패스키 보안 챌린지가 일치하지 않거나 만료되었습니다. 다시 시도해 주세요.")
+
+        # 다중 기기(PC + 모바일 여러 브라우저) 지원을 위해 Credential ID를 사용자 계정에 추가 바인딩
+        if cred_id not in mfa_data["creds"]:
+            mfa_data["creds"].append(cred_id)
+
+        # 선택적으로 숫자 패스키(PIN)도 함께 전달된 경우 동시에 저장
+        if payload.passkey_pin:
+            pin_clean = str(payload.passkey_pin).strip()
+            if pin_clean.isdigit() and 4 <= len(pin_clean) <= 8 and not mfa_data.get("pin"):
+                mfa_data["pin"] = pwd_context.hash(pin_clean)
+
+        user.supabase_uid = _serialize_user_mfa_binding(user.id, mfa_data)
         db.commit()
+        verified_2fa = True
+
+    # 2-B. 브라우저 무관 2차 숫자 패스키(PIN) 검증 (구글앱 인앱 브라우저·크롬·엣지·PC 공통 호환)
+    elif payload.passkey_pin:
+        pin_clean = str(payload.passkey_pin).strip()
+        if not pin_clean.isdigit() or not (4 <= len(pin_clean) <= 8):
+            raise HTTPException(status_code=400, detail="2차 숫자 패스키는 4~8자리 숫자로 입력해 주세요.")
+
+        if mfa_data.get("pin"):
+            if not pwd_context.verify(pin_clean, mfa_data["pin"]):
+                raise HTTPException(status_code=401, detail="입력하신 2차 숫자 패스키(PIN)가 올바르지 않습니다.")
+        else:
+            # 최초 숫자 패스키 등록 (1단계 이메일+비밀번호 검증을 통과한 직후 본인의 2차 숫자 패스키 설정)
+            mfa_data["pin"] = pwd_context.hash(pin_clean)
+            user.supabase_uid = _serialize_user_mfa_binding(user.id, mfa_data)
+            db.commit()
+
+        verified_2fa = True
+
+    # 2-C. 레거시 Supabase WebAuthn/Passkey JWT 검증 호환 유지
+    elif payload.supabase_access_token:
+        supa_payload = verify_supabase_token(payload.supabase_access_token)
+        supa_uid = supa_payload.get("sub")
+        supa_email = (supa_payload.get("email") or "").strip().lower()
+
+        if supa_email and supa_email != user.email.strip().lower():
+            raise HTTPException(
+                status_code=403,
+                detail="1단계 로그인 계정(이메일)과 2단계 패스키 소유자 계정이 일치하지 않습니다."
+            )
+
+        if supa_uid and supa_uid not in mfa_data["su"]:
+            mfa_data["su"].append(supa_uid)
+        if supa_uid and supa_uid not in mfa_data["creds"]:
+            mfa_data["creds"].append(supa_uid)
+
+        user.supabase_uid = _serialize_user_mfa_binding(user.id, mfa_data)
+        db.commit()
+        verified_2fa = True
+
+    if not verified_2fa:
+        raise HTTPException(status_code=400, detail="2단계 패스키 인증 정보가 제공되지 않았습니다.")
 
     role_str = user.role.value if hasattr(user.role, "value") else str(user.role)
 
-    # 4. 1·2단계 모두 통과 -> 최종 AAL2 Access Token 발급 (8시간 유효)
+    # 3. 1·2단계 모두 통과 -> 최종 AAL2 Access Token 발급 (8시간 유효)
     access_token = create_jwt_token(
         data={
             "sub": str(user.id),

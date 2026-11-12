@@ -72,7 +72,9 @@ class EmailLoginRequest(BaseModel):
 
 class Verify2FARequest(BaseModel):
     pre_auth_token: str
-    supabase_access_token: str
+    supabase_access_token: Optional[str] = None
+    webauthn_credential: Optional[dict] = None
+    passkey_pin: Optional[str] = None
 
 class ForgotPasswordRequest(BaseModel):
     email: str

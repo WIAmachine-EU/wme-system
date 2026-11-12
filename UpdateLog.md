@@ -49,6 +49,18 @@
 * models.CustomUser 스키마 및 REST API 엔드포인트 목록 테이블 갱신 (AAL2 직렬 2FA, 제로터치 초대 링크, 비밀번호 분실/재설정 API 6종 명세 반영).
 
 
+### 6. 모바일(구글앱·크롬·엣지·사파리) 및 PC 전 환경 2단계 패스키 호환성 및 다중 기기 지원 고도화
+* **모바일 브라우저(iOS WebKit 등) 터치 제스처 만료(`NotAllowedError`) 방지 및 0ms 즉시 호출 (Login.jsx, main.py)**:
+  * 기존 2단계 인증 버튼 클릭 후 외부 서버와의 비동기 통신 대기로 인해 모바일(iOS WebKit)의 사용자 제스처 유효시간이 만료되어 `The request is not allowed by the user agent...` 에러가 발생하던 구조를 전면 개선.
+  * 1단계 로그인 검증 완료 시점에 백엔드에서 서명된 `webauthn_challenge`를 사전 발급(Pre-fetch)하고, 2단계 버튼 터치 시 0ms 즉시 브라우저 `navigator.credentials.create()` / `get()`을 동기적으로 호출하여 모바일 안면인식(Face ID), 지문, 기기 암호 창이 즉시 실행되도록 최적화.
+* **PC + 모바일 다중 기기·다중 브라우저 패스키 동시 바인딩 지원 (main.py, schemas.py)**:
+  * PC(Windows Hello 숫자 PIN)에서 패스키를 기등록했더라도, 모바일(스마트폰)이나 다른 브라우저(크롬, 엣지, 구글앱)에서 접속 시 기존 패스키와 충돌하지 않고 기기별 Credential ID를 복수 등록·유지(`_parse_user_mfa_binding`, `_serialize_user_mfa_binding`)할 수 있도록 아키텍처 확장.
+* **구글앱 인앱 브라우저 등 전 브라우저 100% 호환 2차 숫자 패스키(PIN) 듀얼 모드 지원 (Login.jsx)**:
+  * 2단계 인증 화면에 **`생체 / 기기 패스키`** 및 **`숫자 패스키 (PIN)`** 2개 탭을 제공하여, 구글 앱 내장 인앱 웹뷰처럼 OS 생체인증 팝업이 차단되는 환경에서도 4~8자리 숫자 패스키(PIN, `PBKDF2-HMAC-SHA256` 암호화 해시 저장)로 모든 브라우저에서 제약 없이 2차 인증을 통과할 수 있도록 이중화 구현.
+  * 생체인증 팝업 차단(`NotAllowedError`) 감지 시 사용자 안내 메시지와 함께 숫자 패스키 모드로 원활하게 자동 전환 폴백.
+
+
+
 ## [2026-11-11] Google Antigravity 기반 코끼리-금붕어 모델(EGM, Elephant-Goldfish Model) 아키텍처 및 무상태 코드 감사 자동화 체계 전면 도입
 
 ### 1. 코끼리-금붕어 모델(EGM) 상시 아키텍처 규칙 파일 구축 (.antigravityrules, AGENTS.md)
