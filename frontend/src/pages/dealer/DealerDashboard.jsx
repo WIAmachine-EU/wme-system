@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Ship, Calendar, Package } from 'lucide-react';
+import { Ship, Calendar, Package, FileSpreadsheet, ArrowRight } from 'lucide-react';
 
 export default function DealerDashboard({ isMobileView, setActiveTab }) {
   const { t } = useTranslation();
@@ -35,24 +35,8 @@ export default function DealerDashboard({ isMobileView, setActiveTab }) {
   const shippingCount = orders.filter(o => o.current_status === 'SHIPPING').length;
   const readyCount = orders.filter(o => o.current_status === 'IN_STOCK').length;
 
-  const [atpOrders, setAtpOrders] = useState([]);
-  
-  const fetchATP = async () => {
-    try {
-      const res = await fetch('/api/orders?status_filter=IN_STOCK');
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setAtpOrders(data.filter(o => (o.stock_type || 'AVAILABLE') === 'AVAILABLE'));
-      }
-    } catch (e) {}
-  };
-
-  useEffect(() => {
-    fetchATP();
-  }, []);
-
   const [corpStock, setCorpStock] = useState([]);
-  
+
   const fetchCorpStock = async () => {
     try {
       const res = await fetch('/api/orders?is_corporate_stock=true');
@@ -60,7 +44,7 @@ export default function DealerDashboard({ isMobileView, setActiveTab }) {
       if (Array.isArray(data)) {
         setCorpStock(data.filter(o => String(o.reference_no || '').trim().toUpperCase().startsWith('F')));
       }
-    } catch (e) {}
+    } catch (e) { }
   };
 
   useEffect(() => {
@@ -73,16 +57,42 @@ export default function DealerDashboard({ isMobileView, setActiveTab }) {
   const showroomCount = corpStock.filter(o => (o.stock_type || 'AVAILABLE') === 'SHOWROOM').length;
   const promotionCount = corpStock.filter(o => (o.stock_type || 'AVAILABLE') === 'PROMOTION').length;
 
-  const handleRequestAllocation = (order) => {
-    const modelName = order.product_model ? order.product_model.model_name : order.reference_no;
-    const serialNumber = order.serial_number;
-    const email = "freelogin3975@gmail.com,jypark@hyundai-wia.de";
-    const subject = "딜러 장비 출고 신청";
-    const body = `모델명: ${modelName}\n시리얼 번호: ${serialNumber}\n\n위 장비에 대한 즉시 할당을 신청합니다.`;
-    
-    window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    
-    alert(`[${modelName}] 기계의 할당 요청 이메일 작성을 시작합니다.`);
+  // 구매 내역: 최근 주문일/생성일 내림차순 정렬 후 상위 4개 추출
+  const sortedPurchases = [...orders].sort((a, b) => {
+    const dateA = a.dealer_order_date || a.created_at;
+    const dateB = b.dealer_order_date || b.created_at;
+    return new Date(dateB) - new Date(dateA);
+  });
+  const recentOrders = sortedPurchases.slice(0, 4);
+
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case 'CONFIRMED': return 'Order';
+      case 'IN_PRODUCTION': return 'In Production';
+      case 'SHIPPING':
+      case 'SHIPPED': return 'Shipping';
+      case 'ARRIVED':
+      case 'PORT_ARRIVED': return 'Arrived';
+      case 'IN_STOCK': return 'In Warehouse';
+      case 'DISPATCHED': return 'Dispatched';
+      case 'SOLD': return 'Picked Up';
+      default: return status || '-';
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'CONFIRMED': return '#0A1C8F';
+      case 'IN_PRODUCTION': return '#F59E0B';
+      case 'SHIPPING':
+      case 'SHIPPED': return '#0EA5E9';
+      case 'ARRIVED':
+      case 'PORT_ARRIVED': return '#6366F1';
+      case 'IN_STOCK': return '#10B981';
+      case 'DISPATCHED':
+      case 'SOLD': return '#16A34A';
+      default: return '#6B7280';
+    }
   };
 
   return (
@@ -98,6 +108,7 @@ export default function DealerDashboard({ isMobileView, setActiveTab }) {
         <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('navbar.init_seed_loading')}</div>
       ) : (
         <>
+          {/* 상위: 박스 3개 (KPI Grid) */}
           <div className="kpi-grid">
             <div className="glass-card kpi-card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -127,136 +138,172 @@ export default function DealerDashboard({ isMobileView, setActiveTab }) {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: isMobileView ? '1fr' : 'repeat(auto-fit, minmax(450px, 1fr))', gap: '24px' }}>
-            <div className="glass-card" style={{ padding: '28px', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ minHeight: '100px' }}>
-                <h3 style={{ fontSize: '1.2rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* 중간: 'WIA 가용재고 목록' 박스 */}
+          <div className="glass-card" style={{ padding: isMobileView ? '20px' : '28px', display: 'flex', flexDirection: 'column', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '16px' }}>
+              <div>
+                <h3 style={{ fontSize: '1.2rem', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
                   <Package size={20} color="var(--status-stock)" />
-                  {t('menu2.inventory_list_title', 'WIA available Stock List')}
+                  {t('menu2.inventory_list_title', 'WIA 가용재고 목록')}
                 </h3>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '20px' }}>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>
                   {t('menu2.page_desc', 'WIA 유럽법인의 가용 재고(ATP) 현황을 파악 할 수 있습니다.')}
                 </p>
               </div>
-              
-              {/* Summary Banner */}
-              <div style={{
-                marginBottom: '16px', padding: '0 16px', minHeight: '50px', backgroundColor: 'var(--bg-card)',
-                border: '1px solid var(--border-color)', borderRadius: '12px',
-                display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)', fontSize: '0.85rem'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>All:</span>
-                  <span style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{corpStock.length}</span>
-                </div>
-                <div style={{ height: '16px', width: '1px', backgroundColor: 'var(--border-color)' }}></div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>Available:</span>
-                  <span style={{ fontWeight: 'bold', color: 'var(--status-stock)' }}>{availableCount}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>Reserved:</span>
-                  <span style={{ fontWeight: 'bold', color: '#7c3aed' }}>{reservedCount}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>Rental:</span>
-                  <span style={{ fontWeight: 'bold', color: 'var(--status-production)' }}>{rentalCount}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>Showroom:</span>
-                  <span style={{ fontWeight: 'bold', color: '#4da6ff' }}>{showroomCount}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>Promotion:</span>
-                  <span style={{ fontWeight: 'bold', color: 'var(--accent-pink)' }}>{promotionCount}</span>
-                </div>
-              </div>
 
               {/* Navigation Button */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
-                <button
-                  className="btn btn-outline"
-                  onClick={() => setActiveTab && setActiveTab('dealer-inventory')}
-                  style={{ padding: '8px 24px', fontWeight: 600, fontSize: '0.9rem', color: 'var(--accent-cyan)', borderColor: 'var(--accent-cyan)', borderRadius: '20px' }}
-                >
-                  GO stock list
-                </button>
-              </div>
+              <button
+                className="btn btn-outline"
+                onClick={() => setActiveTab && setActiveTab('dealer-inventory')}
+                style={{ padding: '8px 22px', fontWeight: 600, fontSize: '0.85rem', color: 'var(--accent-cyan)', borderColor: 'var(--accent-cyan)', borderRadius: '20px', display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}
+              >
+                GO stock list <ArrowRight size={14} />
+              </button>
             </div>
 
-            <div className="glass-card" style={{ padding: '28px', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ minHeight: '100px' }}>
-                <h3 style={{ fontSize: '1.2rem', marginBottom: '8px' }}>{t('dealer_dashboard.atp_list_title')}</h3>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '20px' }}>
-                  {t('dealer_dashboard.atp_list_desc')}
+            {/* Summary Banner */}
+            <div style={{
+              padding: '14px 20px', backgroundColor: 'var(--bg-card)',
+              border: '1px solid var(--border-color)', borderRadius: '12px',
+              display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)', fontSize: '0.88rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>All:</span>
+                <span style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{corpStock.length}</span>
+              </div>
+              <div style={{ height: '16px', width: '1px', backgroundColor: 'var(--border-color)' }}></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Available:</span>
+                <span style={{ fontWeight: 'bold', color: 'var(--status-stock)' }}>{availableCount}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Reserved:</span>
+                <span style={{ fontWeight: 'bold', color: '#7c3aed' }}>{reservedCount}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Rental:</span>
+                <span style={{ fontWeight: 'bold', color: 'var(--status-production)' }}>{rentalCount}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Showroom:</span>
+                <span style={{ fontWeight: 'bold', color: '#4da6ff' }}>{showroomCount}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Promotion:</span>
+                <span style={{ fontWeight: 'bold', color: 'var(--accent-pink)' }}>{promotionCount}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 하단: '내 구매 내역' 박스 */}
+          <div className="glass-card" style={{ padding: isMobileView ? '20px' : '28px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
+              <div>
+                <h3 style={{ fontSize: '1.2rem', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+                  <FileSpreadsheet size={20} color="var(--accent-blue)" />
+                  {t('sidebar.dealer_menu.sales_archive', '내 구매 내역')}
+                </h3>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>
+                  {t('dealer_dashboard.my_ordered_desc', '주문한 구매 내역 리스트입니다.')}
                 </p>
               </div>
 
-              {isMobileView ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}>
-                  {atpOrders.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>{t('dealer_dashboard.no_atp')}</div>
-                  ) : (
-                    atpOrders.map(o => (
-                      <div key={o.id} style={{ background: 'var(--bg-secondary)', padding: '14px', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                        <div>
-                          <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
-                            {o.product_model ? o.product_model.model_name : 'Unknown'}
-                          </div>
-                          <div style={{ fontSize: '0.8rem', color: 'var(--accent-cyan)' }}>S/N: {o.serial_number}</div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>구역: {o.physical_location || '물류창고'}</div>
+              {/* GO my ordered 바로가기 버튼 */}
+              <button
+                className="btn btn-outline"
+                onClick={() => setActiveTab && setActiveTab('dealer-sales-archive')}
+                style={{ padding: '8px 22px', fontWeight: 600, fontSize: '0.85rem', color: 'var(--accent-blue)', borderColor: 'var(--accent-blue)', borderRadius: '20px', display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}
+              >
+                GO my ordered <ArrowRight size={14} />
+              </button>
+            </div>
+
+            {isMobileView ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {recentOrders.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>구매 내역이 존재하지 않습니다.</div>
+                ) : (
+                  recentOrders.map((order, idx) => {
+                    const statusColor = getStatusColor(order.current_status);
+                    return (
+                      <div key={order.id || idx} style={{ background: 'var(--bg-secondary)', padding: '14px 16px', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '1rem' }}>
+                            {order.product_model ? order.product_model.model_name : (order.reference_no || '-')}
+                          </span>
+                          <span style={{
+                            display: 'inline-block', padding: '3px 8px', borderRadius: '4px',
+                            fontWeight: 600, fontSize: '0.75rem', whiteSpace: 'nowrap',
+                            backgroundColor: `${statusColor}20`, color: statusColor, border: `1px solid ${statusColor}40`
+                          }}>
+                            {getStatusLabel(order.current_status)}
+                          </span>
                         </div>
-                        <button
-                          onClick={() => handleRequestAllocation(o)}
-                          className="btn btn-primary btn-request"
-                          style={{ padding: '6px 14px', fontSize: '0.8rem', borderRadius: '20px' }}
-                        >
-                          {t('dealer_dashboard.btn_allocation')}
-                        </button>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                          <div><span style={{ color: 'var(--text-muted)' }}>Order Date: </span>{new Date(order.dealer_order_date || order.created_at).toLocaleDateString()}</div>
+                          <div><span style={{ color: 'var(--text-muted)' }}>P/O: </span>{order.reference_no || '-'}</div>
+                          <div><span style={{ color: 'var(--text-muted)' }}>NC: </span>{order.nc || '-'}</div>
+                          <div><span style={{ color: 'var(--text-muted)' }}>S/N: </span>{order.serial_number || '-'}</div>
+                        </div>
                       </div>
-                    ))
-                  )}
-                </div>
-              ) : (
-                <div className="data-table-container" style={{ flex: 1 }}>
-                  <table className="data-table">
-                    <thead>
-                      <tr style={{ height: '50px' }}>
-                        <th>{t('dealer_dashboard.header_model')}</th>
-                        <th>{t('dealer_dashboard.header_sn')}</th>
-                        <th>{t('dealer_dashboard.header_location')}</th>
-                        <th style={{ textAlign: 'center' }}>{t('dealer_dashboard.header_request')}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {atpOrders.length === 0 ? (
-                        <tr><td colSpan={4} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>{t('dealer_dashboard.no_atp')}</td></tr>
-                      ) : (
-                        atpOrders.map(o => (
-                          <tr key={o.id}>
-                            <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                              {o.product_model ? o.product_model.model_name : 'Unknown'}
+                    );
+                  })
+                )}
+              </div>
+            ) : (
+              <div className="data-table-container">
+                <table className="data-table">
+                  <thead>
+                    <tr style={{ height: '46px' }}>
+                      <th style={{ width: '6%', textAlign: 'center' }}>No.</th>
+                      <th style={{ width: '16%', textAlign: 'center' }}>Order Date</th>
+                      <th style={{ width: '22%', textAlign: 'center' }}>Model</th>
+                      <th style={{ width: '14%', textAlign: 'center' }}>NC</th>
+                      <th style={{ width: '16%', textAlign: 'center' }}>S/N</th>
+                      <th style={{ width: '14%', textAlign: 'center' }}>P/O</th>
+                      <th style={{ width: '12%', textAlign: 'center' }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentOrders.length === 0 ? (
+                      <tr><td colSpan={7} style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>구매 내역이 존재하지 않습니다.</td></tr>
+                    ) : (
+                      recentOrders.map((order, idx) => {
+                        const statusColor = getStatusColor(order.current_status);
+                        return (
+                          <tr key={order.id || idx}>
+                            <td style={{ textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>{idx + 1}</td>
+                            <td style={{ textAlign: 'center', fontSize: '0.85rem' }}>
+                              {new Date(order.dealer_order_date || order.created_at).toLocaleDateString()}
                             </td>
-                            <td style={{ fontSize: '0.8rem', color: 'var(--accent-cyan)' }}>{o.serial_number}</td>
-                            <td style={{ fontSize: '0.8rem' }}>{o.physical_location || '물류창고'}</td>
+                            <td style={{ textAlign: 'center', fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                              {order.product_model ? order.product_model.model_name : '-'}
+                            </td>
+                            <td style={{ textAlign: 'center', fontSize: '0.85rem' }}>{order.nc || '-'}</td>
+                            <td style={{ textAlign: 'center', fontSize: '0.85rem', color: 'var(--accent-cyan)', fontWeight: 500 }}>
+                              {order.serial_number || '-'}
+                            </td>
+                            <td style={{ textAlign: 'center', fontSize: '0.85rem', fontWeight: 500 }}>
+                              {order.reference_no || '-'}
+                            </td>
                             <td style={{ textAlign: 'center' }}>
-                              <button
-                                onClick={() => handleRequestAllocation(o)}
-                                className="btn btn-primary btn-request"
-                                style={{ padding: '4px 12px', fontSize: '0.75rem', borderRadius: '20px' }}
-                              >
-                                {t('dealer_dashboard.btn_allocation')}
-                              </button>
+                              <span style={{
+                                display: 'inline-block', minWidth: '95px', textAlign: 'center', padding: '3px 8px', borderRadius: '4px',
+                                fontWeight: 600, fontSize: '0.78rem', whiteSpace: 'nowrap',
+                                backgroundColor: `${statusColor}20`, color: statusColor, border: `1px solid ${statusColor}40`
+                              }}>
+                                {getStatusLabel(order.current_status)}
+                              </span>
                             </td>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </>
       )}

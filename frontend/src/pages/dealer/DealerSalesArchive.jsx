@@ -96,12 +96,15 @@ function CargoDetailModal({ isOpen, onClose, serialNumber, modelName }) {
 const getStatusLabel = (status) => {
   switch (status) {
     case 'CONFIRMED': return 'Order';
-    case 'IN_PRODUCTION': return '생산중';
-    case 'SHIPPED': return '배송';
-    case 'PORT_ARRIVED': return '항구도착';
+    case 'IN_PRODUCTION': return 'In Production';
+    case 'SHIPPING':
+    case 'SHIPPED': return 'Shipping';
+    case 'ARRIVED':
+    case 'PORT_ARRIVED': return 'Arrived';
     case 'IN_STOCK': return 'In Warehouse';
+    case 'DISPATCHED': return 'Dispatched';
     case 'SOLD': return 'Picked Up';
-    default: return status;
+    default: return status || '-';
   }
 };
 
@@ -109,9 +112,12 @@ const getStatusColor = (status) => {
   switch (status) {
     case 'CONFIRMED': return '#3b82f6';
     case 'IN_PRODUCTION': return '#8b5cf6';
+    case 'SHIPPING':
     case 'SHIPPED': return '#f59e0b';
+    case 'ARRIVED':
     case 'PORT_ARRIVED': return '#ec4899';
     case 'IN_STOCK': return '#10b981';
+    case 'DISPATCHED':
     case 'SOLD': return '#6b7280';
     default: return '#9ca3af';
   }
@@ -443,7 +449,7 @@ export default function DealerSalesArchive({ isMobileView }) {
                         </div>
                         <span style={{
                           display: 'inline-block', padding: '4px 10px', borderRadius: '6px',
-                          fontWeight: 600, fontSize: '12px',
+                          fontWeight: 600, fontSize: '12px', whiteSpace: 'nowrap',
                           backgroundColor: `${statusColor}20`, color: statusColor, border: `1px solid ${statusColor}40`
                         }}>
                           {getStatusLabel(order.current_status)}
@@ -521,39 +527,39 @@ export default function DealerSalesArchive({ isMobileView }) {
 
                     return (
                       <tr key={order.id}>
-                        <td style={{ padding: '14px 12px', textAlign: 'center', fontSize: '12px' }}>
+                        <td style={{ padding: '13px 12px', textAlign: 'center', fontSize: '11px' }}>
                           <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>{index + 1}</span>
                         </td>
-                        <td style={{ padding: '14px 12px', textAlign: 'center', fontSize: '12px' }}>
+                        <td style={{ padding: '13px 12px', textAlign: 'center', fontSize: '11px' }}>
                           {new Date(order.dealer_order_date || order.created_at).toLocaleDateString()}
                         </td>
-                        <td style={{ padding: '14px 12px', textAlign: 'center', fontWeight: 600, fontSize: '12px' }}>
+                        <td style={{ padding: '13px 12px', textAlign: 'center', fontWeight: 600, fontSize: '11px' }}>
                           {order.product_model ? order.product_model.model_name : '-'}
                         </td>
-                        <td style={{ padding: '14px 12px', textAlign: 'center', fontSize: '12px' }}>
+                        <td style={{ padding: '13px 12px', textAlign: 'center', fontSize: '11px' }}>
                           {order.nc || '-'}
                         </td>
-                        <td style={{ padding: '14px 12px', textAlign: 'center', fontSize: '12px' }}>
+                        <td style={{ padding: '13px 12px', textAlign: 'center', fontSize: '11px' }}>
                           {order.serial_number || '-'}
                         </td>
-                        <td style={{ padding: '14px 12px', textAlign: 'center', fontWeight: 500, fontSize: '12px' }}>
+                        <td style={{ padding: '13px 12px', textAlign: 'center', fontWeight: 500, fontSize: '11px' }}>
                           {order.reference_no || '-'}
                         </td>
-                        <td style={{ padding: '14px 12px', textAlign: 'center', fontSize: '12px' }}>
+                        <td style={{ padding: '13px 12px', textAlign: 'center', fontSize: '11px' }}>
                           <span style={{
                             display: 'inline-block', width: '95px', textAlign: 'center', padding: '4px 8px', borderRadius: '4px',
-                            fontWeight: 600,
+                            fontWeight: 600, whiteSpace: 'nowrap', fontSize: '11px',
                             backgroundColor: `${statusColor}20`, color: statusColor, border: `1px solid ${statusColor}40`
                           }}>
                             {getStatusLabel(order.current_status)}
                           </span>
                         </td>
-                        <td style={{ padding: '14px 12px', textAlign: 'center', fontSize: '12px' }}>
+                        <td style={{ padding: '13px 12px', textAlign: 'center', fontSize: '11px' }}>
                           <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
                             {getOrderPort(order)}
                           </span>
                         </td>
-                        <td style={{ padding: '14px 12px', textAlign: 'center', fontSize: '12px' }}>
+                        <td style={{ padding: '13px 12px', textAlign: 'center', fontSize: '11px' }}>
                           <button
                             onClick={() => openCargoModal(order.serial_number, order.product_model ? order.product_model.model_name : '')}
                             disabled={!order.serial_number}
@@ -562,7 +568,7 @@ export default function DealerSalesArchive({ isMobileView }) {
                               color: order.serial_number ? 'var(--text-primary)' : 'var(--text-muted)',
                               fontFamily: 'SUITE, sans-serif',
                               fontWeight: order.serial_number ? 600 : 100,
-                              padding: '4px 10px', borderRadius: '6px', fontSize: '12px',
+                              padding: '4px 10px', borderRadius: '6px', fontSize: '11px',
                               cursor: order.serial_number ? 'pointer' : 'not-allowed',
                               display: 'inline-flex', alignItems: 'center', gap: '4px',
                               transition: 'all 0.2s'
@@ -572,7 +578,7 @@ export default function DealerSalesArchive({ isMobileView }) {
                             <ExternalLink size={14} /> Details
                           </button>
                         </td>
-                        <td style={{ padding: '14px 12px', textAlign: 'center', fontSize: '12px' }}>
+                        <td style={{ padding: '13px 12px', textAlign: 'center', fontSize: '11px' }}>
                           {isPickedUp ? (
                             <span style={{ color: 'var(--success-color)', fontWeight: 600 }}>Picked Up</span>
                           ) : (

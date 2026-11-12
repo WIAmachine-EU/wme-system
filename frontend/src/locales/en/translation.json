@@ -48,8 +48,8 @@
       "dashboard": "RSM Sales Stats"
     },
     "dealer_menu": {
-      "dashboard": "Order / Delivery Status",
-      "orders": "Delivery Status",
+      "dashboard": "Portal Dashboard",
+      "orders": "Order / Delivery Status",
       "sales_archive": "My Ordered",
       "inventory": "WIA Stock List",
       "promotion": "WIA Promotion",
@@ -380,8 +380,9 @@
     "search_placeholder": "search"
   },
   "dealer_dashboard": {
-    "title": "Dealer Portal Dashboard",
+    "title": "Portal Dashboard",
     "subtitle": "Order summary and ATP stock overview.",
+    "my_ordered_desc": "The list of your order history",
     "active_orders": "Order in Progress",
     "active_desc": "Total active orders in timeline",
     "shipping_orders": "Shipping Machine",
@@ -401,7 +402,7 @@
     "header_request": "Request"
   },
   "dealer_orders": {
-    "title": "Delivery Status",
+    "title": "Order / Delivery Status",
     "subtitle": "Track your orders through a detailed timeline using P/O or S/N.",
     "search_placeholder": "Search",
     "pipeline_title": "Delivery Tracking Timeline",

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import ScrollButtons from './components/ScrollButtons';
@@ -35,6 +36,7 @@ import UserProfile from './pages/UserProfile';
 const INACTIVITY_TIME = 30 * 60 * 1000; // 30 minutes in milliseconds
 
 export default function App() {
+  const { i18n } = useTranslation();
   const [authState] = useState(() => {
     try {
       const stored = localStorage.getItem('erp_auth');
@@ -174,6 +176,12 @@ export default function App() {
     setCurrentUserEmail(email || userId);
     setNeedsProfileSetup(Boolean(profileSetupNeeded));
     setIsAuthenticated(true);
+
+    // 딜러 포털 로그인 시 기본적으로 영문(EN) 페이지를 우선 적용
+    if (role === 'DEALER') {
+      i18n.changeLanguage('en');
+    }
+
     if (profileSetupNeeded) {
       setActiveTab('profile');
     }

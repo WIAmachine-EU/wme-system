@@ -4,7 +4,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 export function InventoryAgingWidget({ orders }) {
   const now = new Date();
   let normal = 0, longTerm = 0, bad = 0;
-  
+
   if (orders && orders.length > 0) {
     orders.forEach(order => {
       if (order.current_status === 'IN_STOCK' && order.actual_date) {
@@ -65,7 +65,7 @@ export function InventoryAgingWidget({ orders }) {
 export function DelayRateWidget({ shipments, isMobileView = false }) {
   let totalActive = 0;
   let delayed = 0;
-  
+
   if (shipments && shipments.length > 0) {
     shipments.forEach(s => {
       totalActive++;
@@ -80,7 +80,7 @@ export function DelayRateWidget({ shipments, isMobileView = false }) {
 
   const onTime = totalActive - delayed;
   const delayRate = totalActive > 0 ? ((delayed / totalActive) * 100).toFixed(1) : 0;
-  
+
   let statusColor = '#22c55e'; // green-500
   if (delayRate > 10) statusColor = '#eab308'; // yellow-500
   if (delayRate > 20) statusColor = '#ef4444'; // red-500
@@ -91,20 +91,19 @@ export function DelayRateWidget({ shipments, isMobileView = false }) {
   ];
 
   return (
-    <div style={{ 
-      backgroundColor: '#fff', 
-      padding: isMobileView ? '14px 16px' : '16px', 
-      borderRadius: '12px', 
-      boxShadow: isMobileView ? '0 1px 3px rgba(0,0,0,0.05)' : '0 4px 6px -1px rgba(0,0,0,0.1)', 
-      border: '1px solid #e2e8f0', 
-      display: 'flex', 
+    <div style={{
+      backgroundColor: '#fff',
+      padding: isMobileView ? '14px 16px' : '16px',
+      borderRadius: '12px',
+      boxShadow: isMobileView ? '0 1px 3px rgba(0,0,0,0.05)' : '0 4px 6px -1px rgba(0,0,0,0.1)',
+      border: '1px solid #e2e8f0',
+      display: 'flex',
       flexDirection: 'column',
       width: '100%',
       boxSizing: 'border-box'
     }}>
       <div style={{ marginBottom: '8px' }}>
         <h3 style={{ fontSize: isMobileView ? '1rem' : '1.125rem', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>해상 운송 지연율</h3>
-        <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '2px 0 0 0' }}>TrackCargo 연동 ETA 변동 기준</p>
       </div>
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ width: '50%', height: isMobileView ? '135px' : '160px' }}>
