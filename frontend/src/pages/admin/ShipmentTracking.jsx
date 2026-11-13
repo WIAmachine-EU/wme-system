@@ -609,59 +609,70 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
             {/* Tab Content */}
             <div style={{ flex: 1, overflowY: isMobile ? 'visible' : 'auto', padding: isMobile ? '16px' : '20px' }}>
               {activeTab === 'Containers' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {activeShipment.orders?.map((o, idx) => (
                     <div
                       key={idx}
                       style={{
                         backgroundColor: '#ffffff',
-                        padding: '12px 16px',
-                        borderRadius: '10px',
+                        padding: '10px 14px',
+                        borderRadius: '8px',
                         border: '1px solid #e2e8f0',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                        display: 'flex',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1.35fr 1.15fr',
                         alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '8px',
+                        gap: '6px',
                         fontFamily: "'SUITE', sans-serif",
                         transition: 'all 0.15s ease'
                       }}
                     >
-                      {/* 왼쪽: 모델정보 */}
-                      <span style={{ fontWeight: 800, fontSize: '0.8rem', color: '#0f172a', minWidth: '60px', fontFamily: "'SUITE', sans-serif" }}>
-                        {o.product_model?.model_name || 'Machine'}
-                      </span>
+                      {/* 왼쪽: 모델정보 (왼쪽 정렬) */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', minWidth: 0, overflow: 'hidden' }}>
+                        <span style={{
+                          fontWeight: 800,
+                          fontSize: '0.65rem',
+                          color: '#0f172a',
+                          fontFamily: "'SUITE', sans-serif",
+                          whiteSpace: 'nowrap',
+                          textOverflow: 'ellipsis',
+                          overflow: 'hidden'
+                        }}>
+                          {o.product_model?.model_name || 'Machine'}
+                        </span>
+                      </div>
 
-                      {/* 가운데: S/N정보 */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 600, fontFamily: "'SUITE', sans-serif" }}>S/N:</span>
+                      {/* 가운데: S/N정보 (중앙 정렬) */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                        <span style={{ color: '#64748b', fontSize: '0.65rem', fontWeight: 600, fontFamily: "'SUITE', sans-serif" }}>S/N:</span>
                         {o.serial_number ? (
                           <span style={{
                             fontFamily: "'SUITE', sans-serif",
-                            fontSize: '0.8rem',
+                            fontSize: '0.65rem',
                             fontWeight: 700,
                             color: '#1d4ed8',
                             backgroundColor: '#eff6ff',
-                            padding: '2px 8px',
+                            padding: '2px 6px',
                             borderRadius: '4px',
-                            border: '1px solid #dbeafe'
+                            border: '1px solid #dbeafe',
+                            whiteSpace: 'nowrap'
                           }}>
                             {o.serial_number}
                           </span>
                         ) : (
-                          <span style={{ color: '#94a3b8', fontSize: '0.8rem', fontStyle: 'italic', fontFamily: "'SUITE', sans-serif" }}>미배정 (-)</span>
+                          <span style={{ color: '#94a3b8', fontSize: '0.65rem', fontStyle: 'italic', fontFamily: "'SUITE', sans-serif", whiteSpace: 'nowrap' }}>미배정 (-)</span>
                         )}
                       </div>
 
-                      {/* 오른쪽: P/O정보 */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', fontFamily: "'SUITE', sans-serif" }}>
+                      {/* 오른쪽: P/O정보 (중앙 정렬) */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', fontSize: '0.65rem', fontFamily: "'SUITE', sans-serif" }}>
                         <span style={{ color: '#94a3b8', fontWeight: 500, fontFamily: "'SUITE', sans-serif" }}>P/O:</span>
-                        <span style={{ fontWeight: 600, color: '#1e293b', fontFamily: "'SUITE', sans-serif" }}>{o.reference_no}</span>
+                        <span style={{ fontWeight: 600, color: '#1e293b', fontFamily: "'SUITE', sans-serif", whiteSpace: 'nowrap' }}>{o.reference_no}</span>
                       </div>
                     </div>
                   ))}
                   {(!activeShipment.orders || activeShipment.orders.length === 0) && (
-                    <p style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center', padding: '24px 0', margin: 0, fontFamily: "'SUITE', sans-serif" }}>포함된 장비 정보가 없습니다.</p>
+                    <p style={{ fontSize: '0.65rem', color: '#64748b', textAlign: 'center', padding: '24px 0', margin: 0, fontFamily: "'SUITE', sans-serif" }}>포함된 장비 정보가 없습니다.</p>
                   )}
                 </div>
               )}
