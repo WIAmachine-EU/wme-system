@@ -370,7 +370,7 @@ export default function DealerInventory({ isMobileView }) {
         {isMobileView ? (
           <div className="mobile-cards-grid">
             {loading ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('navbar.init_seed_loading')}</div>
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('common.loading', 'Loading data...')}</div>
             ) : sortedOrders.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dealer_dashboard.no_atp')}</div>
             ) : (
@@ -484,7 +484,7 @@ export default function DealerInventory({ isMobileView }) {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={10} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('navbar.init_seed_loading')}</td></tr>
+                  <tr><td colSpan={10} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('common.loading', 'Loading data...')}</td></tr>
                 ) : sortedOrders.length === 0 ? (
                   <tr><td colSpan={10} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dealer_dashboard.no_atp')}</td></tr>
                 ) : (

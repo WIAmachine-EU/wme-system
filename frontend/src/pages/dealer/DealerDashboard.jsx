@@ -105,7 +105,7 @@ export default function DealerDashboard({ isMobileView, setActiveTab }) {
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('navbar.init_seed_loading')}</div>
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('common.loading', 'Loading data...')}</div>
       ) : (
         <>
           {/* 상위: 박스 3개 (KPI Grid) */}
@@ -222,7 +222,7 @@ export default function DealerDashboard({ isMobileView, setActiveTab }) {
             {isMobileView ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {recentOrders.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>구매 내역이 존재하지 않습니다.</div>
+                  <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>{t('dealer_orders.no_orders', 'No order history available.')}</div>
                 ) : (
                   recentOrders.map((order, idx) => {
                     const statusColor = getStatusColor(order.current_status);
@@ -267,7 +267,7 @@ export default function DealerDashboard({ isMobileView, setActiveTab }) {
                   </thead>
                   <tbody>
                     {recentOrders.length === 0 ? (
-                      <tr><td colSpan={7} style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>구매 내역이 존재하지 않습니다.</td></tr>
+                      <tr><td colSpan={7} style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>{t('dealer_orders.no_orders', 'No order history available.')}</td></tr>
                     ) : (
                       recentOrders.map((order, idx) => {
                         const statusColor = getStatusColor(order.current_status);

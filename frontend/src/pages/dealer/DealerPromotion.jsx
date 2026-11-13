@@ -432,7 +432,7 @@ export default function DealerPromotion({ isMobileView }) {
         )}
 
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('navbar.init_seed_loading')}</div>
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('common.loading', 'Loading data...')}</div>
         ) : isMobileView ? (
           <div className="mobile-cards-grid">
             {sortedPromotions.length === 0 ? (

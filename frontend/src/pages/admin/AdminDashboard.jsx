@@ -541,9 +541,9 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
         {isMobileView ? (
           <div className="mobile-cards-grid">
             {loading ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>데이터를 불러오는 중입니다...</div>
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('common.loading', 'Loading data...')}</div>
             ) : sortedOrders.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>조회된 주문 내역이 없습니다.</div>
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('common.no_orders', 'No orders found.')}</div>
             ) : (
               sortedOrders.map(order => (
                 <div key={order.id} className="mobile-order-card" onClick={() => toggleRow(order.id)} style={{ cursor: 'pointer' }}>
@@ -700,9 +700,9 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>데이터를 불러오는 중입니다...</td></tr>
+                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('common.loading', 'Loading data...')}</td></tr>
                 ) : sortedOrders.length === 0 ? (
-                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>조회된 주문 내역이 없습니다.</td></tr>
+                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('common.no_orders', 'No orders found.')}</td></tr>
                 ) : (
                   sortedOrders.map((order, index) => {
                     const showSchedule = !['CONFIRMED', 'IN_PRODUCTION'].includes(order.current_status);

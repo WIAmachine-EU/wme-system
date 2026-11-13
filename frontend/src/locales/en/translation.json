@@ -73,7 +73,9 @@
     "stat_in_production": "in Production",
     "stat_shipping": "Shipping",
     "stat_arrived": "Arrived",
-    "stat_in_stock": "Stock"
+    "stat_in_stock": "Stock",
+    "loading": "Loading data...",
+    "no_orders": "No orders found."
   },
   "menu1": {
     "header_no": "*",
@@ -418,7 +420,8 @@
     "header_status": "Status",
     "header_port": "Port",
     "header_tracking": "Tracking",
-    "cargo_tracking_btn": "Cargo Tracking"
+    "cargo_tracking_btn": "Cargo Tracking",
+    "loading": "Loading data..."
   },
   "dealer_promotion": {
     "page_title": "WIA Promotion",
@@ -519,6 +522,9 @@
     "sort_stage_early": "(Initial stage)",
     "sort_stage_late": "(Final stage)",
     "sort_normal": "(Normal first)",
-    "sort_aging": "(Aging first)"
+    "sort_aging": "(Aging first)",
+    "loading": "Loading data...",
+    "no_orders": "No orders found.",
+    "no_data": "No data found."
   }
 }

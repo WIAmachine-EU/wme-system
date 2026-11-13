@@ -44,7 +44,7 @@ function CargoDetailModal({ isOpen, onClose, serialNumber, modelName }) {
         </h2>
 
         {loading ? (
-          <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>데이터를 불러오는 중입니다...</div>
+          <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>{t('common.loading', 'Loading data...')}</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', borderBottom: '2px solid var(--border-color)', paddingBottom: '12px' }}>
@@ -425,7 +425,7 @@ export default function DealerSalesArchive({ isMobileView }) {
 
         <div className="data-table-container full-bleed">
           {loading ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>{t('navbar.init_seed_loading', '데이터를 불러오는 중입니다...')}</div>
+            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>{t('common.loading', 'Loading data...')}</div>
           ) : isMobileView ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {sortedOrders.length > 0 ? (

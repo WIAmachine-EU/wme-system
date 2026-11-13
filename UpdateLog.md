@@ -17,6 +17,10 @@
   * 마우스 오버(Hover) 시 카드의 활성 테두리(border/box-shadow)와 가로 폭이 넓은 기계 이미지(HD2600 등)의 좌우 가장자리가 닿거나 겹치는 현상 개선.
   * 이미지 스타일에 상단 12px, 좌우 18px, 하단 4px 내부 패딩(padding: '12px 18px 4px 18px', boxSizing: 'border-box')을 부여하여 카드의 테두리 선 안쪽으로 기계 이미지가 여유 있게 안착되도록 시각적 여백 확보.
   * 마우스 오버(Hover) 시 카드의 하이라이트 테두리 두께를 기존 2px에서 **3px**(box-shadow: inset 0 0 0 2px rgb(205, 170, 125))로 확장하여, 레이아웃 밀림(Layout Shift) 없이 명확하고 직관적인 카드 포커스 시각 효과 구현.
+* **전역 데이터 로딩 및 빈 목록 문구 다국어(i18n) 동기화 (	ranslation.json, DealerOrders.jsx, AdminDashboard.jsx 등)**:
+  * 영문 페이지에서 테이블 데이터 조회 중 '데이터를 불러오는 중입니다...' 또는 잘못된 시드 데이터 생성 문구가 노출되던 문제 해결.
+  * locales/ko/translation.json 및 locales/en/translation.json 내 common.loading('데이터를 불러오는 중입니다...' / 'Loading data...'), common.no_orders, common.no_data 리소스를 통합 추가.
+  * DealerOrders, DealerDashboard, DealerInventory, DealerPromotion, DealerSalesArchive, AdminDashboard, AdminInventory, AdminSalesArchive, AdminDispatch 등 시스템 전반의 테이블 로딩 플레이스홀더를 다국어 표준 호출(	('common.loading'))로 일괄 전환.
 
 
 ## [2026-11-12] 표준 프로토콜 기반 직렬 2단계 인증(AAL2), 제로터치 온보딩, 전 환경 패스키 호환성 및 딜러 포털 대시보드·구매내역 UI/다국어 전면 개편

@@ -44,7 +44,7 @@ function CargoDetailModal({ isOpen, onClose, serialNumber, modelName }) {
         </h2>
 
         {loading ? (
-          <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>{t('dispatch.loading', '데이터를 불러오는 중입니다...')}</div>
+          <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>{t('common.loading', 'Loading data...')}</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', borderBottom: '2px solid var(--border-color)', paddingBottom: '12px' }}>
@@ -675,7 +675,7 @@ export default function AdminDispatch({ isMobileView }) {
         {isMobileView ? (
           <div className="mobile-cards-grid">
             {loading ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dispatch.loading', '데이터를 불러오는 중입니다...')}</div>
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('common.loading', 'Loading data...')}</div>
             ) : sortedOrders.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dispatch.no_data', '조건에 맞는 입고 장비가 없습니다.')}</div>
             ) : (
@@ -807,7 +807,7 @@ export default function AdminDispatch({ isMobileView }) {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={10} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dispatch.loading', '데이터를 불러오는 중입니다...')}</td></tr>
+                  <tr><td colSpan={10} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('common.loading', 'Loading data...')}</td></tr>
                 ) : sortedOrders.length === 0 ? (
                   <tr><td colSpan={10} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dispatch.no_data', '조건에 맞는 입고 장비가 없습니다.')}</td></tr>
                 ) : (

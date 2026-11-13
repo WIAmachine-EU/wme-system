@@ -73,7 +73,9 @@
     "stat_in_production": "생산중",
     "stat_shipping": "배송",
     "stat_arrived": "항구도착",
-    "stat_in_stock": "입고"
+    "stat_in_stock": "입고",
+    "loading": "데이터를 불러오는 중입니다...",
+    "no_orders": "조회된 주문 내역이 없습니다."
   },
   "menu1": {
     "header_no": "*",
@@ -418,7 +420,8 @@
     "header_status": "Status",
     "header_port": "Port",
     "header_tracking": "화물추적",
-    "cargo_tracking_btn": "화물추적"
+    "cargo_tracking_btn": "화물추적",
+    "loading": "데이터를 불러오는 중입니다..."
   },
   "dealer_promotion": {
     "page_title": "WIA 프로모션",
@@ -519,6 +522,9 @@
     "sort_stage_early": "(초기단계순)",
     "sort_stage_late": "(완료단계순)",
     "sort_normal": "(일반순)",
-    "sort_aging": "(장기순)"
+    "sort_aging": "(장기순)",
+    "loading": "데이터를 불러오는 중입니다...",
+    "no_orders": "조회된 주문 내역이 없습니다.",
+    "no_data": "조회된 데이터가 없습니다."
   }
 }

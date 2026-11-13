@@ -286,9 +286,9 @@ export default function DealerOrders({ isMobileView }) {
         {isMobileView ? (
           <div className="mobile-cards-grid">
             {loading ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('navbar.init_seed_loading')}</div>
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dealer_orders.loading', 'Loading data...')}</div>
             ) : sortedOrders.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dealer_orders.no_orders')}</div>
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dealer_orders.no_orders', 'No order history available.')}</div>
             ) : (
               sortedOrders.map(order => (
                 <div key={order.id} className="mobile-order-card" onClick={() => toggleRow(order.id)} style={{ cursor: 'pointer' }}>
@@ -385,9 +385,9 @@ export default function DealerOrders({ isMobileView }) {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('navbar.init_seed_loading')}</td></tr>
+                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dealer_orders.loading', 'Loading data...')}</td></tr>
                 ) : sortedOrders.length === 0 ? (
-                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dealer_orders.no_orders')}</td></tr>
+                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('dealer_orders.no_orders', 'No order history available.')}</td></tr>
                 ) : (
                   sortedOrders.map((order, index) => {
                     const showSchedule = !['CONFIRMED', 'IN_PRODUCTION'].includes(order.current_status);

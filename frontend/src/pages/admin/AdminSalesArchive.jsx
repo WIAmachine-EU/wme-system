@@ -476,9 +476,9 @@ export default function AdminSalesArchive({ isMobileView }) {
           /* Mobile Card View */
           <div className="mobile-cards-grid">
             {loading ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>데이터를 불러오는 중입니다...</div>
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('common.loading', 'Loading data...')}</div>
             ) : sortedOrders.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>조건에 맞는 판매 장비가 없습니다.</div>
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('common.no_data', 'No sales history available.')}</div>
             ) : (
               sortedOrders.map((order, idx) => {
                 const isPickedUp = !!order.pickup_date;
@@ -598,9 +598,9 @@ export default function AdminSalesArchive({ isMobileView }) {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={11} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>데이터를 불러오는 중입니다...</td></tr>
+                  <tr><td colSpan={11} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('common.loading', 'Loading data...')}</td></tr>
                 ) : sortedOrders.length === 0 ? (
-                  <tr><td colSpan={11} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>조건에 맞는 판매 장비가 없습니다.</td></tr>
+                  <tr><td colSpan={11} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('common.no_data', 'No sales history available.')}</td></tr>
                 ) : (
                   sortedOrders.map((order, index) => {
                     const isPickedUp = !!order.pickup_date;
