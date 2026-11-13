@@ -55,7 +55,7 @@ const fetchSyncStatus = async () => {
 
 export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
   const [selectedMbl, setSelectedMbl] = useState(null);
-  const [activeTab, setActiveTab] = useState('Route'); // Route, Containers, Vessel, Exceptions
+  const [activeTab, setActiveTab] = useState('Containers'); // Containers, Route, Vessel, Exceptions
   const [isManualSyncing, setIsManualSyncing] = useState(false);
   const [syncFeedback, setSyncFeedback] = useState(null);
 
@@ -582,7 +582,7 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
               flexShrink: 0,
               backgroundColor: '#f8fafc'
             }}>
-              {['Route', 'Vessel', 'Containers', 'Exceptions'].map(tab => (
+              {['Containers', 'Route', 'Vessel', 'Exceptions'].map(tab => (
                 <button
                   key={tab}
                   style={{
@@ -600,13 +600,70 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
                   }}
                   onClick={() => setActiveTab(tab)}
                 >
-                  {tab === 'Route' ? '항로' : (tab === 'Vessel' ? '선박' : (tab === 'Containers' ? '장비목록' : '예외사항'))}
+                  {tab === 'Containers' ? '장비목록' : (tab === 'Route' ? '항로' : (tab === 'Vessel' ? '선박' : '예외사항'))}
                 </button>
               ))}
             </div>
 
             {/* Tab Content */}
             <div style={{ flex: 1, overflowY: isMobile ? 'visible' : 'auto', padding: isMobile ? '16px' : '20px' }}>
+              {activeTab === 'Containers' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {activeShipment.orders?.map((o, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        backgroundColor: '#ffffff',
+                        padding: '12px 16px',
+                        borderRadius: '10px',
+                        border: '1px solid #e2e8f0',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '8px',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {/* 왼쪽: 모델정보 */}
+                      <span style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a', minWidth: '60px' }}>
+                        {o.product_model?.model_name || 'Machine'}
+                      </span>
+
+                      {/* 가운데: S/N정보 */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 600 }}>S/N:</span>
+                        {o.serial_number ? (
+                          <span style={{
+                            fontFamily: 'monospace',
+                            fontSize: '0.8rem',
+                            fontWeight: 700,
+                            color: '#1d4ed8',
+                            backgroundColor: '#eff6ff',
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            border: '1px solid #dbeafe'
+                          }}>
+                            {o.serial_number}
+                          </span>
+                        ) : (
+                          <span style={{ color: '#94a3b8', fontSize: '0.78rem', fontStyle: 'italic' }}>미배정 (-)</span>
+                        )}
+                      </div>
+
+                      {/* 오른쪽: P/O정보 */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem' }}>
+                        <span style={{ color: '#94a3b8', fontWeight: 500 }}>P/O:</span>
+                        <span style={{ fontWeight: 600, color: '#1e293b' }}>{o.reference_no}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {(!activeShipment.orders || activeShipment.orders.length === 0) && (
+                    <p style={{ fontSize: '0.875rem', color: '#64748b', textAlign: 'center', padding: '24px 0', margin: 0 }}>포함된 장비 정보가 없습니다.</p>
+                  )}
+                </div>
+              )}
+
               {activeTab === 'Route' && (() => {
                 const isShipmentArrived = Boolean(
                   activeShipment.is_arrived ||
@@ -698,72 +755,6 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
                   </div>
                 );
               })()}
-
-              {activeTab === 'Containers' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {activeShipment.orders?.map((o, idx) => (
-                    <div
-                      key={idx}
-                      style={{
-                        backgroundColor: '#ffffff',
-                        padding: '14px 16px',
-                        borderRadius: '10px',
-                        border: '1px solid #e2e8f0',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '8px',
-                        transition: 'all 0.15s ease'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>
-                          {o.product_model?.model_name || 'Machine'}
-                        </span>
-                        <span style={{
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
-                          backgroundColor: o.current_status === 'SHIPPING' ? '#eff6ff' : (o.current_status === 'CONFIRMED' ? '#ecfdf5' : '#f8fafc'),
-                          color: o.current_status === 'SHIPPING' ? '#2563eb' : (o.current_status === 'CONFIRMED' ? '#059669' : '#475569'),
-                          padding: '3px 8px',
-                          borderRadius: '6px',
-                          border: `1px solid ${o.current_status === 'SHIPPING' ? '#bfdbfe' : (o.current_status === 'CONFIRMED' ? '#a7f3d0' : '#e2e8f0')}`,
-                          letterSpacing: '0.02em'
-                        }}>
-                          {o.current_status || 'TRANSIT'}
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', paddingTop: '4px', borderTop: '1px dashed #f1f5f9' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ color: '#64748b', fontWeight: 600 }}>S/N:</span>
-                          {o.serial_number ? (
-                            <span style={{
-                              fontFamily: 'monospace',
-                              fontWeight: 700,
-                              color: '#1d4ed8',
-                              backgroundColor: '#eff6ff',
-                              padding: '2px 7px',
-                              borderRadius: '4px',
-                              border: '1px solid #dbeafe'
-                            }}>
-                              {o.serial_number}
-                            </span>
-                          ) : (
-                            <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>미배정 (-)</span>
-                          )}
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#475569' }}>
-                          <span style={{ color: '#94a3b8' }}>P/O:</span>
-                          <span style={{ fontWeight: 600, color: '#1e293b' }}>{o.reference_no}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {(!activeShipment.orders || activeShipment.orders.length === 0) && (
-                    <p style={{ fontSize: '0.875rem', color: '#64748b', textAlign: 'center', padding: '24px 0', margin: 0 }}>포함된 장비 정보가 없습니다.</p>
-                  )}
-                </div>
-              )}
 
               {activeTab === 'Vessel' && (() => {
                 const isShipmentArrived = Boolean(
