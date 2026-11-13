@@ -275,8 +275,8 @@ export default function ProductLibrary({ currentRole, isMobileView }) {
         }
         .library-product-card:hover {
           border-color: rgb(205, 170, 125) !important;
-          /* Base border is 1px, inset shadow adds 1px for a total 2px visual border */
-          box-shadow: inset 0 0 0 1px rgb(205, 170, 125), var(--shadow-lg) !important;
+          /* Base border is 1px, inset shadow adds 2px for a total 3px visual border */
+          box-shadow: inset 0 0 0 2px rgb(205, 170, 125), var(--shadow-lg) !important;
           background-color: var(--bg-card) !important;
         }
       `}</style>
