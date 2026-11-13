@@ -1,5 +1,6 @@
 import React from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+import { checkIsDelayed } from '../utils/geoUtils';
 
 export function InventoryAgingWidget({ orders }) {
   const now = new Date();
@@ -66,29 +67,37 @@ export function DelayRateWidget({ shipments, isMobileView = false }) {
   let totalActive = 0;
   let delayed = 0;
 
-  if (shipments && shipments.length > 0) {
+  if (Array.isArray(shipments) && shipments.length > 0) {
     shipments.forEach(s => {
       totalActive++;
-      if (s.trackcargo_status === 'Delayed' || (s.trackcargo_error && s.trackcargo_error.includes('Delay'))) {
+      const isShipmentArrived = Boolean(
+        s.is_arrived ||
+        /arrived|discharged|picked up|delivered|입고|도착/i.test(s.tracking_status_detail || s.trackcargo_status || s.status) ||
+        (s.eta && new Date(s.eta) <= new Date())
+      );
+      const isDelayed = isShipmentArrived ? false : checkIsDelayed(s);
+      if (isDelayed) {
         delayed++;
       }
     });
-  } else {
-    totalActive = 15;
-    delayed = 2;
   }
 
   const onTime = totalActive - delayed;
-  const delayRate = totalActive > 0 ? ((delayed / totalActive) * 100).toFixed(1) : 0;
+  const delayRateNum = totalActive > 0 ? (delayed / totalActive) * 100 : 0;
+  const delayRate = delayRateNum.toFixed(1);
 
   let statusColor = '#22c55e'; // green-500
-  if (delayRate > 10) statusColor = '#eab308'; // yellow-500
-  if (delayRate > 20) statusColor = '#ef4444'; // red-500
+  if (delayRateNum > 0 && delayRateNum <= 20) statusColor = '#eab308'; // yellow-500
+  if (delayRateNum > 20) statusColor = '#ef4444'; // red-500
 
-  const data = [
-    { name: '정상 운항', value: onTime, color: '#4ade80' },
-    { name: '지연 (3일+)', value: delayed, color: '#f87171' },
-  ];
+  const data = totalActive > 0
+    ? [
+        { name: '정상 운항', value: onTime, color: '#4ade80' },
+        { name: '지연 선박', value: delayed, color: '#f87171' },
+      ]
+    : [
+        { name: '조회 중 / 없음', value: 1, color: '#e2e8f0' },
+      ];
 
   return (
     <div style={{
@@ -109,12 +118,14 @@ export function DelayRateWidget({ shipments, isMobileView = false }) {
         <div style={{ width: '50%', height: isMobileView ? '135px' : '160px' }}>
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
-              <Pie data={data} cx="50%" cy="70%" startAngle={180} endAngle={0} innerRadius={50} outerRadius={70} paddingAngle={2} dataKey="value">
+              <Pie data={data} cx="50%" cy="70%" startAngle={180} endAngle={0} innerRadius={50} outerRadius={70} paddingAngle={delayed > 0 && onTime > 0 ? 2 : 0} dataKey="value">
                 {data.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip formatter={(value) => [`${value} 건`, '선적 수']} />
+              {totalActive > 0 && (
+                <Tooltip formatter={(value, name) => [`${value} 건`, name]} />
+              )}
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -123,9 +134,9 @@ export function DelayRateWidget({ shipments, isMobileView = false }) {
             <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '4px', marginTop: 0 }}>전체 운송 중 선박</p>
             <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>{totalActive} <span style={{ fontSize: '0.875rem', fontWeight: 'normal' }}>건</span></p>
           </div>
-          <div>
-            <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '4px', marginTop: 0 }}>지연율</p>
-            <p style={{ fontSize: '1.25rem', fontWeight: 'bold', color: statusColor, margin: 0 }}>{delayRate}%</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>지연율</span>
+            <span style={{ fontSize: '1.25rem', fontWeight: 'bold', color: statusColor, lineHeight: 1 }}>{delayRate}%</span>
           </div>
         </div>
       </div>
