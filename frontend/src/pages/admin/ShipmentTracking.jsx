@@ -631,7 +631,7 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', minWidth: 0, overflow: 'hidden' }}>
                         <span style={{
                           fontWeight: 800,
-                          fontSize: '0.65rem',
+                          fontSize: '0.7rem',
                           color: '#0f172a',
                           fontFamily: "'SUITE', sans-serif",
                           whiteSpace: 'nowrap',
@@ -644,11 +644,11 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
 
                       {/* 가운데: S/N정보 (중앙 정렬) */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                        <span style={{ color: '#64748b', fontSize: '0.65rem', fontWeight: 600, fontFamily: "'SUITE', sans-serif" }}>S/N:</span>
+                        <span style={{ color: '#64748b', fontSize: '0.7rem', fontWeight: 600, fontFamily: "'SUITE', sans-serif" }}>S/N:</span>
                         {o.serial_number ? (
                           <span style={{
                             fontFamily: "'SUITE', sans-serif",
-                            fontSize: '0.65rem',
+                            fontSize: '0.7rem',
                             fontWeight: 700,
                             color: '#1d4ed8',
                             backgroundColor: '#eff6ff',
@@ -660,19 +660,19 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
                             {o.serial_number}
                           </span>
                         ) : (
-                          <span style={{ color: '#94a3b8', fontSize: '0.65rem', fontStyle: 'italic', fontFamily: "'SUITE', sans-serif", whiteSpace: 'nowrap' }}>미배정 (-)</span>
+                          <span style={{ color: '#94a3b8', fontSize: '0.7rem', fontStyle: 'italic', fontFamily: "'SUITE', sans-serif", whiteSpace: 'nowrap' }}>미배정 (-)</span>
                         )}
                       </div>
 
                       {/* 오른쪽: P/O정보 (중앙 정렬) */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', fontSize: '0.65rem', fontFamily: "'SUITE', sans-serif" }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', fontSize: '0.7rem', fontFamily: "'SUITE', sans-serif" }}>
                         <span style={{ color: '#94a3b8', fontWeight: 500, fontFamily: "'SUITE', sans-serif" }}>P/O:</span>
                         <span style={{ fontWeight: 600, color: '#1e293b', fontFamily: "'SUITE', sans-serif", whiteSpace: 'nowrap' }}>{o.reference_no}</span>
                       </div>
                     </div>
                   ))}
                   {(!activeShipment.orders || activeShipment.orders.length === 0) && (
-                    <p style={{ fontSize: '0.65rem', color: '#64748b', textAlign: 'center', padding: '24px 0', margin: 0, fontFamily: "'SUITE', sans-serif" }}>포함된 장비 정보가 없습니다.</p>
+                    <p style={{ fontSize: '0.7rem', color: '#64748b', textAlign: 'center', padding: '24px 0', margin: 0, fontFamily: "'SUITE', sans-serif" }}>포함된 장비 정보가 없습니다.</p>
                   )}
                 </div>
               )}
