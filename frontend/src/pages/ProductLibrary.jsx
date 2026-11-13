@@ -139,7 +139,7 @@ export default function ProductLibrary({ currentRole, isMobileView }) {
               <img 
                 src={`${import.meta.env.VITE_R2_CUSTOM_DOMAIN || 'https://pub-6d550208b84b4585ba380e73abb8ae79.r2.dev'}/thumbnail/${encodeURIComponent(model.thumbnail_file || (model.thumbnail ? `${model.thumbnail}.webp` : `${model.id}.webp`))}`} 
                 alt={model.name} 
-                style={{ width: '100%', height: '100%', paddingTop: '5px', objectFit: 'contain' }}
+                style={{ width: '100%', height: '100%', padding: '12px 18px 4px 18px', boxSizing: 'border-box', objectFit: 'contain' }}
                 loading="lazy"
                 onError={(e) => {
                   e.target.style.display = 'none';

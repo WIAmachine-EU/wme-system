@@ -12,7 +12,10 @@
 
 ### 2. Cloudflare R2 퍼블릭 도메인(Public Development URL) 갱신 및 썸네일 로딩 정상화
 * **스토리지 엔드포인트 갱신**: Cloudflare R2 버킷(wmeins)의 Public Development URL 활성화에 따른 최신 공개 도메인(https://pub-6d550208b84b4585ba380e73abb8ae79.r2.dev) 동기화.
-* **프론트엔드 환경변수 및 폴백 URL 동기화**: rontend/.env 및 rontend/src/pages/ProductLibrary.jsx의 기본 도메인 설정을 새 R2 주소로 업데이트하여 404 차단 현상을 해결하고, 218종 전 모델의 고화질 WebP 썸네일 이미지가 라인업 제품 라이브러리 화면에서 끊김 없이 정상 로딩되도록 조치 완료.
+* **프론트엔드 환경변수 및 폴백 URL 동기화**: frontend/.env 및 frontend/src/pages/ProductLibrary.jsx의 기본 도메인 설정을 새 R2 주소로 업데이트하여 404 차단 현상을 해결하고, 218종 전 모델의 고화질 WebP 썸네일 이미지가 라인업 제품 라이브러리 화면에서 끊김 없이 정상 로딩되도록 조치 완료.
+* **카드 썸네일 내부 여백 및 테두리 겹침 방지 최적화 (ProductLibrary.jsx)**:
+  * 마우스 오버(Hover) 시 카드의 활성 테두리(border/box-shadow)와 가로 폭이 넓은 기계 이미지(HD2600 등)의 좌우 가장자리가 닿거나 겹치는 현상 개선.
+  * 이미지 스타일에 상단 12px, 좌우 18px, 하단 4px 내부 패딩(padding: '12px 18px 4px 18px', boxSizing: 'border-box')을 부여하여 카드의 테두리 선 안쪽으로 기계 이미지가 여유 있게 안착되도록 시각적 여백 확보.
 
 
 ## [2026-11-12] 표준 프로토콜 기반 직렬 2단계 인증(AAL2), 제로터치 온보딩, 전 환경 패스키 호환성 및 딜러 포털 대시보드·구매내역 UI/다국어 전면 개편
