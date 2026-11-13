@@ -137,7 +137,7 @@ export default function ProductLibrary({ currentRole, isMobileView }) {
             <div style={{ height: '190px', background: 'transparent', position: 'relative' }}>
               {/* Cloudflare R2 버킷 기본 도메인 폴백 지정 (Render 배포 환경변수 누락 대비) */}
               <img 
-                src={`${import.meta.env.VITE_R2_CUSTOM_DOMAIN || 'https://pub-83904521416547dabb69bfc1d46438a8.r2.dev'}/thumbnail/${encodeURIComponent(model.thumbnail_file || (model.thumbnail ? `${model.thumbnail}.webp` : `${model.id}.webp`))}`} 
+                src={`${import.meta.env.VITE_R2_CUSTOM_DOMAIN || 'https://pub-6d550208b84b4585ba380e73abb8ae79.r2.dev'}/thumbnail/${encodeURIComponent(model.thumbnail_file || (model.thumbnail ? `${model.thumbnail}.webp` : `${model.id}.webp`))}`} 
                 alt={model.name} 
                 style={{ width: '100%', height: '100%', paddingTop: '5px', objectFit: 'contain' }}
                 loading="lazy"
