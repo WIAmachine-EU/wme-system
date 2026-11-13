@@ -1,5 +1,16 @@
 ﻿# 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
+## [2026-11-13] 제품 라이브러리(Product Library) 218종 전 모델 썸네일 파일명 매핑 및 데이터베이스 동기화
+
+### 1. 218종 공작기계 모델 Cloudflare R2 썸네일 파일명(Thumbnail file_name .webp) DB 동기화
+* **데이터베이스 컬럼 및 매핑 업데이트**:
+  * SQLite(`scm_erp.db`) 내 `product_models` 테이블의 218개 전 모델에 대해 `Thumbnail code` 문서 기준 `thumbnail_file`(.webp) 100% 매핑 및 업데이트 완료.
+  * 백엔드 자동 마이그레이션 스크립트(`backend/update_thumbnails.py`) 내 `THUMBNAIL_DATA` 딕셔너리를 218개 전 모델 매핑으로 전면 확장하고 `run_migration(db)` 로직을 보완하여 Render PostgreSQL 환경에서도 서버 재시작 시 자동으로 최신 썸네일 파일명이 반영되도록 구성.
+* **프론트엔드 제품 라이브러리 연동 및 인코딩 최적화**:
+  * `frontend/src/data/productLibraryModels.js`의 218개 모델 객체에 `thumbnail_file` 속성 추가 반영.
+  * `frontend/src/pages/ProductLibrary.jsx` 썸네일 이미지 로더 URL에 `encodeURIComponent`를 적용하여 파일명 내 공백이 포함된 모델(`thumbnail_HD2600 3100 Series.webp`, `thumbnail_L600 700 800 Series.webp` 등)도 Cloudflare R2 스토리지(`/thumbnail/`)에서 깨짐 없이 완벽하게 로드되도록 개선.
+
+
 ## [2026-11-12] 표준 프로토콜 기반 직렬 2단계 인증(AAL2), 제로터치 온보딩, 전 환경 패스키 호환성 및 딜러 포털 대시보드·구매내역 UI/다국어 전면 개편
 
 ### 1. 로그인 식별자 이메일(email) 단일화 및 사용자 성명(username) 역할 분리

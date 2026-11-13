@@ -1,6 +1,7 @@
 export const productLibraryModels = [
     {
       id: 'E160A',
+      thumbnail_file: 'thumbnail_E160.webp',
       name: 'E160A',
       category: 'CNC T/C',
       series: 'E160 Series',
@@ -28,6 +29,7 @@ export const productLibraryModels = [
     },
     {
       id: 'E160C',
+      thumbnail_file: 'thumbnail_E160.webp',
       name: 'E160C',
       category: 'CNC T/C',
       series: 'E160 Series',
@@ -55,6 +57,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HD2200',
+      thumbnail_file: 'thumbnail_HD2200.webp',
       name: 'HD2200',
       category: 'CNC T/C',
       series: 'HD2200 Series',
@@ -82,6 +85,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HD2200C',
+      thumbnail_file: 'thumbnail_HD2200.webp',
       name: 'HD2200C',
       category: 'CNC T/C',
       series: 'HD2200 Series',
@@ -109,6 +113,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HD2200M',
+      thumbnail_file: 'thumbnail_HD2200.webp',
       name: 'HD2200M',
       category: 'CNC T/C',
       series: 'HD2200 Series',
@@ -136,6 +141,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HD2200MC',
+      thumbnail_file: 'thumbnail_HD2200.webp',
       name: 'HD2200MC',
       category: 'CNC T/C',
       series: 'HD2200 Series',
@@ -163,6 +169,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HD2600',
+      thumbnail_file: 'thumbnail_HD2600 3100 Series.webp',
       name: 'HD2600',
       category: 'CNC T/C',
       series: 'HD2600/3100 Series',
@@ -190,6 +197,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HD2600L',
+      thumbnail_file: 'thumbnail_HD2600 3100 Series.webp',
       name: 'HD2600L',
       category: 'CNC T/C',
       series: 'HD2600/3100 Series',
@@ -217,6 +225,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HD2600LM',
+      thumbnail_file: 'thumbnail_HD2600 3100 Series.webp',
       name: 'HD2600LM',
       category: 'CNC T/C',
       series: 'HD2600/3100 Series',
@@ -244,6 +253,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HD2600M',
+      thumbnail_file: 'thumbnail_HD2600 3100 Series.webp',
       name: 'HD2600M',
       category: 'CNC T/C',
       series: 'HD2600/3100 Series',
@@ -271,6 +281,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HD3100',
+      thumbnail_file: 'thumbnail_HD2600 3100 Series.webp',
       name: 'HD3100',
       category: 'CNC T/C',
       series: 'HD2600/3100 Series',
@@ -298,6 +309,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HD3100A',
+      thumbnail_file: 'thumbnail_HD2600 3100 Series.webp',
       name: 'HD3100A',
       category: 'CNC T/C',
       series: 'HD2600/3100 Series',
@@ -325,6 +337,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HD3100L',
+      thumbnail_file: 'thumbnail_HD2600 3100 Series.webp',
       name: 'HD3100L',
       category: 'CNC T/C',
       series: 'HD2600/3100 Series',
@@ -352,6 +365,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HD3100LM',
+      thumbnail_file: 'thumbnail_HD2600 3100 Series.webp',
       name: 'HD3100LM',
       category: 'CNC T/C',
       series: 'HD2600/3100 Series',
@@ -379,6 +393,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HD3100M',
+      thumbnail_file: 'thumbnail_HD2600 3100 Series.webp',
       name: 'HD3100M',
       category: 'CNC T/C',
       series: 'HD2600/3100 Series',
@@ -406,6 +421,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HD3100MA',
+      thumbnail_file: 'thumbnail_HD2600 3100 Series.webp',
       name: 'HD3100MA',
       category: 'CNC T/C',
       series: 'HD2600/3100 Series',
@@ -433,6 +449,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KIT250',
+      thumbnail_file: 'thumbnail_KIT Series.webp',
       name: 'KIT250',
       category: 'CNC T/C',
       series: 'KIT Series',
@@ -460,6 +477,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KIT4500',
+      thumbnail_file: 'thumbnail_KIT Series.webp',
       name: 'KIT4500',
       category: 'CNC T/C',
       series: 'KIT Series',
@@ -487,6 +505,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KIT60G',
+      thumbnail_file: 'thumbnail_KIT Series.webp',
       name: 'KIT60G',
       category: 'CNC T/C',
       series: 'KIT Series',
@@ -514,6 +533,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L300A',
+      thumbnail_file: 'thumbnail_L300 Series.webp',
       name: 'L300A',
       category: 'CNC T/C',
       series: 'L300 Series',
@@ -541,6 +561,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L300C',
+      thumbnail_file: 'thumbnail_L300 Series.webp',
       name: 'L300C',
       category: 'CNC T/C',
       series: 'L300 Series',
@@ -568,6 +589,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L300LA',
+      thumbnail_file: 'thumbnail_L300 Series.webp',
       name: 'L300LA',
       category: 'CNC T/C',
       series: 'L300 Series',
@@ -595,6 +617,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L300LC',
+      thumbnail_file: 'thumbnail_L300 Series.webp',
       name: 'L300LC',
       category: 'CNC T/C',
       series: 'L300 Series',
@@ -622,6 +645,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L300LMA',
+      thumbnail_file: 'thumbnail_L300 Series.webp',
       name: 'L300LMA',
       category: 'CNC T/C',
       series: 'L300 Series',
@@ -649,6 +673,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L300LMC',
+      thumbnail_file: 'thumbnail_L300 Series.webp',
       name: 'L300LMC',
       category: 'CNC T/C',
       series: 'L300 Series',
@@ -676,6 +701,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L300LMSA',
+      thumbnail_file: 'thumbnail_L300 Series.webp',
       name: 'L300LMSA',
       category: 'CNC T/C',
       series: 'L300 Series',
@@ -703,6 +729,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L300MA',
+      thumbnail_file: 'thumbnail_L300 Series.webp',
       name: 'L300MA',
       category: 'CNC T/C',
       series: 'L300 Series',
@@ -730,6 +757,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L300MC',
+      thumbnail_file: 'thumbnail_L300 Series.webp',
       name: 'L300MC',
       category: 'CNC T/C',
       series: 'L300 Series',
@@ -757,6 +785,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L300MSA',
+      thumbnail_file: 'thumbnail_L300 Series.webp',
       name: 'L300MSA',
       category: 'CNC T/C',
       series: 'L300 Series',
@@ -784,6 +813,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L300MSC',
+      thumbnail_file: 'thumbnail_L300 Series.webp',
       name: 'L300MSC',
       category: 'CNC T/C',
       series: 'L300 Series',
@@ -811,6 +841,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L4000',
+      thumbnail_file: 'thumbnail_L4000 Series.webp',
       name: 'L4000',
       category: 'CNC T/C',
       series: 'L4000 Series',
@@ -838,6 +869,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L4000C',
+      thumbnail_file: 'thumbnail_L4000 Series.webp',
       name: 'L4000C',
       category: 'CNC T/C',
       series: 'L4000 Series',
@@ -865,6 +897,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L4000L',
+      thumbnail_file: 'thumbnail_L4000 Series.webp',
       name: 'L4000L',
       category: 'CNC T/C',
       series: 'L4000 Series',
@@ -892,6 +925,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L4000LC',
+      thumbnail_file: 'thumbnail_L4000 Series.webp',
       name: 'L4000LC',
       category: 'CNC T/C',
       series: 'L4000 Series',
@@ -919,6 +953,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L4000LM',
+      thumbnail_file: 'thumbnail_L4000 Series.webp',
       name: 'L4000LM',
       category: 'CNC T/C',
       series: 'L4000 Series',
@@ -946,6 +981,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L4000LMC',
+      thumbnail_file: 'thumbnail_L4000 Series.webp',
       name: 'L4000LMC',
       category: 'CNC T/C',
       series: 'L4000 Series',
@@ -973,6 +1009,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L4000M',
+      thumbnail_file: 'thumbnail_L4000 Series.webp',
       name: 'L4000M',
       category: 'CNC T/C',
       series: 'L4000 Series',
@@ -1000,6 +1037,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L4000MC',
+      thumbnail_file: 'thumbnail_L4000 Series.webp',
       name: 'L4000MC',
       category: 'CNC T/C',
       series: 'L4000 Series',
@@ -1027,6 +1065,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L5100L',
+      thumbnail_file: 'thumbnail_L5100L Series.webp',
       name: 'L5100L',
       category: 'CNC T/C',
       series: 'L5100L Series',
@@ -1054,6 +1093,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L5100LC',
+      thumbnail_file: 'thumbnail_L5100L Series.webp',
       name: 'L5100LC',
       category: 'CNC T/C',
       series: 'L5100L Series',
@@ -1081,6 +1121,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L5100LM',
+      thumbnail_file: 'thumbnail_L5100L Series.webp',
       name: 'L5100LM',
       category: 'CNC T/C',
       series: 'L5100L Series',
@@ -1108,6 +1149,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L5100LMC',
+      thumbnail_file: 'thumbnail_L5100L Series.webp',
       name: 'L5100LMC',
       category: 'CNC T/C',
       series: 'L5100L Series',
@@ -1135,6 +1177,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L600A',
+      thumbnail_file: 'thumbnail_L600 700 800 Series.webp',
       name: 'L600A',
       category: 'CNC T/C',
       series: 'L600/700/800 Series',
@@ -1162,6 +1205,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L600LA',
+      thumbnail_file: 'thumbnail_L600 700 800 Series.webp',
       name: 'L600LA',
       category: 'CNC T/C',
       series: 'L600/700/800 Series',
@@ -1189,6 +1233,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L600LMA',
+      thumbnail_file: 'thumbnail_L600 700 800 Series.webp',
       name: 'L600LMA',
       category: 'CNC T/C',
       series: 'L600/700/800 Series',
@@ -1216,6 +1261,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L600MA',
+      thumbnail_file: 'thumbnail_L600 700 800 Series.webp',
       name: 'L600MA',
       category: 'CNC T/C',
       series: 'L600/700/800 Series',
@@ -1243,6 +1289,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L700A',
+      thumbnail_file: 'thumbnail_L600 700 800 Series.webp',
       name: 'L700A',
       category: 'CNC T/C',
       series: 'L600/700/800 Series',
@@ -1270,6 +1317,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L700LA',
+      thumbnail_file: 'thumbnail_L600 700 800 Series.webp',
       name: 'L700LA',
       category: 'CNC T/C',
       series: 'L600/700/800 Series',
@@ -1297,6 +1345,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L700LMA',
+      thumbnail_file: 'thumbnail_L600 700 800 Series.webp',
       name: 'L700LMA',
       category: 'CNC T/C',
       series: 'L600/700/800 Series',
@@ -1324,6 +1373,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L700MA',
+      thumbnail_file: 'thumbnail_L600 700 800 Series.webp',
       name: 'L700MA',
       category: 'CNC T/C',
       series: 'L600/700/800 Series',
@@ -1351,6 +1401,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L800A',
+      thumbnail_file: 'thumbnail_L600 700 800 Series.webp',
       name: 'L800A',
       category: 'CNC T/C',
       series: 'L600/700/800 Series',
@@ -1378,6 +1429,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L800D',
+      thumbnail_file: 'thumbnail_L600 700 800 Series.webp',
       name: 'L800D',
       category: 'CNC T/C',
       series: 'L600/700/800 Series',
@@ -1405,6 +1457,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L800LA',
+      thumbnail_file: 'thumbnail_L600 700 800 Series.webp',
       name: 'L800LA',
       category: 'CNC T/C',
       series: 'L600/700/800 Series',
@@ -1432,6 +1485,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L800LD',
+      thumbnail_file: 'thumbnail_L600 700 800 Series.webp',
       name: 'L800LD',
       category: 'CNC T/C',
       series: 'L600/700/800 Series',
@@ -1459,6 +1513,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L800LMA',
+      thumbnail_file: 'thumbnail_L600 700 800 Series.webp',
       name: 'L800LMA',
       category: 'CNC T/C',
       series: 'L600/700/800 Series',
@@ -1486,6 +1541,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L800LMD',
+      thumbnail_file: 'thumbnail_L600 700 800 Series.webp',
       name: 'L800LMD',
       category: 'CNC T/C',
       series: 'L600/700/800 Series',
@@ -1513,6 +1569,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L800MA',
+      thumbnail_file: 'thumbnail_L600 700 800 Series.webp',
       name: 'L800MA',
       category: 'CNC T/C',
       series: 'L600/700/800 Series',
@@ -1540,6 +1597,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L800MD',
+      thumbnail_file: 'thumbnail_L600 700 800 Series.webp',
       name: 'L800MD',
       category: 'CNC T/C',
       series: 'L600/700/800 Series',
@@ -1567,6 +1625,7 @@ export const productLibraryModels = [
     },
     {
       id: 'SE2200',
+      thumbnail_file: 'thumbnail_SE2200 Series.webp',
       name: 'SE2200',
       category: 'CNC T/C',
       series: 'SE2200 Series',
@@ -1594,6 +1653,7 @@ export const productLibraryModels = [
     },
     {
       id: 'SE2200A',
+      thumbnail_file: 'thumbnail_SE2200 Series.webp',
       name: 'SE2200A',
       category: 'CNC T/C',
       series: 'SE2200 Series',
@@ -1621,6 +1681,7 @@ export const productLibraryModels = [
     },
     {
       id: 'SE2200L',
+      thumbnail_file: 'thumbnail_SE2200 Series.webp',
       name: 'SE2200L',
       category: 'CNC T/C',
       series: 'SE2200 Series',
@@ -1648,6 +1709,7 @@ export const productLibraryModels = [
     },
     {
       id: 'SE2200LA',
+      thumbnail_file: 'thumbnail_SE2200 Series.webp',
       name: 'SE2200LA',
       category: 'CNC T/C',
       series: 'SE2200 Series',
@@ -1675,6 +1737,7 @@ export const productLibraryModels = [
     },
     {
       id: 'SE2200LC',
+      thumbnail_file: 'thumbnail_SE2200 Series.webp',
       name: 'SE2200LC',
       category: 'CNC T/C',
       series: 'SE2200 Series',
@@ -1702,6 +1765,7 @@ export const productLibraryModels = [
     },
     {
       id: 'SE2200LM',
+      thumbnail_file: 'thumbnail_SE2200 Series.webp',
       name: 'SE2200LM',
       category: 'CNC T/C',
       series: 'SE2200 Series',
@@ -1729,6 +1793,7 @@ export const productLibraryModels = [
     },
     {
       id: 'SE2200LMA',
+      thumbnail_file: 'thumbnail_SE2200 Series.webp',
       name: 'SE2200LMA',
       category: 'CNC T/C',
       series: 'SE2200 Series',
@@ -1756,6 +1821,7 @@ export const productLibraryModels = [
     },
     {
       id: 'SE2200LMC',
+      thumbnail_file: 'thumbnail_SE2200 Series.webp',
       name: 'SE2200LMC',
       category: 'CNC T/C',
       series: 'SE2200 Series',
@@ -1783,6 +1849,7 @@ export const productLibraryModels = [
     },
     {
       id: 'SE2200LMS',
+      thumbnail_file: 'thumbnail_SE2200 Series.webp',
       name: 'SE2200LMS',
       category: 'CNC T/C',
       series: 'SE2200 Series',
@@ -1810,6 +1877,7 @@ export const productLibraryModels = [
     },
     {
       id: 'SE2200LMSA',
+      thumbnail_file: 'thumbnail_SE2200 Series.webp',
       name: 'SE2200LMSA',
       category: 'CNC T/C',
       series: 'SE2200 Series',
@@ -1837,6 +1905,7 @@ export const productLibraryModels = [
     },
     {
       id: 'SE2200LMSC',
+      thumbnail_file: 'thumbnail_SE2200 Series.webp',
       name: 'SE2200LMSC',
       category: 'CNC T/C',
       series: 'SE2200 Series',
@@ -1864,6 +1933,7 @@ export const productLibraryModels = [
     },
     {
       id: 'SE2200M',
+      thumbnail_file: 'thumbnail_SE2200 Series.webp',
       name: 'SE2200M',
       category: 'CNC T/C',
       series: 'SE2200 Series',
@@ -1891,6 +1961,7 @@ export const productLibraryModels = [
     },
     {
       id: 'SE2200MA',
+      thumbnail_file: 'thumbnail_SE2200 Series.webp',
       name: 'SE2200MA',
       category: 'CNC T/C',
       series: 'SE2200 Series',
@@ -1918,6 +1989,7 @@ export const productLibraryModels = [
     },
     {
       id: 'SE2600',
+      thumbnail_file: 'thumbnail_SE2600 Series.webp',
       name: 'SE2600',
       category: 'CNC T/C',
       series: 'SE2600 Series',
@@ -1945,6 +2017,7 @@ export const productLibraryModels = [
     },
     {
       id: 'SE2600L',
+      thumbnail_file: 'thumbnail_SE2600 Series.webp',
       name: 'SE2600L',
       category: 'CNC T/C',
       series: 'SE2600 Series',
@@ -1972,6 +2045,7 @@ export const productLibraryModels = [
     },
     {
       id: 'SE2600LM',
+      thumbnail_file: 'thumbnail_SE2600 Series.webp',
       name: 'SE2600LM',
       category: 'CNC T/C',
       series: 'SE2600 Series',
@@ -1999,6 +2073,7 @@ export const productLibraryModels = [
     },
     {
       id: 'SE2600M',
+      thumbnail_file: 'thumbnail_SE2600 Series.webp',
       name: 'SE2600M',
       category: 'CNC T/C',
       series: 'SE2600 Series',
@@ -2026,6 +2101,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HD2200SY',
+      thumbnail_file: 'thumbnail_HD-SY Series.webp',
       name: 'HD2200SY',
       category: 'CNC T/C',
       series: 'HD-SY Series',
@@ -2053,6 +2129,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HD2200Y',
+      thumbnail_file: 'thumbnail_HD-SY Series.webp',
       name: 'HD2200Y',
       category: 'CNC T/C',
       series: 'HD-SY Series',
@@ -2080,6 +2157,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HD2600LSY',
+      thumbnail_file: 'thumbnail_HD-SY Series.webp',
       name: 'HD2600LSY',
       category: 'CNC T/C',
       series: 'HD-SY Series',
@@ -2107,6 +2185,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HD2600LY',
+      thumbnail_file: 'thumbnail_HD-SY Series.webp',
       name: 'HD2600LY',
       category: 'CNC T/C',
       series: 'HD-SY Series',
@@ -2134,6 +2213,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HD2600SY',
+      thumbnail_file: 'thumbnail_HD-SY Series.webp',
       name: 'HD2600SY',
       category: 'CNC T/C',
       series: 'HD-SY Series',
@@ -2161,6 +2241,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HD2600Y',
+      thumbnail_file: 'thumbnail_HD-SY Series.webp',
       name: 'HD2600Y',
       category: 'CNC T/C',
       series: 'HD-SY Series',
@@ -2188,6 +2269,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HD3100LY',
+      thumbnail_file: 'thumbnail_HD-SY Series.webp',
       name: 'HD3100LY',
       category: 'CNC T/C',
       series: 'HD-SY Series',
@@ -2215,6 +2297,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HD3100LYA',
+      thumbnail_file: 'thumbnail_HD-SY Series.webp',
       name: 'HD3100LYA',
       category: 'CNC T/C',
       series: 'HD-SY Series',
@@ -2242,6 +2325,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HD3100SY',
+      thumbnail_file: 'thumbnail_HD-SY Series.webp',
       name: 'HD3100SY',
       category: 'CNC T/C',
       series: 'HD-SY Series',
@@ -2269,6 +2353,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HD3100SYA',
+      thumbnail_file: 'thumbnail_HD-SY Series.webp',
       name: 'HD3100SYA',
       category: 'CNC T/C',
       series: 'HD-SY Series',
@@ -2296,6 +2381,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HD3100Y',
+      thumbnail_file: 'thumbnail_HD-SY Series.webp',
       name: 'HD3100Y',
       category: 'CNC T/C',
       series: 'HD-SY Series',
@@ -2323,6 +2409,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HD3100YA',
+      thumbnail_file: 'thumbnail_HD-SY Series.webp',
       name: 'HD3100YA',
       category: 'CNC T/C',
       series: 'HD-SY Series',
@@ -2350,6 +2437,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KL7000LY',
+      thumbnail_file: 'thumbnail_KL-Y Series.webp',
       name: 'KL7000LY',
       category: 'CNC T/C',
       series: 'KL-Y Series',
@@ -2377,6 +2465,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KL8000LY',
+      thumbnail_file: 'thumbnail_KL-Y Series.webp',
       name: 'KL8000LY',
       category: 'CNC T/C',
       series: 'KL-Y Series',
@@ -2404,6 +2493,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L5100LY',
+      thumbnail_file: 'thumbnail_L5100LY.webp',
       name: 'L5100LY',
       category: 'CNC T/C',
       series: 'L5100LY',
@@ -2431,6 +2521,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L2000LSY',
+      thumbnail_file: 'thumbnail_L-Y Series.webp',
       name: 'L2000LSY',
       category: 'CNC T/C',
       series: 'L-Y Series',
@@ -2458,6 +2549,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L2000LY',
+      thumbnail_file: 'thumbnail_L-Y Series.webp',
       name: 'L2000LY',
       category: 'CNC T/C',
       series: 'L-Y Series',
@@ -2485,6 +2577,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L2000SY',
+      thumbnail_file: 'thumbnail_L-Y Series.webp',
       name: 'L2000SY',
       category: 'CNC T/C',
       series: 'L-Y Series',
@@ -2512,6 +2605,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L2000Y',
+      thumbnail_file: 'thumbnail_L-Y Series.webp',
       name: 'L2000Y',
       category: 'CNC T/C',
       series: 'L-Y Series',
@@ -2539,6 +2633,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L2600LY',
+      thumbnail_file: 'thumbnail_L-Y Series.webp',
       name: 'L2600LY',
       category: 'CNC T/C',
       series: 'L-Y Series',
@@ -2566,6 +2661,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L2600SY',
+      thumbnail_file: 'thumbnail_L-Y Series.webp',
       name: 'L2600SY',
       category: 'CNC T/C',
       series: 'L-Y Series',
@@ -2593,6 +2689,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L2600Y',
+      thumbnail_file: 'thumbnail_L-Y Series.webp',
       name: 'L2600Y',
       category: 'CNC T/C',
       series: 'L-Y Series',
@@ -2620,6 +2717,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L3000LY',
+      thumbnail_file: 'thumbnail_L-Y Series.webp',
       name: 'L3000LY',
       category: 'CNC T/C',
       series: 'L-Y Series',
@@ -2647,6 +2745,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L3000SY',
+      thumbnail_file: 'thumbnail_L-Y Series.webp',
       name: 'L3000SY',
       category: 'CNC T/C',
       series: 'L-Y Series',
@@ -2674,6 +2773,7 @@ export const productLibraryModels = [
     },
     {
       id: 'L3000Y',
+      thumbnail_file: 'thumbnail_L-Y Series.webp',
       name: 'L3000Y',
       category: 'CNC T/C',
       series: 'L-Y Series',
@@ -2701,6 +2801,7 @@ export const productLibraryModels = [
     },
     {
       id: 'SE2200LSY',
+      thumbnail_file: 'thumbnail_SE2200Y Series.webp',
       name: 'SE2200LSY',
       category: 'CNC T/C',
       series: 'SE2200Y Series',
@@ -2728,6 +2829,7 @@ export const productLibraryModels = [
     },
     {
       id: 'SE2200LSYA',
+      thumbnail_file: 'thumbnail_SE2200Y Series.webp',
       name: 'SE2200LSYA',
       category: 'CNC T/C',
       series: 'SE2200Y Series',
@@ -2755,6 +2857,7 @@ export const productLibraryModels = [
     },
     {
       id: 'SE2200LY',
+      thumbnail_file: 'thumbnail_SE2200Y Series.webp',
       name: 'SE2200LY',
       category: 'CNC T/C',
       series: 'SE2200Y Series',
@@ -2782,6 +2885,7 @@ export const productLibraryModels = [
     },
     {
       id: 'SE2200LYA',
+      thumbnail_file: 'thumbnail_SE2200Y Series.webp',
       name: 'SE2200LYA',
       category: 'CNC T/C',
       series: 'SE2200Y Series',
@@ -2809,6 +2913,7 @@ export const productLibraryModels = [
     },
     {
       id: 'SE2200Y',
+      thumbnail_file: 'thumbnail_SE2200Y Series.webp',
       name: 'SE2200Y',
       category: 'CNC T/C',
       series: 'SE2200Y Series',
@@ -2836,6 +2941,7 @@ export const productLibraryModels = [
     },
     {
       id: 'SE2200YA',
+      thumbnail_file: 'thumbnail_SE2200Y Series.webp',
       name: 'SE2200YA',
       category: 'CNC T/C',
       series: 'SE2200Y Series',
@@ -2863,6 +2969,7 @@ export const productLibraryModels = [
     },
     {
       id: 'SE2600LSY',
+      thumbnail_file: 'thumbnail_SE2600Y Series.webp',
       name: 'SE2600LSY',
       category: 'CNC T/C',
       series: 'SE2600Y Series',
@@ -2890,6 +2997,7 @@ export const productLibraryModels = [
     },
     {
       id: 'SE2600LY',
+      thumbnail_file: 'thumbnail_SE2600Y Series.webp',
       name: 'SE2600LY',
       category: 'CNC T/C',
       series: 'SE2600Y Series',
@@ -2917,6 +3025,7 @@ export const productLibraryModels = [
     },
     {
       id: 'SE2600SY',
+      thumbnail_file: 'thumbnail_SE2600Y Series.webp',
       name: 'SE2600SY',
       category: 'CNC T/C',
       series: 'SE2600Y Series',
@@ -2944,6 +3053,7 @@ export const productLibraryModels = [
     },
     {
       id: 'SE2600Y',
+      thumbnail_file: 'thumbnail_SE2600Y Series.webp',
       name: 'SE2600Y',
       category: 'CNC T/C',
       series: 'SE2600Y Series',
@@ -2971,6 +3081,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LV1100R',
+      thumbnail_file: 'thumbnail_LV1100 Series.webp',
       name: 'LV1100R',
       category: 'CNC T/C',
       series: 'LV1100 Series',
@@ -2998,6 +3109,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LV1100RM',
+      thumbnail_file: 'thumbnail_LV1100 Series.webp',
       name: 'LV1100RM',
       category: 'CNC T/C',
       series: 'LV1100 Series',
@@ -3025,6 +3137,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LV4500L',
+      thumbnail_file: 'thumbnail_LV4500 Series.webp',
       name: 'LV4500L',
       category: 'CNC T/C',
       series: 'LV4500 Series',
@@ -3052,6 +3165,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LV4500LM',
+      thumbnail_file: 'thumbnail_LV4500 Series.webp',
       name: 'LV4500LM',
       category: 'CNC T/C',
       series: 'LV4500 Series',
@@ -3079,6 +3193,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LV4500R',
+      thumbnail_file: 'thumbnail_LV4500 Series.webp',
       name: 'LV4500R',
       category: 'CNC T/C',
       series: 'LV4500 Series',
@@ -3106,6 +3221,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LV4500RM',
+      thumbnail_file: 'thumbnail_LV4500 Series.webp',
       name: 'LV4500RM',
       category: 'CNC T/C',
       series: 'LV4500 Series',
@@ -3133,6 +3249,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LV500L',
+      thumbnail_file: 'thumbnail_LV500 Series.webp',
       name: 'LV500L',
       category: 'CNC T/C',
       series: 'LV500 Series',
@@ -3160,6 +3277,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LV500LM',
+      thumbnail_file: 'thumbnail_LV500 Series.webp',
       name: 'LV500LM',
       category: 'CNC T/C',
       series: 'LV500 Series',
@@ -3187,6 +3305,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LV500R',
+      thumbnail_file: 'thumbnail_LV500 Series.webp',
       name: 'LV500R',
       category: 'CNC T/C',
       series: 'LV500 Series',
@@ -3214,6 +3333,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LV500RM',
+      thumbnail_file: 'thumbnail_LV500 Series.webp',
       name: 'LV500RM',
       category: 'CNC T/C',
       series: 'LV500 Series',
@@ -3241,6 +3361,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LV8500L',
+      thumbnail_file: 'thumbnail_LV8500 Series.webp',
       name: 'LV8500L',
       category: 'CNC T/C',
       series: 'LV8500 Series',
@@ -3268,6 +3389,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LV8500LM',
+      thumbnail_file: 'thumbnail_LV8500 Series.webp',
       name: 'LV8500LM',
       category: 'CNC T/C',
       series: 'LV8500 Series',
@@ -3295,6 +3417,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LV8500R',
+      thumbnail_file: 'thumbnail_LV8500 Series.webp',
       name: 'LV8500R',
       category: 'CNC T/C',
       series: 'LV8500 Series',
@@ -3322,6 +3445,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LV8500RM',
+      thumbnail_file: 'thumbnail_LV8500 Series.webp',
       name: 'LV8500RM',
       category: 'CNC T/C',
       series: 'LV8500 Series',
@@ -3349,6 +3473,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LV1400',
+      thumbnail_file: 'thumbnail_LV1400.webp',
       name: 'LV1400',
       category: 'CNC T/C',
       series: 'LV1400/2000',
@@ -3376,6 +3501,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LV2000MM',
+      thumbnail_file: 'thumbnail_LV2000.webp',
       name: 'LV2000MM',
       category: 'CNC T/C',
       series: 'LV1400/2000',
@@ -3403,6 +3529,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LF2200 Ⅱ',
+      thumbnail_file: 'thumbnail_LF-Ⅱ Series.webp',
       name: 'LF2200 Ⅱ',
       category: 'CNC T/C',
       series: 'LF-Ⅱ Series',
@@ -3430,6 +3557,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LF2200M Ⅱ',
+      thumbnail_file: 'thumbnail_LF-Ⅱ Series.webp',
       name: 'LF2200M Ⅱ',
       category: 'CNC T/C',
       series: 'LF-Ⅱ Series',
@@ -3457,6 +3585,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LF2200MQUICK Ⅱ',
+      thumbnail_file: 'thumbnail_LF-Ⅱ Series.webp',
       name: 'LF2200MQUICK Ⅱ',
       category: 'CNC T/C',
       series: 'LF-Ⅱ Series',
@@ -3484,6 +3613,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LF2200QUICK Ⅱ',
+      thumbnail_file: 'thumbnail_LF-Ⅱ Series.webp',
       name: 'LF2200QUICK Ⅱ',
       category: 'CNC T/C',
       series: 'LF-Ⅱ Series',
@@ -3511,6 +3641,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LF2600 Ⅱ',
+      thumbnail_file: 'thumbnail_LF-Ⅱ Series.webp',
       name: 'LF2600 Ⅱ',
       category: 'CNC T/C',
       series: 'LF-Ⅱ Series',
@@ -3538,6 +3669,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LF2600M Ⅱ',
+      thumbnail_file: 'thumbnail_LF-Ⅱ Series.webp',
       name: 'LF2600M Ⅱ',
       category: 'CNC T/C',
       series: 'LF-Ⅱ Series',
@@ -3565,6 +3697,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LF2600MQUICK Ⅱ',
+      thumbnail_file: 'thumbnail_LF-Ⅱ Series.webp',
       name: 'LF2600MQUICK Ⅱ',
       category: 'CNC T/C',
       series: 'LF-Ⅱ Series',
@@ -3592,6 +3725,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LF2600QUICK Ⅱ',
+      thumbnail_file: 'thumbnail_LF-Ⅱ Series.webp',
       name: 'LF2600QUICK Ⅱ',
       category: 'CNC T/C',
       series: 'LF-Ⅱ Series',
@@ -3619,6 +3753,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LM1600TTMS',
+      thumbnail_file: 'thumbnail_LM1600TT Series.webp',
       name: 'LM1600TTMS',
       category: 'CNC T/C',
       series: 'LM1600TT Series',
@@ -3646,6 +3781,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LM1600TTS',
+      thumbnail_file: 'thumbnail_LM1600TT Series.webp',
       name: 'LM1600TTS',
       category: 'CNC T/C',
       series: 'LM1600TT Series',
@@ -3673,6 +3809,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LM1600TTSY',
+      thumbnail_file: 'thumbnail_LM1600TT Series.webp',
       name: 'LM1600TTSY',
       category: 'CNC T/C',
       series: 'LM1600TT Series',
@@ -3700,6 +3837,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LM1800TTMS',
+      thumbnail_file: 'thumbnail_LM1800TT Series.webp',
       name: 'LM1800TTMS',
       category: 'CNC T/C',
       series: 'LM1800TT Series',
@@ -3727,6 +3865,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LM1800TTS',
+      thumbnail_file: 'thumbnail_LM1800TT Series.webp',
       name: 'LM1800TTS',
       category: 'CNC T/C',
       series: 'LM1800TT Series',
@@ -3754,6 +3893,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LM1800TTSY',
+      thumbnail_file: 'thumbnail_LM1800TT Series.webp',
       name: 'LM1800TTSY',
       category: 'CNC T/C',
       series: 'LM1800TT Series',
@@ -3781,6 +3921,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LM2200TTSYY',
+      thumbnail_file: 'thumbnail_LM2200TT Series.webp',
       name: 'LM2200TTSYY',
       category: 'CNC T/C',
       series: 'LM2200TT Series',
@@ -3808,6 +3949,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LM2200TTSYYC',
+      thumbnail_file: 'thumbnail_LM2200TT Series.webp',
       name: 'LM2200TTSYYC',
       category: 'CNC T/C',
       series: 'LM2200TT Series',
@@ -3835,6 +3977,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LM2500TT Ⅱ',
+      thumbnail_file: 'thumbnail_LM2500TT II Series.webp',
       name: 'LM2500TT Ⅱ',
       category: 'CNC T/C',
       series: 'LM2500TT II Series',
@@ -3862,6 +4005,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LM2500TTM Ⅱ',
+      thumbnail_file: 'thumbnail_LM2500TT II Series.webp',
       name: 'LM2500TTM Ⅱ',
       category: 'CNC T/C',
       series: 'LM2500TT II Series',
@@ -3889,6 +4033,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LM2500TTMS Ⅱ',
+      thumbnail_file: 'thumbnail_LM2500TT II Series.webp',
       name: 'LM2500TTMS Ⅱ',
       category: 'CNC T/C',
       series: 'LM2500TT II Series',
@@ -3916,6 +4061,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LM2500TTS Ⅱ',
+      thumbnail_file: 'thumbnail_LM2500TT II Series.webp',
       name: 'LM2500TTS Ⅱ',
       category: 'CNC T/C',
       series: 'LM2500TT II Series',
@@ -3943,6 +4089,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LM2500TTSY II',
+      thumbnail_file: 'thumbnail_LM2500TT II Series.webp',
       name: 'LM2500TTSY II',
       category: 'CNC T/C',
       series: 'LM2500TT II Series',
@@ -3970,6 +4117,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KL6500AW',
+      thumbnail_file: 'thumbnail_AL WHEEL Series.webp',
       name: 'KL6500AW',
       category: 'CNC T/C',
       series: 'AL WHEEL Series',
@@ -3997,6 +4145,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LV800AW-TT',
+      thumbnail_file: 'thumbnail_AL WHEEL Series.webp',
       name: 'LV800AW-TT',
       category: 'CNC T/C',
       series: 'AL WHEEL Series',
@@ -4024,6 +4173,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LV8500RAW',
+      thumbnail_file: 'thumbnail_AL WHEEL Series.webp',
       name: 'LV8500RAW',
       category: 'CNC T/C',
       series: 'AL WHEEL Series',
@@ -4051,6 +4201,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KIT600G',
+      thumbnail_file: 'thumbnail_KIT600G-800G.webp',
       name: 'KIT600G',
       category: 'CNC T/C',
       series: 'KIT600G/800G',
@@ -4078,6 +4229,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KIT800G',
+      thumbnail_file: 'thumbnail_KIT600G-800G.webp',
       name: 'KIT800G',
       category: 'CNC T/C',
       series: 'KIT600G/800G',
@@ -4105,6 +4257,7 @@ export const productLibraryModels = [
     },
     {
       id: 'LV600G',
+      thumbnail_file: 'thumbnail_LV600G.webp',
       name: 'LV600G',
       category: 'CNC T/C',
       series: 'LV600G',
@@ -4132,6 +4285,7 @@ export const productLibraryModels = [
     },
     {
       id: 'i-CUT4000',
+      thumbnail_file: 'thumbnail_i-CUT Series.webp',
       name: 'i-CUT4000',
       category: 'Vertical M/C',
       series: 'i-CUT Series',
@@ -4159,6 +4313,7 @@ export const productLibraryModels = [
     },
     {
       id: 'i-CUT400TD',
+      thumbnail_file: 'thumbnail_i-CUT Series.webp',
       name: 'i-CUT400TD',
       category: 'Vertical M/C',
       series: 'i-CUT Series',
@@ -4186,6 +4341,7 @@ export const productLibraryModels = [
     },
     {
       id: 'i-CUT4500',
+      thumbnail_file: 'thumbnail_i-CUT Series.webp',
       name: 'i-CUT4500',
       category: 'Vertical M/C',
       series: 'i-CUT Series',
@@ -4213,6 +4369,7 @@ export const productLibraryModels = [
     },
     {
       id: 'F960B',
+      thumbnail_file: 'thumbnail_F960B.webp',
       name: 'F960B',
       category: 'Vertical M/C',
       series: 'F960B',
@@ -4240,6 +4397,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF4',
+      thumbnail_file: 'thumbnail_KF4 Series.webp',
       name: 'KF4',
       category: 'Vertical M/C',
       series: 'KF4/5/6 Series',
@@ -4267,6 +4425,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF4L',
+      thumbnail_file: 'thumbnail_KF4 Series.webp',
       name: 'KF4L',
       category: 'Vertical M/C',
       series: 'KF4/5/6 Series',
@@ -4294,6 +4453,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF5',
+      thumbnail_file: 'thumbnail_KF5 Series.webp',
       name: 'KF5',
       category: 'Vertical M/C',
       series: 'KF4/5/6 Series',
@@ -4321,6 +4481,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF5/50',
+      thumbnail_file: 'thumbnail_KF5 Series.webp',
       name: 'KF5/50',
       category: 'Vertical M/C',
       series: 'KF4/5/6 Series',
@@ -4348,6 +4509,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF5L',
+      thumbnail_file: 'thumbnail_KF5 Series.webp',
       name: 'KF5L',
       category: 'Vertical M/C',
       series: 'KF4/5/6 Series',
@@ -4375,6 +4537,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF6',
+      thumbnail_file: 'thumbnail_KF6 Series.webp',
       name: 'KF6',
       category: 'Vertical M/C',
       series: 'KF4/5/6 Series',
@@ -4402,6 +4565,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF6/50',
+      thumbnail_file: 'thumbnail_KF6 Series.webp',
       name: 'KF6/50',
       category: 'Vertical M/C',
       series: 'KF4/5/6 Series',
@@ -4429,6 +4593,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF6L',
+      thumbnail_file: 'thumbnail_KF6 Series.webp',
       name: 'KF6L',
       category: 'Vertical M/C',
       series: 'KF4/5/6 Series',
@@ -4456,6 +4621,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF7600L',
+      thumbnail_file: 'thumbnail_KF7600L.webp',
       name: 'KF7600L',
       category: 'Vertical M/C',
       series: 'KF7600L',
@@ -4483,6 +4649,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF5700B/50 II',
+      thumbnail_file: 'thumbnail_KF-B II Series 5700.webp',
       name: 'KF5700B/50 II',
       category: 'Vertical M/C',
       series: 'KF-B II Series',
@@ -4510,6 +4677,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF5700B II',
+      thumbnail_file: 'thumbnail_KF-B II Series 5700.webp',
       name: 'KF5700B II',
       category: 'Vertical M/C',
       series: 'KF-B II Series',
@@ -4537,6 +4705,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF6700B/50 II',
+      thumbnail_file: 'thumbnail_KF-B II Series 6700.webp',
       name: 'KF6700B/50 II',
       category: 'Vertical M/C',
       series: 'KF-B II Series',
@@ -4564,6 +4733,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF6700B II',
+      thumbnail_file: 'thumbnail_KF-B II Series 6700.webp',
       name: 'KF6700B II',
       category: 'Vertical M/C',
       series: 'KF-B II Series',
@@ -4591,6 +4761,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF7700B/50 II',
+      thumbnail_file: 'thumbnail_KF-B II Series 7700.webp',
       name: 'KF7700B/50 II',
       category: 'Vertical M/C',
       series: 'KF-B II Series',
@@ -4618,6 +4789,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF7700B II',
+      thumbnail_file: 'thumbnail_KF-B II Series 7700.webp',
       name: 'KF7700B II',
       category: 'Vertical M/C',
       series: 'KF-B II Series',
@@ -4645,6 +4817,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF1000B',
+      thumbnail_file: 'thumbnail_KF-B Series.webp',
       name: 'KF1000B',
       category: 'Vertical M/C',
       series: 'KF-B Series',
@@ -4672,6 +4845,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF1100B',
+      thumbnail_file: 'thumbnail_KF-B Series.webp',
       name: 'KF1100B',
       category: 'Vertical M/C',
       series: 'KF-B Series',
@@ -4699,6 +4873,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF4300D',
+      thumbnail_file: 'thumbnail_KF-D Series 4300.webp',
       name: 'KF4300D',
       category: 'Vertical M/C',
       series: 'KF-D Series',
@@ -4726,6 +4901,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF5200D',
+      thumbnail_file: 'thumbnail_KF-D Series 5200.webp',
       name: 'KF5200D',
       category: 'Vertical M/C',
       series: 'KF-D Series',
@@ -4753,6 +4929,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF6000D',
+      thumbnail_file: 'thumbnail_KF-D Series 6000.webp',
       name: 'KF6000D',
       category: 'Vertical M/C',
       series: 'KF-D Series',
@@ -4780,6 +4957,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF4000/2SP',
+      thumbnail_file: 'thumbnail_KF-2SP Series 4000.webp',
       name: 'KF4000/2SP',
       category: 'Vertical M/C',
       series: 'KF-2SP Series',
@@ -4807,6 +4985,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF4000I/2SP',
+      thumbnail_file: 'thumbnail_KF-2SP Series 4000.webp',
       name: 'KF4000I/2SP',
       category: 'Vertical M/C',
       series: 'KF-2SP Series',
@@ -4834,6 +5013,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF4300/2SP',
+      thumbnail_file: 'thumbnail_KF-2SP Series 4000.webp',
       name: 'KF4300/2SP',
       category: 'Vertical M/C',
       series: 'KF-2SP Series',
@@ -4861,6 +5041,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF4300G/2SP',
+      thumbnail_file: 'thumbnail_KF-2SP Series 4000.webp',
       name: 'KF4300G/2SP',
       category: 'Vertical M/C',
       series: 'KF-2SP Series',
@@ -4888,6 +5069,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF4300P/2SP',
+      thumbnail_file: 'thumbnail_KF-2SP Series 4000.webp',
       name: 'KF4300P/2SP',
       category: 'Vertical M/C',
       series: 'KF-2SP Series',
@@ -4915,6 +5097,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF5200/2SP',
+      thumbnail_file: 'thumbnail_KF-2SP Series 5200.webp',
       name: 'KF5200/2SP',
       category: 'Vertical M/C',
       series: 'KF-2SP Series',
@@ -4942,6 +5125,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF5200G/2SP',
+      thumbnail_file: 'thumbnail_KF-2SP Series 5200.webp',
       name: 'KF5200G/2SP',
       category: 'Vertical M/C',
       series: 'KF-2SP Series',
@@ -4969,6 +5153,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF5200P/2SP',
+      thumbnail_file: 'thumbnail_KF-2SP Series 5200.webp',
       name: 'KF5200P/2SP',
       category: 'Vertical M/C',
       series: 'KF-2SP Series',
@@ -4996,6 +5181,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF5700/2SP',
+      thumbnail_file: 'thumbnail_KF-2SP Series 5200.webp',
       name: 'KF5700/2SP',
       category: 'Vertical M/C',
       series: 'KF-2SP Series',
@@ -5023,6 +5209,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF5700G/2SP',
+      thumbnail_file: 'thumbnail_KF-2SP Series 5200.webp',
       name: 'KF5700G/2SP',
       category: 'Vertical M/C',
       series: 'KF-2SP Series',
@@ -5050,6 +5237,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF6700/2SP',
+      thumbnail_file: 'thumbnail_KF-2SP Series 6700.webp',
       name: 'KF6700/2SP',
       category: 'Vertical M/C',
       series: 'KF-2SP Series',
@@ -5077,6 +5265,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF6700G/2SP',
+      thumbnail_file: 'thumbnail_KF-2SP Series 6700.webp',
       name: 'KF6700G/2SP',
       category: 'Vertical M/C',
       series: 'KF-2SP Series',
@@ -5104,6 +5293,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF6750/2SP',
+      thumbnail_file: 'thumbnail_KF-2SP Series 6700.webp',
       name: 'KF6750/2SP',
       category: 'Vertical M/C',
       series: 'KF-2SP Series',
@@ -5131,6 +5321,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF8200/2SP',
+      thumbnail_file: 'thumbnail_KF-2SP Series 6700.webp',
       name: 'KF8200/2SP',
       category: 'Vertical M/C',
       series: 'KF-2SP Series',
@@ -5158,6 +5349,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF8250/2SP',
+      thumbnail_file: 'thumbnail_KF-2SP Series 6700.webp',
       name: 'KF8250/2SP',
       category: 'Vertical M/C',
       series: 'KF-2SP Series',
@@ -5185,6 +5377,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HS10000',
+      thumbnail_file: 'thumbnail_HS10000.webp',
       name: 'HS10000',
       category: 'Horizontal M/C',
       series: 'HS10000',
@@ -5212,6 +5405,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HS4000 II',
+      thumbnail_file: 'thumbnail_HS4000 II Series.webp',
       name: 'HS4000 II',
       category: 'Horizontal M/C',
       series: 'HS4000/5000 II Series',
@@ -5239,6 +5433,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HS5000/50 II',
+      thumbnail_file: 'thumbnail_HS5000 II Series.webp',
       name: 'HS5000/50 II',
       category: 'Horizontal M/C',
       series: 'HS4000/5000 II Series',
@@ -5266,6 +5461,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HS5000 II',
+      thumbnail_file: 'thumbnail_HS5000 II Series.webp',
       name: 'HS5000 II',
       category: 'Horizontal M/C',
       series: 'HS4000/5000 II Series',
@@ -5293,6 +5489,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HS6300 II',
+      thumbnail_file: 'thumbnail_HS6300 8000 II.webp',
       name: 'HS6300 II',
       category: 'Horizontal M/C',
       series: 'HS6300/8000 II',
@@ -5320,6 +5517,7 @@ export const productLibraryModels = [
     },
     {
       id: 'HS8000 II',
+      thumbnail_file: 'thumbnail_HS6300 8000 II.webp',
       name: 'HS8000 II',
       category: 'Horizontal M/C',
       series: 'HS6300/8000 II',
@@ -5347,6 +5545,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KH1000',
+      thumbnail_file: 'thumbnail_KH1000.webp',
       name: 'KH1000',
       category: 'Horizontal M/C',
       series: 'KH1000',
@@ -5374,6 +5573,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KH50G',
+      thumbnail_file: 'thumbnail_KH50G.webp',
       name: 'KH50G',
       category: 'Horizontal M/C',
       series: 'KH50G',
@@ -5401,6 +5601,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KH6300',
+      thumbnail_file: 'thumbnail_KH6300.webp',
       name: 'KH6300',
       category: 'Horizontal M/C',
       series: 'KH6300/8000',
@@ -5428,6 +5629,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KH8000',
+      thumbnail_file: 'thumbnail_KH8000.webp',
       name: 'KH8000',
       category: 'Horizontal M/C',
       series: 'KH6300/8000',
@@ -5455,6 +5657,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KBN1300C',
+      thumbnail_file: 'thumbnail_KBN Series.webp',
       name: 'KBN1300C',
       category: 'Horizontal M/C',
       series: 'KBN Series',
@@ -5482,6 +5685,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KBN1600C',
+      thumbnail_file: 'thumbnail_KBN Series.webp',
       name: 'KBN1600C',
       category: 'Horizontal M/C',
       series: 'KBN Series',
@@ -5509,6 +5713,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KBR1300C',
+      thumbnail_file: 'thumbnail_KBR Series.webp',
       name: 'KBR1300C',
       category: 'Horizontal M/C',
       series: 'KBR Series',
@@ -5536,6 +5741,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KBR1600C',
+      thumbnail_file: 'thumbnail_KBR Series.webp',
       name: 'KBR1600C',
       category: 'Horizontal M/C',
       series: 'KBR Series',
@@ -5563,6 +5769,7 @@ export const productLibraryModels = [
     },
     {
       id: 'XM2600',
+      thumbnail_file: 'thumbnail_XM Series.webp',
       name: 'XM2600',
       category: 'Multi-Tasking',
       series: 'XM Series',
@@ -5590,6 +5797,7 @@ export const productLibraryModels = [
     },
     {
       id: 'XM2600S',
+      thumbnail_file: 'thumbnail_XM Series.webp',
       name: 'XM2600S',
       category: 'Multi-Tasking',
       series: 'XM Series',
@@ -5617,6 +5825,7 @@ export const productLibraryModels = [
     },
     {
       id: 'XM2600ST',
+      thumbnail_file: 'thumbnail_XM Series.webp',
       name: 'XM2600ST',
       category: 'Multi-Tasking',
       series: 'XM Series',
@@ -5644,6 +5853,7 @@ export const productLibraryModels = [
     },
     {
       id: 'XM3100',
+      thumbnail_file: 'thumbnail_XM Series.webp',
       name: 'XM3100',
       category: 'Multi-Tasking',
       series: 'XM Series',
@@ -5671,6 +5881,7 @@ export const productLibraryModels = [
     },
     {
       id: 'XM3100S',
+      thumbnail_file: 'thumbnail_XM Series.webp',
       name: 'XM3100S',
       category: 'Multi-Tasking',
       series: 'XM Series',
@@ -5698,6 +5909,7 @@ export const productLibraryModels = [
     },
     {
       id: 'XM3100ST',
+      thumbnail_file: 'thumbnail_XM Series.webp',
       name: 'XM3100ST',
       category: 'Multi-Tasking',
       series: 'XM Series',
@@ -5725,6 +5937,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF3500/5A',
+      thumbnail_file: 'thumbnail_KF-5A Series.webp',
       name: 'KF3500/5A',
       category: '5-Axis M/C',
       series: 'KF-5A Series',
@@ -5752,6 +5965,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF6500/5A',
+      thumbnail_file: 'thumbnail_KF-5A Series.webp',
       name: 'KF6500/5A',
       category: '5-Axis M/C',
       series: 'KF-5A Series',
@@ -5779,6 +5993,7 @@ export const productLibraryModels = [
     },
     {
       id: 'KF7300/5A',
+      thumbnail_file: 'thumbnail_KF-5A Series.webp',
       name: 'KF7300/5A',
       category: '5-Axis M/C',
       series: 'KF-5A Series',
@@ -5806,6 +6021,7 @@ export const productLibraryModels = [
     },
     {
       id: 'XF6300',
+      thumbnail_file: 'thumbnail_XF Series.webp',
       name: 'XF6300',
       category: '5-Axis M/C',
       series: 'XF Series',
@@ -5833,6 +6049,7 @@ export const productLibraryModels = [
     },
     {
       id: 'XF8500',
+      thumbnail_file: 'thumbnail_XF Series.webp',
       name: 'XF8500',
       category: '5-Axis M/C',
       series: 'XF Series',
@@ -5860,6 +6077,7 @@ export const productLibraryModels = [
     },
     {
       id: 'XF2000i',
+      thumbnail_file: 'thumbnail_XF2000i.webp',
       name: 'XF2000i',
       category: '5-Axis M/C',
       series: 'XF2000i',
