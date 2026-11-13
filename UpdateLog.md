@@ -22,6 +22,21 @@
   * locales/ko/translation.json 및 locales/en/translation.json 내 common.loading('데이터를 불러오는 중입니다...' / 'Loading data...'), common.no_orders, common.no_data 리소스를 통합 추가.
   * DealerOrders, DealerDashboard, DealerInventory, DealerPromotion, DealerSalesArchive, AdminDashboard, AdminInventory, AdminSalesArchive, AdminDispatch 등 시스템 전반의 테이블 로딩 플레이스홀더를 다국어 표준 호출(	('common.loading'))로 일괄 전환.
 
+### 3. 선적 트래킹(Shipment Tracking) 페이지 UI/UX 레이아웃 개선 및 위젯 정보 재배치
+* **선적 트래킹 목록 뷰 UI 정돈 (ShipmentTracking.jsx, ShipmentWidgets.jsx)**:
+  * 왼쪽 패널 상단 우측의 총 {n}건 배지 삭제로 타이틀 영역 시각적 간결화.
+  * 해상 운송 지연율 위젯 내 전체 운송 중 문구를 **전체 운송 중 선박**으로 명확히 수정.
+  * 가이드 문구(카드 선택 시 상세 정보 확인) 정리 및 전체 레이아웃 시각적 완성도 향상.
+* **선적 상세 정보 및 지도 오버레이 플로팅 위젯 재배치 (TrackingMapboxWidget.jsx, ShipmentTracking.jsx)**:
+  * **지도 상단 플로팅 바 삭제 및 '항로' 탭 하단 통합 이전**:
+    * 지도 상단 중앙에 오버레이되던 최후 AIS 수신 위치 플로팅 박스를 삭제하여 지도 시야 확보.
+    * 해당 정보(선박 위/경도 좌표, 속력 kn, 침로 방위각 °, 입항/정박 상태)를 왼쪽 패널 **항로 (Route) 탭 타임라인 마일스톤 바로 아래**에 일체형 카드로 신규 배치.
+  * **지도 우측 플로팅 SCM Voyage KPI 위젯 삭제 및 왼쪽 패널 상단 개요 카드 통합**:
+    * 지도 우측 화면을 가리던 대형 SCM Voyage KPI 플로팅 대시보드를 삭제.
+    * 핵심 지표인 **출항일 (ETD), 최종 예정일 (ETA), 해상 운항 소요 (Aging)** 정보를 왼쪽 패널 상단 개요 카드(운송 프로그레스 바 직하단)에 3열 메트릭 그리드로 컴팩트하게 배치.
+    * 도착 완료 선박은 해상 소요 일수 확정(Freeze), 미도착 선박은 경과일(Aging)을 직관적으로 실시간 표기.
+    * TrackingMapboxWidget.jsx 내 미사용 useMemo 및 변수 정리로 지도 렌더링 성능 최적화.
+
 
 ## [2026-11-12] 표준 프로토콜 기반 직렬 2단계 인증(AAL2), 제로터치 온보딩, 전 환경 패스키 호환성 및 딜러 포털 대시보드·구매내역 UI/다국어 전면 개편
 

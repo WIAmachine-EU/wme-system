@@ -120,7 +120,7 @@ export function DelayRateWidget({ shipments, isMobileView = false }) {
         </div>
         <div style={{ width: '50%', paddingLeft: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div style={{ marginBottom: '12px' }}>
-            <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '4px', marginTop: 0 }}>전체 운송 중</p>
+            <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '4px', marginTop: 0 }}>전체 운송 중 선박</p>
             <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>{totalActive} <span style={{ fontSize: '0.875rem', fontWeight: 'normal' }}>건</span></p>
           </div>
           <div>
