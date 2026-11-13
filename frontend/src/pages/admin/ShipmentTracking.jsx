@@ -588,6 +588,7 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
                   style={{
                     padding: isMobile ? '10px 4px' : '12px',
                     fontSize: isMobile ? '0.78rem' : '0.875rem',
+                    fontFamily: "'SUITE', sans-serif",
                     fontWeight: 600,
                     border: 'none',
                     borderBottom: activeTab === tab ? '2px solid #2563eb' : '2px solid transparent',
@@ -622,20 +623,21 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         gap: '8px',
+                        fontFamily: "'SUITE', sans-serif",
                         transition: 'all 0.15s ease'
                       }}
                     >
                       {/* 왼쪽: 모델정보 */}
-                      <span style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a', minWidth: '60px' }}>
+                      <span style={{ fontWeight: 800, fontSize: '0.8rem', color: '#0f172a', minWidth: '60px', fontFamily: "'SUITE', sans-serif" }}>
                         {o.product_model?.model_name || 'Machine'}
                       </span>
 
                       {/* 가운데: S/N정보 */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 600 }}>S/N:</span>
+                        <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 600, fontFamily: "'SUITE', sans-serif" }}>S/N:</span>
                         {o.serial_number ? (
                           <span style={{
-                            fontFamily: 'monospace',
+                            fontFamily: "'SUITE', sans-serif",
                             fontSize: '0.8rem',
                             fontWeight: 700,
                             color: '#1d4ed8',
@@ -647,19 +649,19 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
                             {o.serial_number}
                           </span>
                         ) : (
-                          <span style={{ color: '#94a3b8', fontSize: '0.78rem', fontStyle: 'italic' }}>미배정 (-)</span>
+                          <span style={{ color: '#94a3b8', fontSize: '0.8rem', fontStyle: 'italic', fontFamily: "'SUITE', sans-serif" }}>미배정 (-)</span>
                         )}
                       </div>
 
                       {/* 오른쪽: P/O정보 */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem' }}>
-                        <span style={{ color: '#94a3b8', fontWeight: 500 }}>P/O:</span>
-                        <span style={{ fontWeight: 600, color: '#1e293b' }}>{o.reference_no}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', fontFamily: "'SUITE', sans-serif" }}>
+                        <span style={{ color: '#94a3b8', fontWeight: 500, fontFamily: "'SUITE', sans-serif" }}>P/O:</span>
+                        <span style={{ fontWeight: 600, color: '#1e293b', fontFamily: "'SUITE', sans-serif" }}>{o.reference_no}</span>
                       </div>
                     </div>
                   ))}
                   {(!activeShipment.orders || activeShipment.orders.length === 0) && (
-                    <p style={{ fontSize: '0.875rem', color: '#64748b', textAlign: 'center', padding: '24px 0', margin: 0 }}>포함된 장비 정보가 없습니다.</p>
+                    <p style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center', padding: '24px 0', margin: 0, fontFamily: "'SUITE', sans-serif" }}>포함된 장비 정보가 없습니다.</p>
                   )}
                 </div>
               )}
