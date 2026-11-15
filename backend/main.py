@@ -978,6 +978,9 @@ def create_order(
         if not stock_type:
             stock_type = 'AVAILABLE'
 
+    # SALES PRICE(판매가)는 P/O 기준 A발주에만 적용
+    effective_sales_price = payload.sales_price if ref_clean.startswith("A") else None
+
     new_order = models.Order(
         reference_no=payload.reference_no,
         serial_number=payload.serial_number,
@@ -992,6 +995,9 @@ def create_order(
         nc=payload.nc,
         incoterms=payload.incoterms,
         destination_port=payload.destination_port,
+        detail_spec=payload.detail_spec,
+        price=payload.price,
+        sales_price=effective_sales_price,
         dealer_order_date=payload.dealer_order_date,
         dealer_order_no=payload.dealer_order_no,
         delivery_request_date=payload.delivery_request_date
@@ -1796,10 +1802,15 @@ async def upload_excel_bulk(file: UploadFile = File(...), db: Session = Depends(
         # DEALER ORDER NO 컬럼 추출 (옵션)
         d_order_no_raw = str(row.get('DEALER ORDER NO', row.get('DEALER PO', row.get('딜러주문번호', row.get('딜러 주문번호', ''))))).strip()
         dealer_order_no_val = None if (not d_order_no_raw or d_order_no_raw.lower() == 'nan') else d_order_no_raw
+
+        # SALES PRICE 컬럼 추출 (옵션, A발주에 적용)
+        sales_price_raw = str(row.get('SALES PRICE', row.get('판매가', ''))).strip()
+        sales_price_val = None if (not sales_price_raw or sales_price_raw.lower() == 'nan') else sales_price_raw
+        clean_price_val = None if (not price_val or price_val.lower() == 'nan') else price_val
+        ref_clean = ref_no.strip().upper()
         
         existing = db.query(models.Order).filter(models.Order.reference_no == ref_no).first()
         if not existing:
-            ref_clean = ref_no.strip().upper()
             if ref_clean.startswith('A'):
                 is_corp_stock = False
                 order_stock_type = 'DEALER_ORDER'
@@ -1834,20 +1845,27 @@ async def upload_excel_bulk(file: UploadFile = File(...), db: Session = Depends(
                 detail_spec=detail_spec_val if detail_spec_val else None,
                 incoterms=incoterms_val if incoterms_val else None,
                 destination_port=port_val if port_val else None,
-                price=price_val if price_val else None,
+                price=clean_price_val,
+                sales_price=sales_price_val if ref_clean.startswith('A') else None,
                 remark=None
             )
             db.add(new_order)
             session_ref_nos.add(ref_no)
             valid_count += 1
         else:
-            # 이미 존재하는 P/O인 경우, S/N 또는 Dealer Order No 정보가 제공되었으면 데이터베이스 업데이트 적용
+            # 이미 존재하는 P/O인 경우, S/N, Dealer Order No, Buying, Sales Price 정보가 제공되었으면 데이터베이스 업데이트 적용
             updated = False
             if sn_val:
                 existing.serial_number = sn_val
                 updated = True
             if dealer_order_no_val:
                 existing.dealer_order_no = dealer_order_no_val
+                updated = True
+            if clean_price_val:
+                existing.price = clean_price_val
+                updated = True
+            if sales_price_val and ref_clean.startswith('A'):
+                existing.sales_price = sales_price_val
                 updated = True
             if updated:
                 valid_count += 1

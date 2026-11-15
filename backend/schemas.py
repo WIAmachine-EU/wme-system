@@ -266,6 +266,8 @@ class OrderCreate(BaseModel):
     vessel: Optional[str] = None
     warehouse: Optional[str] = None
     destination_port: Optional[str] = None
+    detail_spec: Optional[str] = None
+    remark: Optional[str] = None
     price: Optional[str] = None
     sales_price: Optional[str] = None
     sales_month: Optional[str] = None

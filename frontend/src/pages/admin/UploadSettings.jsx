@@ -85,6 +85,8 @@ export default function UploadSettings() {
     dealer_order_date: '',
     dealer_order_no: '',
     delivery_request_date: '',
+    price: '',
+    sales_price: '',
     detail_spec: ''
   });
   const [creatingOrder, setCreatingOrder] = useState(false);
@@ -135,6 +137,8 @@ export default function UploadSettings() {
 
     setCreatingOrder(true);
     try {
+      const refClean = (newOrderForm.reference_no || '').trim().toUpperCase();
+      const isAOrder = refClean.startsWith('A');
       const res = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -148,6 +152,8 @@ export default function UploadSettings() {
           dealer_order_date: newOrderForm.dealer_order_date || null,
           dealer_order_no: newOrderForm.dealer_order_no || null,
           delivery_request_date: newOrderForm.delivery_request_date || null,
+          price: newOrderForm.price || null,
+          sales_price: isAOrder ? (newOrderForm.sales_price || null) : null,
           detail_spec: newOrderForm.detail_spec || null
         })
       });
@@ -155,7 +161,7 @@ export default function UploadSettings() {
       if (res.ok) {
         alert("신규 발주가 성공적으로 생성되었습니다.");
         setShowCreateModal(false);
-        setNewOrderForm({ reference_no: '', product_model_id: '', dealer_company_id: '', nc: '', incoterms: '', destination_port: '', dealer_order_date: '', dealer_order_no: '', delivery_request_date: '', detail_spec: '' });
+        setNewOrderForm({ reference_no: '', product_model_id: '', dealer_company_id: '', nc: '', incoterms: '', destination_port: '', dealer_order_date: '', dealer_order_no: '', delivery_request_date: '', price: '', sales_price: '', detail_spec: '' });
       } else {
         const err = await res.json();
         alert(`생성 실패: ${err.detail || '알 수 없는 오류'}`);
@@ -579,7 +585,7 @@ export default function UploadSettings() {
                 />
               </div>
 
-              {/* 6. Delivery Request Date */}
+              {/* 6. Delivery Request Date & Buying / SALES PRICE */}
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('management.modal_label_req_date', '배송요청일')}</label>
                 <input
@@ -589,7 +595,29 @@ export default function UploadSettings() {
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
                 />
               </div>
-              <div />
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('management.modal_label_buying', 'Buying (구매가)')}</label>
+                  <input
+                    type="text"
+                    value={newOrderForm.price}
+                    onChange={e => setNewOrderForm({ ...newOrderForm, price: e.target.value })}
+                    placeholder={t('management.modal_placeholder_buying', '구매가(€) 입력')}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('management.modal_label_sales_price', 'SALES PRICE (판매가)')}</label>
+                  <input
+                    type="text"
+                    value={newOrderForm.sales_price}
+                    onChange={e => setNewOrderForm({ ...newOrderForm, sales_price: e.target.value })}
+                    placeholder={t('management.modal_placeholder_sales_price', '판매가(€) 입력')}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                  />
+                </div>
+              </div>
 
               {/* 7. INCOTERMS */}
               <div>
