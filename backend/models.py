@@ -207,6 +207,7 @@ class Order(Base):
     pickup_date = Column(DateTime, nullable=True) # 창고 출고/픽업 일자 (Pickup Date)
     remark = Column(Text, nullable=True)
     dealer_order_date = Column(DateTime, nullable=True)
+    dealer_order_no = Column(String, nullable=True) # 딜러 주문번호 (Dealer Order No)
     delivery_request_date = Column(String, nullable=True)
     rental_start_date = Column(DateTime, nullable=True)
     rental_expiry_date = Column(DateTime, nullable=True)

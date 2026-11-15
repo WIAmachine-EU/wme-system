@@ -1,4 +1,40 @@
-﻿# 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
+# 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
+
+## [2026-11-15] 주문/배송 타임라인 딜러 주문번호 표기, 신규 발주 생성 및 장비 정보 수정 모달 항목 순서 개편
+
+### 1. 주문/배송 타임라인 상세 뷰 '딜러 주문번호' 표기 (`AdminDashboard.jsx`, `DealerOrders.jsx`)
+* **타임라인 하단 상세 정보 영역 확장**:
+  * 주문/배송현황 페이지(`AdminDashboard.jsx`, `DealerOrders.jsx`)의 배송 추적 타임라인 하단 상세 정보 영역에서 `딜러발주 일자` 바로 오른쪽에 `딜러 주문번호`(`dealer_order_no`)를 나란히 인라인 배치.
+  * 미등록 또는 데이터 부재 시 `-`로 Null-safe하게 폴백 처리.
+  * 모바일 카드 뷰 및 데스크탑 테이블 상세 뷰 모두에 동일하게 일관된 다국어(`menu1.dealer_order_no`, `menu1.order_date`) 적용.
+
+### 2. 신규 단건 발주 생성 모달 '딜러 주문번호' 입력 항목 추가 (`UploadSettings.jsx`)
+* **[신규 단건 발주 생성] 팝업창 UI/UX 개선**:
+  * `주문일자(dealer_order_date)` 입력란 바로 오른쪽에 `딜러 주문번호(dealer_order_no)` 텍스트 인풋을 신규 배치.
+  * 신규 발주 생성 폼 상태(`newOrderForm`) 및 API 연동 페이로드(`handleCreateOrder`)에 `dealer_order_no` 매핑 및 발주 생성 후 초기화 로직 적용.
+
+### 3. 장비 정보 수정 모달 항목 2열 그리드 순서 전면 개편 (`AdminDashboard.jsx`)
+* **사용자 요청 맞춤형 8행 2열 [왼쪽 - 오른쪽] 레이아웃 재배치**:
+  * **Row 1**: `모델명` (Select) - `P/O` (Input)
+  * **Row 2**: `NC` (Select) - `S/N` (Input)
+  * **Row 3**: `Dealer` (Select) - `딜러 주문번호` (Input 신규 추가)
+  * **Row 4**: `딜러주문일` (Date Input 신규 추가) - `배송요청일` (Month Input)
+  * **Row 5**: `Buying` (Input) - `S/O` (Input)
+  * **Row 6**: `Incoterms` (Select) - `Port` (Select)
+  * **Row 7**: `DETAIL SPEC` (전체 폭 Full Width Input)
+  * **Row 8**: `REMARK` (전체 폭 Full Width Textarea)
+* **데이터 동기화 및 바인딩**:
+  * `handleEditClick` 시 기존 발주 건의 `dealer_order_no` 및 `dealer_order_date`를 폼에 자동 로드.
+  * `handleUpdateSubmit`을 통해 PATCH `/api/orders/{id}`로 백엔드 DB에 원활히 반영.
+
+### 4. 백엔드 DB 스키마 확장 및 API 지원 (`models.py`, `schemas.py`, `main.py`)
+* **ORM 모델 및 Pydantic 스키마**:
+  * `Order` 모델에 `dealer_order_no = Column(String, nullable=True)` 컬럼 추가.
+  * `schemas.OrderBase`, `OrderCreate`, `OrderUpdate`에 `dealer_order_no: Optional[str] = None` 추가.
+* **무중단 마이그레이션 및 파싱 처리**:
+  * 서버 기동(`on_startup`) 시 PostgreSQL 및 SQLite 모두 호환되는 `ALTER TABLE orders ADD COLUMN ...` 마이그레이션 쿼리 적용.
+  * 로컬 `scm_erp.db` 마이그레이션 완료.
+  * `create_order`, `update_order_info`, 엑셀 대량 업로드(`upload_excel_bulk`) 엔드포인트에 `dealer_order_no` 저장 및 업데이트 로직 반영.
 
 ## [2026-11-14] 선적 트래킹(Shipment Tracking) UI/UX 전면 개편, 탭·장비목록 3열 단일행 정돈 및 해상 운송 지연율 산출 동기화
 

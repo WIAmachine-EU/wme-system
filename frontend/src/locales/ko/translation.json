@@ -98,6 +98,19 @@
     "edit_modal": {
       "title": "장비 정보 수정",
       "model": "모델명",
+      "po": "P/O",
+      "nc": "NC",
+      "sn": "S/N",
+      "dealer": "Dealer",
+      "dealer_order_no": "딜러 주문번호",
+      "dealer_order_date": "딜러주문일",
+      "delivery_request_date": "배송요청일",
+      "buying": "Buying",
+      "so": "S/O",
+      "incoterms": "Incoterms",
+      "port": "Port",
+      "detail_spec": "DETAIL SPEC",
+      "remark": "REMARK",
       "sn_placeholder": "S/N 입력",
       "so_placeholder": "S/O 번호",
       "detail_placeholder": "상세 스펙",
@@ -111,7 +124,8 @@
       "cancel": "취소",
       "save": "저장"
     },
-    "order_date": "딜러발주 일자"
+    "order_date": "딜러발주 일자",
+    "dealer_order_no": "딜러 주문번호"
   },
   "menu4": {
     "page_title": "판매 목록",
@@ -318,6 +332,8 @@
     "modal_label_po": "P/O",
     "modal_label_dealer": "딜러",
     "modal_label_order_date": "주문일자",
+    "modal_label_dealer_order_no": "딜러 주문번호",
+    "modal_placeholder_dealer_order_no": "딜러 주문번호 입력",
     "modal_label_req_date": "배송요청일",
     "modal_label_incoterms": "Incoterms",
     "modal_label_port": "항구",
@@ -421,6 +437,8 @@
     "header_port": "Port",
     "header_tracking": "화물추적",
     "cargo_tracking_btn": "화물추적",
+    "order_date": "딜러발주 일자",
+    "dealer_order_no": "딜러 주문번호",
     "loading": "데이터를 불러오는 중입니다..."
   },
   "dealer_promotion": {

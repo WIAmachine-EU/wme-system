@@ -241,6 +241,7 @@ def on_startup():
             f"ALTER TABLE orders ADD COLUMN {if_not_exists}sales_price VARCHAR",
             f"ALTER TABLE orders ADD COLUMN {if_not_exists}sales_month VARCHAR",
             f"ALTER TABLE orders ADD COLUMN {if_not_exists}pickup_date {timestamp_type}",
+            f"ALTER TABLE orders ADD COLUMN {if_not_exists}dealer_order_no VARCHAR",
         ]:
             try:
                 db.execute(text(col_def))
@@ -992,6 +993,7 @@ def create_order(
         incoterms=payload.incoterms,
         destination_port=payload.destination_port,
         dealer_order_date=payload.dealer_order_date,
+        dealer_order_no=payload.dealer_order_no,
         delivery_request_date=payload.delivery_request_date
     )
     db.add(new_order)
@@ -1091,9 +1093,17 @@ def update_order_info(
             order.current_status = models.OrderStatus.SOLD
             order.is_timeline_completed = True
             order.is_corporate_stock = False
-    if hasattr(payload, 'dealer_order_date') and payload.dealer_order_date is not None:
+    if "dealer_order_date" in payload.model_fields_set:
         order.dealer_order_date = payload.dealer_order_date
-    if hasattr(payload, 'delivery_request_date') and payload.delivery_request_date is not None:
+    elif hasattr(payload, 'dealer_order_date') and payload.dealer_order_date is not None:
+        order.dealer_order_date = payload.dealer_order_date
+    if "dealer_order_no" in payload.model_fields_set:
+        order.dealer_order_no = payload.dealer_order_no
+    elif hasattr(payload, 'dealer_order_no') and payload.dealer_order_no is not None:
+        order.dealer_order_no = payload.dealer_order_no
+    if "delivery_request_date" in payload.model_fields_set:
+        order.delivery_request_date = payload.delivery_request_date
+    elif hasattr(payload, 'delivery_request_date') and payload.delivery_request_date is not None:
         order.delivery_request_date = payload.delivery_request_date
     if hasattr(payload, 'rental_start_date') and payload.rental_start_date is not None:
         order.rental_start_date = payload.rental_start_date
@@ -1782,6 +1792,10 @@ async def upload_excel_bulk(file: UploadFile = File(...), db: Session = Depends(
         # S/N 컬럼 추출 (옵션)
         sn_raw = str(row.get('S/N', row.get('SERIAL NUMBER', row.get('시리얼번호', '')))).strip()
         sn_val = None if (not sn_raw or sn_raw.lower() == 'nan') else sn_raw
+
+        # DEALER ORDER NO 컬럼 추출 (옵션)
+        d_order_no_raw = str(row.get('DEALER ORDER NO', row.get('DEALER PO', row.get('딜러주문번호', row.get('딜러 주문번호', ''))))).strip()
+        dealer_order_no_val = None if (not d_order_no_raw or d_order_no_raw.lower() == 'nan') else d_order_no_raw
         
         existing = db.query(models.Order).filter(models.Order.reference_no == ref_no).first()
         if not existing:
@@ -1810,6 +1824,7 @@ async def upload_excel_bulk(file: UploadFile = File(...), db: Session = Depends(
                 product_model_id=models_dict[m_code],
                 dealer_company_id=dealers_dict[d_name],
                 dealer_order_date=parsed_order_date,
+                dealer_order_no=dealer_order_no_val,
                 current_status=models.OrderStatus.CONFIRMED,
                 etd=None,
                 eta=None,
@@ -1826,9 +1841,15 @@ async def upload_excel_bulk(file: UploadFile = File(...), db: Session = Depends(
             session_ref_nos.add(ref_no)
             valid_count += 1
         else:
-            # 이미 존재하는 P/O인 경우, S/N 정보가 제공되었으면 데이터베이스 업데이트 적용
+            # 이미 존재하는 P/O인 경우, S/N 또는 Dealer Order No 정보가 제공되었으면 데이터베이스 업데이트 적용
+            updated = False
             if sn_val:
                 existing.serial_number = sn_val
+                updated = True
+            if dealer_order_no_val:
+                existing.dealer_order_no = dealer_order_no_val
+                updated = True
+            if updated:
                 valid_count += 1
             else:
                 errors.append(f"{index + 2}행: 이미 시스템에 존재하는 P/O ('{ref_no}') - 건너뜀")

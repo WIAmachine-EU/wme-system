@@ -351,6 +351,7 @@ export default function DealerOrders({ isMobileView }) {
                       <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>NC:</strong> <span>{order.nc || 'F0iP'}</span></div>
                       <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>DETAIL SPEC:</strong> <span>{order.detail_spec || 'T/F, CC(S-H)+B, 20BAR, B/I, P/C, Q(A)'}</span></div>
                       <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>{t('menu1.order_date', 'Order date')}:</strong> <span>{order.dealer_order_date ? new Date(order.dealer_order_date).toLocaleDateString() : '-'}</span></div>
+                      <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>{t('menu1.dealer_order_no', 'Dealer Order No')}:</strong> <span>{order.dealer_order_no || '-'}</span></div>
                       <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>Incoterms:</strong> <span>{order.incoterms || '-'}</span></div>
                       <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>ETD / ETA:</strong> <span>{order.etd ? new Date(order.etd).toLocaleDateString() : '-'} / {order.eta ? new Date(order.eta).toLocaleDateString() : '-'}</span></div>
                       <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '90px' }}>VESSEL:</strong> <span>{order.vessel || '-'}</span></div>
@@ -477,7 +478,10 @@ export default function DealerOrders({ isMobileView }) {
                                   <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>S/O:</span> {order.so_no || '-'}</div>
                                   <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>NC:</span> {order.nc || 'F0iP'}</div>
                                   <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>DETAIL SPEC:</span> {order.detail_spec || 'T/F, CC(S-H)+B, 20BAR, B/I, P/C, Q(A)'}</div>
-                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu1.order_date', 'Order date')}:</span> {order.dealer_order_date ? new Date(order.dealer_order_date).toLocaleDateString() : '-'}</div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+                                    <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu1.order_date', 'Order date')}:</span> {order.dealer_order_date ? new Date(order.dealer_order_date).toLocaleDateString() : '-'}</div>
+                                    <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu1.dealer_order_no', 'Dealer Order No')}:</span> {order.dealer_order_no || '-'}</div>
+                                  </div>
                                 </div>
 
                                 <div style={{

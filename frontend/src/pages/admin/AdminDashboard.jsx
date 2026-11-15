@@ -158,6 +158,8 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
       reference_no: order.reference_no || '',
       nc: order.nc || '',
       dealer_company_id: order.dealer_company_id || '',
+      dealer_order_no: order.dealer_order_no || '',
+      dealer_order_date: order.dealer_order_date ? order.dealer_order_date.substring(0, 10) : '',
       serial_number: order.serial_number || '',
       so_no: order.so_no || '',
       price: order.price || '',
@@ -181,6 +183,8 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
           reference_no: editForm.reference_no,
           nc: editForm.nc,
           dealer_company_id: parseInt(editForm.dealer_company_id) || null,
+          dealer_order_no: editForm.dealer_order_no || null,
+          dealer_order_date: editForm.dealer_order_date ? new Date(editForm.dealer_order_date).toISOString() : null,
           serial_number: editForm.serial_number,
           so_no: editForm.so_no,
           price: editForm.price,
@@ -661,6 +665,7 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
                       <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '100px' }}>NC:</strong> <span>{order.nc || '-'}</span></div>
                       <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '100px' }}>DETAIL SPEC:</strong> <span>{order.detail_spec || 'T/F, CC(S-H)+B, 20BAR, B/I, P/C, Q(A)'}</span></div>
                       <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '100px' }}>Order date:</strong> <span>{order.dealer_order_date ? new Date(order.dealer_order_date).toLocaleDateString() : '-'}</span></div>
+                      <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '100px' }}>{t('menu1.dealer_order_no', 'Dealer Order No')}:</strong> <span>{order.dealer_order_no || '-'}</span></div>
                       <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '100px' }}>Date of Request:</strong> <span style={{ display: 'inline-flex', alignItems: 'center' }}>{order.delivery_request_date || '-'}{renderTrafficLight(order.delivery_request_date)}</span></div>
                       <div style={{ display: 'flex' }}><strong style={{ color: 'var(--text-primary)', width: '100px' }}>{t('menu2.detail_etd_eta', 'ETD / ETA')}:</strong> <span>{order.etd ? new Date(order.etd).toLocaleDateString() : '-'} / {order.eta ? new Date(order.eta).toLocaleDateString() : '-'}</span></div>
 
@@ -849,7 +854,10 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
                                   <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>S/O:</span> {order.so_no || '-'}</div>
                                   <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>NC:</span> {order.nc || 'F0iP'}</div>
                                   <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>DETAIL SPEC:</span> {order.detail_spec || 'T/F, CC(S-H)+B, 20BAR, B/I, P/C, Q(A)'}</div>
-                                  <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu1.order_date', '딜러발주 일자')}:</span> {order.dealer_order_date ? new Date(order.dealer_order_date).toLocaleDateString() : '-'}</div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+                                    <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu1.order_date', '딜러발주 일자')}:</span> {order.dealer_order_date ? new Date(order.dealer_order_date).toLocaleDateString() : '-'}</div>
+                                    <div><span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'inline-block', width: '100px' }}>{t('menu1.dealer_order_no', '딜러 주문번호')}:</span> {order.dealer_order_no || '-'}</div>
+                                  </div>
                                 </div>
 
                                 <div style={{
@@ -897,28 +905,26 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
             <form onSubmit={handleUpdateSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                {/* Row 1 */}
-                <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{t('menu1.edit_modal.model')}</label>
-                    <select
-                      value={editForm.product_model_id}
-                      onChange={e => setEditForm({ ...editForm, product_model_id: e.target.value })}
-                      style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
-                    >
-                      <option value="">-- 모델 선택 --</option>
-                      {models.map(m => (
-                        <option key={m.id} value={m.id}>{m.model_code}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>P/O</label>
-                    <input type="text" value={editForm.reference_no} onChange={e => setEditForm({ ...editForm, reference_no: e.target.value })} placeholder="P/O 번호" style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
-                  </div>
+                {/* Row 1: 모델명 - P/O */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{t('menu1.edit_modal.model', '모델명')}</label>
+                  <select
+                    value={editForm.product_model_id}
+                    onChange={e => setEditForm({ ...editForm, product_model_id: e.target.value })}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                  >
+                    <option value="">-- 모델 선택 --</option>
+                    {models.map(m => (
+                      <option key={m.id} value={m.id}>{m.model_code}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>P/O</label>
+                  <input type="text" value={editForm.reference_no} onChange={e => setEditForm({ ...editForm, reference_no: e.target.value })} placeholder="P/O 번호" style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
                 </div>
 
-                {/* Row 2 */}
+                {/* Row 2: NC - S/N */}
                 <div>
                   <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>NC</label>
                   <select
@@ -933,6 +939,12 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
                   </select>
                 </div>
                 <div>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>S/N</label>
+                  <input type="text" value={editForm.serial_number} onChange={e => setEditForm({ ...editForm, serial_number: e.target.value })} placeholder={t('menu1.edit_modal.sn_placeholder', 'S/N 입력')} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
+                </div>
+
+                {/* Row 3: Dealer - 딜러 주문번호 */}
+                <div>
                   <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Dealer</label>
                   <select
                     value={editForm.dealer_company_id}
@@ -945,21 +957,44 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
                     ))}
                   </select>
                 </div>
-
-                {/* Row 3 */}
                 <div>
-                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>S/N</label>
-                  <input type="text" value={editForm.serial_number} onChange={e => setEditForm({ ...editForm, serial_number: e.target.value })} placeholder={t('menu1.edit_modal.sn_placeholder')} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>S/O</label>
-                  <input type="text" value={editForm.so_no} onChange={e => setEditForm({ ...editForm, so_no: e.target.value })} placeholder={t('menu1.edit_modal.so_placeholder')} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{t('menu1.edit_modal.dealer_order_no', '딜러 주문번호')}</label>
+                  <input type="text" value={editForm.dealer_order_no} onChange={e => setEditForm({ ...editForm, dealer_order_no: e.target.value })} placeholder={t('management.modal_placeholder_dealer_order_no', '딜러 주문번호 입력')} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
                 </div>
 
-                {/* Row 4 */}
+                {/* Row 4: 딜러주문일 - 배송요청일 */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{t('menu1.edit_modal.dealer_order_date', '딜러주문일')}</label>
+                  <input type="date" value={editForm.dealer_order_date || ''} onChange={e => setEditForm({ ...editForm, dealer_order_date: e.target.value })} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{t('management.modal_label_req_date', '배송요청일')}</label>
+                  <input type="month" value={editForm.delivery_request_date || ''} onChange={e => setEditForm({ ...editForm, delivery_request_date: e.target.value })} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
+                </div>
+
+                {/* Row 5: Buying - S/O */}
                 <div>
                   <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Buying</label>
                   <input type="text" value={editForm.price} onChange={e => setEditForm({ ...editForm, price: e.target.value })} placeholder="구매가(€)" style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>S/O</label>
+                  <input type="text" value={editForm.so_no} onChange={e => setEditForm({ ...editForm, so_no: e.target.value })} placeholder={t('menu1.edit_modal.so_placeholder', 'S/O 번호')} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
+                </div>
+
+                {/* Row 6: Incoterms - Port */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Incoterms</label>
+                  <select
+                    value={editForm.incoterms}
+                    onChange={e => setEditForm({ ...editForm, incoterms: e.target.value })}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                  >
+                    <option value="">-- Incoterms 선택 --</option>
+                    {incotermCodes.map(term => (
+                      <option key={term.incoterm_code} value={term.incoterm_code}>{term.incoterm_code}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Port</label>
@@ -975,35 +1010,16 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
                   </select>
                 </div>
 
-                {/* Row 5 */}
+                {/* Row 7: DETAIL SPEC */}
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>DETAIL SPEC</label>
-                  <input type="text" value={editForm.detail_spec} onChange={e => setEditForm({ ...editForm, detail_spec: e.target.value })} placeholder={t('menu1.edit_modal.detail_placeholder')} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
+                  <input type="text" value={editForm.detail_spec} onChange={e => setEditForm({ ...editForm, detail_spec: e.target.value })} placeholder={t('menu1.edit_modal.detail_placeholder', '상세 스펙')} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
                 </div>
 
-                {/* Row 6 */}
-                <div>
-                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Incoterms</label>
-                  <select
-                    value={editForm.incoterms}
-                    onChange={e => setEditForm({ ...editForm, incoterms: e.target.value })}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
-                  >
-                    <option value="">-- Incoterms 선택 --</option>
-                    {incotermCodes.map(term => (
-                      <option key={term.incoterm_code} value={term.incoterm_code}>{term.incoterm_code}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{t('management.modal_label_req_date', '배송요청일')}</label>
-                  <input type="month" value={editForm.delivery_request_date || ''} onChange={e => setEditForm({ ...editForm, delivery_request_date: e.target.value })} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
-                </div>
-
-                {/* Row 7 */}
+                {/* Row 8: REMARK */}
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>REMARK</label>
-                  <textarea value={editForm.remark} onChange={e => setEditForm({ ...editForm, remark: e.target.value })} placeholder={t('menu1.edit_modal.remark_placeholder')} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)', resize: 'vertical', minHeight: '80px' }} />
+                  <textarea value={editForm.remark} onChange={e => setEditForm({ ...editForm, remark: e.target.value })} placeholder={t('menu1.edit_modal.remark_placeholder', '비고 작성')} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)', resize: 'vertical', minHeight: '80px' }} />
                 </div>
               </div>
               </div>

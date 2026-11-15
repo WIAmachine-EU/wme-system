@@ -83,6 +83,7 @@ export default function UploadSettings() {
     incoterms: '',
     destination_port: '',
     dealer_order_date: '',
+    dealer_order_no: '',
     delivery_request_date: '',
     detail_spec: ''
   });
@@ -145,6 +146,7 @@ export default function UploadSettings() {
           incoterms: newOrderForm.incoterms,
           destination_port: newOrderForm.destination_port,
           dealer_order_date: newOrderForm.dealer_order_date || null,
+          dealer_order_no: newOrderForm.dealer_order_no || null,
           delivery_request_date: newOrderForm.delivery_request_date || null,
           detail_spec: newOrderForm.detail_spec || null
         })
@@ -153,7 +155,7 @@ export default function UploadSettings() {
       if (res.ok) {
         alert("신규 발주가 성공적으로 생성되었습니다.");
         setShowCreateModal(false);
-        setNewOrderForm({ reference_no: '', product_model_id: '', dealer_company_id: '', nc: '', incoterms: '', destination_port: '', dealer_order_date: '', delivery_request_date: '', detail_spec: '' });
+        setNewOrderForm({ reference_no: '', product_model_id: '', dealer_company_id: '', nc: '', incoterms: '', destination_port: '', dealer_order_date: '', dealer_order_no: '', delivery_request_date: '', detail_spec: '' });
       } else {
         const err = await res.json();
         alert(`생성 실패: ${err.detail || '알 수 없는 오류'}`);
@@ -555,13 +557,24 @@ export default function UploadSettings() {
                 </select>
               </div>
 
-              {/* 5. Dealer Order Date */}
+              {/* 5. Dealer Order Date & Dealer Order No */}
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('management.modal_label_order_date', '주문일자')}</label>
                 <input
                   type="date"
                   value={newOrderForm.dealer_order_date}
                   onChange={e => setNewOrderForm({ ...newOrderForm, dealer_order_date: e.target.value })}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('management.modal_label_dealer_order_no', '딜러 주문번호')}</label>
+                <input
+                  type="text"
+                  value={newOrderForm.dealer_order_no}
+                  onChange={e => setNewOrderForm({ ...newOrderForm, dealer_order_no: e.target.value })}
+                  placeholder={t('management.modal_placeholder_dealer_order_no', '딜러 주문번호 입력')}
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
                 />
               </div>
@@ -576,6 +589,7 @@ export default function UploadSettings() {
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
                 />
               </div>
+              <div />
 
               {/* 7. INCOTERMS */}
               <div>

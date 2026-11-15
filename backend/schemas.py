@@ -241,6 +241,7 @@ class OrderBase(BaseModel):
     pickup_date: Optional[datetime] = None # 출고/픽업일자
     remark: Optional[str] = None
     dealer_order_date: Optional[datetime] = None
+    dealer_order_no: Optional[str] = None
     delivery_request_date: Optional[str] = None
     rental_start_date: Optional[datetime] = None
     rental_expiry_date: Optional[datetime] = None
@@ -270,6 +271,7 @@ class OrderCreate(BaseModel):
     sales_month: Optional[str] = None
     pickup_date: Optional[datetime] = None
     dealer_order_date: Optional[datetime] = None
+    dealer_order_no: Optional[str] = None
     delivery_request_date: Optional[str] = None
     rental_start_date: Optional[datetime] = None
     rental_expiry_date: Optional[datetime] = None
@@ -312,6 +314,7 @@ class OrderUpdate(BaseModel):
     pickup_date: Optional[datetime] = None
     remark: Optional[str] = None
     dealer_order_date: Optional[datetime] = None
+    dealer_order_no: Optional[str] = None
     delivery_request_date: Optional[str] = None
     rental_start_date: Optional[datetime] = None
     rental_expiry_date: Optional[datetime] = None

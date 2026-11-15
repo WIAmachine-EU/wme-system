@@ -98,6 +98,19 @@
     "edit_modal": {
       "title": "Order detail change",
       "model": "Model",
+      "po": "P/O",
+      "nc": "NC",
+      "sn": "S/N",
+      "dealer": "Dealer",
+      "dealer_order_no": "Dealer Order No",
+      "dealer_order_date": "Order Date",
+      "delivery_request_date": "Req. Delivery Date",
+      "buying": "Buying",
+      "so": "S/O",
+      "incoterms": "Incoterms",
+      "port": "Port",
+      "detail_spec": "DETAIL SPEC",
+      "remark": "REMARK",
       "sn_placeholder": "S/N",
       "so_placeholder": "S/O",
       "detail_placeholder": "detail",
@@ -111,7 +124,8 @@
       "cancel": "cancell",
       "save": "Save"
     },
-    "order_date": "Order date"
+    "order_date": "Order date",
+    "dealer_order_no": "Dealer Order No"
   },
   "menu4": {
     "page_title": "Sales List",
@@ -318,6 +332,8 @@
     "modal_label_po": "P/O",
     "modal_label_dealer": "Dealer",
     "modal_label_order_date": "Order date",
+    "modal_label_dealer_order_no": "Dealer Order No",
+    "modal_placeholder_dealer_order_no": "Dealer Order No",
     "modal_label_req_date": "Date of Request",
     "modal_label_incoterms": "Incoterms",
     "modal_label_port": "Port",
@@ -421,6 +437,8 @@
     "header_port": "Port",
     "header_tracking": "Tracking",
     "cargo_tracking_btn": "Cargo Tracking",
+    "order_date": "Order date",
+    "dealer_order_no": "Dealer Order No",
     "loading": "Loading data..."
   },
   "dealer_promotion": {
