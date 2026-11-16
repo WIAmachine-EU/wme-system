@@ -1,6 +1,6 @@
 # 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
-## [2026-11-16] 시스템 로그인 화면 영문화 전환, 비밀번호 재설정 UI 및 재설정 안내 이메일 영·한 병기 개편
+## [2026-11-16] 시스템 전반 다국어(EN/KR) 고도화, 로그인·인증 영문화, 발주/수정 모달 개편 및 재고 변경 취소 기능
 
 ### 1. 시스템 로그인 화면 전 과정 영문화 (English Only UI) (`Login.jsx`, `main.py`)
 * **로그인 절차 영어 인터페이스 적용**:
@@ -70,22 +70,21 @@
   * WIA 가용재고 목록의 `상태` 또는 `주문선택` 드롭다운을 변경할 때, `확정` 버튼 오른쪽에 `취소`(`Cancel`) 버튼을 나란히 표시(데스크톱 테이블 및 모바일 카드 뷰 모두 지원).
   * `취소` 버튼 클릭 시 `handleCancelPendingChanges`가 해당 행의 미확정 변경사항(`pendingChanges`)을 즉시 초기화하여 `확정`/`취소` 버튼이 사라지고 기존의 확정되어 있던 상태·딜러 선택 그대로 원복되도록 구현.
 
-## [2026-11-16] 주문/배송 타임라인 딜러 주문번호 표기, 신규 발주 생성 모달(딜러주문번호·구매가·판매가) 및 장비 정보 수정 모달 항목 순서 개편
 
-### 1. 주문/배송 타임라인 상세 뷰 '딜러 주문번호' 표기 (`AdminDashboard.jsx`, `DealerOrders.jsx`)
+### 11. 주문/배송 타임라인 상세 뷰 '딜러 주문번호' 표기 (`AdminDashboard.jsx`, `DealerOrders.jsx`)
 * **타임라인 하단 상세 정보 영역 확장**:
   * 주문/배송현황 페이지(`AdminDashboard.jsx`, `DealerOrders.jsx`)의 배송 추적 타임라인 하단 상세 정보 영역에서 `딜러발주 일자` 바로 오른쪽에 `딜러 주문번호`(`dealer_order_no`)를 나란히 인라인 배치.
   * 미등록 또는 데이터 부재 시 `-`로 Null-safe하게 폴백 처리.
   * 모바일 카드 뷰 및 데스크탑 테이블 상세 뷰 모두에 동일하게 일관된 다국어(`menu1.dealer_order_no`, `menu1.order_date`) 적용.
 
-### 2. 신규 단건 발주 생성 모달 '딜러 주문번호', 'Buying(구매가)', 'SALES PRICE(판매가)' 입력 항목 추가 (`UploadSettings.jsx`)
+### 12. 신규 단건 발주 생성 모달 '딜러 주문번호', 'Buying(구매가)', 'SALES PRICE(판매가)' 입력 항목 추가 (`UploadSettings.jsx`)
 * **[신규 단건 발주 생성] 팝업창 UI/UX 개선 및 가격 데이터 연동**:
   * `주문일자(dealer_order_date)` 입력란 바로 오른쪽에 `딜러 주문번호(dealer_order_no)` 텍스트 인풋을 신규 배치.
   * `배송요청일(delivery_request_date)` 입력란 바로 오른쪽에 `Buying (구매가)` 및 `SALES PRICE (판매가)` 입력란을 나란히 배치.
   * **Buying (구매가, `price`)**: P/O 정보 기준으로 시스템 내 전체 페이지(주문/배송현황 장비 정보 수정, WIA 재고리스트, WIA 창고, 판매 목록 등)의 구매가 필드에 동일하게 적용.
   * **SALES PRICE (판매가, `sales_price`)**: P/O 정보 기준 A발주 건에 대해 판매가 항목이 있는 페이지(판매 목록 등)의 판매가 필드에 동일하게 적용.
 
-### 3. 장비 정보 수정 모달 항목 2열 그리드 순서 전면 개편 (`AdminDashboard.jsx`)
+### 13. 장비 정보 수정 모달 항목 2열 그리드 순서 전면 개편 (`AdminDashboard.jsx`)
 * **사용자 요청 맞춤형 8행 2열 [왼쪽 - 오른쪽] 레이아웃 재배치**:
   * **Row 1**: `모델명` (Select) - `P/O` (Input)
   * **Row 2**: `NC` (Select) - `S/N` (Input)
@@ -99,7 +98,7 @@
   * `handleEditClick` 시 기존 발주 건의 `dealer_order_no` 및 `dealer_order_date`를 폼에 자동 로드.
   * `handleUpdateSubmit`을 통해 PATCH `/api/orders/{id}`로 백엔드 DB에 원활히 반영.
 
-### 4. 백엔드 DB 스키마 확장 및 API 지원 (`models.py`, `schemas.py`, `main.py`)
+### 14. 백엔드 DB 스키마 확장 및 API 지원 (`models.py`, `schemas.py`, `main.py`)
 * **ORM 모델 및 Pydantic 스키마**:
   * `Order` 모델에 `dealer_order_no = Column(String, nullable=True)` 컬럼 추가.
   * `schemas.OrderBase`, `OrderCreate`, `OrderUpdate`에 `dealer_order_no: Optional[str] = None` 추가.
