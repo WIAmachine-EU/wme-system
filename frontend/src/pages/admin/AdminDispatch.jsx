@@ -93,9 +93,9 @@ function CargoDetailModal({ isOpen, onClose, serialNumber, modelName }) {
 }
 
 const AGING_COLORS = {
-  NORMAL: { color: '#16C47F', bg: 'rgba(22, 196, 127, 0.12)' },   // 일반 재고: 초록색
-  LONG: { color: '#F97316', bg: 'rgba(249, 115, 22, 0.12)' },     // 장기 재고: 오렌지색
-  CRITICAL: { color: '#EF4444', bg: 'rgba(239, 68, 68, 0.12)' }   // 악성 재고: 빨간색
+  NORMAL: { color: 'rgb(4, 154, 67)', bg: 'rgba(4, 154, 67, 0.12)' },       // 일반 재고: rgb(4, 154, 67)
+  LONG: { color: 'rgb(254, 151, 6)', bg: 'rgba(254, 151, 6, 0.12)' },       // 장기 재고: rgb(254, 151, 6)
+  CRITICAL: { color: 'rgb(124, 15, 3)', bg: 'rgba(124, 15, 3, 0.12)' }     // 악성 재고: rgb(124, 15, 3)
 };
 
 const calculateAging = (etd) => {
@@ -701,8 +701,9 @@ export default function AdminDispatch({ isMobileView }) {
                       <span
                         title={aging.statusText}
                         style={{
-                          display: 'inline-block', padding: '4px 10px', borderRadius: '12px',
-                          fontSize: '0.8rem', fontWeight: 700, color: aging.color, background: aging.bg
+                          fontSize: '0.85rem',
+                          fontWeight: 700,
+                          color: aging.color
                         }}
                       >
                         {aging.days}{t('dispatch.days_suffix', '일')}
@@ -716,7 +717,7 @@ export default function AdminDispatch({ isMobileView }) {
                         className="btn btn-outline"
                         style={{ flex: 1, padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', opacity: order.serial_number ? 1 : 0.5 }}
                       >
-                        <ExternalLink size={14} /> {t('dispatch.btn_dimension', '화물')}
+                        <ExternalLink size={14} /> {t('dispatch.btn_dimension', 'cm / kg')}
                       </button>
                       <button
                         onClick={() => handleViewHistory(order)}
@@ -780,7 +781,7 @@ export default function AdminDispatch({ isMobileView }) {
                   {renderSortHeader('stock_type', t('dispatch.header_status', '상태'), '9%')}
                   {renderSortHeader('warehouse', t('dispatch.header_location', '위치'), '9%')}
                   {renderSortHeader('aging', t('dispatch.header_aging', '에이징'), '11%')}
-                  <th style={{ width: '7%', textAlign: 'center', fontWeight: 'bold' }}>{t('dispatch.header_dimension', '화물')}</th>
+                  <th style={{ width: '7%', textAlign: 'center', fontWeight: 'bold' }}>{t('dispatch.header_dimension', '화물정보')}</th>
                   <th style={{ width: '19%', textAlign: 'center', fontWeight: 'bold' }}>{t('dispatch.header_progress', '진행')}</th>
                 </tr>
               </thead>
@@ -856,8 +857,9 @@ export default function AdminDispatch({ isMobileView }) {
                             <span
                               title={aging.statusText}
                               style={{
-                                display: 'inline-block', padding: '4px 10px', borderRadius: '12px',
-                                fontSize: '11px', fontWeight: 700, color: aging.color, background: aging.bg
+                                fontSize: '12px',
+                                fontWeight: 700,
+                                color: aging.color
                               }}
                             >
                               {aging.days}{t('dispatch.days_suffix', '일')}
@@ -880,7 +882,7 @@ export default function AdminDispatch({ isMobileView }) {
                               }}
                               className={order.serial_number ? "hover-bg-subtle" : ""}
                             >
-                              <ExternalLink size={13} /> {t('dispatch.btn_dimension', '화물')}
+                              <ExternalLink size={13} /> {t('dispatch.btn_dimension', 'cm / kg')}
                             </button>
                           </td>
                           {/* 10. 진행 */}
