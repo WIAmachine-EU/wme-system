@@ -1,5 +1,34 @@
 # 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
+## [2026-11-16] 시스템 로그인 화면 영문화 전환, 비밀번호 재설정 UI 및 재설정 안내 이메일 영·한 병기 개편
+
+### 1. 시스템 로그인 화면 전 과정 영문화 (English Only UI) (`Login.jsx`, `main.py`)
+* **로그인 절차 영어 인터페이스 적용**:
+  * 고객, 딜러사 및 해외 법인 직원의 접근성을 위해 로그인 1단계(이메일·비밀번호) 및 2단계(WebAuthn 생체/기기 패스키, 4~8자리 숫자 PIN 패스키)의 모든 레이블, 버튼, 안내 문구를 영어로 전환.
+  * `STEP 1 / 2 · Email Account Authentication`, `Next (Step 2 Passkey Verification)`, `Forgot your password?`
+  * `STEP 2 / 2 · Passkey 2nd Factor Authentication`, `Biometric / Device Passkey`, `PIN Passkey`, `Verify Device Passkey & Sign In`, `Register PIN & Sign In` 등 직관적인 영문 UI 제공.
+  * 브라우저 호환 안내 및 인앱 브라우저(구글앱 등) 자동 폴백 메시지도 자연스러운 영문으로 변경.
+* **백엔드 인증 오류 메시지 영문화 및 프론트엔드 다국어 번역 맵핑**:
+  * 백엔드 인증 엔드포인트(`/api/v1/auth/login`, `/api/v1/auth/verify-2fa`)의 응답 메시지 영문화.
+  * 프론트엔드 `translateError`, `translateInfo` 함수를 통해 백엔드에서 반환되는 예외 및 오류 메시지를 100% 영문으로 즉시 치환 표시하여 외국인 사용자가 어떠한 상황에서도 한국어 오류에 직면하지 않도록 보장.
+* **로그인 완료 후 메인 시스템 다국어 선택 유지**:
+  * 로그인 완료 후 메인 대시보드 진입 시 상단 네비게이션 바의 언어 변환 토글(`KR / EN`)을 통해 한국어/영어를 자유롭게 전환 가능하도록 기존 기능 유지 및 검증.
+
+### 2. 비밀번호 분실 및 재설정 화면 영문화 (`Login.jsx`, `main.py`)
+* **비밀번호 재설정 요청 및 새 비밀번호 입력 화면 개편**:
+  * 비밀번호 분실 요청 모달: `Reset Your Password`, `Enter your registered email address`, `Send Password Reset Link`, `Back to Sign In`.
+  * 새 비밀번호 설정 화면(`?reset_token=...`): `Set New Password`, `New Password (min. 8 characters)`, `Confirm New Password` 항목 추가 및 8자 이상 검증, 불일치 검증 로직 영문 적용.
+  * 신규 계정 초대 수락 화면(`?invite_token=...`): `Accept Invitation · Set Initial Password`, `Invited Account`, `Save Password & Proceed to Passkey Setup`으로 영문화.
+
+### 3. 비밀번호 재설정 및 신규 계정 초대 안내 이메일 영·한 병기 (`email_service.py`)
+* **이메일 제목 및 타이틀 영문화**:
+  * 비밀번호 재설정 이메일 제목: `[WMEINS ERP] Password Reset Instructions`
+  * 신규 계정 초대 이메일 제목: `[WMEINS ERP] Account Invitation & Initial Password Setup`
+* **본문 구조 [상단 영어 안내 - 하단 한국어 안내] 2단 구성**:
+  * 본문 상단: 해외 딜러 및 외국인 사용자를 위한 영문 안내문구(`Hello {username}, A password reset request has been received...`, `▶ Password Reset Link (Valid for 15 minutes, single use)`) 배치.
+  * 구분선(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`) 삽입.
+  * 본문 하단: 국내 사용자를 위한 한국어 안내문구(`안녕하세요 {username} 님, WMEINS 시스템 비밀번호 재설정이 요청되었습니다...`, `▶ 비밀번호 재설정 링크 (15분 유효, 1회용)`) 배치.
+
 ## [2026-11-16] 주문/배송 타임라인 딜러 주문번호 표기, 신규 발주 생성 모달(딜러주문번호·구매가·판매가) 및 장비 정보 수정 모달 항목 순서 개편
 
 ### 1. 주문/배송 타임라인 상세 뷰 '딜러 주문번호' 표기 (`AdminDashboard.jsx`, `DealerOrders.jsx`)

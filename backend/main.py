@@ -2392,34 +2392,34 @@ def accept_invite_and_set_initial_password(
     db: Session = Depends(get_db)
 ):
     if len(payload.new_password) < 8:
-        raise HTTPException(status_code=400, detail="비밀번호는 최소 8자 이상이어야 합니다.")
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long.")
 
     try:
         unverified = jwt.decode(payload.invite_token, options={"verify_signature": False})
         user_id = int(unverified.get("sub", 0))
     except Exception:
-        raise HTTPException(status_code=400, detail="유효하지 않은 초대 링크입니다.")
+        raise HTTPException(status_code=400, detail="Invalid invitation link.")
 
     user = db.query(models.CustomUser).filter(models.CustomUser.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="계정을 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail="Account not found.")
 
     if hasattr(user, "is_active") and user.is_active is False:
-        raise HTTPException(status_code=403, detail="비활성화된 계정입니다. 시스템 관리자에게 문의하세요.")
+        raise HTTPException(status_code=403, detail="Your account has been deactivated. Please contact the administrator.")
 
     if user.password_hash is not None:
-        raise HTTPException(status_code=400, detail="이미 초기 비밀번호 설정이 완료된 초대 링크입니다.")
+        raise HTTPException(status_code=400, detail="This invitation link has already been used.")
 
     # 서명 및 48시간 유효기간 검증 (Stateless Dynamic HMAC)
     dynamic_secret = f"{JWT_SECRET}:INVITE_PENDING"
     try:
         verified = jwt.decode(payload.invite_token, dynamic_secret, algorithms=[ALGORITHM])
         if verified.get("scope") != "account_invite":
-            raise HTTPException(status_code=400, detail="잘못된 초대 토큰입니다.")
+            raise HTTPException(status_code=400, detail="Invalid invitation token.")
     except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=400, detail="초대 링크 유효기간(48시간)이 만료되었습니다. 관리자에게 재발송을 요청해 주세요.")
+        raise HTTPException(status_code=400, detail="Invitation link has expired (48-hour limit). Please request a new invitation.")
     except jwt.InvalidTokenError:
-        raise HTTPException(status_code=400, detail="유효하지 않은 초대 링크입니다.")
+        raise HTTPException(status_code=400, detail="Invalid invitation link.")
 
     # 초기 비밀번호 해싱 저장 (이 순간 dynamic_secret이 바뀌어 초대 링크는 즉시 자동 폐기됨)
     user.password_hash = pwd_context.hash(payload.new_password)
@@ -2462,19 +2462,19 @@ def step1_email_password_login(payload: schemas.EmailLoginRequest, db: Session =
     ).first()
 
     if not user:
-        raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 올바르지 않습니다.")
+        raise HTTPException(status_code=401, detail="Invalid email address or password.")
 
     if hasattr(user, "is_active") and user.is_active is False:
-        raise HTTPException(status_code=403, detail="비활성화된 계정입니다. 시스템 관리자에게 문의하세요.")
+        raise HTTPException(status_code=403, detail="Your account has been deactivated. Please contact the administrator.")
 
     if not user.password_hash:
         raise HTTPException(
             status_code=403,
-            detail="초대 대기 중인 계정입니다. 이메일로 발송된 '초기 비밀번호 설정 초대 링크'를 통해 먼저 비밀번호를 설정해 주세요."
+            detail="Account invitation pending. Please set your password using the invitation link sent to your email."
         )
 
     if not pwd_context.verify(payload.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 올바르지 않습니다.")
+        raise HTTPException(status_code=401, detail="Invalid email address or password.")
 
     # 기존 평문 비밀번호였던 경우 자동으로 암호화 해시로 업그레이드
     if not user.password_hash.startswith(("pbkdf2_sha256$", "$2a$", "$2b$", "$2y$")):
@@ -2514,22 +2514,22 @@ def step2_verify_passkey_and_issue_session(payload: schemas.Verify2FARequest, db
     try:
         pre_payload = jwt.decode(payload.pre_auth_token, JWT_SECRET, algorithms=[ALGORITHM])
         if pre_payload.get("scope") != "mfa_pending" or pre_payload.get("aal") != "aal1":
-            raise HTTPException(status_code=403, detail="잘못된 1단계 인증 토큰입니다.")
+            raise HTTPException(status_code=403, detail="Invalid Step 1 authentication token.")
         user_id = int(pre_payload.get("sub"))
         expected_challenge = pre_payload.get("challenge")
     except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="1단계 인증 유효시간(5분)이 만료되었습니다. 처음부터 다시 로그인해 주세요.")
+        raise HTTPException(status_code=401, detail="Step 1 authentication session expired (5 min). Please log in again from Step 1.")
     except HTTPException:
         raise
     except Exception:
-        raise HTTPException(status_code=401, detail="유효하지 않은 1단계 인증 토큰입니다.")
+        raise HTTPException(status_code=401, detail="Invalid Step 1 authentication token.")
 
     user = db.query(models.CustomUser).filter(models.CustomUser.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail="User not found.")
 
     if hasattr(user, "is_active") and user.is_active is False:
-        raise HTTPException(status_code=403, detail="비활성화된 계정입니다. 시스템 관리자에게 문의하세요.")
+        raise HTTPException(status_code=403, detail="Your account has been deactivated. Please contact the administrator.")
 
     mfa_data = _parse_user_mfa_binding(user.supabase_uid)
     verified_2fa = False
@@ -2542,24 +2542,24 @@ def step2_verify_passkey_and_issue_session(payload: schemas.Verify2FARequest, db
         client_data_b64 = str(cred.get("clientDataJSON") or resp_obj.get("clientDataJSON") or "").strip()
 
         if not cred_id or not client_data_b64:
-            raise HTTPException(status_code=400, detail="유효하지 않은 기기 패스키 응답 데이터입니다.")
+            raise HTTPException(status_code=400, detail="Invalid device passkey response data.")
 
         try:
             padded = client_data_b64 + "=" * ((4 - len(client_data_b64) % 4) % 4)
             client_data_raw = base64.urlsafe_b64decode(padded.encode("ascii"))
             client_data = json.loads(client_data_raw.decode("utf-8"))
         except Exception:
-            raise HTTPException(status_code=400, detail="패스키 clientDataJSON 파싱에 실패했습니다.")
+            raise HTTPException(status_code=400, detail="Failed to parse passkey clientDataJSON.")
 
         ceremony_type = client_data.get("type")
         if ceremony_type not in ("webauthn.create", "webauthn.get"):
-            raise HTTPException(status_code=401, detail="유효하지 않은 WebAuthn 인증 타입입니다.")
+            raise HTTPException(status_code=401, detail="Invalid WebAuthn ceremony type.")
 
         if expected_challenge:
             received_challenge = str(client_data.get("challenge") or "").rstrip("=")
             expected_norm = str(expected_challenge).rstrip("=")
             if received_challenge != expected_norm:
-                raise HTTPException(status_code=401, detail="패스키 보안 챌린지가 일치하지 않거나 만료되었습니다. 다시 시도해 주세요.")
+                raise HTTPException(status_code=401, detail="Passkey challenge mismatch or expired. Please try again.")
 
         # 다중 기기(PC + 모바일 여러 브라우저) 지원을 위해 Credential ID를 사용자 계정에 추가 바인딩
         if cred_id not in mfa_data["creds"]:
@@ -2579,11 +2579,11 @@ def step2_verify_passkey_and_issue_session(payload: schemas.Verify2FARequest, db
     elif payload.passkey_pin:
         pin_clean = str(payload.passkey_pin).strip()
         if not pin_clean.isdigit() or not (4 <= len(pin_clean) <= 8):
-            raise HTTPException(status_code=400, detail="2차 숫자 패스키는 4~8자리 숫자로 입력해 주세요.")
+            raise HTTPException(status_code=400, detail="PIN passkey must be 4 to 8 digits.")
 
         if mfa_data.get("pin"):
             if not pwd_context.verify(pin_clean, mfa_data["pin"]):
-                raise HTTPException(status_code=401, detail="입력하신 2차 숫자 패스키(PIN)가 올바르지 않습니다.")
+                raise HTTPException(status_code=401, detail="Invalid PIN passkey.")
         else:
             # 최초 숫자 패스키 등록 (1단계 이메일+비밀번호 검증을 통과한 직후 본인의 2차 숫자 패스키 설정)
             mfa_data["pin"] = pwd_context.hash(pin_clean)
@@ -2601,7 +2601,7 @@ def step2_verify_passkey_and_issue_session(payload: schemas.Verify2FARequest, db
         if supa_email and supa_email != user.email.strip().lower():
             raise HTTPException(
                 status_code=403,
-                detail="1단계 로그인 계정(이메일)과 2단계 패스키 소유자 계정이 일치하지 않습니다."
+                detail="Step 1 login email does not match Step 2 passkey account."
             )
 
         if supa_uid and supa_uid not in mfa_data["su"]:
@@ -2614,7 +2614,7 @@ def step2_verify_passkey_and_issue_session(payload: schemas.Verify2FARequest, db
         verified_2fa = True
 
     if not verified_2fa:
-        raise HTTPException(status_code=400, detail="2단계 패스키 인증 정보가 제공되지 않았습니다.")
+        raise HTTPException(status_code=400, detail="Step 2 passkey credentials were not provided.")
 
     role_str = user.role.value if hasattr(user.role, "value") else str(user.role)
 
@@ -2671,40 +2671,40 @@ def forgot_password(payload: schemas.ForgotPasswordRequest, db: Session = Depend
             reset_link=reset_link
         )
 
-    return {"message": "등록된 이메일인 경우 비밀번호 재설정 링크가 발송되었습니다. (유효시간 15분)"}
+    return {"message": "If this email is registered, a password reset link has been sent. (Valid for 15 minutes)"}
 
 
 @app.post("/api/v1/auth/reset-password")
 def reset_password(payload: schemas.ResetPasswordRequest, db: Session = Depends(get_db)):
     if len(payload.new_password) < 8:
-        raise HTTPException(status_code=400, detail="새 비밀번호는 최소 8자 이상이어야 합니다.")
+        raise HTTPException(status_code=400, detail="New password must be at least 8 characters long.")
 
     try:
         unverified = jwt.decode(payload.token, options={"verify_signature": False})
         user_id = int(unverified.get("sub", 0))
     except Exception:
-        raise HTTPException(status_code=400, detail="유효하지 않은 재설정 링크입니다.")
+        raise HTTPException(status_code=400, detail="Invalid password reset link.")
 
     user = db.query(models.CustomUser).filter(models.CustomUser.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=400, detail="계정을 찾을 수 없습니다.")
+        raise HTTPException(status_code=400, detail="Account not found.")
 
     if hasattr(user, "is_active") and user.is_active is False:
-        raise HTTPException(status_code=403, detail="비활성화된 계정입니다. 시스템 관리자에게 문의하세요.")
+        raise HTTPException(status_code=403, detail="Your account has been deactivated. Please contact the administrator.")
 
     dynamic_secret = f"{JWT_SECRET}:{user.password_hash}"
     try:
         verified = jwt.decode(payload.token, dynamic_secret, algorithms=[ALGORITHM])
         if verified.get("scope") != "password_reset":
-            raise HTTPException(status_code=400, detail="잘못된 토큰 용도입니다.")
+            raise HTTPException(status_code=400, detail="Invalid token scope.")
     except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=400, detail="재설정 링크 유효시간(15분)이 만료되었습니다.")
+        raise HTTPException(status_code=400, detail="Password reset link has expired (15-minute limit).")
     except jwt.InvalidTokenError:
-        raise HTTPException(status_code=400, detail="이미 사용되었거나 만료된 재설정 링크입니다.")
+        raise HTTPException(status_code=400, detail="This reset link has already been used or has expired.")
 
     user.password_hash = pwd_context.hash(payload.new_password)
     db.commit()
-    return {"message": "비밀번호가 재설정되었습니다. 이메일과 새 비밀번호로 1단계 로그인을 진행해 주세요."}
+    return {"message": "Your password has been successfully reset. Please sign in with your email and new password."}
 
 # ==========================================
 # 10. 문서 다운로드 API

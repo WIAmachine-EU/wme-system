@@ -252,12 +252,26 @@ def send_email(to_email: str, subject: str, body: str) -> dict:
 def send_account_invitation_email(to_email: str, role: str, invite_link: str, dealer_name: str = ""):
     """
     관리자가 신규 계정 생성 시 대상 이메일로 '초기 비밀번호 설정 초대 링크'를 자동 발송합니다.
+    (영어 상단 안내 + 한국어 하단 안내 병기)
     """
-    subject = "[WMEINS ERP] 계정 생성 안내 및 초기 비밀번호 설정 초대"
-    org_info = f" ({dealer_name})" if dealer_name else ""
-    body = f"""안녕하세요, 현대위아 유럽법인 글로벌 SCM ERP (WMEINS) 시스템입니다.
+    subject = "[WMEINS ERP] Account Invitation & Initial Password Setup"
+    org_info_en = f" ({dealer_name})" if dealer_name else ""
+    org_info_ko = f" ({dealer_name})" if dealer_name else ""
+    body = f"""Hello, this is Hyundai WIA Europe Global SCM ERP (WMEINS) system.
 
-귀하의 이메일({to_email})로 WMEINS 시스템 계정[권한: {role}{org_info}]이 생성되었습니다.
+Your WMEINS account [Role: {role}{org_info_en}] has been created for {to_email}.
+For security, please click the invitation link below to set your initial password and register your 2nd factor Passkey.
+
+▶ Initial Password Setup Link (Valid for 48 hours, single use):
+{invite_link}
+
+※ After signing in, please update your display name in the Profile settings menu.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+안녕하세요, 현대위아 유럽법인 글로벌 SCM ERP (WMEINS) 시스템입니다.
+
+귀하의 이메일({to_email})로 WMEINS 시스템 계정[권한: {role}{org_info_ko}]이 생성되었습니다.
 보안을 위해 관리자는 초기 비밀번호를 지정하지 않으며, 아래 초대 링크를 클릭하여 직접 초기 비밀번호를 설정하신 후 2단계 패스키(Passkey)를 등록해 주시기 바랍니다.
 
 ▶ 초기 비밀번호 설정 링크 (48시간 유효, 1회용):
@@ -270,9 +284,20 @@ def send_account_invitation_email(to_email: str, role: str, invite_link: str, de
 def send_password_reset_email(to_email: str, username: str, reset_link: str):
     """
     비밀번호 분실 시 15분 유효한 일회용 재설정 링크를 발송합니다.
+    (영어 상단 안내 + 한국어 하단 안내 병기)
     """
-    subject = "[WMEINS ERP] 비밀번호 재설정 안내"
-    body = f"""안녕하세요 {username}님,
+    subject = "[WMEINS ERP] Password Reset Instructions"
+    body = f"""Hello {username},
+
+A password reset request has been received for your WMEINS ERP account.
+Please click the link below to set a new password within 15 minutes.
+
+▶ Password Reset Link (Valid for 15 minutes, single use):
+{reset_link}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+안녕하세요 {username} 님,
 
 WMEINS 시스템 비밀번호 재설정이 요청되었습니다.
 아래 링크를 클릭하여 15분 이내에 새 비밀번호를 설정해 주세요.

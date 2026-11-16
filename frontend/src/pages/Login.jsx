@@ -25,6 +25,47 @@ function bufferToBase64Url(buffer) {
   return window.btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+function translateError(msg) {
+  if (!msg) return '';
+  const s = String(msg);
+  if (s.includes('이메일 또는 비밀번호가 올바르지 않습니다')) return 'Invalid email address or password.';
+  if (s.includes('비활성화된 계정')) return 'Your account has been deactivated. Please contact the administrator.';
+  if (s.includes('초대 대기 중')) return 'Account invitation pending. Please set your password using the invitation link sent to your email.';
+  if (s.includes('서버와 통신할 수 없습니다')) return 'Unable to connect to the server. Please check your network.';
+  if (s.includes('보안 챌린지 정보가 만료')) return 'Security challenge expired. Please restart login from Step 1.';
+  if (s.includes('패스키 인증 응답을 받지 못했습니다')) return 'No passkey response received.';
+  if (s.includes('2단계 패스키 검증에 실패') || s.includes('2단계 패스키 인증 실패')) return 'Step 2 passkey verification failed.';
+  if (s.includes('2차 숫자 패스키는 4~8자리')) return 'PIN passkey must be 4 to 8 digits.';
+  if (s.includes('입력하신 두 숫자 패스키가 일치하지 않습니다')) return 'The two PIN passkeys do not match.';
+  if (s.includes('입력하신 2차 숫자 패스키(PIN)가 올바르지 않습니다')) return 'Invalid PIN passkey.';
+  if (s.includes('2차 숫자 패스키 검증에 실패했습니다')) return 'Invalid PIN passkey.';
+  if (s.includes('비밀번호는 최소 8자 이상')) return 'Password must be at least 8 characters long.';
+  if (s.includes('입력하신 두 비밀번호가 일치하지 않습니다')) return 'The two passwords do not match.';
+  if (s.includes('초기 비밀번호 설정에 실패했습니다')) return 'Failed to set initial password.';
+  if (s.includes('요청 처리 중 오류가 발생했습니다')) return 'An error occurred while processing your request.';
+  if (s.includes('유효하지 않은 재설정 링크')) return 'Invalid password reset link.';
+  if (s.includes('계정을 찾을 수 없습니다')) return 'Account not found.';
+  if (s.includes('재설정 링크 유효시간') || s.includes('만료되었습니다')) return 'Password reset link has expired (15-minute limit).';
+  if (s.includes('이미 사용되었거나 만료된')) return 'This reset link has already been used or has expired.';
+  if (s.includes('비밀번호 재설정 실패')) return 'Password reset failed.';
+  if (s.includes('1단계 인증 유효시간') || s.includes('처음부터 다시')) return 'Step 1 verification expired. Please log in again from Step 1.';
+  if (s.includes('유효하지 않은 1단계 인증 토큰')) return 'Invalid Step 1 authentication token.';
+  if (s.includes('패스키 보안 챌린지가 일치하지 않거나')) return 'Passkey challenge mismatch or expired. Please try again.';
+  return s;
+}
+
+function translateInfo(msg) {
+  if (!msg) return '';
+  const s = String(msg);
+  if (s.includes('등록된 이메일인 경우 비밀번호 재설정 링크가 발송되었습니다') || s.includes('비밀번호 재설정 링크가 발송되었습니다')) {
+    return 'If this email is registered, a password reset link has been sent. (Valid for 15 minutes)';
+  }
+  if (s.includes('비밀번호가 재설정되었습니다')) {
+    return 'Your password has been successfully reset. Please sign in with your email and new password.';
+  }
+  return s;
+}
+
 export default function Login({ onLogin }) {
   // 'STEP1_EMAIL_PW' | 'STEP2_PASSKEY' | 'ACCEPT_INVITE' | 'FORGOT_PW' | 'RESET_PW'
   const [authStep, setAuthStep] = useState('STEP1_EMAIL_PW');
@@ -117,7 +158,7 @@ export default function Login({ onLogin }) {
       const data = await res.json();
       if (!res.ok) {
         addAuditLog('Step1 Login Failed', email || 'unknown', 'Failed');
-        setError(data.detail || '이메일 또는 비밀번호가 올바르지 않습니다.');
+        setError(translateError(data.detail) || 'Invalid email address or password.');
         return;
       }
 
@@ -125,7 +166,7 @@ export default function Login({ onLogin }) {
       applyStep1AuthData(data);
       addAuditLog('Step1 Email/PW Verified (AAL1)', data.email, 'Success');
     } catch (err) {
-      setError('서버와 통신할 수 없습니다.');
+      setError('Unable to connect to the server. Please check your network.');
     } finally {
       setLoading(false);
     }
@@ -144,12 +185,12 @@ export default function Login({ onLogin }) {
       typeof navigator.credentials.create !== 'function'
     ) {
       setStep2Mode('PIN');
-      setInfoMessage('현재 브라우저 환경에서는 모든 브라우저 호환 [숫자 패스키(PIN)]로 2차 인증을 진행해 주세요.');
+      setInfoMessage('Device biometric authentication is not supported in this browser. Please use [PIN Passkey] mode to sign in.');
       return;
     }
 
     if (!webauthnChallenge) {
-      setError('보안 챌린지 정보가 만료되었습니다. 1단계 로그인을 다시 시도해 주세요.');
+      setError('Security challenge expired. Please restart login from Step 1.');
       return;
     }
 
@@ -216,7 +257,7 @@ export default function Login({ onLogin }) {
       setLoading(true);
       const credential = await credentialPromise;
       if (!credential) {
-        throw new Error('패스키 인증 응답을 받지 못했습니다.');
+        throw new Error('No passkey response received.');
       }
 
       const credIdB64 = credential.id || bufferToBase64Url(credential.rawId);
@@ -240,7 +281,7 @@ export default function Login({ onLogin }) {
 
       const finalData = await res.json();
       if (!res.ok) {
-        throw new Error(finalData.detail || '2단계 패스키 검증에 실패했습니다.');
+        throw new Error(translateError(finalData.detail) || 'Step 2 passkey verification failed.');
       }
 
       // 현재 브라우저/기기에 등록된 패스키 Credential ID를 저장하여 다음 로그인 시 즉시 인식
@@ -273,10 +314,10 @@ export default function Login({ onLogin }) {
         setStep2Mode('PIN');
         setError('');
         setInfoMessage(
-          '현재 모바일 브라우저(구글앱 인앱 환경 등)에서 기기 생체인증 호출이 제한되어 [숫자 패스키(PIN)] 모드로 전환되었습니다. 숫자 패스키(4~8자리)로 즉시 로그인하실 수 있습니다.'
+          'Device biometric authentication is restricted in this mobile browser (e.g. Google app). Switched to [PIN Passkey] mode. You can sign in immediately using your 4-8 digit PIN.'
         );
       } else {
-        setError(`2단계 패스키 인증 실패: ${errMsg}`);
+        setError(translateError(errMsg) || `Step 2 passkey verification failed: ${errMsg}`);
       }
     } finally {
       setLoading(false);
@@ -291,12 +332,12 @@ export default function Login({ onLogin }) {
 
     const cleanPin = passkeyPin.trim();
     if (!/^\d{4,8}$/.test(cleanPin)) {
-      setError('2차 숫자 패스키는 4~8자리 숫자로 입력해 주세요.');
+      setError('PIN passkey must be 4 to 8 digits.');
       return;
     }
 
     if (!hasPinPasskey && cleanPin !== passkeyPinConfirm.trim()) {
-      setError('입력하신 두 숫자 패스키가 일치하지 않습니다.');
+      setError('The two PIN passkeys do not match.');
       return;
     }
 
@@ -313,7 +354,7 @@ export default function Login({ onLogin }) {
 
       const finalData = await res.json();
       if (!res.ok) {
-        throw new Error(finalData.detail || '2차 숫자 패스키 검증에 실패했습니다.');
+        throw new Error(translateError(finalData.detail) || 'Invalid PIN passkey.');
       }
 
       localStorage.setItem('wme_access_token', finalData.access_token);
@@ -326,7 +367,7 @@ export default function Login({ onLogin }) {
         finalData.email
       );
     } catch (err) {
-      setError(`2단계 패스키 인증 실패: ${err.message}`);
+      setError(translateError(err.message) || `Step 2 PIN verification failed: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -338,11 +379,11 @@ export default function Login({ onLogin }) {
     setError('');
     setInfoMessage('');
     if (newPassword.length < 8) {
-      setError('비밀번호는 최소 8자 이상이어야 합니다.');
+      setError('Password must be at least 8 characters long.');
       return;
     }
     if (newPassword !== confirmPassword) {
-      setError('입력하신 두 비밀번호가 일치하지 않습니다.');
+      setError('The two passwords do not match.');
       return;
     }
     setLoading(true);
@@ -356,16 +397,16 @@ export default function Login({ onLogin }) {
         })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || '초기 비밀번호 설정에 실패했습니다.');
+      if (!res.ok) throw new Error(translateError(data.detail) || 'Failed to set initial password.');
 
       window.history.replaceState({}, document.title, '/login');
       setEmail(data.email);
       setPassword(newPassword);
-      setInfoMessage(data.message);
+      setInfoMessage(translateInfo(data.message));
       applyStep1AuthData(data);
       addAuditLog('Invite Accepted & Initial Password Set (AAL1)', data.email, 'Success');
     } catch (err) {
-      setError(err.message);
+      setError(translateError(err.message));
     } finally {
       setLoading(false);
     }
@@ -384,9 +425,9 @@ export default function Login({ onLogin }) {
         body: JSON.stringify({ email: email.trim().toLowerCase() })
       });
       const data = await res.json();
-      setInfoMessage(data.message);
+      setInfoMessage(translateInfo(data.message) || 'If this email is registered, a password reset link has been sent. (Valid for 15 minutes)');
     } catch (err) {
-      setError('요청 처리 중 오류가 발생했습니다.');
+      setError('An error occurred while processing your request.');
     } finally {
       setLoading(false);
     }
@@ -395,8 +436,19 @@ export default function Login({ onLogin }) {
   // [비밀번호 재설정] 이메일 링크 클릭 후 새 비밀번호 저장
   const handleResetPassword = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
+    setInfoMessage('');
+
+    if (newPassword.length < 8) {
+      setError('Password must be at least 8 characters long.');
+      return;
+    }
+    if (confirmPassword && newPassword !== confirmPassword) {
+      setError('The two passwords do not match.');
+      return;
+    }
+
+    setLoading(true);
     try {
       const res = await fetch('/api/v1/auth/reset-password', {
         method: 'POST',
@@ -404,14 +456,16 @@ export default function Login({ onLogin }) {
         body: JSON.stringify({ token: resetToken, new_password: newPassword })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || '비밀번호 재설정 실패');
+      if (!res.ok) throw new Error(translateError(data.detail) || 'Failed to reset password.');
 
-      setInfoMessage(data.message);
+      setInfoMessage(translateInfo(data.message) || 'Your password has been successfully reset. Please sign in with your email and new password.');
       window.history.replaceState({}, document.title, '/login');
       setAuthStep('STEP1_EMAIL_PW');
       setPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
     } catch (err) {
-      setError(err.message);
+      setError(translateError(err.message));
     } finally {
       setLoading(false);
     }
@@ -451,7 +505,7 @@ export default function Login({ onLogin }) {
           {authStep === 'STEP1_EMAIL_PW' && (
             <form onSubmit={handleStep1EmailLogin} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ textAlign: 'center', fontSize: '0.82rem', fontWeight: 700, color: 'var(--wia-blue)', marginBottom: '4px' }}>
-                STEP 1 / 2 · 이메일 계정 인증
+                STEP 1 / 2 · Email Account Authentication
               </div>
 
               <div style={{ position: 'relative', width: '75%', margin: '0 auto' }}>
@@ -483,7 +537,7 @@ export default function Login({ onLogin }) {
                 fontSize: '1rem', fontWeight: '700', cursor: 'pointer', display: 'flex',
                 justifyContent: 'center', alignItems: 'center', gap: '8px', margin: '12px auto 0', transition: 'background-color 0.2s'
               }}>
-                {loading ? '검증 중...' : <>다음 (2단계 패스키 인증) <ArrowRight size={18} /></>}
+                {loading ? 'Verifying...' : <>Next (Step 2 Passkey Verification) <ArrowRight size={18} /></>}
               </button>
 
               <div style={{ marginTop: '12px', textAlign: 'center' }}>
@@ -491,7 +545,7 @@ export default function Login({ onLogin }) {
                   onClick={() => { setError(''); setInfoMessage(''); setAuthStep('FORGOT_PW'); }}
                   style={{ fontSize: '0.85rem', color: 'var(--text-muted)', cursor: 'pointer', textDecoration: 'underline' }}
                 >
-                  비밀번호를 잊으셨나요? (Forgot your password?)
+                  Forgot your password?
                 </span>
               </div>
             </form>
@@ -503,10 +557,10 @@ export default function Login({ onLogin }) {
               <ShieldCheck size={36} color="var(--wia-blue)" />
               <div style={{ textAlign: 'center', width: '100%' }}>
                 <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--wia-blue)' }}>
-                  STEP 2 / 2 · 패스키 생체/기기 2차 인증
+                  STEP 2 / 2 · Passkey 2nd Factor Authentication
                 </div>
                 <p style={{ fontSize: '0.86rem', color: 'var(--text-primary)', margin: '6px 0 0', lineHeight: 1.45 }}>
-                  <strong>{email}</strong> 계정의 1차 비밀번호가 확인되었습니다.
+                  Password verified for <strong>{email}</strong>.
                 </p>
               </div>
 
@@ -529,7 +583,7 @@ export default function Login({ onLogin }) {
                   }}
                 >
                   <Smartphone size={14} style={{ flexShrink: 0 }} />
-                  <span>생체 / 기기 패스키</span>
+                  <span>Biometric / Device Passkey</span>
                 </button>
                 <button
                   type="button"
@@ -544,7 +598,7 @@ export default function Login({ onLogin }) {
                   }}
                 >
                   <Hash size={14} style={{ flexShrink: 0 }} />
-                  <span>숫자 패스키 (PIN)</span>
+                  <span>PIN Passkey</span>
                 </button>
               </div>
 
@@ -553,8 +607,8 @@ export default function Login({ onLogin }) {
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', width: '100%' }}>
                   <p style={{ fontSize: '0.83rem', color: 'var(--text-secondary)', margin: 0, textAlign: 'center', lineHeight: 1.45, padding: '0 8px' }}>
                     {hasLocalDevicePasskey
-                      ? '현재 기기에 등록된 패스키(Face ID / 지문 / 기기 PIN)로 2차 인증을 완료해 주세요.'
-                      : '현재 접속 기기(모바일/PC)의 생체인증(안면인식/지문) 또는 기기 암호로 패스키를 연결 후 로그인합니다.'}
+                      ? 'Please complete 2-factor authentication with the passkey registered on this device (Face ID, Fingerprint, or Windows Hello).'
+                      : 'Sign in by authenticating with your device biometric (Face ID / Fingerprint) or device passkey.'}
                   </p>
 
                   <button
@@ -570,8 +624,8 @@ export default function Login({ onLogin }) {
                   >
                     <KeyRound size={18} />
                     {loading
-                      ? '패스키 검증 중...'
-                      : (hasLocalDevicePasskey ? '패스키로 2차 인증 완료하기' : '내 기기 패스키 인증 및 로그인')}
+                      ? 'Verifying Passkey...'
+                      : (hasLocalDevicePasskey ? 'Verify with Device Passkey' : 'Verify Device Passkey & Sign In')}
                   </button>
 
                   {hasLocalDevicePasskey && (
@@ -584,19 +638,19 @@ export default function Login({ onLogin }) {
                         fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline'
                       }}
                     >
-                      현재 브라우저/기기에 패스키 새로 연결하기
+                      Link a new passkey on this browser/device
                     </button>
                   )}
 
                   <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '2px' }}>
-                    구글앱 등 인앱 브라우저를 사용 중이신가요? 상단의{' '}
+                    Using an in-app browser (e.g. Google app)? Use{' '}
                     <span
                       onClick={() => { setError(''); setStep2Mode('PIN'); }}
                       style={{ color: 'var(--wia-blue)', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
                     >
-                      [숫자 패스키 (PIN)]
+                      [PIN Passkey]
                     </span>
-                    를 사용하시면 모든 브라우저에서 즉시 호환됩니다.
+                    {' '}above for instant compatibility across all browsers.
                   </div>
                 </div>
               )}
@@ -606,8 +660,8 @@ export default function Login({ onLogin }) {
                 <form onSubmit={handleStep2PinVerify} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', width: '100%' }}>
                   <p style={{ fontSize: '0.83rem', color: 'var(--text-secondary)', margin: 0, textAlign: 'center', lineHeight: 1.45, padding: '0 8px' }}>
                     {hasPinPasskey
-                      ? '등록하신 2차 숫자 패스키(4~8자리 숫자)를 입력해 주세요. (구글앱·크롬·엣지·PC 공통 사용)'
-                      : '모든 모바일 브라우저(구글앱·크롬·엣지)와 PC에서 공용으로 사용할 2차 숫자 패스키(4~8자리)를 설정해 주세요.'}
+                      ? 'Enter your 4 to 8 digit PIN passkey. (Works across Google app, Chrome, Safari, Edge, and PC)'
+                      : 'Set a 4 to 8 digit PIN passkey for universal access across all mobile browsers and PC.'}
                   </p>
 
                   <input
@@ -615,7 +669,7 @@ export default function Login({ onLogin }) {
                     inputMode="numeric"
                     pattern="[0-9]*"
                     maxLength={8}
-                    placeholder={hasPinPasskey ? '2차 숫자 패스키 입력 (4~8자리)' : '사용할 숫자 패스키 입력 (4~8자리 숫자)'}
+                    placeholder={hasPinPasskey ? 'Enter PIN Passkey (4-8 digits)' : 'Set PIN Passkey (4-8 digits)'}
                     value={passkeyPin}
                     onChange={(e) => setPasskeyPin(e.target.value.replace(/[^0-9]/g, ''))}
                     style={{
@@ -633,7 +687,7 @@ export default function Login({ onLogin }) {
                       inputMode="numeric"
                       pattern="[0-9]*"
                       maxLength={8}
-                      placeholder="숫자 패스키 한 번 더 입력 (확인)"
+                      placeholder="Re-enter PIN Passkey to confirm"
                       value={passkeyPinConfirm}
                       onChange={(e) => setPasskeyPinConfirm(e.target.value.replace(/[^0-9]/g, ''))}
                       style={{
@@ -657,8 +711,8 @@ export default function Login({ onLogin }) {
                   >
                     <KeyRound size={18} />
                     {loading
-                      ? '검증 중...'
-                      : (hasPinPasskey ? '숫자 패스키로 2차 인증 완료' : '숫자 패스키 등록 후 로그인')}
+                      ? 'Verifying...'
+                      : (hasPinPasskey ? 'Verify PIN Passkey & Sign In' : 'Register PIN & Sign In')}
                   </button>
                 </form>
               )}
@@ -676,7 +730,7 @@ export default function Login({ onLogin }) {
                 }}
                 style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}
               >
-                <RotateCcw size={14} /> 1단계(이메일 입력)로 돌아가기
+                <RotateCcw size={14} /> Back to Step 1 (Email & Password)
               </button>
             </div>
           )}
@@ -684,23 +738,23 @@ export default function Login({ onLogin }) {
           {/* 비밀번호 분실(찾기) 요청 화면 */}
           {authStep === 'FORGOT_PW' && (
             <form onSubmit={handleForgotPassword} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ textAlign: 'center', fontSize: '0.9rem', fontWeight: 700 }}>
-                비밀번호 재설정 링크 받기
+              <div style={{ textAlign: 'center', fontSize: '0.9rem', fontWeight: 700, color: 'var(--wia-blue)' }}>
+                Reset Your Password
               </div>
               <input
                 type="email"
-                placeholder="가입된 이메일 주소 입력"
+                placeholder="Enter your registered email address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 style={{ width: '75%', margin: '0 auto', padding: '12px 16px', borderRadius: '12px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', outline: 'none' }}
                 required
               />
               <button type="submit" disabled={loading} className="sign-in-btn" style={{ width: '75%', margin: '0 auto', padding: '12px', borderRadius: '12px', border: 'none', color: 'white', fontWeight: 700, cursor: 'pointer', transition: 'background-color 0.2s' }}>
-                {loading ? '발송 중...' : '재설정 링크 이메일 발송'}
+                {loading ? 'Sending...' : 'Send Password Reset Link'}
               </button>
               <div style={{ textAlign: 'center', marginTop: '8px' }}>
-                <span onClick={() => setAuthStep('STEP1_EMAIL_PW')} style={{ fontSize: '0.85rem', color: 'var(--text-muted)', cursor: 'pointer', textDecoration: 'underline' }}>
-                  로그인 화면으로 돌아가기
+                <span onClick={() => { setError(''); setInfoMessage(''); setAuthStep('STEP1_EMAIL_PW'); }} style={{ fontSize: '0.85rem', color: 'var(--text-muted)', cursor: 'pointer', textDecoration: 'underline' }}>
+                  Back to Sign In
                 </span>
               </div>
             </form>
@@ -710,7 +764,7 @@ export default function Login({ onLogin }) {
           {authStep === 'ACCEPT_INVITE' && (
             <form onSubmit={handleAcceptInvite} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ textAlign: 'center', fontSize: '0.9rem', fontWeight: 700, color: 'var(--wia-blue)' }}>
-                신규 계정 초대 수락 · 초기 비밀번호 설정
+                Accept Invitation · Set Initial Password
               </div>
               {inviteEmail && (
                 <div style={{
@@ -718,12 +772,12 @@ export default function Login({ onLogin }) {
                   backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
                   fontSize: '0.88rem', color: 'var(--text-primary)', textAlign: 'center', fontWeight: 600
                 }}>
-                  초대 계정: {inviteEmail}
+                  Invited Account: {inviteEmail}
                 </div>
               )}
               <input
                 type="password"
-                placeholder="초기 비밀번호 입력 (8자 이상)"
+                placeholder="Initial Password (min. 8 characters)"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 style={{ width: '75%', margin: '0 auto', padding: '12px 16px', borderRadius: '12px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', outline: 'none' }}
@@ -731,14 +785,14 @@ export default function Login({ onLogin }) {
               />
               <input
                 type="password"
-                placeholder="초기 비밀번호 확인"
+                placeholder="Confirm Initial Password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 style={{ width: '75%', margin: '0 auto', padding: '12px 16px', borderRadius: '12px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', outline: 'none' }}
                 required
               />
               <button type="submit" disabled={loading} className="sign-in-btn" style={{ width: '75%', margin: '4px auto 0', padding: '12px', borderRadius: '12px', border: 'none', color: 'white', fontWeight: 700, cursor: 'pointer', transition: 'background-color 0.2s' }}>
-                {loading ? '저장 중...' : '초기 비밀번호 저장 및 패스키 등록 진행'}
+                {loading ? 'Saving...' : 'Save Password & Proceed to Passkey Setup'}
               </button>
               <div style={{ textAlign: 'center', marginTop: '6px' }}>
                 <span
@@ -748,7 +802,7 @@ export default function Login({ onLogin }) {
                   }}
                   style={{ fontSize: '0.82rem', color: 'var(--text-muted)', cursor: 'pointer', textDecoration: 'underline' }}
                 >
-                  일반 로그인 화면으로 이동
+                  Back to Sign In
                 </span>
               </div>
             </form>
@@ -757,20 +811,39 @@ export default function Login({ onLogin }) {
           {/* 이메일 링크 진입 시 새 비밀번호 입력 화면 */}
           {authStep === 'RESET_PW' && (
             <form onSubmit={handleResetPassword} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ textAlign: 'center', fontSize: '0.9rem', fontWeight: 700 }}>
-                새 비밀번호 설정
+              <div style={{ textAlign: 'center', fontSize: '0.9rem', fontWeight: 700, color: 'var(--wia-blue)' }}>
+                Set New Password
               </div>
               <input
                 type="password"
-                placeholder="새 비밀번호 (8자 이상)"
+                placeholder="New Password (min. 8 characters)"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 style={{ width: '75%', margin: '0 auto', padding: '12px 16px', borderRadius: '12px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', outline: 'none' }}
                 required
               />
+              <input
+                type="password"
+                placeholder="Confirm New Password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                style={{ width: '75%', margin: '0 auto', padding: '12px 16px', borderRadius: '12px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', outline: 'none' }}
+                required
+              />
               <button type="submit" disabled={loading} className="sign-in-btn" style={{ width: '75%', margin: '0 auto', padding: '12px', borderRadius: '12px', border: 'none', color: 'white', fontWeight: 700, cursor: 'pointer', transition: 'background-color 0.2s' }}>
-                {loading ? '저장 중...' : '비밀번호 변경 확정'}
+                {loading ? 'Saving...' : 'Confirm Password Change'}
               </button>
+              <div style={{ textAlign: 'center', marginTop: '6px' }}>
+                <span
+                  onClick={() => {
+                    window.history.replaceState({}, document.title, '/login');
+                    setAuthStep('STEP1_EMAIL_PW');
+                  }}
+                  style={{ fontSize: '0.82rem', color: 'var(--text-muted)', cursor: 'pointer', textDecoration: 'underline' }}
+                >
+                  Back to Sign In
+                </span>
+              </div>
             </form>
           )}
         </div>
@@ -798,7 +871,7 @@ export default function Login({ onLogin }) {
           justifyContent: 'center', alignItems: 'center', padding: '40px', textAlign: 'center',
           color: 'var(--text-muted)'
         }}>
-          <p>코어 밸류 이미지를 frontend/public 폴더에<br /><b>login-bg.png</b> 라는 이름으로 저장해주세요.</p>
+          <p>Please place the core value image in the <code>frontend/public</code> folder as <b>login-bg.png</b>.</p>
         </div>
       </div>
 
