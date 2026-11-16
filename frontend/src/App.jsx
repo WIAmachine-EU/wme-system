@@ -313,7 +313,7 @@ export default function App() {
           {activeTab === 'dealer-promotion' && <DealerPromotion isMobileView={isMobileView} />}
           {activeTab === 'dealer-library' && <ProductLibrary currentRole={currentRole} isMobileView={isMobileView} />}
           
-          {['admin-dashboard', 'rsm-dashboard', 'admin-inventory', 'admin-promotion', 'admin-users', 'dealer-inventory', 'admin-library', 'dealer-library'].includes(activeTab) && (
+          {['admin-dashboard', 'rsm-dashboard', 'admin-inventory', 'admin-dispatch', 'admin-promotion', 'admin-users', 'dealer-inventory', 'admin-library', 'dealer-library'].includes(activeTab) && (
             <ScrollButtons />
           )}
         </main>
