@@ -177,10 +177,8 @@ export default function App() {
     setNeedsProfileSetup(Boolean(profileSetupNeeded));
     setIsAuthenticated(true);
 
-    // 딜러 포털 로그인 시 기본적으로 영문(EN) 페이지를 우선 적용
-    if (role === 'DEALER') {
-      i18n.changeLanguage('en');
-    }
+    // 관리자, RSM, 딜러 포털 모두 로그인 성공 후 시스템 진입 시 기본적으로 영문(EN) 우선 적용
+    i18n.changeLanguage('en');
 
     if (profileSetupNeeded) {
       setActiveTab('profile');
