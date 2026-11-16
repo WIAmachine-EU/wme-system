@@ -92,16 +92,22 @@ function CargoDetailModal({ isOpen, onClose, serialNumber, modelName }) {
   );
 }
 
+const AGING_COLORS = {
+  NORMAL: { color: '#16C47F', bg: 'rgba(22, 196, 127, 0.12)' },   // 일반 재고: 초록색
+  LONG: { color: '#F97316', bg: 'rgba(249, 115, 22, 0.12)' },     // 장기 재고: 오렌지색
+  CRITICAL: { color: '#EF4444', bg: 'rgba(239, 68, 68, 0.12)' }   // 악성 재고: 빨간색
+};
+
 const calculateAging = (etd) => {
-  if (!etd) return { type: 'NORMAL', status: '일반', days: 0, color: 'var(--status-stock)', bg: 'rgba(16, 185, 129, 0.1)' };
+  if (!etd) return { type: 'NORMAL', status: '일반', days: 0, ...AGING_COLORS.NORMAL };
   const etdDate = new Date(etd);
   const today = new Date();
   const diffTime = Math.abs(today - etdDate);
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-  if (diffDays <= 180) return { type: 'NORMAL', status: '일반', days: diffDays, color: 'var(--status-stock)', bg: 'rgba(16, 185, 129, 0.1)' };
-  if (diffDays <= 360) return { type: 'LONG', status: '장기', days: diffDays, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' };
-  return { type: 'CRITICAL', status: '악성', days: diffDays, color: 'var(--accent-red)', bg: 'rgba(239, 68, 68, 0.1)' };
+  if (diffDays <= 180) return { type: 'NORMAL', status: '일반', days: diffDays, ...AGING_COLORS.NORMAL };
+  if (diffDays <= 360) return { type: 'LONG', status: '장기', days: diffDays, ...AGING_COLORS.LONG };
+  return { type: 'CRITICAL', status: '악성', days: diffDays, ...AGING_COLORS.CRITICAL };
 };
 
 export default function AdminDispatch({ isMobileView }) {
@@ -623,20 +629,20 @@ export default function AdminDispatch({ isMobileView }) {
           </div>
           <div style={{ height: '24px', width: '1px', backgroundColor: 'var(--border-color)' }}></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('dispatch.stat_normal', '일반 재고:')}</span>
-            <span style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--status-stock)' }}>
+            <span style={{ fontSize: '0.9rem', fontWeight: 600, color: AGING_COLORS.NORMAL.color }}>{t('dispatch.stat_normal', '일반 재고:')}</span>
+            <span style={{ fontSize: '1.1rem', fontWeight: 'bold', color: AGING_COLORS.NORMAL.color }}>
               {filteredOrders.filter(o => getAgingStatus(o.etd).type === 'NORMAL').length}
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('dispatch.stat_long', '장기 재고:')}</span>
-            <span style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#f59e0b' }}>
+            <span style={{ fontSize: '0.9rem', fontWeight: 600, color: AGING_COLORS.LONG.color }}>{t('dispatch.stat_long', '장기 재고:')}</span>
+            <span style={{ fontSize: '1.1rem', fontWeight: 'bold', color: AGING_COLORS.LONG.color }}>
               {filteredOrders.filter(o => getAgingStatus(o.etd).type === 'LONG').length}
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('dispatch.stat_critical', '악성 재고:')}</span>
-            <span style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--accent-red)' }}>
+            <span style={{ fontSize: '0.9rem', fontWeight: 600, color: AGING_COLORS.CRITICAL.color }}>{t('dispatch.stat_critical', '악성 재고:')}</span>
+            <span style={{ fontSize: '1.1rem', fontWeight: 'bold', color: AGING_COLORS.CRITICAL.color }}>
               {filteredOrders.filter(o => getAgingStatus(o.etd).type === 'CRITICAL').length}
             </span>
           </div>
@@ -692,11 +698,14 @@ export default function AdminDispatch({ isMobileView }) {
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingBottom: '8px', borderBottom: '1px dashed var(--border-color)' }}>
                       <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{t('dispatch.header_aging', '에이징')}:</span>
-                      <span style={{
-                        display: 'inline-block', padding: '4px 8px', borderRadius: '12px',
-                        fontSize: '0.8rem', fontWeight: 600, color: aging.color, background: aging.bg
-                      }}>
-                        {aging.statusText} ({aging.days}{t('dispatch.days_suffix', '일')})
+                      <span
+                        title={aging.statusText}
+                        style={{
+                          display: 'inline-block', padding: '4px 10px', borderRadius: '12px',
+                          fontSize: '0.8rem', fontWeight: 700, color: aging.color, background: aging.bg
+                        }}
+                      >
+                        {aging.days}{t('dispatch.days_suffix', '일')}
                       </span>
                     </div>
 
@@ -844,11 +853,14 @@ export default function AdminDispatch({ isMobileView }) {
                           </td>
                           {/* 8. 에이징 */}
                           <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px', textAlign: 'center' }}>
-                            <span style={{
-                              display: 'inline-block', padding: '4px 8px', borderRadius: '12px',
-                              fontSize: '11px', fontWeight: 600, color: aging.color, background: aging.bg
-                            }}>
-                              {aging.statusText} ({aging.days}{t('dispatch.days_suffix', '일')})
+                            <span
+                              title={aging.statusText}
+                              style={{
+                                display: 'inline-block', padding: '4px 10px', borderRadius: '12px',
+                                fontSize: '11px', fontWeight: 700, color: aging.color, background: aging.bg
+                              }}
+                            >
+                              {aging.days}{t('dispatch.days_suffix', '일')}
                             </span>
                           </td>
                           {/* 9. 화물 */}
