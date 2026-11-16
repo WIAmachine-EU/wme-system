@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Package, CheckCircle, Clock, X, ExternalLink } from 'lucide-react';
+import { Search, Package, CheckCircle, X, ExternalLink } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 function CargoDetailModal({ isOpen, onClose, serialNumber, modelName }) {
@@ -225,9 +225,6 @@ export default function AdminDispatch({ isMobileView }) {
   const [agingFilter, setAgingFilter] = useState('ALL');
   const [stockTypeFilter, setStockTypeFilter] = useState('ALL');
 
-  const [selectedOrderForHistory, setSelectedOrderForHistory] = useState(null);
-  const [orderHistory, setOrderHistory] = useState([]);
-
   const [expandedRows, setExpandedRows] = useState(new Set());
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -373,26 +370,6 @@ export default function AdminDispatch({ isMobileView }) {
       console.error(e);
       alert("출고 처리 중 오류가 발생했습니다.");
     }
-  };
-
-  const handleViewHistory = async (order) => {
-    setSelectedOrderForHistory(order);
-    try {
-      const res = await fetch(`/api/orders/${order.id}/history`);
-      if (res.ok) {
-        setOrderHistory(await res.json());
-      } else {
-        setOrderHistory([]);
-      }
-    } catch (e) {
-      console.error(e);
-      setOrderHistory([]);
-    }
-  };
-
-  const closeHistory = () => {
-    setSelectedOrderForHistory(null);
-    setOrderHistory([]);
   };
 
   const filteredOrders = orders.filter(o => {
@@ -720,13 +697,6 @@ export default function AdminDispatch({ isMobileView }) {
                         <ExternalLink size={14} /> {t('dispatch.btn_dimension', 'cm / kg')}
                       </button>
                       <button
-                        onClick={() => handleViewHistory(order)}
-                        className="btn btn-outline"
-                        style={{ flex: 1, padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                      >
-                        <Clock size={14} /> {t('dispatch.btn_history', '이력')}
-                      </button>
-                      <button
                         onClick={() => handleEditClick(order)}
                         className="btn btn-outline"
                         style={{ flex: 1, padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
@@ -889,13 +859,6 @@ export default function AdminDispatch({ isMobileView }) {
                           <td onClick={e => e.stopPropagation()} style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '5px', paddingTop: '5px', textAlign: 'center' }}>
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'center' }}>
                               <button
-                                onClick={() => handleViewHistory(order)}
-                                className="btn btn-outline"
-                                style={{ padding: '4px 8px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                              >
-                                <Clock size={13} /> {t('dispatch.btn_history', '이력')}
-                              </button>
-                              <button
                                 onClick={() => handleEditClick(order)}
                                 className="btn btn-outline"
                                 style={{ padding: '4px 8px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
@@ -954,56 +917,6 @@ export default function AdminDispatch({ isMobileView }) {
         )}
       </div>
 
-      {selectedOrderForHistory && (
-        <div className="modal-overlay" onClick={closeHistory}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
-            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <h3 style={{ margin: 0 }}>{t('dispatch.timeline_title', '타임라인 뷰 (진행 이력)')}</h3>
-                <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                  {selectedOrderForHistory.product_model?.model_name} (S/N: {selectedOrderForHistory.serial_number || '-'})
-                </p>
-              </div>
-              <button onClick={closeHistory} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}>
-                <X size={20} />
-              </button>
-            </div>
-            <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto', padding: '20px' }}>
-              {orderHistory.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {orderHistory.map((hist, idx) => (
-                    <div key={hist.id} style={{ display: 'flex', gap: '12px', borderLeft: '2px solid var(--border-color)', paddingLeft: '16px', position: 'relative' }}>
-                      <div style={{
-                        position: 'absolute', left: '-7px', top: '0', width: '12px', height: '12px',
-                        borderRadius: '50%', background: idx === 0 ? 'var(--accent-blue)' : 'var(--border-color)',
-                        border: '2px solid white'
-                      }}></div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>
-                          {hist.from_status} → <span style={{ color: 'var(--accent-blue)' }}>{hist.to_status}</span>
-                        </div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                          {new Date(hist.changed_at).toLocaleString()}
-                        </div>
-                        {hist.reason && (
-                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                            사유: {hist.reason}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>{t('dispatch.no_history', '이력 데이터가 없습니다.')}</div>
-              )}
-            </div>
-            <div className="modal-footer" style={{ borderTop: '1px solid var(--border-color)', padding: '16px 20px', display: 'flex', justifyContent: 'flex-end' }}>
-              <button onClick={closeHistory} className="btn btn-outline">{t('dispatch.close', '닫기')}</button>
-            </div>
-          </div>
-        </div>
-      )}
       {/* 장비 정보 수정 모달 */}
       {editingOrder && (
         <div className="modal-overlay" onClick={() => setEditingOrder(null)}>
