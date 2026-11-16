@@ -881,48 +881,6 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
                         <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{Math.round(course)}°</span>
                       </div>
                     </div>
-
-                    {/* Route Details Box */}
-                    <div style={{
-                      backgroundColor: isShipmentArrived ? '#f0fdf4' : '#eff6ff',
-                      padding: '12px',
-                      borderRadius: '8px',
-                      border: `1px solid ${isShipmentArrived ? '#bbf7d0' : '#bfdbfe'}`,
-                      fontSize: '12px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '4px'
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 700, color: isShipmentArrived ? '#166534' : '#1e40af' }}>
-                          {isShipmentArrived
-                            ? (isKo ? '🌊 운항 항로: 완주 완료 (독일 함부르크 도착)' : '🌊 Route: Completed (Arrived in Hamburg, DE)')
-                            : (isKo ? '🌊 운항 항로: 남아공 희망봉 우회' : '🌊 Route: Via Cape of Good Hope')}
-                        </span>
-                        <span style={{ fontSize: '11px', color: isShipmentArrived ? '#059669' : '#3b82f6' }}>{isKo ? 'AIS 고정밀 궤적' : 'AIS Precision Track'}</span>
-                      </div>
-                      {isShipmentArrived ? (
-                        <p style={{ margin: 0, fontSize: '11px', color: '#14532d', lineHeight: 1.5 }}>
-                          {isKo ? (
-                            <>최후 보고 위치: <strong>53.5413°N, 9.9841°E (독일 함부르크항 POD 도착 완료)</strong><br />
-                            (희망봉 우회 항로 전 구간 완주 27,259 km, 선박 속력 0.0 kts, 정박/하역 완료)</>
-                          ) : (
-                            <>Last Reported Position: <strong>53.5413°N, 9.9841°E (Arrived at POD Hamburg, DE)</strong><br />
-                            (Full Cape of Good Hope route completed 27,259 km, Speed 0.0 kts, Berthed / Discharged)</>
-                          )}
-                        </p>
-                      ) : (
-                        <p style={{ margin: 0, fontSize: '11px', color: '#1e3a8a', lineHeight: 1.5 }}>
-                          {isKo ? (
-                            <>최후 보고 위치: <strong>{lastLat.toFixed(4)}°N, {lastLng.toFixed(4)}°E</strong><br />
-                            (홍해/수에즈 운하 지정학적 이슈로 인해 아프리카 대륙 최남단 케이프타운을 선회하여 유럽으로 입항)</>
-                          ) : (
-                            <>Last Reported Position: <strong>{lastLat.toFixed(4)}°N, {lastLng.toFixed(4)}°E</strong><br />
-                            (Rerouted around Cape Town / Cape of Good Hope to Europe due to Red Sea / Suez Canal disruptions)</>
-                          )}
-                        </p>
-                      )}
-                    </div>
                   </div>
                 );
               })()}
