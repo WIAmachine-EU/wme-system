@@ -186,6 +186,7 @@
     "type_promotion": "Promotion",
     "convert_to_order": "to order",
     "btn_confirm": "Confirm",
+    "btn_cancel": "Cancel",
     "search_placeholder": "search",
     "inventory_list_title": "WIA available Stock List",
     "detail_status": "STATUS",

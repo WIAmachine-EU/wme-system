@@ -65,6 +65,11 @@
   * `Step 1: Password`, `Step 2: Biometric / Passkey (WebAuthn AAL2)`, 패스키 연동 상태(`Passkey Linked (Protected by NIST AAL2 2-Factor Auth)`) 및 패스키 초기화 요청 안내 문구 영·한 분기 적용.
   * `비밀번호 변경`(`Change Password`) 모달 및 프로필/비밀번호 변경 알림(`alert`) 전체 영문화 지원.
 
+### 10. [WIA 재고리스트] 상태 및 주문선택 변경 '취소' 버튼 기능 추가 (`AdminInventory.jsx`, `translation.json`)
+* **상태·딜러 변경 선택 사항 원복 기능**:
+  * WIA 가용재고 목록의 `상태` 또는 `주문선택` 드롭다운을 변경할 때, `확정` 버튼 오른쪽에 `취소`(`Cancel`) 버튼을 나란히 표시(데스크톱 테이블 및 모바일 카드 뷰 모두 지원).
+  * `취소` 버튼 클릭 시 `handleCancelPendingChanges`가 해당 행의 미확정 변경사항(`pendingChanges`)을 즉시 초기화하여 `확정`/`취소` 버튼이 사라지고 기존의 확정되어 있던 상태·딜러 선택 그대로 원복되도록 구현.
+
 ## [2026-11-16] 주문/배송 타임라인 딜러 주문번호 표기, 신규 발주 생성 모달(딜러주문번호·구매가·판매가) 및 장비 정보 수정 모달 항목 순서 개편
 
 ### 1. 주문/배송 타임라인 상세 뷰 '딜러 주문번호' 표기 (`AdminDashboard.jsx`, `DealerOrders.jsx`)

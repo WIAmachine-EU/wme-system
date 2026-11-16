@@ -198,6 +198,14 @@ export default function AdminInventory({ isMobileView }) {
     });
   };
 
+  const handleCancelPendingChanges = (orderId) => {
+    setPendingChanges(prev => {
+      const next = { ...prev };
+      delete next[orderId];
+      return next;
+    });
+  };
+
   const handleUpdateStockType = async (orderId, newType) => {
     try {
       const res = await fetch(`/api/orders/${orderId}`, {
@@ -978,13 +986,24 @@ export default function AdminInventory({ isMobileView }) {
                               ))}
                             </select>
                             {pendingChanges[order.id] && (Object.keys(pendingChanges[order.id]).length > 0) && (
-                              <button
-                                onClick={() => handleConfirmChanges(order.id)}
-                                className="btn btn-primary"
-                                style={{ padding: '6px 12px', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
-                              >
-                                {t('menu2.btn_confirm', '확정')}
-                              </button>
+                              <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleConfirmChanges(order.id)}
+                                  className="btn btn-primary"
+                                  style={{ padding: '6px 10px', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
+                                >
+                                  {t('menu2.btn_confirm', '확정')}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCancelPendingChanges(order.id)}
+                                  className="btn btn-outline"
+                                  style={{ padding: '6px 10px', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
+                                >
+                                  {t('menu2.btn_cancel', '취소')}
+                                </button>
+                              </div>
                             )}
                           </div>
                         )}
@@ -1163,13 +1182,13 @@ export default function AdminInventory({ isMobileView }) {
                                 </div>
                               </div>
                             ) : (
-                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                                 <select
                                   value={pendingChanges[order.id]?.dealerId !== undefined ? pendingChanges[order.id].dealerId : (order.dealer_company_id || "")}
                                   onChange={(e) => handlePendingChange(order.id, 'dealerId', e.target.value)}
                                   style={{
                                     background: 'var(--bg-secondary)', border: '1px solid var(--accent-cyan)', color: 'var(--text-primary)',
-                                    padding: '4px 8px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', flex: 1, textAlign: 'center'
+                                    padding: '4px 6px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', flex: 1, minWidth: 0, textAlign: 'center'
                                   }}
                                 >
                                   <option value="" disabled>{t('menu2.convert_to_order', '딜러선택')}</option>
@@ -1178,13 +1197,24 @@ export default function AdminInventory({ isMobileView }) {
                                   ))}
                                 </select>
                                 {pendingChanges[order.id] && (Object.keys(pendingChanges[order.id]).length > 0) && (
-                                  <button
-                                    onClick={() => handleConfirmChanges(order.id)}
-                                    className="btn btn-primary"
-                                    style={{ padding: '4px 12px', fontSize: '11px', whiteSpace: 'nowrap' }}
-                                  >
-                                    {t('menu2.btn_confirm', '확정')}
-                                  </button>
+                                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleConfirmChanges(order.id)}
+                                      className="btn btn-primary"
+                                      style={{ padding: '4px 8px', fontSize: '11px', whiteSpace: 'nowrap' }}
+                                    >
+                                      {t('menu2.btn_confirm', '확정')}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCancelPendingChanges(order.id)}
+                                      className="btn btn-outline"
+                                      style={{ padding: '4px 8px', fontSize: '11px', whiteSpace: 'nowrap' }}
+                                    >
+                                      {t('menu2.btn_cancel', '취소')}
+                                    </button>
+                                  </div>
                                 )}
                               </div>
                             )}

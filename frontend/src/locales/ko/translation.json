@@ -186,6 +186,7 @@
     "type_promotion": "프로모션",
     "convert_to_order": "딜러선택",
     "btn_confirm": "확정",
+    "btn_cancel": "취소",
     "search_placeholder": "검색",
     "inventory_list_title": "WIA 가용재고 목록",
     "detail_status": "진행 상황",
