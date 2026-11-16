@@ -1,6 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Package, CheckCircle, X, ExternalLink } from 'lucide-react';
+import { Search, Package, CheckCircle, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+
+const CubeIcon = ({ size = 14 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="butt"
+    strokeLinejoin="miter"
+    style={{ flexShrink: 0 }}
+    aria-hidden="true"
+  >
+    <path d="M12 2.5L20.23 7.25V16.75L12 21.5L3.77 16.75V7.25Z" />
+    <path d="M3.77 7.25L12 12L20.23 7.25" />
+    <path d="M12 12V21.5" />
+  </svg>
+);
 
 function CargoDetailModal({ isOpen, onClose, serialNumber, modelName }) {
   const { t } = useTranslation();
@@ -95,7 +114,7 @@ function CargoDetailModal({ isOpen, onClose, serialNumber, modelName }) {
 const AGING_COLORS = {
   NORMAL: { color: 'rgb(4, 154, 67)', bg: 'rgba(4, 154, 67, 0.12)' },       // 일반 재고: rgb(4, 154, 67)
   LONG: { color: 'rgb(254, 151, 6)', bg: 'rgba(254, 151, 6, 0.12)' },       // 장기 재고: rgb(254, 151, 6)
-  CRITICAL: { color: 'rgb(124, 15, 3)', bg: 'rgba(124, 15, 3, 0.12)' }     // 악성 재고: rgb(124, 15, 3)
+  CRITICAL: { color: 'rgb(255, 25, 0)', bg: 'rgba(255, 25, 0, 0.12)' }     // 악성 재고: rgb(255, 25, 0)
 };
 
 const calculateAging = (etd) => {
@@ -694,7 +713,7 @@ export default function AdminDispatch({ isMobileView }) {
                         className="btn btn-outline"
                         style={{ flex: 1, padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', opacity: order.serial_number ? 1 : 0.5 }}
                       >
-                        <ExternalLink size={14} /> {t('dispatch.btn_dimension', 'cm / kg')}
+                        <CubeIcon size={14} /> {t('dispatch.btn_dimension', 'cm / kg')}
                       </button>
                       <button
                         onClick={() => handleEditClick(order)}
@@ -852,7 +871,7 @@ export default function AdminDispatch({ isMobileView }) {
                               }}
                               className={order.serial_number ? "hover-bg-subtle" : ""}
                             >
-                              <ExternalLink size={13} /> {t('dispatch.btn_dimension', 'cm / kg')}
+                              <CubeIcon size={13} /> {t('dispatch.btn_dimension', 'cm / kg')}
                             </button>
                           </td>
                           {/* 10. 진행 */}
