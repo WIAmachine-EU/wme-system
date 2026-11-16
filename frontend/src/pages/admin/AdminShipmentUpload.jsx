@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { 
   UploadCloud, 
   CheckCircle, 
@@ -25,6 +26,9 @@ import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 
 export default function AdminShipmentUpload({ isMobileView }) {
+  const { i18n } = useTranslation();
+  const isKo = i18n.language.startsWith('ko');
+
   // ================= [ 우측: 선적정보 업로드 State ] =================
   const [data, setData] = useState([]);
   const [errors, setErrors] = useState([]);
@@ -74,7 +78,7 @@ export default function AdminShipmentUpload({ isMobileView }) {
       setHistoryList(json || []);
     } catch (err) {
       console.error('Failed to fetch shipment history:', err);
-      setHistoryError('선적내역을 불러오는 중 오류가 발생했습니다.');
+      setHistoryError(isKo ? '선적내역을 불러오는 중 오류가 발생했습니다.' : 'Failed to load shipment history.');
     } finally {
       setIsLoadingHistory(false);
     }
@@ -205,14 +209,14 @@ export default function AdminShipmentUpload({ isMobileView }) {
         skipEmptyLines: true,
         complete: (results) => {
           if (!results.data || results.data.length === 0) {
-            alert('CSV 파일에 데이터 행이 존재하지 않습니다.');
+            alert(isKo ? 'CSV 파일에 데이터 행이 존재하지 않습니다.' : 'No data rows found in the CSV file.');
             return;
           }
           validateAndSetData(results.data);
         },
         error: (err) => {
           console.error('CSV parse error:', err);
-          alert(`CSV 파일 파싱 중 오류가 발생했습니다: ${err.message || err}`);
+          alert(isKo ? `CSV 파일 파싱 중 오류가 발생했습니다: ${err.message || err}` : `Error parsing CSV file: ${err.message || err}`);
         }
       });
     } else if (ext === '.xlsx' || ext === '.xls') {
@@ -223,13 +227,13 @@ export default function AdminShipmentUpload({ isMobileView }) {
           const workbook = XLSX.read(buffer, { type: 'array' });
           const firstSheetName = workbook.SheetNames[0];
           if (!firstSheetName) {
-            alert('엑셀 파일에 시트(Sheet)가 존재하지 않습니다.');
+            alert(isKo ? '엑셀 파일에 시트(Sheet)가 존재하지 않습니다.' : 'No sheets found in the Excel file.');
             return;
           }
           const worksheet = workbook.Sheets[firstSheetName];
           const json = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
           if (!json || json.length === 0) {
-            alert('선택한 엑셀 파일의 첫 번째 시트에 유효한 데이터 행이 없습니다.');
+            alert(isKo ? '선택한 엑셀 파일의 첫 번째 시트에 유효한 데이터 행이 없습니다.' : 'No valid data rows found in the first sheet of the Excel file.');
             return;
           }
           validateAndSetData(json);
@@ -244,17 +248,17 @@ export default function AdminShipmentUpload({ isMobileView }) {
           if (isDrm) {
             setDrmModalInfo({ fileName: file.name, error: errMsg });
           } else {
-            alert(`엑셀 파일을 분석하는 중 오류가 발생했습니다: ${errMsg}`);
+            alert(isKo ? `엑셀 파일을 분석하는 중 오류가 발생했습니다: ${errMsg}` : `Error analyzing Excel file: ${errMsg}`);
           }
           resetCurrentFile();
         }
       };
       reader.onerror = () => {
-        alert('파일을 읽어오는 중 브라우저 오류가 발생했습니다.');
+        alert(isKo ? '파일을 읽어오는 중 브라우저 오류가 발생했습니다.' : 'Browser error occurred while reading the file.');
       };
       reader.readAsArrayBuffer(file);
     } else {
-      alert(`지원하지 않는 파일 형식(${ext || '알 수 없음'})입니다. .xlsx, .xls 또는 .csv 파일을 업로드해주세요.`);
+      alert(isKo ? `지원하지 않는 파일 형식(${ext || '알 수 없음'})입니다. .xlsx, .xls 또는 .csv 파일을 업로드해주세요.` : `Unsupported file format (${ext || 'unknown'}). Please upload a .xlsx, .xls, or .csv file.`);
       resetCurrentFile();
     }
   };
@@ -309,15 +313,15 @@ export default function AdminShipmentUpload({ isMobileView }) {
 
       if (!rowData.mbl_no) {
         rowData._isValid = false;
-        rowData._errorMsg += 'MBL(선하증권 번호) 누락. ';
+        rowData._errorMsg += isKo ? 'MBL(선하증권 번호) 누락. ' : 'Missing MBL. ';
       }
       if (!rowData.serial_number && !rowData.reference_no) {
         rowData._isValid = false;
-        rowData._errorMsg += 'S/N 또는 P/O 필수. ';
+        rowData._errorMsg += isKo ? 'S/N 또는 P/O 필수. ' : 'S/N or P/O required. ';
       }
       if (rowData.serial_number && snSet.has(rowData.serial_number)) {
         rowData._isValid = false;
-        rowData._errorMsg += 'S/N 중복. ';
+        rowData._errorMsg += isKo ? 'S/N 중복. ' : 'Duplicate S/N. ';
       }
 
       if (rowData.serial_number) {
@@ -389,7 +393,7 @@ export default function AdminShipmentUpload({ isMobileView }) {
 
           if (hasKnownHeaders) {
             validateAndSetData(results.data);
-            setCurrentFile({ name: '클립보드 직접 붙여넣기', size: text.length });
+            setCurrentFile({ name: isKo ? '클립보드 직접 붙여넣기' : 'Clipboard Direct Paste', size: text.length });
             setIsPasteModalOpen(false);
             setPastedText('');
           } else {
@@ -405,18 +409,18 @@ export default function AdminShipmentUpload({ isMobileView }) {
                   'P/O': arr[4] || ''
                 }));
                 validateAndSetData(rows);
-                setCurrentFile({ name: '클립보드 직접 붙여넣기', size: text.length });
+                setCurrentFile({ name: isKo ? '클립보드 직접 붙여넣기' : 'Clipboard Direct Paste', size: text.length });
                 setIsPasteModalOpen(false);
                 setPastedText('');
               }
             });
           }
         } else {
-          alert('붙여넣은 데이터에서 유효한 행을 찾을 수 없습니다.');
+          alert(isKo ? '붙여넣은 데이터에서 유효한 행을 찾을 수 없습니다.' : 'No valid rows found in pasted data.');
         }
       },
       error: (err) => {
-        alert('붙여넣은 데이터를 분석하는 중 오류가 발생했습니다: ' + err.message);
+        alert((isKo ? '붙여넣은 데이터를 분석하는 중 오류가 발생했습니다: ' : 'Error parsing pasted data: ') + err.message);
       }
     });
   };
@@ -424,7 +428,11 @@ export default function AdminShipmentUpload({ isMobileView }) {
   const handleSubmit = async () => {
     if (data.length === 0) return;
     if (errors.length > 0) {
-      const confirmSubmit = window.confirm('오류가 있는 데이터가 포함되어 있습니다. 무시하고 전송하시겠습니까? (오류 데이터는 백엔드에서 처리되지 않을 수 있습니다)');
+      const confirmSubmit = window.confirm(
+        isKo
+          ? '오류가 있는 데이터가 포함되어 있습니다. 무시하고 전송하시겠습니까? (오류 데이터는 백엔드에서 처리되지 않을 수 있습니다)'
+          : 'Some rows contain errors. Do you want to proceed anyway? (Invalid rows may not be processed by the backend)'
+      );
       if (!confirmSubmit) return;
     }
 
@@ -466,12 +474,12 @@ export default function AdminShipmentUpload({ isMobileView }) {
         }, 3000);
       } else {
         const err = await res.json();
-        throw new Error(err.detail || '업로드 실패');
+        throw new Error(err.detail || (isKo ? '업로드 실패' : 'Upload failed'));
       }
     } catch (e) {
       clearInterval(progressInterval);
       setUploadStatus('error');
-      alert(`업로드 중 오류 발생: ${e.message}`);
+      alert(isKo ? `업로드 중 오류 발생: ${e.message}` : `Upload error: ${e.message}`);
     } finally {
       setIsUploading(false);
     }
@@ -508,10 +516,12 @@ export default function AdminShipmentUpload({ isMobileView }) {
             gap: '10px'
           }}>
             <Ship size={24} color="#0284c7" />
-            선적 관리 & 업로드
+            {isKo ? '선적 관리 & 업로드' : 'Shipment Management & Upload'}
           </h1>
           <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-            기존에 등록된 선적 내역을 조회하고, 신규 선적(MBL) 및 장비 시리얼 정보를 실시간 업로드합니다.
+            {isKo
+              ? '기존에 등록된 선적 내역을 조회하고, 신규 선적(MBL) 및 장비 시리얼 정보를 실시간 업로드합니다.'
+              : 'View registered shipment history and upload new MBL & machine serial information in real time.'}
           </p>
         </div>
 
@@ -531,28 +541,28 @@ export default function AdminShipmentUpload({ isMobileView }) {
               fontSize: '0.85rem',
               padding: '6px 12px'
             }}
-            title="사내 DRM 암호화와 무관하게 엑셀 내용을 복사하여 붙여넣기"
+            title={isKo ? '사내 DRM 암호화와 무관하게 엑셀 내용을 복사하여 붙여넣기' : 'Copy and paste Excel contents directly (bypasses corporate DRM encryption)'}
           >
             <Clipboard size={15} />
-            <span>엑셀 복사/붙여넣기</span>
+            <span>{isKo ? '엑셀 복사/붙여넣기' : 'Excel Copy & Paste'}</span>
           </button>
           <button 
             onClick={downloadTemplate}
             className="btn btn-outline"
             style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.85rem', padding: '6px 12px' }}
-            title="엑셀 형식(.xlsx) 템플릿 다운로드"
+            title={isKo ? '엑셀 형식(.xlsx) 템플릿 다운로드' : 'Download Excel (.xlsx) template'}
           >
             <Download size={14} />
-            <span>템플릿 (.xlsx)</span>
+            <span>{isKo ? '템플릿 (.xlsx)' : 'Template (.xlsx)'}</span>
           </button>
           <button 
             onClick={downloadCsvTemplate}
             className="btn btn-outline"
             style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.85rem', padding: '6px 12px' }}
-            title="사내 DRM 암호화 영향을 받지 않는 CSV 형식 템플릿 다운로드"
+            title={isKo ? '사내 DRM 암호화 영향을 받지 않는 CSV 형식 템플릿 다운로드' : 'Download CSV template (unaffected by corporate DRM encryption)'}
           >
             <Download size={14} />
-            <span>템플릿 (.csv)</span>
+            <span>{isKo ? '템플릿 (.csv)' : 'Template (.csv)'}</span>
           </button>
         </div>
       </div>
@@ -602,10 +612,10 @@ export default function AdminShipmentUpload({ isMobileView }) {
               </div>
               <div>
                 <h2 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
-                  선적내역 리스트
+                  {isKo ? '선적내역 리스트' : 'Shipment History'}
                 </h2>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                  과거 및 현재 등록된 전체 B/L 선적 이력
+                  {isKo ? '과거 및 현재 등록된 전체 B/L 선적 이력' : 'All past and current registered B/L shipments'}
                 </span>
               </div>
             </div>
@@ -630,11 +640,11 @@ export default function AdminShipmentUpload({ isMobileView }) {
                     outline: 'none',
                     fontFamily: "'SUITE', sans-serif"
                   }}
-                  title="출항 년도(ETD) 기준 필터링"
+                  title={isKo ? '출항 년도(ETD) 기준 필터링' : 'Filter by ETD Year'}
                 >
-                  <option value="ALL">전체 년도</option>
+                  <option value="ALL">{isKo ? '전체 년도' : 'All Years'}</option>
                   {availableYears.map(year => (
-                    <option key={year} value={year}>{year}년</option>
+                    <option key={year} value={year}>{isKo ? `${year}년` : year}</option>
                   ))}
                 </select>
               </div>
@@ -656,10 +666,10 @@ export default function AdminShipmentUpload({ isMobileView }) {
                   fontWeight: 600,
                   cursor: isLoadingHistory ? 'not-allowed' : 'pointer'
                 }}
-                title="선적내역 새로고침"
+                title={isKo ? '선적내역 새로고침' : 'Refresh shipment history'}
               >
                 <RefreshCw size={13} className={isLoadingHistory ? 'animate-spin' : ''} />
-                <span>새로고침</span>
+                <span>{isKo ? '새로고침' : 'Refresh'}</span>
               </button>
 
               {/* 총 건수 뱃지 */}
@@ -672,7 +682,7 @@ export default function AdminShipmentUpload({ isMobileView }) {
                 padding: '4px 8px',
                 borderRadius: '9999px'
               }}>
-                총 {filteredHistory.length}건
+                {isKo ? `총 ${filteredHistory.length}건` : `Total ${filteredHistory.length}`}
               </span>
             </div>
           </div>
@@ -691,7 +701,7 @@ export default function AdminShipmentUpload({ isMobileView }) {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="B/L 번호, 도착지 항구, 선박명 검색..."
+              placeholder={isKo ? 'B/L 번호, 도착지 항구, 선박명 검색...' : 'Search by B/L No., POD, or Vessel...'}
               style={{
                 border: 'none',
                 outline: 'none',
@@ -736,11 +746,11 @@ export default function AdminShipmentUpload({ isMobileView }) {
             <table className="wia-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', fontFamily: "'SUITE', sans-serif" }}>
               <thead style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: 'var(--bg-secondary, #f8fafc)', fontFamily: "'SUITE', sans-serif" }}>
                 <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <th style={{ width: '45px', textAlign: 'center', padding: '10px 8px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>번호</th>
-                  <th style={{ textAlign: 'left', padding: '10px 10px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>B/L 번호</th>
-                  <th style={{ textAlign: 'center', padding: '10px 8px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>ETD (출항일)</th>
-                  <th style={{ textAlign: 'left', padding: '10px 10px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>도착지 항구</th>
-                  <th style={{ textAlign: 'center', padding: '10px 10px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>장비개수 (S/N)</th>
+                  <th style={{ width: '45px', textAlign: 'center', padding: '10px 8px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>{isKo ? '번호' : 'No.'}</th>
+                  <th style={{ textAlign: 'left', padding: '10px 10px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>{isKo ? 'B/L 번호' : 'B/L No.'}</th>
+                  <th style={{ textAlign: 'center', padding: '10px 8px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>{isKo ? 'ETD (출항일)' : 'ETD'}</th>
+                  <th style={{ textAlign: 'left', padding: '10px 10px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>{isKo ? '도착지 항구' : 'POD'}</th>
+                  <th style={{ textAlign: 'center', padding: '10px 10px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>{isKo ? '장비개수 (S/N)' : 'Units (S/N)'}</th>
                 </tr>
               </thead>
               <tbody style={{ fontFamily: "'SUITE', sans-serif" }}>
@@ -748,7 +758,7 @@ export default function AdminShipmentUpload({ isMobileView }) {
                   <tr>
                     <td colSpan={5} style={{ textAlign: 'center', padding: '40px 16px', color: '#0284c7', fontFamily: "'SUITE', sans-serif" }}>
                       <Loader2 size={24} className="animate-spin" style={{ margin: '0 auto 8px' }} />
-                      <div style={{ fontSize: '0.85rem', fontWeight: 600, fontFamily: "'SUITE', sans-serif" }}>선적내역을 불러오는 중입니다...</div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, fontFamily: "'SUITE', sans-serif" }}>{isKo ? '선적내역을 불러오는 중입니다...' : 'Loading shipment history...'}</div>
                     </td>
                   </tr>
                 )}
@@ -757,9 +767,11 @@ export default function AdminShipmentUpload({ isMobileView }) {
                   <tr>
                     <td colSpan={5} style={{ textAlign: 'center', padding: '48px 16px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>
                       <Ship size={32} color="#cbd5e1" style={{ margin: '0 auto 8px' }} />
-                      <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontFamily: "'SUITE', sans-serif" }}>선적내역이 존재하지 않습니다.</div>
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontFamily: "'SUITE', sans-serif" }}>{isKo ? '선적내역이 존재하지 않습니다.' : 'No shipment history found.'}</div>
                       <div style={{ fontSize: '0.75rem', marginTop: '4px', fontFamily: "'SUITE', sans-serif" }}>
-                        {selectedYear !== 'ALL' ? `${selectedYear}년도에 출항한 선적이 없습니다.` : '오른쪽에서 신규 선적정보를 업로드해 보세요.'}
+                        {selectedYear !== 'ALL'
+                          ? (isKo ? `${selectedYear}년도에 출항한 선적이 없습니다.` : `No shipments departed in ${selectedYear}.`)
+                          : (isKo ? '오른쪽에서 신규 선적정보를 업로드해 보세요.' : 'Upload new shipment information on the right.')}
                       </div>
                     </td>
                   </tr>
@@ -809,7 +821,7 @@ export default function AdminShipmentUpload({ isMobileView }) {
                             </span>
                             <button
                               onClick={(e) => handleCopyMbl(e, shipment.mbl_no)}
-                              title="B/L 번호 복사"
+                              title={isKo ? 'B/L 번호 복사' : 'Copy B/L No.'}
                               style={{
                                 background: 'none',
                                 border: 'none',
@@ -845,7 +857,7 @@ export default function AdminShipmentUpload({ isMobileView }) {
                           </div>
                           {shipment.carrier && (
                             <span style={{ fontSize: '0.74rem', color: '#64748b', fontFamily: "'SUITE', sans-serif" }}>
-                              선사: {shipment.carrier}
+                              {isKo ? '선사:' : 'Carrier:'} {shipment.carrier}
                             </span>
                           )}
                         </td>
@@ -866,7 +878,7 @@ export default function AdminShipmentUpload({ isMobileView }) {
                             fontFamily: "'SUITE', sans-serif"
                           }}>
                             <Package size={12} />
-                            {snCount > 0 ? `${snCount}대` : `${totalOrderCount}대`}
+                            {snCount > 0 ? (isKo ? `${snCount}대` : `${snCount} units`) : (isKo ? `${totalOrderCount}대` : `${totalOrderCount} units`)}
                           </span>
                         </td>
                       </tr>
@@ -892,16 +904,18 @@ export default function AdminShipmentUpload({ isMobileView }) {
                                 fontFamily: "'SUITE', sans-serif"
                               }}>
                                 <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155', fontFamily: "'SUITE', sans-serif" }}>
-                                  📦 선적 장비 상세 목록 ({shipment.orders?.length || 0}건 / S/N 부여: {snCount}건)
+                                  {isKo
+                                    ? `📦 선적 장비 상세 목록 (${shipment.orders?.length || 0}건 / S/N 부여: ${snCount}건)`
+                                    : `📦 Shipped Units (${shipment.orders?.length || 0} total / S/N assigned: ${snCount})`}
                                 </span>
                                 <span style={{ fontSize: '0.75rem', color: '#64748b', fontFamily: "'SUITE', sans-serif" }}>
-                                  ETA: {shipment.eta ? String(shipment.eta).slice(0, 10) : '-'} | 상태: {shipment.trackcargo_status || '운송중'}
+                                  ETA: {shipment.eta ? String(shipment.eta).slice(0, 10) : '-'} | {isKo ? '상태:' : 'Status:'} {shipment.trackcargo_status || (isKo ? '운송중' : 'In Transit')}
                                 </span>
                               </div>
 
                               {(!shipment.orders || shipment.orders.length === 0) ? (
                                 <div style={{ fontSize: '0.75rem', color: '#94a3b8', textAlign: 'center', padding: '8px', fontFamily: "'SUITE', sans-serif" }}>
-                                  등록된 장비 주문이 없습니다.
+                                  {isKo ? '등록된 장비 주문이 없습니다.' : 'No registered machine orders.'}
                                 </div>
                               ) : (
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '8px', fontFamily: "'SUITE', sans-serif" }}>
@@ -919,7 +933,7 @@ export default function AdminShipmentUpload({ isMobileView }) {
                                     }}>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: "'SUITE', sans-serif" }}>
                                         <span style={{ fontWeight: 700, color: '#0f172a', fontFamily: "'SUITE', sans-serif" }}>
-                                          {ord.product_model?.model_name || '장비'}
+                                          {ord.product_model?.model_name || (isKo ? '장비' : 'Machine')}
                                         </span>
                                         <span style={{
                                           fontSize: '0.68rem',
@@ -934,7 +948,7 @@ export default function AdminShipmentUpload({ isMobileView }) {
                                         </span>
                                       </div>
                                       <div style={{ color: '#475569', fontFamily: "'SUITE', sans-serif" }}>
-                                        S/N: <strong style={{ color: ord.serial_number ? '#0284c7' : '#94a3b8', fontFamily: "'SUITE', sans-serif" }}>{ord.serial_number || '미부여'}</strong>
+                                        S/N: <strong style={{ color: ord.serial_number ? '#0284c7' : '#94a3b8', fontFamily: "'SUITE', sans-serif" }}>{ord.serial_number || (isKo ? '미부여' : 'Unassigned')}</strong>
                                       </div>
                                       <div style={{ color: '#64748b', fontSize: '0.7rem', fontFamily: "'SUITE', sans-serif" }}>
                                         P/O: {ord.reference_no || '-'}
@@ -989,10 +1003,10 @@ export default function AdminShipmentUpload({ isMobileView }) {
               </div>
               <div>
                 <h2 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
-                  선적정보 업로드 (API Tracking 연동)
+                  {isKo ? '선적정보 업로드 (API Tracking 연동)' : 'Upload Shipment Info (API Tracking)'}
                 </h2>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                  엑셀 파일 드롭 또는 복사/붙여넣기로 TrackCargo 실시간 등록
+                  {isKo ? '엑셀 파일 드롭 또는 복사/붙여넣기로 TrackCargo 실시간 등록' : 'Drop an Excel/CSV file or copy/paste to register TrackCargo live tracking'}
                 </span>
               </div>
             </div>
@@ -1004,7 +1018,7 @@ export default function AdminShipmentUpload({ isMobileView }) {
                 style={{ fontSize: '0.75rem', padding: '4px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}
               >
                 <X size={12} />
-                <span>취소/재선택</span>
+                <span>{isKo ? '취소/재선택' : 'Clear / Reselect'}</span>
               </button>
             )}
           </div>
@@ -1052,17 +1066,21 @@ export default function AdminShipmentUpload({ isMobileView }) {
                   />
                 </div>
                 <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '6px', color: isDragging ? '#0284c7' : 'var(--text-primary)' }}>
-                  {isDragging ? '여기에 엑셀 파일을 놓으세요 (Drop File)' : '클릭하거나 엑셀 파일을 이곳에 드롭하세요'}
+                  {isDragging
+                    ? (isKo ? '여기에 엑셀 파일을 놓으세요 (Drop File)' : 'Drop your file here')
+                    : (isKo ? '클릭하거나 엑셀 파일을 이곳에 드롭하세요' : 'Click or drag & drop Excel/CSV file here')}
                 </h3>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: '0 0 8px' }}>
-                  지원 형식: <strong>.xlsx, .xls, .csv</strong> (헤더 지능형 자동 매핑)
+                  {isKo
+                    ? <>지원 형식: <strong>.xlsx, .xls, .csv</strong> (헤더 지능형 자동 매핑)</>
+                    : <>Supported: <strong>.xlsx, .xls, .csv</strong> (Smart Header Mapping)</>}
                 </p>
                 <div style={{ display: 'inline-flex', gap: '6px', fontSize: '0.72rem', color: 'var(--text-muted, #94a3b8)', flexWrap: 'wrap', justifyContent: 'center' }}>
-                  <span>필수 헤더: MBL (선하증권)</span>
+                  <span>{isKo ? '필수 헤더: MBL (선하증권)' : 'Required: MBL'}</span>
                   <span>•</span>
-                  <span>S/N 또는 P/O</span>
+                  <span>{isKo ? 'S/N 또는 P/O' : 'S/N or P/O'}</span>
                   <span>•</span>
-                  <span>POD (도착항)</span>
+                  <span>{isKo ? 'POD (도착항)' : 'POD (Port)'}</span>
                 </div>
               </div>
 
@@ -1095,13 +1113,13 @@ export default function AdminShipmentUpload({ isMobileView }) {
                       {currentFile.name}
                     </div>
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                      {(currentFile.size / 1024).toFixed(1)} KB • {data.length}개 행 감지됨
+                      {(currentFile.size / 1024).toFixed(1)} KB • {isKo ? `${data.length}개 행 감지됨` : `${data.length} rows detected`}
                     </div>
                   </div>
                 </div>
                 <button
                   onClick={resetCurrentFile}
-                  title="파일 초기화"
+                  title={isKo ? '파일 초기화' : 'Clear file'}
                   style={{
                     background: 'none',
                     border: 'none',
@@ -1123,12 +1141,12 @@ export default function AdminShipmentUpload({ isMobileView }) {
               <div style={{ background: 'var(--bg-primary)', borderRadius: '10px', padding: '16px', border: '1px solid var(--border-color)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                   <h3 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
-                    데이터 검증 결과 ({data.length}건)
+                    {isKo ? `데이터 검증 결과 (${data.length}건)` : `Validation Results (${data.length} rows)`}
                   </h3>
                   {errors.length > 0 && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ef4444' }}>
                       <AlertTriangle size={15} />
-                      <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{errors.length}개의 오류 발견</span>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{isKo ? `${errors.length}개의 오류 발견` : `${errors.length} error(s) found`}</span>
                     </div>
                   )}
                 </div>
@@ -1140,10 +1158,10 @@ export default function AdminShipmentUpload({ isMobileView }) {
                         <th style={{ width: '35px' }}>No</th>
                         <th>MBL</th>
                         <th>POD</th>
-                        <th>장비명</th>
+                        <th>{isKo ? '장비명' : 'Model'}</th>
                         <th>S/N</th>
                         <th>P/O</th>
-                        <th style={{ width: '40px' }}>검증</th>
+                        <th style={{ width: '40px' }}>{isKo ? '검증' : 'Valid'}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1189,7 +1207,7 @@ export default function AdminShipmentUpload({ isMobileView }) {
                   {uploadStatus === 'success' && (
                     <div style={{ color: '#16a34a', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', fontWeight: 600 }}>
                       <CheckCircle size={18} />
-                      <span>업로드 성공! TrackCargo 연동 시작 및 리스트 갱신 완료</span>
+                      <span>{isKo ? '업로드 성공! TrackCargo 연동 시작 및 리스트 갱신 완료' : 'Upload complete! TrackCargo tracking initiated and list updated.'}</span>
                     </div>
                   )}
 
@@ -1213,12 +1231,12 @@ export default function AdminShipmentUpload({ isMobileView }) {
                     {isUploading ? (
                       <>
                         <Loader2 size={16} className="animate-spin" />
-                        <span>연동 처리중...</span>
+                        <span>{isKo ? '연동 처리중...' : 'Uploading...'}</span>
                       </>
                     ) : (
                       <>
                         <UploadCloud size={16} />
-                        <span>업로드 최종 확정</span>
+                        <span>{isKo ? '업로드 최종 확정' : 'Confirm & Upload'}</span>
                       </>
                     )}
                   </button>
@@ -1266,10 +1284,12 @@ export default function AdminShipmentUpload({ isMobileView }) {
                 </div>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 600 }}>
-                    엑셀 데이터 직접 복사 / 붙여넣기
+                    {isKo ? '엑셀 데이터 직접 복사 / 붙여넣기' : 'Direct Excel Copy & Paste'}
                   </h3>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    사내 DRM(MIP) 암호화와 무관하게 엑셀 내용을 즉시 등록할 수 있습니다.
+                    {isKo
+                      ? '사내 DRM(MIP) 암호화와 무관하게 엑셀 내용을 즉시 등록할 수 있습니다.'
+                      : 'Paste Excel rows directly regardless of corporate DRM/MIP file encryption.'}
                   </span>
                 </div>
               </div>
@@ -1292,13 +1312,18 @@ export default function AdminShipmentUpload({ isMobileView }) {
                 color: 'var(--text-secondary)',
                 lineHeight: 1.5
               }}>
-                💡 <strong>사용 방법:</strong> 엑셀에서 표 범위를 드래그하여 <strong>복사(Ctrl+C)</strong>한 뒤, 아래 상자에 <strong>붙여넣기(Ctrl+V)</strong>하고 [데이터 적용]을 누르세요.
+                {isKo
+                  ? <>💡 <strong>사용 방법:</strong> 엑셀에서 표 범위를 드래그하여 <strong>복사(Ctrl+C)</strong>한 뒤, 아래 상자에 <strong>붙여넣기(Ctrl+V)</strong>하고 [데이터 파싱 및 적용]을 누르세요.</>
+                  : <>💡 <strong>How to use:</strong> Select and <strong>copy (Ctrl+C)</strong> table cells in Excel, <strong>paste (Ctrl+V)</strong> them below, and click [Parse &amp; Apply Data].</>}
               </div>
 
               <textarea
                 value={pastedText}
                 onChange={(e) => setPastedText(e.target.value)}
-                placeholder="엑셀에서 복사(Ctrl+C)한 셀 데이터를 이곳에 붙여넣기(Ctrl+V) 하세요...&#10;&#10;예시:&#10;MBL (선하증권 번호)	PORT (도착항/POD)	MODEL (장비명)	S/N (시리얼 번호)	P/O (주문 번호)&#10;HDMUSELE22174500	Hamburg	KF5600II	K3G112	PO-2601"
+                placeholder={isKo
+                  ? "엑셀에서 복사(Ctrl+C)한 셀 데이터를 이곳에 붙여넣기(Ctrl+V) 하세요...\n\n예시:\nMBL (선하증권 번호)\tPORT (도착항/POD)\tMODEL (장비명)\tS/N (시리얼 번호)\tP/O (주문 번호)\nHDMUSELE22174500\tHamburg\tKF5600II\tK3G112\tPO-2601"
+                  : "Paste copied Excel cells here (Ctrl+V)...\n\nExample:\nMBL\tPORT (POD)\tMODEL\tS/N\tP/O\nHDMUSELE22174500\tHamburg\tKF5600II\tK3G112\tPO-2601"
+                }
                 rows={8}
                 style={{
                   width: '100%',
@@ -1330,14 +1355,16 @@ export default function AdminShipmentUpload({ isMobileView }) {
                     const text = await navigator.clipboard.readText();
                     if (text) setPastedText(text);
                   } catch (e) {
-                    alert('클립보드 접근 권한이 없거나 지원되지 않습니다. 텍스트 상자를 클릭 후 Ctrl+V를 눌러주세요.');
+                    alert(isKo
+                      ? '클립보드 접근 권한이 없거나 지원되지 않습니다. 텍스트 상자를 클릭 후 Ctrl+V를 눌러주세요.'
+                      : 'Clipboard access denied or unsupported. Please click the text box and press Ctrl+V.');
                   }
                 }}
                 className="btn btn-outline"
                 style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
               >
                 <Clipboard size={14} />
-                <span>클립보드에서 가져오기</span>
+                <span>{isKo ? '클립보드에서 가져오기' : 'Paste from Clipboard'}</span>
               </button>
 
               <div style={{ display: 'flex', gap: '8px' }}>
@@ -1346,7 +1373,7 @@ export default function AdminShipmentUpload({ isMobileView }) {
                   onClick={() => setIsPasteModalOpen(false)}
                   className="btn btn-outline"
                 >
-                  취소
+                  {isKo ? '취소' : 'Cancel'}
                 </button>
                 <button
                   type="button"
@@ -1355,7 +1382,7 @@ export default function AdminShipmentUpload({ isMobileView }) {
                   className="btn btn-primary"
                   style={{ backgroundColor: '#0284c7', borderColor: '#0284c7', color: 'white' }}
                 >
-                  데이터 파싱 및 적용
+                  {isKo ? '데이터 파싱 및 적용' : 'Parse & Apply Data'}
                 </button>
               </div>
             </div>
@@ -1398,17 +1425,21 @@ export default function AdminShipmentUpload({ isMobileView }) {
               </div>
               <div>
                 <h3 style={{ margin: 0, color: '#991b1b', fontSize: '1.1rem', fontWeight: 700 }}>
-                  사내 보안(Microsoft Information Protection / DRM) 암호화 감지
+                  {isKo ? '사내 보안(Microsoft Information Protection / DRM) 암호화 감지' : 'Corporate Security (DRM / MIP) Encryption Detected'}
                 </h3>
                 <span style={{ fontSize: '0.8rem', color: '#b91c1c' }}>
-                  {drmModalInfo.fileName} 파일은 사내 보안 정책으로 암호화되어 있어 웹에서 직접 읽을 수 없습니다.
+                  {isKo
+                    ? `${drmModalInfo.fileName} 파일은 사내 보안 정책으로 암호화되어 있어 웹에서 직접 읽을 수 없습니다.`
+                    : `File "${drmModalInfo.fileName}" is encrypted by corporate security policy and cannot be read directly by the browser.`}
                 </span>
               </div>
             </div>
 
             <div style={{ padding: '24px', fontSize: '0.9rem', color: 'var(--text-primary)', lineHeight: 1.6 }}>
               <p style={{ margin: '0 0 16px 0', color: 'var(--text-secondary)' }}>
-                기업용 Office 365(현대위아 사내 PC 등)에서 엑셀 문서를 저장할 때 <strong>Microsoft Information Protection(MIP)</strong> 보안 라벨이 자동 적용되어 웹 브라우저가 파일 내부 데이터를 읽을 수 없도록 암호화됩니다.
+                {isKo
+                  ? <>기업용 Office 365(현대위아 사내 PC 등)에서 엑셀 문서를 저장할 때 <strong>Microsoft Information Protection(MIP)</strong> 보안 라벨이 자동 적용되어 웹 브라우저가 파일 내부 데이터를 읽을 수 없도록 암호화됩니다.</>
+                  : <>When saving Excel files in enterprise Office 365, <strong>Microsoft Information Protection (MIP)</strong> security labels automatically encrypt the file, preventing web browsers from reading its contents.</>}
               </p>
 
               <div style={{
@@ -1419,17 +1450,23 @@ export default function AdminShipmentUpload({ isMobileView }) {
                 marginBottom: '20px'
               }}>
                 <div style={{ fontWeight: 700, marginBottom: '8px', color: '#0284c7' }}>
-                  💡 권장 해결 방법 (3가지 중 선택):
+                  {isKo ? '💡 권장 해결 방법 (3가지 중 선택):' : '💡 Recommended Solutions (Choose one):'}
                 </div>
                 <ol style={{ margin: 0, paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem' }}>
                   <li>
-                    <strong>📋 엑셀 내용 직접 복사/붙여넣기 (가장 편리)</strong>: 엑셀에서 표 범위를 복사(Ctrl+C)한 뒤, 시스템에 붙여넣기(Ctrl+V)하면 암호화 영향을 전혀 받지 않습니다.
+                    {isKo
+                      ? <><strong>📋 엑셀 내용 직접 복사/붙여넣기 (가장 편리)</strong>: 엑셀에서 표 범위를 복사(Ctrl+C)한 뒤, 시스템에 붙여넣기(Ctrl+V)하면 암호화 영향을 전혀 받지 않습니다.</>
+                      : <><strong>📋 Direct Excel Copy &amp; Paste (Easiest)</strong>: Copy the table cells in Excel (Ctrl+C) and paste (Ctrl+V) into the system—completely unaffected by encryption.</>}
                   </li>
                   <li>
-                    <strong>💾 CSV 형식으로 저장 후 업로드</strong>: 엑셀에서 [파일] → [다른 이름으로 저장] → 파일 형식을 <code>CSV UTF-8 (쉼표로 분리)(*.csv)</code>로 저장하여 업로드하세요.
+                    {isKo
+                      ? <><strong>💾 CSV 형식으로 저장 후 업로드</strong>: 엑셀에서 [파일] → [다른 이름으로 저장] → 파일 형식을 <code>CSV UTF-8 (쉼표로 분리)(*.csv)</code>로 저장하여 업로드하세요.</>
+                      : <><strong>💾 Save as CSV and Upload</strong>: In Excel, go to [File] → [Save As] → choose <code>CSV UTF-8 (Comma delimited) (*.csv)</code> and upload.</>}
                   </li>
                   <li>
-                    <strong>🔓 엑셀 문서 민감도(보안) 라벨 변경</strong>: 엑셀 상단 [민감도 / Sensitivity] 탭에서 암호화 보안 라벨을 '일반' 또는 '공개'로 변경 후 저장하세요.
+                    {isKo
+                      ? <><strong>🔓 엑셀 문서 민감도(보안) 라벨 변경</strong>: 엑셀 상단 [민감도 / Sensitivity] 탭에서 암호화 보안 라벨을 '일반' 또는 '공개'로 변경 후 저장하세요.</>
+                      : <><strong>🔓 Change Sensitivity Label</strong>: In Excel, change the [Sensitivity] label to 'General' or 'Public' and save again.</>}
                   </li>
                 </ol>
               </div>
@@ -1439,7 +1476,7 @@ export default function AdminShipmentUpload({ isMobileView }) {
                   onClick={() => setDrmModalInfo(null)}
                   className="btn btn-outline"
                 >
-                  닫기
+                  {isKo ? '닫기' : 'Close'}
                 </button>
                 <button
                   onClick={downloadCsvTemplate}
@@ -1447,7 +1484,7 @@ export default function AdminShipmentUpload({ isMobileView }) {
                   style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
                   <Download size={15} />
-                  <span>CSV 템플릿 받기</span>
+                  <span>{isKo ? 'CSV 템플릿 받기' : 'Download CSV Template'}</span>
                 </button>
                 <button
                   onClick={() => {
@@ -1458,7 +1495,7 @@ export default function AdminShipmentUpload({ isMobileView }) {
                   style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#0284c7', borderColor: '#0284c7', color: 'white' }}
                 >
                   <Clipboard size={15} />
-                  <span>지금 바로 복사/붙여넣기</span>
+                  <span>{isKo ? '지금 바로 복사/붙여넣기' : 'Copy & Paste Now'}</span>
                 </button>
               </div>
             </div>
