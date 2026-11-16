@@ -52,6 +52,12 @@
 * **불필요한 고정 안내 박스 제거**:
   * `Vessel`(선박) 탭 하단에 표시되던 `운항 항로: 남아공 희망봉 우회`(`Route: Via Cape of Good Hope`) 및 `AIS 고정밀 궤적` 안내 박스를 한국어/영어 뷰 모두에서 제거하여 선박 제원 정보만 깔끔하게 표시되도록 개선.
 
+### 8. [유저 및 보안 관리] '신규 사용자 등록' 팝업창 및 사용자 관리 모달/배지 다국어 지원 적용 (`AdminUsers.jsx`)
+* **신규 사용자 등록·정보 수정 모달 및 상태 배지·알림 영·한 분기 처리**:
+  * `신규 사용자 등록` 모달 내 제로터치 온보딩(Zero-Touch Onboarding) 안내 박스 및 `Email (Login ID)` 라벨 영·한 분기 적용.
+  * `사용자 정보 수정` 모달 내 `Display Name`, `Account Status`(`Active / Inactive (Blocked)`), `Reset Passkey (2FA)` 체크박스 다국어 처리.
+  * 사용자 테이블 온보딩 상태 배지(`Inactive`, `Invite Sent`, `Resend Invite`, `Passkey Pending`, `Active (AAL2)`) 및 등록·수정·삭제·재발송 알림(`alert`, `confirm`) 전체 영문화 지원.
+
 ## [2026-11-16] 주문/배송 타임라인 딜러 주문번호 표기, 신규 발주 생성 모달(딜러주문번호·구매가·판매가) 및 장비 정보 수정 모달 항목 순서 개편
 
 ### 1. 주문/배송 타임라인 상세 뷰 '딜러 주문번호' 표기 (`AdminDashboard.jsx`, `DealerOrders.jsx`)

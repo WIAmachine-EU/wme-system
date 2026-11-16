@@ -5,6 +5,7 @@ import { getAuditLogs } from '../../utils/auditLogger';
 
 export default function AdminUsers({ isMobileView }) {
   const { t, i18n } = useTranslation();
+  const isKo = i18n.language.startsWith('ko');
   const [activeTab, setActiveTab] = useState('users'); // 'users' or 'logs'
   const [logs, setLogs] = useState([]);
   const [users, setUsers] = useState([]);
@@ -45,7 +46,7 @@ export default function AdminUsers({ isMobileView }) {
     );
     return {
       id: u.id,
-      name: u.username || '(미설정)',
+      name: u.username || (isKo ? '(미설정)' : '(Not set)'),
       rawUsername: u.username || '',
       email: u.email,
       role: u.role,
@@ -118,13 +119,13 @@ export default function AdminUsers({ isMobileView }) {
         setUsers([...users, mapUserToRow(created)]);
         setShowCreateModal(false);
         setNewUserForm({ username: '', email: '', role: 'RSM', department: '', dealer_company_id: '' });
-        alert(created.message || `${created.email} 주소로 초기 비밀번호 설정 초대 링크가 발송되었습니다.`);
+        alert(created.message || (isKo ? `${created.email} 주소로 초기 비밀번호 설정 초대 링크가 발송되었습니다.` : `An initial password setup invitation link has been sent to ${created.email}.`));
       } else {
         const err = await res.json();
-        alert(`생성 실패: ${err.detail || '알 수 없는 오류'}`);
+        alert(isKo ? `생성 실패: ${err.detail || '알 수 없는 오류'}` : `Registration failed: ${err.detail || 'Unknown error'}`);
       }
     } catch (err) {
-      alert("서버 통신 오류가 발생했습니다.");
+      alert(isKo ? '서버 통신 오류가 발생했습니다.' : 'A server communication error occurred.');
     } finally {
       setCreatingUser(false);
     }
@@ -138,12 +139,12 @@ export default function AdminUsers({ isMobileView }) {
       });
       const data = await res.json();
       if (res.ok) {
-        alert(data.message || `${user.email} 주소로 초대 링크를 재발송했습니다.`);
+        alert(data.message || (isKo ? `${user.email} 주소로 초대 링크를 재발송했습니다.` : `Invitation link resent to ${user.email}.`));
       } else {
-        alert(`재발송 실패: ${data.detail || '알 수 없는 오류'}`);
+        alert(isKo ? `재발송 실패: ${data.detail || '알 수 없는 오류'}` : `Resend failed: ${data.detail || 'Unknown error'}`);
       }
     } catch (err) {
-      alert("서버 통신 오류가 발생했습니다.");
+      alert(isKo ? '서버 통신 오류가 발생했습니다.' : 'A server communication error occurred.');
     } finally {
       setResendingUserId(null);
     }
@@ -152,7 +153,7 @@ export default function AdminUsers({ isMobileView }) {
   const openEditModal = (user) => {
     setEditingUserId(user.id);
     setEditUserForm({
-      username: user.rawUsername !== undefined ? user.rawUsername : (user.name === '(미설정)' ? '' : user.name),
+      username: user.rawUsername !== undefined ? user.rawUsername : (user.name === '(미설정)' || user.name === '(Not set)' ? '' : user.name),
       email: user.email,
       role: user.role,
       department: user.company !== 'WIA HQ' && !dealers.find(d => d.name === user.company) ? user.company : '',
@@ -193,28 +194,28 @@ export default function AdminUsers({ isMobileView }) {
         setShowEditModal(false);
       } else {
         const err = await res.json();
-        alert(`수정 실패: ${err.detail || '알 수 없는 오류'}`);
+        alert(isKo ? `수정 실패: ${err.detail || '알 수 없는 오류'}` : `Update failed: ${err.detail || 'Unknown error'}`);
       }
     } catch (err) {
-      alert("서버 통신 오류가 발생했습니다.");
+      alert(isKo ? '서버 통신 오류가 발생했습니다.' : 'A server communication error occurred.');
     } finally {
       setUpdatingUser(false);
     }
   };
 
   const handleDeleteUser = async (userId) => {
-    if (!window.confirm("정말 이 사용자를 삭제하시겠습니까?")) return;
+    if (!window.confirm(isKo ? '정말 이 사용자를 삭제하시겠습니까?' : 'Are you sure you want to delete this user?')) return;
     try {
       const res = await fetch(`/api/users/${userId}`, { method: 'DELETE' });
       if (res.ok) {
         setUsers(users.filter(u => u.id !== userId));
-        alert("사용자가 삭제되었습니다.");
+        alert(isKo ? '사용자가 삭제되었습니다.' : 'User has been deleted.');
       } else {
         const err = await res.json();
-        alert(`삭제 실패: ${err.detail || '알 수 없는 오류'}`);
+        alert(isKo ? `삭제 실패: ${err.detail || '알 수 없는 오류'}` : `Delete failed: ${err.detail || 'Unknown error'}`);
       }
     } catch (err) {
-      alert("서버 통신 오류가 발생했습니다.");
+      alert(isKo ? '서버 통신 오류가 발생했습니다.' : 'A server communication error occurred.');
     }
   };
 
@@ -238,7 +239,7 @@ export default function AdminUsers({ isMobileView }) {
     if (user.onboardingStatus === 'INACTIVE' || user.is_active === false) {
       return (
         <span style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(128, 130, 133, 0.12)', color: '#808285', fontSize: '0.8rem', fontWeight: 600 }}>
-          비활성 (퇴사/정지)
+          {isKo ? '비활성 (퇴사/정지)' : 'Inactive'}
         </span>
       );
     }
@@ -246,7 +247,7 @@ export default function AdminUsers({ isMobileView }) {
       return (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <span style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(245, 158, 11, 0.14)', color: '#D97706', fontSize: '0.8rem', fontWeight: 600 }}>
-            초대 발송됨
+            {isKo ? '초대 발송됨' : 'Invite Sent'}
           </span>
           <button
             type="button"
@@ -267,7 +268,7 @@ export default function AdminUsers({ isMobileView }) {
             }}
           >
             <Send size={11} />
-            {resendingUserId === user.id ? '발송 중...' : '초대 재발송'}
+            {resendingUserId === user.id ? (isKo ? '발송 중...' : 'Sending...') : (isKo ? '초대 재발송' : 'Resend Invite')}
           </button>
         </div>
       );
@@ -275,13 +276,13 @@ export default function AdminUsers({ isMobileView }) {
     if (user.onboardingStatus === 'PASSKEY_PENDING') {
       return (
         <span style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(59, 130, 246, 0.12)', color: '#2563EB', fontSize: '0.8rem', fontWeight: 600 }}>
-          패스키 등록 대기
+          {isKo ? '패스키 등록 대기' : 'Passkey Pending'}
         </span>
       );
     }
     return (
       <span style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(22, 196, 127, 0.1)', color: '#16C47F', fontSize: '0.8rem', fontWeight: 600 }}>
-        정상 활성 (AAL2)
+        {isKo ? '정상 활성 (AAL2)' : 'Active (AAL2)'}
       </span>
     );
   };
@@ -493,12 +494,21 @@ export default function AdminUsers({ isMobileView }) {
                 color: 'var(--text-primary)',
                 lineHeight: 1.5
               }}>
-                <strong>제로터치 온보딩(Zero-Touch Onboarding) 안내:</strong><br />
-                보안을 위해 관리자는 초기 비밀번호를 지정하지 않습니다. 계정 생성 즉시 대상 이메일로 <strong>48시간 유효한 1회용 초기 비밀번호 설정 초대 링크</strong>가 자동 발송되며, 성명(Username)은 첫 로그인 후 개인정보 설정에서 본인이 직접 입력합니다.
+                {isKo ? (
+                  <>
+                    <strong>제로터치 온보딩(Zero-Touch Onboarding) 안내:</strong><br />
+                    보안을 위해 관리자는 초기 비밀번호를 지정하지 않습니다. 계정 생성 즉시 대상 이메일로 <strong>48시간 유효한 1회용 초기 비밀번호 설정 초대 링크</strong>가 자동 발송되며, 성명(Username)은 첫 로그인 후 개인정보 설정에서 본인이 직접 입력합니다.
+                  </>
+                ) : (
+                  <>
+                    <strong>Zero-Touch Onboarding Guide:</strong><br />
+                    For security, administrators do not set an initial password. Upon account creation, a <strong>single-use invitation link (valid for 48 hours)</strong> is automatically sent to the user's email, and the user sets their display name in Profile settings after first login.
+                  </>
+                )}
               </div>
 
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('menu6.label_email')} (로그인 ID) *</label>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('menu6.label_email')} ({isKo ? '로그인 ID' : 'Login ID'}) *</label>
                 <input
                   type="email"
                   required
@@ -583,7 +593,7 @@ export default function AdminUsers({ isMobileView }) {
             <form onSubmit={handleUpdateUser} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('menu6.label_email')} (로그인 ID) *</label>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('menu6.label_email')} ({isKo ? '로그인 ID' : 'Login ID'}) *</label>
                 <input
                   type="email"
                   required
@@ -594,12 +604,12 @@ export default function AdminUsers({ isMobileView }) {
               </div>
 
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('menu6.label_username')} (표시 이름/성명)</label>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('menu6.label_username')} ({isKo ? '표시 이름/성명' : 'Display Name'})</label>
                 <input
                   type="text"
                   value={editUserForm.username}
                   onChange={e => setEditUserForm({ ...editUserForm, username: e.target.value })}
-                  placeholder="표시 이름(성명) 입력"
+                  placeholder={isKo ? '표시 이름(성명) 입력' : 'Enter display name'}
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
                 />
               </div>
@@ -649,14 +659,14 @@ export default function AdminUsers({ isMobileView }) {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', paddingTop: '8px', borderTop: '1px solid var(--border-color)' }}>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>계정 상태</label>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{isKo ? '계정 상태' : 'Account Status'}</label>
                   <select
                     value={editUserForm.is_active ? 'active' : 'inactive'}
                     onChange={e => setEditUserForm({ ...editUserForm, is_active: e.target.value === 'active' })}
                     style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
                   >
-                    <option value="active">Active (정상 활성)</option>
-                    <option value="inactive">Inactive (로그인 차단)</option>
+                    <option value="active">{isKo ? 'Active (정상 활성)' : 'Active'}</option>
+                    <option value="inactive">{isKo ? 'Inactive (로그인 차단)' : 'Inactive (Blocked)'}</option>
                   </select>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
@@ -666,7 +676,7 @@ export default function AdminUsers({ isMobileView }) {
                       checked={Boolean(editUserForm.reset_passkey)}
                       onChange={e => setEditUserForm({ ...editUserForm, reset_passkey: e.target.checked })}
                     />
-                    <span>패스키(2FA) 등록 초기화</span>
+                    <span>{isKo ? '패스키(2FA) 등록 초기화' : 'Reset Passkey (2FA)'}</span>
                   </label>
                 </div>
               </div>
