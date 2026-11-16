@@ -58,6 +58,13 @@
   * `사용자 정보 수정` 모달 내 `Display Name`, `Account Status`(`Active / Inactive (Blocked)`), `Reset Passkey (2FA)` 체크박스 다국어 처리.
   * 사용자 테이블 온보딩 상태 배지(`Inactive`, `Invite Sent`, `Resend Invite`, `Passkey Pending`, `Active (AAL2)`) 및 등록·수정·삭제·재발송 알림(`alert`, `confirm`) 전체 영문화 지원.
 
+### 9. [내 정보(My Data)] 페이지 다국어(영문/국문) 지원 적용 (`UserProfile.jsx`)
+* **프로필·보안·비밀번호 변경 모달 전체 영·한 분기 처리**:
+  * 상단 `Close`, 편집 `Cancel`/`Save` 버튼 및 최초 로그인 안내 배너 영·한 분기 적용.
+  * `Display Name`, `Headquarters (HQ)`, `Login ID`, 편집 안내 문구 및 미설정 안내 영문화.
+  * `Step 1: Password`, `Step 2: Biometric / Passkey (WebAuthn AAL2)`, 패스키 연동 상태(`Passkey Linked (Protected by NIST AAL2 2-Factor Auth)`) 및 패스키 초기화 요청 안내 문구 영·한 분기 적용.
+  * `비밀번호 변경`(`Change Password`) 모달 및 프로필/비밀번호 변경 알림(`alert`) 전체 영문화 지원.
+
 ## [2026-11-16] 주문/배송 타임라인 딜러 주문번호 표기, 신규 발주 생성 모달(딜러주문번호·구매가·판매가) 및 장비 정보 수정 모달 항목 순서 개편
 
 ### 1. 주문/배송 타임라인 상세 뷰 '딜러 주문번호' 표기 (`AdminDashboard.jsx`, `DealerOrders.jsx`)

@@ -10,7 +10,8 @@ export default function UserProfile({
   isMobileView,
   onClose
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isKo = i18n.language.startsWith('ko');
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   
@@ -48,7 +49,7 @@ export default function UserProfile({
       const res = await fetch(`/api/v1/users/me?username=${queryIdentifier}`, {
         headers: getAuthHeaders(false)
       });
-      if (!res.ok) throw new Error('프로필을 불러올 수 없습니다.');
+      if (!res.ok) throw new Error(isKo ? '프로필을 불러올 수 없습니다.' : 'Unable to load profile.');
       const data = await res.json();
       setProfile(data);
       setEditForm({
@@ -74,7 +75,7 @@ export default function UserProfile({
 
   const handleSaveProfile = async () => {
     if (!editForm.username || !editForm.username.trim()) {
-      alert('표시 이름(성명)을 입력해 주세요.');
+      alert(isKo ? '표시 이름(성명)을 입력해 주세요.' : 'Please enter a display name (Username).');
       return;
     }
 
@@ -89,7 +90,7 @@ export default function UserProfile({
       });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.detail || '프로필 수정에 실패했습니다.');
+        throw new Error(err.detail || (isKo ? '프로필 수정에 실패했습니다.' : 'Failed to update profile.'));
       }
       const data = await res.json();
       setProfile(data);
@@ -97,7 +98,7 @@ export default function UserProfile({
       if (onUpdateProfile) {
         onUpdateProfile(data);
       }
-      alert('프로필이 성공적으로 업데이트되었습니다.');
+      alert(isKo ? '프로필이 성공적으로 업데이트되었습니다.' : 'Profile updated successfully.');
     } catch (error) {
       alert(error.message);
     }
@@ -109,11 +110,11 @@ export default function UserProfile({
     setPasswordSuccess('');
 
     if (passwordForm.new_password !== passwordForm.confirm_password) {
-      setPasswordError('새 비밀번호가 일치하지 않습니다.');
+      setPasswordError(isKo ? '새 비밀번호가 일치하지 않습니다.' : 'New passwords do not match.');
       return;
     }
     if (passwordForm.new_password.length < 8) {
-      setPasswordError('비밀번호는 최소 8자리 이상이어야 합니다.');
+      setPasswordError(isKo ? '비밀번호는 최소 8자리 이상이어야 합니다.' : 'Password must be at least 8 characters long.');
       return;
     }
 
@@ -126,10 +127,10 @@ export default function UserProfile({
       
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || '비밀번호 변경에 실패했습니다.');
+        throw new Error(data.detail || (isKo ? '비밀번호 변경에 실패했습니다.' : 'Failed to change password.'));
       }
       
-      setPasswordSuccess(data.message);
+      setPasswordSuccess(data.message || (isKo ? '비밀번호가 성공적으로 변경되었습니다.' : 'Password changed successfully.'));
       setTimeout(() => {
         setIsPasswordModalOpen(false);
         setPasswordForm({ current_password: '', new_password: '', confirm_password: '' });
@@ -145,7 +146,7 @@ export default function UserProfile({
   }
 
   if (!profile) {
-    return <div style={{ padding: '20px', textAlign: 'center' }}>프로필 정보를 찾을 수 없습니다.</div>;
+    return <div style={{ padding: '20px', textAlign: 'center' }}>{isKo ? '프로필 정보를 찾을 수 없습니다.' : 'Profile information not found.'}</div>;
   }
 
   const gridTemplateColumns = isMobileView ? '1fr' : '1fr 1fr';
@@ -162,7 +163,7 @@ export default function UserProfile({
             onClick={onClose}
             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '6px', backgroundColor: '#fff', border: '1px solid var(--border-color)', cursor: 'pointer', color: 'var(--text-secondary)', fontWeight: 600, boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}
           >
-            <X size={16} /> 닫기
+            <X size={16} /> {isKo ? '닫기' : 'Close'}
           </button>
         </div>
 
@@ -180,7 +181,11 @@ export default function UserProfile({
             fontWeight: 600
           }}>
             <AlertCircle size={18} />
-            <span>최초 로그인 설정: 시스템 내에 표시될 성명(사용자명)과 소속 부서를 입력 후 [저장]을 눌러주세요.</span>
+            <span>
+              {isKo
+                ? '최초 로그인 설정: 시스템 내에 표시될 성명(사용자명)과 소속 부서를 입력 후 [저장]을 눌러주세요.'
+                : 'Initial Login Setup: Please enter your display name and department, then click [Save].'}
+            </span>
           </div>
         )}
 
@@ -206,13 +211,13 @@ export default function UserProfile({
                   }}
                   style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '6px', backgroundColor: '#f5f5f5', border: '1px solid #ddd', cursor: 'pointer' }}
                 >
-                  <X size={14} /> 취소
+                  <X size={14} /> {isKo ? '취소' : 'Cancel'}
                 </button>
                 <button 
                   onClick={handleSaveProfile}
                   style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '6px', backgroundColor: 'var(--wia-blue)', color: 'white', border: 'none', cursor: 'pointer' }}
                 >
-                  <Save size={14} /> 저장
+                  <Save size={14} /> {isKo ? '저장' : 'Save'}
                 </button>
               </div>
             )}
@@ -222,19 +227,19 @@ export default function UserProfile({
             {/* User Name (Display Name) */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                {t('profile.username')} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--wia-blue)' }}>(표시 이름 / 성명)</span>
+                {t('profile.username')} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--wia-blue)' }}>{isKo ? '(표시 이름 / 성명)' : '(Display Name)'}</span>
               </label>
               {editMode ? (
                 <input 
                   type="text" 
                   value={editForm.username} 
                   onChange={e => setEditForm({...editForm, username: e.target.value})}
-                  placeholder="시스템에 표시될 성명 입력 (동명이인 허용)"
+                  placeholder={isKo ? '시스템에 표시될 성명 입력 (동명이인 허용)' : 'Enter display name'}
                   style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', outline: 'none' }}
                 />
               ) : (
                 <div style={{ padding: '10px', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid transparent' }}>
-                  {profile.username || <span style={{ color: '#D97706', fontWeight: 600 }}>미설정 (편집 버튼을 눌러 입력해 주세요)</span>}
+                  {profile.username || <span style={{ color: '#D97706', fontWeight: 600 }}>{isKo ? '미설정 (편집 버튼을 눌러 입력해 주세요)' : 'Not set (Click Edit to enter)'}</span>}
                 </div>
               )}
             </div>
@@ -243,9 +248,9 @@ export default function UserProfile({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>{t('profile.company')}</label>
               <div style={{ padding: '10px', backgroundColor: '#f0f0f0', color: '#888', borderRadius: '8px', border: '1px solid #e0e0e0', cursor: 'not-allowed' }}>
-                {profile.dealer_company?.name || '본사 (HQ)'}
+                {profile.dealer_company?.name || (isKo ? '본사 (HQ)' : 'Headquarters (HQ)')}
               </div>
-              {editMode && <span style={{ fontSize: '0.75rem', color: 'var(--wia-red)' }}>* 소속 회사는 관리자만 수정 가능합니다.</span>}
+              {editMode && <span style={{ fontSize: '0.75rem', color: 'var(--wia-red)' }}>{isKo ? '* 소속 회사는 관리자만 수정 가능합니다.' : '* Company name can only be modified by an administrator.'}</span>}
             </div>
 
             {/* Department */}
@@ -257,7 +262,7 @@ export default function UserProfile({
                   value={editForm.department} 
                   onChange={e => setEditForm({...editForm, department: e.target.value})}
                   style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', outline: 'none' }}
-                  placeholder="소속 부서/팀 입력"
+                  placeholder={isKo ? '소속 부서/팀 입력' : 'Enter department / team'}
                 />
               ) : (
                 <div style={{ padding: '10px', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid transparent' }}>
@@ -269,12 +274,12 @@ export default function UserProfile({
             {/* Email Address (Immutable Login ID) */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                {t('profile.email')} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)' }}>(로그인 고유 ID)</span>
+                {t('profile.email')} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)' }}>{isKo ? '(로그인 고유 ID)' : '(Login ID)'}</span>
               </label>
               <div style={{ padding: '10px', backgroundColor: '#f0f0f0', color: '#666', borderRadius: '8px', border: '1px solid #e0e0e0', cursor: 'not-allowed' }}>
                 {profile.email}
               </div>
-              {editMode && <span style={{ fontSize: '0.75rem', color: 'var(--wia-red)' }}>* 로그인 고유 식별자(이메일)는 변경할 수 없습니다.</span>}
+              {editMode && <span style={{ fontSize: '0.75rem', color: 'var(--wia-red)' }}>{isKo ? '* 로그인 고유 식별자(이메일)는 변경할 수 없습니다.' : '* Login ID (email) cannot be changed.'}</span>}
             </div>
           </div>
         </div>
@@ -292,7 +297,7 @@ export default function UserProfile({
 
           <div style={{ display: 'grid', gridTemplateColumns, gap: '20px', alignItems: 'center' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>1단계: {t('profile.password')}</label>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>{isKo ? '1단계:' : 'Step 1:'} {t('profile.password')}</label>
               <div style={{ padding: '10px', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid transparent', letterSpacing: '2px', fontSize: '1.2rem', display: 'flex', alignItems: 'center' }}>
                 ••••••••
               </div>
@@ -309,7 +314,7 @@ export default function UserProfile({
 
           <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid var(--border-color)', display: 'grid', gridTemplateColumns, gap: '20px', alignItems: 'center' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>2단계: 생체인증 / 패스키 (WebAuthn AAL2)</label>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>{isKo ? '2단계: 생체인증 / 패스키 (WebAuthn AAL2)' : 'Step 2: Biometric / Passkey (WebAuthn AAL2)'}</label>
               <div style={{
                 padding: '10px 12px',
                 backgroundColor: profile.supabase_uid ? 'rgba(22, 196, 127, 0.08)' : 'rgba(245, 158, 11, 0.1)',
@@ -324,14 +329,16 @@ export default function UserProfile({
               }}>
                 <Fingerprint size={18} />
                 {profile.supabase_uid ? (
-                  <span>패스키 연동 완료 (NIST AAL2 직렬 2단계 인증 보호 중)</span>
+                  <span>{isKo ? '패스키 연동 완료 (NIST AAL2 직렬 2단계 인증 보호 중)' : 'Passkey Linked (Protected by NIST AAL2 2-Factor Auth)'}</span>
                 ) : (
-                  <span>다음 로그인 2단계에서 패스키가 자동 연동됩니다</span>
+                  <span>{isKo ? '다음 로그인 2단계에서 패스키가 자동 연동됩니다' : 'Passkey will be linked automatically on next Step 2 login'}</span>
                 )}
               </div>
             </div>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-              기기 분실 또는 교체로 패스키 재등록이 필요한 경우 시스템 관리자에게 패스키 초기화를 요청하세요.
+              {isKo
+                ? '기기 분실 또는 교체로 패스키 재등록이 필요한 경우 시스템 관리자에게 패스키 초기화를 요청하세요.'
+                : 'If you need to re-register your passkey due to device loss or replacement, please ask your system administrator to reset your passkey.'}
             </div>
           </div>
         </div>
@@ -343,7 +350,7 @@ export default function UserProfile({
         <div className="modal-overlay" onClick={() => setIsPasswordModalOpen(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
             <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>비밀번호 변경</h3>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>{isKo ? '비밀번호 변경' : 'Change Password'}</h3>
               <button type="button" onClick={() => setIsPasswordModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
                 <X size={20} color="var(--text-muted)" />
               </button>
@@ -355,7 +362,7 @@ export default function UserProfile({
               {passwordSuccess && <div style={{ padding: '10px', borderRadius: '8px', backgroundColor: 'rgba(0,180,50,0.1)', color: 'green', fontSize: '0.85rem' }}>{passwordSuccess}</div>}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>현재 비밀번호</label>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>{isKo ? '현재 비밀번호' : 'Current Password'}</label>
                 <input 
                   type="password" 
                   value={passwordForm.current_password}
@@ -365,7 +372,7 @@ export default function UserProfile({
                 />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>새 비밀번호 (8자리 이상)</label>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>{isKo ? '새 비밀번호 (8자리 이상)' : 'New Password (min. 8 characters)'}</label>
                 <input 
                   type="password" 
                   value={passwordForm.new_password}
@@ -375,7 +382,7 @@ export default function UserProfile({
                 />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>새 비밀번호 확인</label>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>{isKo ? '새 비밀번호 확인' : 'Confirm New Password'}</label>
                 <input 
                   type="password" 
                   value={passwordForm.confirm_password}
@@ -393,13 +400,13 @@ export default function UserProfile({
                   onClick={() => setIsPasswordModalOpen(false)}
                   style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: '#fff', cursor: 'pointer', fontWeight: 600 }}
                 >
-                  취소
+                  {isKo ? '취소' : 'Cancel'}
                 </button>
                 <button 
                   type="submit"
                   style={{ flex: 1, padding: '12px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--wia-blue)', color: 'white', cursor: 'pointer', fontWeight: 600 }}
                 >
-                  변경하기
+                  {isKo ? '변경하기' : 'Update Password'}
                 </button>
               </div>
             </form>
