@@ -40,6 +40,14 @@
   * `useTranslation`(`isKo`)을 도입하여 페이지 제목, 안내문구, 템플릿 다운로드 버튼, 선적내역 리스트 테이블(번호·B/L·ETD·POD·장비개수), 검색 필터, 아코디언 상세 목록(ETA·상태·미부여), 파일 드롭존, 데이터 검증 결과 테이블, 업로드 상태 메시지 등이 언어 설정(`EN / KR`)에 맞춰 즉시 전환되도록 구현.
   * 엑셀 직접 복사/붙여넣기 모달 및 사내 보안(DRM/MIP) 암호화 감지 안내 모달, 파일 파싱/유효성 검사 알림(`alert`, `confirm`)까지 모두 영문·국문 동시 지원.
 
+### 6. [선적 트래킹] 페이지 및 지도/지연율 위젯 다국어(영문/국문) 지원 적용 (`ShipmentTracking.jsx`, `ShipmentWidgets.jsx`, `TrackingMapboxWidget.jsx`)
+* **선적 트래킹 목록·상세 뷰 전체 다국어 분기 처리**:
+  * `ShipmentTracking.jsx`: 상단 헤더(`Shipment Tracking`), 수동 Diff 동기화 버튼·상태바·토스트 알림, 운송 중 선적 리스트(상태 배지, 출발/도착항, `Details`), 상세 뷰(장비 대수, ETD/ETA/운항 소요일, 4개 탭 `Units/Route/Vessel/Exceptions`, 최후 AIS 수신 위치 카드, 선박 제원 및 희망봉 우회 항로 설명) 영·한 분기 적용.
+* **해상 운송 지연율 & 재고 에이징 KPI 위젯 다국어 처리**:
+  * `ShipmentWidgets.jsx`: `DelayRateWidget`(`Ocean Transit Delay Rate`, `Active Shipments`, `Delay Rate`, `On Time / Delayed`) 및 `InventoryAgingWidget`(`Inventory Aging Ratio`) 다국어 전환 지원.
+* **Mapbox 해상 트래킹 위젯 팝업 및 안내 다국어 처리**:
+  * `TrackingMapboxWidget.jsx`: 출발항(POL)·환적항(Transit Port)·도착항(POD)·선박 마커 팝업(항로·누적 항해 거리·AIS 궤적 포인트·현재 속도·침로·최종 ETA·상세 항로 보기 버튼), 생산 중/대기 라벨 및 Mapbox 토큰 안내 화면 영·한 분기 적용.
+
 ## [2026-11-16] 주문/배송 타임라인 딜러 주문번호 표기, 신규 발주 생성 모달(딜러주문번호·구매가·판매가) 및 장비 정보 수정 모달 항목 순서 개편
 
 ### 1. 주문/배송 타임라인 상세 뷰 '딜러 주문번호' 표기 (`AdminDashboard.jsx`, `DealerOrders.jsx`)

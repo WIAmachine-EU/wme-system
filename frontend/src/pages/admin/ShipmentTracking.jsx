@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ChevronDown,
   ChevronUp,
@@ -54,6 +55,8 @@ const fetchSyncStatus = async () => {
 };
 
 export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
+  const { i18n } = useTranslation();
+  const isKo = i18n.language.startsWith('ko');
   const [selectedMbl, setSelectedMbl] = useState(null);
   const [activeTab, setActiveTab] = useState('Containers'); // Containers, Route, Vessel, Exceptions
   const [isManualSyncing, setIsManualSyncing] = useState(false);
@@ -100,13 +103,15 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
       await Promise.all([refetchSyncStatus(), refetchShipments()]);
       setSyncFeedback({
         type: 'success',
-        msg: `동기화 완료: 대상 ${data.target_count}건 중 갱신 ${data.updated_count}건, 변동없음(Skip) ${data.skipped_count}건 (효율: ${data.sync_efficiency_ratio}%)`
+        msg: isKo
+          ? `동기화 완료: 대상 ${data.target_count}건 중 갱신 ${data.updated_count}건, 변동없음(Skip) ${data.skipped_count}건 (효율: ${data.sync_efficiency_ratio}%)`
+          : `Sync complete: ${data.updated_count} updated, ${data.skipped_count} skipped out of ${data.target_count} (Efficiency: ${data.sync_efficiency_ratio}%)`
       });
       setTimeout(() => setSyncFeedback(null), 6000);
     } catch (err) {
       setSyncFeedback({
         type: 'error',
-        msg: `동기화 오류: ${err.message}`
+        msg: isKo ? `동기화 오류: ${err.message}` : `Sync error: ${err.message}`
       });
       setTimeout(() => setSyncFeedback(null), 5000);
     } finally {
@@ -188,14 +193,14 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
             }}>
               <div>
                 <h2 style={{ fontSize: isMobile ? '1.05rem' : '1.125rem', fontWeight: 'bold', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                  <Ship size={20} color="#2563eb" /> 선적 트래킹
+                  <Ship size={20} color="#2563eb" /> {isKo ? '선적 트래킹' : 'Shipment Tracking'}
                 </h2>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <button
                   onClick={handleTriggerManualSync}
                   disabled={isManualSyncing}
-                  title="2시간 주기 Diff-Check 동기화 수동 실행"
+                  title={isKo ? '2시간 주기 Diff-Check 동기화 수동 실행' : 'Manually trigger 2-hour Diff-Check sync'}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -212,7 +217,7 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
                   }}
                 >
                   <RefreshCw size={12} className={isManualSyncing ? "animate-spin" : ""} />
-                  {isManualSyncing ? '동기화 중' : 'Diff 갱신'}
+                  {isManualSyncing ? (isKo ? '동기화 중' : 'Syncing...') : (isKo ? 'Diff 갱신' : 'Diff Sync')}
                 </button>
               </div>
             </div>
@@ -230,15 +235,15 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ color: '#475569', display: 'flex', alignItems: 'center', gap: '5px' }}>
                   <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block' }}></span>
-                  스케줄러: <strong>매 2시간 정각 (0 */2 * * *)</strong>
+                  {isKo ? <>스케줄러: <strong>매 2시간 정각 (0 */2 * * *)</strong></> : <>Scheduler: <strong>Every 2 hrs (0 */2 * * *)</strong></>}
                 </span>
                 <span style={{ color: '#0369a1', fontWeight: 600 }}>
-                  동기화 효율 {syncStatus?.sync_efficiency_ratio != null ? `${syncStatus.sync_efficiency_ratio}%` : '대기중'}
+                  {isKo ? '동기화 효율' : 'Sync Efficiency'} {syncStatus?.sync_efficiency_ratio != null ? `${syncStatus.sync_efficiency_ratio}%` : (isKo ? '대기중' : 'Standby')}
                 </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontSize: '10px' }}>
-                <span>최근 갱신: {syncStatus?.last_sync_time ? new Date(syncStatus.last_sync_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '최근 가동됨'}</span>
-                <span>Dead Tuple 방지: <strong>{syncStatus?.skipped_count || 0}건 스킵</strong></span>
+                <span>{isKo ? '최근 갱신:' : 'Last Sync:'} {syncStatus?.last_sync_time ? new Date(syncStatus.last_sync_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (isKo ? '최근 가동됨' : 'Recently active')}</span>
+                <span>{isKo ? 'Dead Tuple 방지:' : 'Dedup:'} <strong>{syncStatus?.skipped_count || 0}{isKo ? '건 스킵' : ' skipped'}</strong></span>
               </div>
             </div>
 
@@ -271,14 +276,14 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', padding: isMobile ? '0 2px' : '0' }}>
                   <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#334155', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    운송 중인 선적
+                    {isKo ? '운송 중인 선적' : 'Shipments in Transit'}
                   </h3>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '10px' : '10px' }}>
                   {isLoading && (
                     <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '36px 16px', textAlign: 'center', border: '1px solid #e2e8f0', color: '#2563eb' }}>
-                      <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 600 }}>선적 데이터를 실시간 조회 중입니다...</p>
+                      <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 600 }}>{isKo ? '선적 데이터를 실시간 조회 중입니다...' : 'Loading live shipment tracking data...'}</p>
                     </div>
                   )}
 
@@ -340,7 +345,13 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
                             border: `1px solid ${isShipmentArrived ? '#a7f3d0' : (isDischarged ? '#e5e7eb' : (isDelayed ? '#fecaca' : '#dbeafe'))}`,
                             whiteSpace: 'nowrap'
                           }}>
-                            {isShipmentArrived ? '도착 완료 (Arrived)' : (isDischarged ? '도착 (Discharged)' : (isDelayed ? '지연 (Delayed)' : (s.trackcargo_status || '운송중 (In transit)')))}
+                            {isShipmentArrived
+                              ? (isKo ? '도착 완료 (Arrived)' : 'Arrived')
+                              : (isDischarged
+                                ? (isKo ? '도착 (Discharged)' : 'Discharged')
+                                : (isDelayed
+                                  ? (isKo ? '지연 (Delayed)' : 'Delayed')
+                                  : (s.trackcargo_status || (isKo ? '운송중 (In transit)' : 'In Transit'))))}
                           </span>
                         </div>
 
@@ -372,7 +383,7 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
                               color={isDelayed ? '#ef4444' : '#2563eb'}
                               style={{ transform: 'rotate(90deg)' }}
                             />
-                            <span style={{ fontSize: '9px', color: '#94a3b8', marginTop: '2px' }}>해상</span>
+                            <span style={{ fontSize: '9px', color: '#94a3b8', marginTop: '2px' }}>{isKo ? '해상' : 'Ocean'}</span>
                           </div>
 
                           {/* POD (도착항) */}
@@ -398,7 +409,7 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
                             🚢 {s.vessel_name || s.vessel || (s.mbl_no?.includes('YML') ? 'YM WELLHEAD' : 'WIA Global Voyager')}
                           </span>
                           <span style={{ color: '#2563eb', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '2px' }}>
-                            상세보기 ›
+                            {isKo ? '상세보기 ›' : 'Details ›'}
                           </span>
                         </div>
                       </div>
@@ -407,7 +418,7 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
 
                   {shipments?.length === 0 && (
                     <div style={{ backgroundColor: 'white', borderRadius: '10px', padding: '32px 16px', textAlign: 'center', border: '1px solid #e2e8f0' }}>
-                      <p style={{ fontSize: '0.875rem', color: '#64748b', margin: 0 }}>운송 중인 선적 데이터가 없습니다.</p>
+                      <p style={{ fontSize: '0.875rem', color: '#64748b', margin: 0 }}>{isKo ? '운송 중인 선적 데이터가 없습니다.' : 'No shipments in transit.'}</p>
                     </div>
                   )}
                 </div>
@@ -445,7 +456,7 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
                   borderRadius: isMobile ? '6px' : '0'
                 }}
               >
-                <ArrowLeft size={16} /> 목록으로 돌아가기
+                <ArrowLeft size={16} /> {isKo ? '목록으로 돌아가기' : 'Back to List'}
               </button>
             </div>
 
@@ -484,7 +495,7 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Ship size={13} /> 장비 {activeShipment.orders?.length || 0}대
+                        <Ship size={13} /> {isKo ? `장비 ${activeShipment.orders?.length || 0}대` : `${activeShipment.orders?.length || 0} units`}
                       </span>
                       <span style={{
                         backgroundColor: isShipmentArrived ? '#ecfdf5' : '#eff6ff',
@@ -495,18 +506,18 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
                         padding: '3px 8px',
                         borderRadius: '4px'
                       }}>
-                        {isShipmentArrived ? '도착 완료 (Arrived)' : (activeShipment.trackcargo_status || 'In transit')}
+                        {isShipmentArrived ? (isKo ? '도착 완료 (Arrived)' : 'Arrived') : (activeShipment.trackcargo_status || 'In Transit')}
                       </span>
                     </div>
                   </div>
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '8px' }}>
                     <div>
-                      <span style={{ fontSize: '10px', color: '#64748b', display: 'block' }}>출발항 (POL)</span>
+                      <span style={{ fontSize: '10px', color: '#64748b', display: 'block' }}>{isKo ? '출발항 (POL)' : 'Port of Loading (POL)'}</span>
                       <p style={{ fontWeight: 'bold', color: '#111827', fontSize: isMobile ? '0.95rem' : '1rem', margin: 0 }}>{polName}</p>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <span style={{ fontSize: '10px', color: '#64748b', display: 'block' }}>도착항 (POD)</span>
+                      <span style={{ fontSize: '10px', color: '#64748b', display: 'block' }}>{isKo ? '도착항 (POD)' : 'Port of Discharge (POD)'}</span>
                       <p style={{ fontWeight: 'bold', color: '#111827', fontSize: isMobile ? '0.95rem' : '1rem', margin: 0 }}>{podName}</p>
                     </div>
                   </div>
@@ -534,13 +545,13 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
                   }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                       <div style={{ backgroundColor: '#ffffff', padding: '8px 10px', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
-                        <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '2px' }}>출항일 (ETD)</div>
+                        <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '2px' }}>{isKo ? '출항일 (ETD)' : 'Departure (ETD)'}</div>
                         <div style={{ fontSize: '12px', fontWeight: 700, color: '#334155' }}>
                           {activeShipment.etd ? new Date(activeShipment.etd).toLocaleDateString() : '-'}
                         </div>
                       </div>
                       <div style={{ backgroundColor: '#ffffff', padding: '8px 10px', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
-                        <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '2px' }}>최종 예정일 (ETA)</div>
+                        <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '2px' }}>{isKo ? '최종 예정일 (ETA)' : 'Estimated Arrival (ETA)'}</div>
                         <div style={{ 
                           fontSize: '12px', 
                           fontWeight: 700, 
@@ -563,10 +574,10 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
                     }}>
                       <span style={{ color: isShipmentArrived ? '#059669' : '#64748b', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 600 }}>
                         <Clock size={13} color={isShipmentArrived ? '#059669' : (isDelayed ? '#dc2626' : '#0284c7')} />
-                        해상 운항 소요 (Aging):
+                        {isKo ? '해상 운항 소요 (Aging):' : 'Voyage Duration (Aging):'}
                       </span>
                       <span style={{ fontWeight: 700, color: isShipmentArrived ? '#065f46' : '#1e293b' }}>
-                        {voyageDays !== null ? `${voyageDays}일 ${isShipmentArrived ? '(확정 종료)' : '경과'}` : '-'}
+                        {voyageDays !== null ? (isKo ? `${voyageDays}일 ${isShipmentArrived ? '(확정 종료)' : '경과'}` : `${voyageDays} days ${isShipmentArrived ? '(Completed)' : 'elapsed'}`) : '-'}
                       </span>
                     </div>
                   </div>
@@ -601,7 +612,13 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
                   }}
                   onClick={() => setActiveTab(tab)}
                 >
-                  {tab === 'Containers' ? '장비목록' : (tab === 'Route' ? '항로' : (tab === 'Vessel' ? '선박' : '예외사항'))}
+                  {tab === 'Containers'
+                    ? (isKo ? '장비목록' : 'Units')
+                    : (tab === 'Route'
+                      ? (isKo ? '항로' : 'Route')
+                      : (tab === 'Vessel'
+                        ? (isKo ? '선박' : 'Vessel')
+                        : (isKo ? '예외사항' : 'Exceptions')))}
                 </button>
               ))}
             </div>
@@ -660,7 +677,7 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
                             {o.serial_number}
                           </span>
                         ) : (
-                          <span style={{ color: '#94a3b8', fontSize: '0.7rem', fontStyle: 'italic', fontFamily: "'SUITE', sans-serif", whiteSpace: 'nowrap' }}>미배정 (-)</span>
+                          <span style={{ color: '#94a3b8', fontSize: '0.7rem', fontStyle: 'italic', fontFamily: "'SUITE', sans-serif", whiteSpace: 'nowrap' }}>{isKo ? '미배정 (-)' : 'Unassigned (-)'}</span>
                         )}
                       </div>
 
@@ -672,7 +689,7 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
                     </div>
                   ))}
                   {(!activeShipment.orders || activeShipment.orders.length === 0) && (
-                    <p style={{ fontSize: '0.7rem', color: '#64748b', textAlign: 'center', padding: '24px 0', margin: 0, fontFamily: "'SUITE', sans-serif" }}>포함된 장비 정보가 없습니다.</p>
+                    <p style={{ fontSize: '0.7rem', color: '#64748b', textAlign: 'center', padding: '24px 0', margin: 0, fontFamily: "'SUITE', sans-serif" }}>{isKo ? '포함된 장비 정보가 없습니다.' : 'No unit information included.'}</p>
                   )}
                 </div>
               )}
@@ -753,15 +770,17 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          {isShipmentArrived ? '목적항 (DEHAM, 함부르크)' : '최후 AIS 수신 위치'}
+                          {isShipmentArrived
+                            ? (isKo ? '목적항 (DEHAM, 함부르크)' : 'Destination Port (DEHAM, Hamburg)')
+                            : (isKo ? '최후 AIS 수신 위치' : 'Last AIS Position')}
                         </div>
                         <div style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a', marginTop: '1px' }}>
                           {Number(lastLat).toFixed(2)}°N, {Number(lastLng).toFixed(2)}°E
                         </div>
                         <div style={{ fontSize: '10px', color: isShipmentArrived ? '#059669' : '#d97706', fontWeight: 600, marginTop: '2px' }}>
                           {isShipmentArrived 
-                            ? '속력 0.0 kn · 정박/하역 완료' 
-                            : `속력 ${speed} kn · 방위 ${Math.round(course)}°`}
+                            ? (isKo ? '속력 0.0 kn · 정박/하역 완료' : 'Speed 0.0 kn · Berthed / Discharged')
+                            : (isKo ? `속력 ${speed} kn · 방위 ${Math.round(course)}°` : `Speed ${speed} kn · Course ${Math.round(course)}°`)}
                         </div>
                       </div>
                     </div>
@@ -812,7 +831,7 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
                             <Ship size={22} />
                           </div>
                           <div>
-                            <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>선박명 (Vessel Name)</span>
+                            <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>{isKo ? '선박명 (Vessel Name)' : 'Vessel Name'}</span>
                             <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
                               {vesselName}
                             </h3>
@@ -830,12 +849,12 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
                           alignItems: 'center',
                           gap: '4px'
                         }}>
-                          <CheckCircle2 size={12} color="#059669" /> {isShipmentArrived ? '도착 완료' : 'TrackCargo AIS'}
+                          <CheckCircle2 size={12} color="#059669" /> {isShipmentArrived ? (isKo ? '도착 완료' : 'Arrived') : 'TrackCargo AIS'}
                         </span>
                       </div>
                       <div style={{ fontSize: '12px', color: '#64748b', display: 'flex', gap: '12px', borderTop: '1px solid #f1f5f9', paddingTop: '6px', marginTop: '2px' }}>
-                        <span>항차 (Voyage): <strong style={{ color: '#1e293b' }}>{activeShipment.voyage || '036E'}</strong></span>
-                        <span>선사: <strong style={{ color: '#1e293b' }}>{activeShipment.carrier || (activeShipment.mbl_no?.includes('HDM') ? 'HMM' : 'Yang Ming')}</strong></span>
+                        <span>{isKo ? '항차 (Voyage):' : 'Voyage:'} <strong style={{ color: '#1e293b' }}>{activeShipment.voyage || '036E'}</strong></span>
+                        <span>{isKo ? '선사:' : 'Carrier:'} <strong style={{ color: '#1e293b' }}>{activeShipment.carrier || (activeShipment.mbl_no?.includes('HDM') ? 'HMM' : 'Yang Ming')}</strong></span>
                       </div>
                     </div>
 
@@ -846,19 +865,19 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
                       gap: '8px'
                     }}>
                       <div style={{ backgroundColor: '#ffffff', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                        <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>IMO 번호</span>
+                        <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isKo ? 'IMO 번호' : 'IMO Number'}</span>
                         <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{imo}</span>
                       </div>
                       <div style={{ backgroundColor: '#ffffff', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                        <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>MMSI 식별부호</span>
+                        <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isKo ? 'MMSI 식별부호' : 'MMSI ID'}</span>
                         <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{mmsi}</span>
                       </div>
                       <div style={{ backgroundColor: '#ffffff', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                        <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>현재 속력 (Speed)</span>
+                        <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isKo ? '현재 속력 (Speed)' : 'Current Speed'}</span>
                         <span style={{ fontSize: '13px', fontWeight: 700, color: isShipmentArrived ? '#059669' : '#2563eb' }}>{speed} kts</span>
                       </div>
                       <div style={{ backgroundColor: '#ffffff', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                        <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>진행 방위 (Course)</span>
+                        <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{isKo ? '진행 방위 (Course)' : 'Heading / Course'}</span>
                         <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{Math.round(course)}°</span>
                       </div>
                     </div>
@@ -876,19 +895,31 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontWeight: 700, color: isShipmentArrived ? '#166534' : '#1e40af' }}>
-                          {isShipmentArrived ? '🌊 운항 항로: 완주 완료 (독일 함부르크 도착)' : '🌊 운항 항로: 남아공 희망봉 우회'}
+                          {isShipmentArrived
+                            ? (isKo ? '🌊 운항 항로: 완주 완료 (독일 함부르크 도착)' : '🌊 Route: Completed (Arrived in Hamburg, DE)')
+                            : (isKo ? '🌊 운항 항로: 남아공 희망봉 우회' : '🌊 Route: Via Cape of Good Hope')}
                         </span>
-                        <span style={{ fontSize: '11px', color: isShipmentArrived ? '#059669' : '#3b82f6' }}>AIS 고정밀 궤적</span>
+                        <span style={{ fontSize: '11px', color: isShipmentArrived ? '#059669' : '#3b82f6' }}>{isKo ? 'AIS 고정밀 궤적' : 'AIS Precision Track'}</span>
                       </div>
                       {isShipmentArrived ? (
                         <p style={{ margin: 0, fontSize: '11px', color: '#14532d', lineHeight: 1.5 }}>
-                          최후 보고 위치: <strong>53.5413°N, 9.9841°E (독일 함부르크항 POD 도착 완료)</strong><br />
-                          (희망봉 우회 항로 전 구간 완주 27,259 km, 선박 속력 0.0 kts, 정박/하역 완료)
+                          {isKo ? (
+                            <>최후 보고 위치: <strong>53.5413°N, 9.9841°E (독일 함부르크항 POD 도착 완료)</strong><br />
+                            (희망봉 우회 항로 전 구간 완주 27,259 km, 선박 속력 0.0 kts, 정박/하역 완료)</>
+                          ) : (
+                            <>Last Reported Position: <strong>53.5413°N, 9.9841°E (Arrived at POD Hamburg, DE)</strong><br />
+                            (Full Cape of Good Hope route completed 27,259 km, Speed 0.0 kts, Berthed / Discharged)</>
+                          )}
                         </p>
                       ) : (
                         <p style={{ margin: 0, fontSize: '11px', color: '#1e3a8a', lineHeight: 1.5 }}>
-                          최후 보고 위치: <strong>{lastLat.toFixed(4)}°N, {lastLng.toFixed(4)}°E</strong><br />
-                          (홍해/수에즈 운하 지정학적 이슈로 인해 아프리카 대륙 최남단 케이프타운을 선회하여 유럽으로 입항)
+                          {isKo ? (
+                            <>최후 보고 위치: <strong>{lastLat.toFixed(4)}°N, {lastLng.toFixed(4)}°E</strong><br />
+                            (홍해/수에즈 운하 지정학적 이슈로 인해 아프리카 대륙 최남단 케이프타운을 선회하여 유럽으로 입항)</>
+                          ) : (
+                            <>Last Reported Position: <strong>{lastLat.toFixed(4)}°N, {lastLng.toFixed(4)}°E</strong><br />
+                            (Rerouted around Cape Town / Cape of Good Hope to Europe due to Red Sea / Suez Canal disruptions)</>
+                          )}
                         </p>
                       )}
                     </div>
@@ -898,7 +929,7 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
 
               {activeTab === 'Exceptions' && (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', color: '#94a3b8', fontSize: '0.875rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  현재 보고된 운송 이상 징후(Exception)가 없습니다.
+                  {isKo ? '현재 보고된 운송 이상 징후(Exception)가 없습니다.' : 'No transit exceptions currently reported.'}
                 </div>
               )}
             </div>
@@ -907,7 +938,7 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
             <div style={{ padding: '14px 16px', borderTop: '1px solid #f1f5f9', backgroundColor: '#f8fafc', flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#2563eb', fontSize: '0.78rem', fontWeight: 500 }}>
                 <span style={{ width: '18px', height: '18px', borderRadius: '50%', backgroundColor: '#dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '11px' }}>i</span>
-                TrackCargo Webhook 자동 동기화
+                {isKo ? 'TrackCargo Webhook 자동 동기화' : 'TrackCargo Webhook Auto-Sync'}
               </div>
               <button
                 onClick={() => setSelectedMbl(null)}
@@ -922,7 +953,7 @@ export default function ShipmentTracking({ isMobileView, onNavigateUpload }) {
                   cursor: 'pointer'
                 }}
               >
-                목록 닫기
+                {isKo ? '목록 닫기' : 'Close'}
               </button>
             </div>
           </div>

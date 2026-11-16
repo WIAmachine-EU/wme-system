@@ -53,7 +53,8 @@ export default function TrackingMapboxWidget({
   defaultProjection = 'mercator',
   dealerPopupMode = false // [신규] 딜러 포털 팝업 전용 2D 평면 고정 모드
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isKo = i18n.language.startsWith('ko');
   const mapRef = useRef(null);
   const [popupInfo, setPopupInfo] = useState(null);
 
@@ -135,7 +136,7 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
     if (isWaitingDeparture) {
       return {
         mbl_no: shipmentData.mbl_no || '-',
-        vesselName: shipmentData.vessel_name || '생산완료 후 출항',
+        vesselName: shipmentData.vessel_name || (isKo ? '생산완료 후 출항' : 'Departing after production'),
         polName: shipmentData.pol || 'KRPUS (Busan)',
         podName: shipmentData.pod || 'POD',
         polFriendlyName: getFriendlyPortName(shipmentData.pol || 'KRPUS', 'BUSAN, KOREA'),
@@ -149,7 +150,7 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
         isWaitingDeparture: true,
         isDelayed: false,
         isDischarged: false,
-        status: '생산 중 (출항 준비)',
+        status: isKo ? '생산 중 (출항 준비)' : 'In Production (Pre-departure)',
         distanceToGo: calculateDistanceToGo(polCoords, podCoords),
         heading: 0,
         speed: 0,
@@ -235,8 +236,12 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
     const transitPort = getTransitPort(podName);
 
     const status = isShipmentArrived 
-      ? 'Arrived (도착 완료)' 
-      : (isDischarged ? 'Discharged (항구 도착)' : (isDelayed ? 'Delayed (지연 운항)' : 'In Transit (정상 운항)'));
+      ? (isKo ? 'Arrived (도착 완료)' : 'Arrived')
+      : (isDischarged
+        ? (isKo ? 'Discharged (항구 도착)' : 'Discharged')
+        : (isDelayed
+          ? (isKo ? 'Delayed (지연 운항)' : 'Delayed')
+          : (isKo ? 'In Transit (정상 운항)' : 'In Transit')));
 
     return {
       mbl_no: shipmentData.mbl_no || 'N/A',
@@ -268,7 +273,7 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
       eta: shipmentData.eta,
       raw: shipmentData
     };
-  }, [shipmentData]);
+  }, [shipmentData, isKo]);
 
   // 선택된 선적이 변경될 때 부드러운 카메라 이동 (FlyTo)
   useEffect(() => {
@@ -422,12 +427,17 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
             </div>
 
             <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '8px', color: '#ffffff' }}>
-              Mapbox 지도 연동 토큰이 필요합니다
+              {isKo ? 'Mapbox 지도 연동 토큰이 필요합니다' : 'Mapbox Access Token Required'}
             </h3>
 
             <p style={{ fontSize: '13px', color: '#94a3b8', lineHeight: 1.6, marginBottom: '20px' }}>
-              선적 트래킹 해상 경로 및 3D 지구본 지도를 표시하려면<br />
-              <strong style={{ color: '#38bdf8' }}>Mapbox Access Token</strong>이 환경변수(`.env`)에 등록되어 있어야 합니다.
+              {isKo ? (
+                <>선적 트래킹 해상 경로 및 3D 지구본 지도를 표시하려면<br />
+                <strong style={{ color: '#38bdf8' }}>Mapbox Access Token</strong>이 환경변수(`.env`)에 등록되어 있어야 합니다.</>
+              ) : (
+                <>To display maritime tracking routes and the 3D globe map,<br />
+                a <strong style={{ color: '#38bdf8' }}>Mapbox Access Token</strong> must be configured in `.env`.</>
+              )}
             </p>
 
             <div style={{
@@ -440,13 +450,17 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
               fontFamily: 'Consolas, Monaco, monospace',
               marginBottom: '16px'
             }}>
-              <div style={{ color: '#64748b', marginBottom: '4px' }}># frontend/.env 파일에 추가</div>
+              <div style={{ color: '#64748b', marginBottom: '4px' }}>{isKo ? '# frontend/.env 파일에 추가' : '# Add to frontend/.env'}</div>
               <div style={{ color: '#facc15', fontWeight: 600 }}>VITE_MAPBOX_TOKEN=pk.eyJ1Ijoi...</div>
-              <div style={{ color: '#64748b', fontSize: '11px', marginTop: '4px' }}>또는 VITE_MAPBOX_ACCESS_TOKEN=pk.eyJ1Ijoi...</div>
+              <div style={{ color: '#64748b', fontSize: '11px', marginTop: '4px' }}>{isKo ? '또는 VITE_MAPBOX_ACCESS_TOKEN=pk.eyJ1Ijoi...' : 'or VITE_MAPBOX_ACCESS_TOKEN=pk.eyJ1Ijoi...'}</div>
             </div>
 
             <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>
-              💡 사내 Mapbox 공인 키를 <code style={{ color: '#93c5fd' }}>frontend/.env</code>에 입력 후 저장하시면 실시간 해상 항로가 정상 표시됩니다.
+              {isKo ? (
+                <>💡 사내 Mapbox 공인 키를 <code style={{ color: '#93c5fd' }}>frontend/.env</code>에 입력 후 저장하시면 실시간 해상 항로가 정상 표시됩니다.</>
+              ) : (
+                <>💡 Add your official Mapbox key to <code style={{ color: '#93c5fd' }}>frontend/.env</code> to display live ocean routes.</>
+              )}
             </p>
           </div>
         </div>
@@ -494,8 +508,8 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
               }}
               onClick={() => setPopupInfo({
                 type: 'port',
-                title: `출발항 (POL): ${currentShipment.polFriendlyName}`,
-                desc: `ETD: ${currentShipment.etd ? new Date(currentShipment.etd).toLocaleDateString() : (currentShipment.isWaitingDeparture ? '출항 대기 중' : '-')}`,
+                title: `${isKo ? '출발항 (POL)' : 'Port of Loading (POL)'}: ${currentShipment.polFriendlyName}`,
+                desc: `ETD: ${currentShipment.etd ? new Date(currentShipment.etd).toLocaleDateString() : (currentShipment.isWaitingDeparture ? (isKo ? '출항 대기 중' : 'Awaiting Departure') : '-')}`,
                 coord: currentShipment.polCoords
               })}
             >
@@ -540,8 +554,8 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
               }}
               onClick={() => setPopupInfo({
                 type: 'port',
-                title: `환적/경유항 (Transit Port): ${currentShipment.transitPort.name}`,
-                desc: currentShipment.transitPort.description || '대형 모선 기항 후 피더선(Feeder) 환적 연계 허브',
+                title: `${isKo ? '환적/경유항 (Transit Port)' : 'Transit Port'}: ${currentShipment.transitPort.name}`,
+                desc: currentShipment.transitPort.description || (isKo ? '대형 모선 기항 후 피더선(Feeder) 환적 연계 허브' : 'Feeder transshipment hub after mother vessel call'),
                 coord: currentShipment.transitPort.coord
               })}
             >
@@ -586,7 +600,7 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
               }}
               onClick={() => setPopupInfo({
                 type: 'port',
-                title: `도착항 (POD): ${currentShipment.podFriendlyName}`,
+                title: `${isKo ? '도착항 (POD)' : 'Port of Discharge (POD)'}: ${currentShipment.podFriendlyName}`,
                 desc: `ETA: ${currentShipment.eta ? new Date(currentShipment.eta).toLocaleDateString() : '-'}`,
                 coord: currentShipment.podCoords
               })}
@@ -703,7 +717,7 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
                 boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
                 pointerEvents: 'none'
               }}>
-                {currentShipment.isWaitingDeparture ? '⚙️ 생산 중 (부산, KR)' : `🚢 ${currentShipment.vesselName}`}
+                {currentShipment.isWaitingDeparture ? (isKo ? '⚙️ 생산 중 (부산, KR)' : '⚙️ In Production (Busan, KR)') : `🚢 ${currentShipment.vesselName}`}
               </div>
             </div>
           </Marker>
@@ -803,31 +817,31 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
                       </div>
                     )}
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#6b7280' }}>항로 (POL→POD):</span>
+                      <span style={{ color: '#6b7280' }}>{isKo ? '항로 (POL→POD):' : 'Route (POL→POD):'}</span>
                       <span>{popupInfo.data.polName} → {popupInfo.data.podName}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#6b7280' }}>누적 항해 거리:</span>
+                      <span style={{ color: '#6b7280' }}>{isKo ? '누적 항해 거리:' : 'Distance Traveled:'}</span>
                       <span style={{ fontWeight: 700, color: '#2563eb' }}>
                         {popupInfo.data.reportedDistanceKm ? `${Number(popupInfo.data.reportedDistanceKm).toLocaleString()} km` : '26,281 km'}
                       </span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#6b7280' }}>AIS 궤적 포인트:</span>
+                      <span style={{ color: '#6b7280' }}>{isKo ? 'AIS 궤적 포인트:' : 'AIS Waypoints:'}</span>
                       <span style={{ fontWeight: 600 }}>
-                        {popupInfo.data.routeCoordinates?.length || 704} 개 (희망봉 우회)
+                        {popupInfo.data.routeCoordinates?.length || 704} {isKo ? '개 (희망봉 우회)' : 'pts (via Cape of Good Hope)'}
                       </span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#6b7280' }}>현재 속도:</span>
+                      <span style={{ color: '#6b7280' }}>{isKo ? '현재 속도:' : 'Current Speed:'}</span>
                       <span style={{ fontWeight: 600 }}>{popupInfo.data.speed} kts</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#6b7280' }}>침로 (Heading):</span>
+                      <span style={{ color: '#6b7280' }}>{isKo ? '침로 (Heading):' : 'Heading:'}</span>
                       <span>{Math.round(popupInfo.data.heading)}°</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #e5e7eb', paddingTop: '4px', marginTop: '4px' }}>
-                      <span style={{ color: '#6b7280' }}>최종 ETA:</span>
+                      <span style={{ color: '#6b7280' }}>{isKo ? '최종 ETA:' : 'Final ETA:'}</span>
                       <span style={{ fontWeight: 600, color: popupInfo.data.isDelayed ? '#dc2626' : '#2563eb' }}>
                         {popupInfo.data.eta ? new Date(popupInfo.data.eta).toLocaleDateString() : '-'}
                       </span>
@@ -861,7 +875,7 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
                       cursor: 'pointer'
                     }}
                   >
-                    상세 항로 보기
+                    {isKo ? '상세 항로 보기' : 'View Route Details'}
                   </button>
                 </div>
               )}
@@ -938,7 +952,7 @@ const COMPLETE_KRPUS_TO_DEHAM_ROUTE = [
           >
             <img
               src="/Globe-svg.svg"
-              alt="3D 지구본"
+              alt={t('map_controls.globe_3d', '3D Globe')}
               style={{ width: '16px', height: '16px', objectFit: 'contain', flexShrink: 0, display: 'block' }}
             />
             <span>{t('map_controls.globe_3d', '3D 지구본')}</span>

@@ -1,8 +1,11 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { checkIsDelayed } from '../utils/geoUtils';
 
 export function InventoryAgingWidget({ orders }) {
+  const { i18n } = useTranslation();
+  const isKo = i18n.language.startsWith('ko');
   const now = new Date();
   let normal = 0, longTerm = 0, bad = 0;
 
@@ -24,16 +27,16 @@ export function InventoryAgingWidget({ orders }) {
   const total = normal + longTerm + bad;
 
   const data = [
-    { name: '일반 (0~180일)', value: normal, color: '#4ade80' },
-    { name: '장기 (181~360일)', value: longTerm, color: '#facc15' },
-    { name: '악성 (361일 이상)', value: bad, color: '#f87171' },
+    { name: isKo ? '일반 (0~180일)' : 'Normal (0-180d)', value: normal, color: '#4ade80' },
+    { name: isKo ? '장기 (181~360일)' : 'Long-term (181-360d)', value: longTerm, color: '#facc15' },
+    { name: isKo ? '악성 (361일 이상)' : 'Excess (361d+)', value: bad, color: '#f87171' },
   ];
 
   return (
     <div style={{ backgroundColor: '#fff', padding: '16px', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', border: '1px solid #f3f4f6', display: 'flex', flexDirection: 'column' }}>
       <div style={{ marginBottom: '8px' }}>
-        <h3 style={{ fontSize: '1.125rem', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>재고 에이징 비율</h3>
-        <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>항구 하역 후 보관 기간 기준</p>
+        <h3 style={{ fontSize: '1.125rem', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>{isKo ? '재고 에이징 비율' : 'Inventory Aging Ratio'}</h3>
+        <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>{isKo ? '항구 하역 후 보관 기간 기준' : 'Based on storage duration after discharge'}</p>
       </div>
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ width: '50%', height: '160px' }}>
@@ -44,17 +47,17 @@ export function InventoryAgingWidget({ orders }) {
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip formatter={(value) => [`${value} 대`, '재고 수량']} />
+              <Tooltip formatter={(value) => [isKo ? `${value} 대` : `${value} units`, isKo ? '재고 수량' : 'Stock Qty']} />
             </PieChart>
           </ResponsiveContainer>
         </div>
         <div style={{ width: '50%', paddingLeft: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div style={{ marginBottom: '12px' }}>
-            <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '4px', marginTop: 0 }}>총 가용 재고</p>
-            <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>{total} <span style={{ fontSize: '0.875rem', fontWeight: 'normal' }}>대</span></p>
+            <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '4px', marginTop: 0 }}>{isKo ? '총 가용 재고' : 'Total Available'}</p>
+            <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>{total} <span style={{ fontSize: '0.875rem', fontWeight: 'normal' }}>{isKo ? '대' : 'units'}</span></p>
           </div>
           <div>
-            <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '4px', marginTop: 0 }}>장기/악성 점유율</p>
+            <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '4px', marginTop: 0 }}>{isKo ? '장기/악성 점유율' : 'Long/Excess Share'}</p>
             <p style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#ef4444', margin: 0 }}>{((longTerm + bad) / (total || 1) * 100).toFixed(1)}%</p>
           </div>
         </div>
@@ -64,6 +67,8 @@ export function InventoryAgingWidget({ orders }) {
 }
 
 export function DelayRateWidget({ shipments, isMobileView = false }) {
+  const { i18n } = useTranslation();
+  const isKo = i18n.language.startsWith('ko');
   let totalActive = 0;
   let delayed = 0;
 
@@ -92,11 +97,11 @@ export function DelayRateWidget({ shipments, isMobileView = false }) {
 
   const data = totalActive > 0
     ? [
-        { name: '정상 운항', value: onTime, color: '#4ade80' },
-        { name: '지연 선박', value: delayed, color: '#f87171' },
+        { name: isKo ? '정상 운항' : 'On Time', value: onTime, color: '#4ade80' },
+        { name: isKo ? '지연 선박' : 'Delayed', value: delayed, color: '#f87171' },
       ]
     : [
-        { name: '조회 중 / 없음', value: 1, color: '#e2e8f0' },
+        { name: isKo ? '조회 중 / 없음' : 'Loading / None', value: 1, color: '#e2e8f0' },
       ];
 
   return (
@@ -112,7 +117,7 @@ export function DelayRateWidget({ shipments, isMobileView = false }) {
       boxSizing: 'border-box'
     }}>
       <div style={{ marginBottom: '8px' }}>
-        <h3 style={{ fontSize: isMobileView ? '1rem' : '1.125rem', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>해상 운송 지연율</h3>
+        <h3 style={{ fontSize: isMobileView ? '1rem' : '1.125rem', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>{isKo ? '해상 운송 지연율' : 'Ocean Transit Delay Rate'}</h3>
       </div>
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ width: '50%', height: isMobileView ? '135px' : '160px' }}>
@@ -124,18 +129,18 @@ export function DelayRateWidget({ shipments, isMobileView = false }) {
                 ))}
               </Pie>
               {totalActive > 0 && (
-                <Tooltip formatter={(value, name) => [`${value} 건`, name]} />
+                <Tooltip formatter={(value, name) => [isKo ? `${value} 건` : `${value}`, name]} />
               )}
             </PieChart>
           </ResponsiveContainer>
         </div>
         <div style={{ width: '50%', paddingLeft: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div style={{ marginBottom: '12px' }}>
-            <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '4px', marginTop: 0 }}>전체 운송 중 선박</p>
-            <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>{totalActive} <span style={{ fontSize: '0.875rem', fontWeight: 'normal' }}>건</span></p>
+            <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '4px', marginTop: 0 }}>{isKo ? '전체 운송 중 선박' : 'Active Shipments'}</p>
+            <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>{totalActive} {isKo && <span style={{ fontSize: '0.875rem', fontWeight: 'normal' }}>건</span>}</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>지연율</span>
+            <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>{isKo ? '지연율' : 'Delay Rate'}</span>
             <span style={{ fontSize: '1.25rem', fontWeight: 'bold', color: statusColor, lineHeight: 1 }}>{delayRate}%</span>
           </div>
         </div>
