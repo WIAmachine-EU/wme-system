@@ -6,7 +6,7 @@ const ProductionIcon = ({ size = 18 }) => (
   <svg
     width={size}
     height={size}
-    viewBox="-1 -1 26 26"
+    viewBox="0 0 150 150"
     fill="currentColor"
     style={{ flexShrink: 0 }}
     aria-hidden="true"
@@ -14,9 +14,8 @@ const ProductionIcon = ({ size = 18 }) => (
     <path
       fillRule="evenodd"
       clipRule="evenodd"
-      d="M4 0H20A4 4 0 0 1 24 4V20A4 4 0 0 1 20 24H4A4 4 0 0 1 0 20V4A4 4 0 0 1 4 0ZM4 2H9V2.8A3 3 0 0 0 11 5.63V7A1 1 0 0 0 13 7V5.63A3 3 0 0 0 15 2.8V2H20A2 2 0 0 1 22 4V17H2V4A2 2 0 0 1 4 2ZM4.5 19A1.5 1.5 0 1 0 4.5 22A1.5 1.5 0 1 0 4.5 19ZM8.5 19A1.5 1.5 0 1 0 8.5 22A1.5 1.5 0 1 0 8.5 19ZM19.5 19A1.5 1.5 0 1 0 19.5 22A1.5 1.5 0 1 0 19.5 19Z"
+      d="M15 0H135A15 15 0 0 1 150 15V150H0V15A15 15 0 0 1 15 0ZM12 18A6 6 0 0 1 18 12H56V23L69 36V49H81V36L94 23V12H132A6 6 0 0 1 138 18V106H12V18ZM21.5 118.5A9 9 0 1 0 21.5 136.5A9 9 0 1 0 21.5 118.5ZM46.5 118.5A9 9 0 1 0 46.5 136.5A9 9 0 1 0 46.5 118.5ZM127.5 118.5A9 9 0 1 0 127.5 136.5A9 9 0 1 0 127.5 118.5ZM50 63H100V93H50Z"
     />
-    <rect x="8" y="10" width="8" height="5" rx="2" />
   </svg>
 );
 
