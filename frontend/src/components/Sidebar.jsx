@@ -159,12 +159,13 @@ export default function Sidebar({ activeTab, setActiveTab, currentRole, currentU
       id: 'admin-library',
       label: t('sidebar.rsm_menu.library'),
       icon: <FolderOpen size={20} />
-    },
-    {
-      id: 'rsm-dashboard',
-      label: t('sidebar.rsm_menu.dashboard'),
-      icon: <LayoutDashboard size={20} />
     }
+    // 임시 비활성화: RSM 영업통계 대시보드 (추후 개선 후 재활성화 예정)
+    // {
+    //   id: 'rsm-dashboard',
+    //   label: t('sidebar.rsm_menu.dashboard'),
+    //   icon: <LayoutDashboard size={20} />
+    // }
   ];
 
   const menuItems = currentRole === 'DEALER' ? dealerMenuItems : (currentRole === 'RSM' ? rsmMenuItems : adminMenuItems);
@@ -196,7 +197,6 @@ export default function Sidebar({ activeTab, setActiveTab, currentRole, currentU
               style={{ maxWidth: '100%' }}
               onClick={() => {
                 if (currentRole === 'DEALER') setActiveTab('dealer-dashboard');
-                else if (currentRole === 'RSM') setActiveTab('rsm-dashboard');
                 else setActiveTab('admin-dashboard');
                 if (onClose) onClose();
               }}

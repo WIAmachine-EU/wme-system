@@ -27,8 +27,8 @@ import DealerSalesArchive from './pages/dealer/DealerSalesArchive';
 import DealerInventory from './pages/dealer/DealerInventory';
 import DealerPromotion from './pages/dealer/DealerPromotion';
 
-// RSM Pages
-import RsmDashboard from './pages/rsm/RsmDashboard';
+// RSM Pages (임시 비활성화: 추후 개선 후 재활성화 예정)
+// import RsmDashboard from './pages/rsm/RsmDashboard';
 
 // Common Pages
 import UserProfile from './pages/UserProfile';
@@ -155,7 +155,7 @@ export default function App() {
     if (currentRole === 'DEALER') {
       if (!activeTab.startsWith('dealer-')) setActiveTab('dealer-dashboard');
     } else if (currentRole === 'RSM') {
-      if (!['rsm-dashboard', 'admin-inventory', 'admin-promotion', 'admin-sales-archive', 'admin-tracking', 'admin-library', 'admin-dashboard'].includes(activeTab)) {
+      if (!['admin-inventory', 'admin-promotion', 'admin-sales-archive', 'admin-tracking', 'admin-library', 'admin-dashboard'].includes(activeTab)) {
         setActiveTab('admin-dashboard');
       }
     } else {
@@ -284,8 +284,8 @@ export default function App() {
             />
           )}
 
-          {/* RSM Routing */}
-          {activeTab === 'rsm-dashboard' && currentRole === 'RSM' && <RsmDashboard isMobileView={isMobileView} currentUserId={currentUserId} />}
+          {/* RSM Routing (임시 비활성화: 추후 개선 후 재활성화 예정) */}
+          {/* {activeTab === 'rsm-dashboard' && currentRole === 'RSM' && <RsmDashboard isMobileView={isMobileView} currentUserId={currentUserId} />} */}
 
           {/* Admin Routing */}
           {activeTab === 'admin-dashboard' && (currentRole === 'SCM_ADMIN' || currentRole === 'RSM') && <AdminDashboard isMobileView={isMobileView} currentRole={currentRole} />}
@@ -313,7 +313,7 @@ export default function App() {
           {activeTab === 'dealer-promotion' && <DealerPromotion isMobileView={isMobileView} />}
           {activeTab === 'dealer-library' && <ProductLibrary currentRole={currentRole} isMobileView={isMobileView} />}
           
-          {['admin-dashboard', 'rsm-dashboard', 'admin-inventory', 'admin-dispatch', 'admin-promotion', 'admin-users', 'dealer-inventory', 'admin-library', 'dealer-library'].includes(activeTab) && (
+          {['admin-dashboard', 'admin-inventory', 'admin-dispatch', 'admin-promotion', 'admin-users', 'dealer-inventory', 'admin-library', 'dealer-library'].includes(activeTab) && (
             <ScrollButtons />
           )}
         </main>
