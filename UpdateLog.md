@@ -1,5 +1,42 @@
 # 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
+## [2026-11-17] 판매 목록 및 주문 화물(선박) 추적 모달 다국어(EN/KR) 고도화, RSM 대시보드 임시 비활성화 및 Nginx SPA 배포 캐시 제어 강화
+
+### 1. [판매 목록] '장비 및 판매 정보 수정(Order detail change)' 팝업창 전면 영문화 (`AdminSalesArchive.jsx`, `translation.json`)
+* **판매 목록 팝업창 및 세부 폼 다국어 전환**:
+  * RSM 포털 및 관리자 포털의 **[판매 목록]**(`AdminSalesArchive.jsx`) 메뉴에서 '장비 및 판매 정보 수정' 팝업창 내 모든 섹션 헤더 및 입력 항목을 다국어(`menu4.edit_modal.*`) 체계로 전환.
+  * **Section 1**: `기본 주문 및 장비 정보` → `Basic Order & Machine Information`, `-- 딜러/모델/NC 선택 --` 드롭다운 옵션 및 P/O, S/N 플레이스홀더 영문화.
+  * **Section 2**: `판매 매출 및 출고/픽업 현황` → `Sales Revenue & Dispatch / Pickup Status`, 판매가/구매가/매출월 플레이스홀더, 출고/픽업 일자 `초기화`(`Clear`) 버튼 및 미출고(선매출) 안내 문구 영문화.
+  * **Section 3**: `물류 운송 및 상세 스펙` → `Logistics & Detailed Specifications`, `도착지 항구 (Port)`(`Destination Port`), `Incoterms`, `선박명 (VESSEL)`(`Vessel Name (VESSEL)`), `DETAIL SPEC` 라벨 및 플레이스홀더 영문화.
+  * **Section 4 & 하단 액션**: `REMARK (비고)` 라벨 및 플레이스홀더 영문화, 취소 버튼 오타 수정 (`cancell` → `Cancel`).
+* **테이블 헤더, 정렬 툴팁, 알림창 다국어 연동**:
+  * 테이블 열 정렬 마우스 오버 툴팁(`오름차순/내림차순 정렬` ↔ `Sort ascending/descending`), 모바일 카드 뷰 `정보 수정`(`Edit Info`) 버튼, CSV 엑셀 내보내기 헤더 11개 항목 및 저장 성공/실패 알림(`alert`) 전체 영·한 분기 처리.
+
+### 2. RSM 포털 [RSM 영업통계(RSM Sales Stats)] 메뉴 및 라우팅 임시 비활성화 (`Sidebar.jsx`, `App.jsx`)
+* **메뉴 숨김 및 안전한 네비게이션 처리**:
+  * 시스템 안정화 및 향후 고도화 개편 일정에 맞춰 RSM 포털 사이드바에서 `rsm-dashboard`(`RSM 영업통계 / RSM Sales Stats`) 메뉴 항목을 임시 비활성화(주석 처리).
+  * `App.jsx` 내 RSM 권한의 라우팅 컴포넌트 렌더링 및 허용 탭 목록에서 `rsm-dashboard`를 제외하여, 사용자가 해당 URL 또는 세션 상태를 보유하고 있더라도 기본 메인 화면인 `admin-dashboard`([주문 / 배송현황])로 자동 리디렉션되도록 처리.
+  * 상단 WIA 브랜드 로고 클릭 시 RSM 권한의 이동 대상을 `admin-dashboard`로 안전하게 연결.
+  * 향후 기능 개선 및 재오픈에 대비하여 기존 `RsmDashboard.jsx` 소스코드는 유지 및 보존.
+
+### 3. [주문 / 배송현황] '주문 화물(선박) 추적' 팝업창 전체 다국어(EN/KR) 지원 (`DealerVesselTrackingModal.jsx`)
+* **화물추적 팝업창 전 영역 영문화 적용**:
+  * RSM 포털 및 딜러 포털의 [주문 / 배송현황] 타임라인에서 '화물추적' 클릭 시 표시되는 '주문 화물(선박) 추적(Order Cargo (Vessel) Tracking)' 팝업창 전체를 다국어 지원으로 전환.
+  * **모달 헤더 및 목록 패널**: `주문 화물(선박) 추적` ↔ `Order Cargo (Vessel) Tracking`, `닫기` ↔ `Close`, `내 주문 장비 목록` / `{n}대` ↔ `Ordered Machines` / `{n} units`.
+  * **상단 6대 운항 지표(KPI) 요약 바**:
+    * `주문 장비 (Model / S/N)` ↔ `Ordered Machine (Model / S/N)`
+    * `선박명` ↔ `Vessel Name`
+    * `출발일 (ETD)` ↔ `Departure (ETD)` / `도착예정일 (ETA)` ↔ `Estimated Arrival (ETA)` (언어별 로케일 날짜 포맷 적용)
+    * `지연된 일수` ↔ `Delay Status` (`0일 (정상)` ↔ `0 days (On Time)`, `+{n}일 지연` ↔ `+{n} days delayed`)
+    * `해상운항 소요` ↔ `Voyage Duration` (`{n}일째 해상 운항 중` ↔ `{n} days in transit`, `{n}일 소요 (도착 완료)` ↔ `{n} days (Arrived)`, `생산완료 후 출항` ↔ `Departing after production`)
+  * **지도 오버레이 안내 박스**: `생산완료 후 출항 (출항지: Busan, KR)` ↔ `Departing after production (POL: Busan, KR)`, 설명 문구 및 `TrackingMapboxWidget` 연동 데이터 영문화.
+
+### 4. 프론트엔드 Nginx SPA 배포 캐시 제어 및 정적 에셋 무결성 강화 (`nginx.conf`)
+* **HTML 무캐시 및 에셋 404 차단 정책 수립**:
+  * 신규 배포 시 Vite 빌드 번들 해시 파일명(`index-xxxx.js`)이 변경될 때, 브라우저 및 앞단 CDN(Cloudflare)에 캐시된 구버전 `index.html`이 삭제된 이전 JS 번들을 요청하여 발생하는 백지 화면(`MIME type "text/html" strict checking error`) 근본적 차단.
+  * `location /`: `Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0" always`, `Pragma "no-cache" always`, `Cloudflare-CDN-Cache-Control "no-store" always` 헤더를 강제하여 브라우저와 CDN이 항상 최신 `index.html`을 즉시 수신하도록 보장.
+  * `location /assets/`: 해시된 정적 에셋은 장기 캐시(`max-age=31536000, immutable`)를 허용하되, 파일이 존재하지 않을 경우 `index.html`로 폴백되지 않고 엄격히 404 에러(`try_files $uri =404;`)를 반환하도록 Nginx 라우팅 분리.
+
 ## [2026-11-16] 시스템 전반 다국어(EN/KR) 고도화, 로그인·인증 영문화, 발주/수정 모달 개편, 재고 변경 취소 및 WIA 창고(입고 목록) UI/UX 전면 개편
 
 ### 1. 시스템 로그인 화면 전 과정 영문화 (English Only UI) (`Login.jsx`, `main.py`)
