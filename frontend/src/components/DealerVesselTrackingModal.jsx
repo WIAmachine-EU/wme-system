@@ -1,6 +1,7 @@
 // frontend/src/components/DealerVesselTrackingModal.jsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Ship, Clock, AlertTriangle, CheckCircle2, MapPin, PackageCheck } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import TrackingMapboxWidget from './TrackingMapboxWidget';
 
 export default function DealerVesselTrackingModal({
@@ -10,6 +11,8 @@ export default function DealerVesselTrackingModal({
   timelineOrders = [], // 배송 추적 타임라인의 전체 리스트 (개수 1:1 동일 유지)
   shipmentsMap = {} // shipment_id 또는 mbl_no 매핑 데이터
 }) {
+  const { i18n } = useTranslation();
+  const isKo = !i18n.language || i18n.language.startsWith('ko');
   const [activeOrder, setActiveOrder] = useState(selectedOrder);
 
   useEffect(() => {
@@ -59,18 +62,20 @@ export default function DealerVesselTrackingModal({
     const podName = activeOrder.destination_port || shipment.pod || 'Hamburg';
 
     // 해상운항 소요 텍스트: 선박정보가 없거나 출항 전이면 '생산완료 후 출항'
-    let transitDaysText = '생산완료 후 출항';
+    let transitDaysText = isKo ? '생산완료 후 출항' : 'Departing after production';
     if (!isWaitingDeparture && isEtdValid && hasVessel) {
       const endRef = isArrived && isEtaValid ? etaDate : now;
       const diffDays = Math.max(0, Math.round((endRef - etdDate) / (1000 * 60 * 60 * 24)));
-      transitDaysText = isArrived ? `${diffDays}일 소요 (도착 완료)` : `${diffDays}일째 해상 운항 중`;
+      transitDaysText = isArrived
+        ? (isKo ? `${diffDays}일 소요 (도착 완료)` : `${diffDays} days (Arrived)`)
+        : (isKo ? `${diffDays}일째 해상 운항 중` : `${diffDays} days in transit`);
     }
 
     // 출발일(ETD) 표기: 정보가 없으면 '-'
-    const etdFormatted = isEtdValid ? etdDate.toLocaleDateString('ko-KR') : '-';
+    const etdFormatted = isEtdValid ? etdDate.toLocaleDateString(isKo ? 'ko-KR' : 'en-US') : '-';
 
     // 도착예정일(ETA) 표기: 정보가 없으면 '-'
-    const etaFormatted = isEtaValid ? etaDate.toLocaleDateString('ko-KR') : '-';
+    const etaFormatted = isEtaValid ? etaDate.toLocaleDateString(isKo ? 'ko-KR' : 'en-US') : '-';
 
     // 지연된 일수: 선박 정보가 없거나 출항 전/ETA 미확정 시 '-' 표기
     let delayedDays = 0;
@@ -81,13 +86,17 @@ export default function DealerVesselTrackingModal({
       } else if (!isArrived && now > etaDate) {
         delayedDays = Math.max(0, Math.round((now - etaDate) / (1000 * 60 * 60 * 24)));
       }
-      delayedDaysFormatted = delayedDays > 0 ? `+${delayedDays}일 지연` : '0일 (정상)';
+      delayedDaysFormatted = delayedDays > 0
+        ? (isKo ? `+${delayedDays}일 지연` : `+${delayedDays} days delayed`)
+        : (isKo ? '0일 (정상)' : '0 days (On Time)');
     }
 
     // 5. 2D 평면 지도에 전달할 데이터 (출항 대기/생산 중일 때는 부산항 KRPUS 좌표 고정)
     const mapShipmentData = {
       mbl_no: shipment.mbl_no || activeOrder.reference_no,
-      vessel_name: isWaitingDeparture ? `생산완료 후 출항 (${activeOrder.reference_no})` : (hasVessel ? vesselName : activeOrder.reference_no),
+      vessel_name: isWaitingDeparture
+        ? (isKo ? `생산완료 후 출항 (${activeOrder.reference_no})` : `Departing after production (${activeOrder.reference_no})`)
+        : (hasVessel ? vesselName : activeOrder.reference_no),
       pol: polCode,
       pod: podName,
       etd: etdRaw,
@@ -118,7 +127,7 @@ export default function DealerVesselTrackingModal({
       transitDaysText,
       mapShipmentData
     };
-  }, [activeOrder, shipmentsMap]);
+  }, [activeOrder, shipmentsMap, isKo]);
 
   if (!isOpen || !activeOrder || !trackingMetrics) return null;
 
@@ -159,7 +168,7 @@ export default function DealerVesselTrackingModal({
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <Ship size={22} color="#2563eb" />
             <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>
-              주문 화물(선박) 추적
+              {isKo ? '주문 화물(선박) 추적' : 'Order Cargo (Vessel) Tracking'}
             </h2>
           </div>
           <button 
@@ -176,7 +185,8 @@ export default function DealerVesselTrackingModal({
               justifyContent: 'center',
               borderRadius: '6px'
             }}
-            aria-label="Close"
+            aria-label={isKo ? '닫기' : 'Close'}
+            title={isKo ? '닫기' : 'Close'}
           >
             <X size={22} />
           </button>
@@ -203,7 +213,7 @@ export default function DealerVesselTrackingModal({
               justifyContent: 'space-between',
               alignItems: 'center'
             }}>
-              <span>내 주문 장비 목록</span>
+              <span>{isKo ? '내 주문 장비 목록' : 'Ordered Machines'}</span>
               <span style={{ 
                 color: '#2563eb', 
                 backgroundColor: '#eff6ff', 
@@ -212,7 +222,7 @@ export default function DealerVesselTrackingModal({
                 fontSize: '12px',
                 fontWeight: 700
               }}>
-                {timelineOrders.length}대
+                {isKo ? `${timelineOrders.length}대` : `${timelineOrders.length} units`}
               </span>
             </div>
             <div style={{ 
@@ -275,7 +285,7 @@ export default function DealerVesselTrackingModal({
               gap: '12px'
             }}>
               <div>
-                <div style={{ fontSize: '11px', color: '#64748b' }}>주문 장비 (Model / S/N)</div>
+                <div style={{ fontSize: '11px', color: '#64748b' }}>{isKo ? '주문 장비 (Model / S/N)' : 'Ordered Machine (Model / S/N)'}</div>
                 <div style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {activeOrder.product_model?.model_name || activeOrder.model_name || '-'}
                 </div>
@@ -285,7 +295,7 @@ export default function DealerVesselTrackingModal({
               </div>
 
               <div>
-                <div style={{ fontSize: '11px', color: '#64748b' }}>선박명</div>
+                <div style={{ fontSize: '11px', color: '#64748b' }}>{isKo ? '선박명' : 'Vessel Name'}</div>
                 <div style={{ 
                   fontSize: '13px', 
                   fontWeight: 700, 
@@ -299,21 +309,21 @@ export default function DealerVesselTrackingModal({
               </div>
 
               <div>
-                <div style={{ fontSize: '11px', color: '#64748b' }}>출발일 (ETD)</div>
+                <div style={{ fontSize: '11px', color: '#64748b' }}>{isKo ? '출발일 (ETD)' : 'Departure (ETD)'}</div>
                 <div style={{ fontSize: '13px', fontWeight: 700, color: trackingMetrics.etdFormatted === '-' ? '#64748b' : '#0f172a' }}>
                   {trackingMetrics.etdFormatted}
                 </div>
               </div>
 
               <div>
-                <div style={{ fontSize: '11px', color: '#64748b' }}>도착예정일 (ETA)</div>
+                <div style={{ fontSize: '11px', color: '#64748b' }}>{isKo ? '도착예정일 (ETA)' : 'Estimated Arrival (ETA)'}</div>
                 <div style={{ fontSize: '13px', fontWeight: 700, color: trackingMetrics.etaFormatted === '-' ? '#64748b' : '#0f172a' }}>
                   {trackingMetrics.etaFormatted}
                 </div>
               </div>
 
               <div>
-                <div style={{ fontSize: '11px', color: '#64748b' }}>지연된 일수</div>
+                <div style={{ fontSize: '11px', color: '#64748b' }}>{isKo ? '지연된 일수' : 'Delay Status'}</div>
                 <div style={{
                   fontSize: '13px',
                   fontWeight: 700,
@@ -326,7 +336,7 @@ export default function DealerVesselTrackingModal({
               </div>
 
               <div>
-                <div style={{ fontSize: '11px', color: '#64748b' }}>해상운항 소요</div>
+                <div style={{ fontSize: '11px', color: '#64748b' }}>{isKo ? '해상운항 소요' : 'Voyage Duration'}</div>
                 <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', marginBottom: '2px' }}>
                   ({trackingMetrics.polCode} → {trackingMetrics.podName})
                 </div>
@@ -363,10 +373,12 @@ export default function DealerVesselTrackingModal({
                   <MapPin size={18} color="#2563eb" />
                   <div>
                     <div style={{ fontSize: '13px', fontWeight: 800, color: '#1e40af' }}>
-                      생산완료 후 출항 (출항지: Busan, KR)
+                      {isKo ? '생산완료 후 출항 (출항지: Busan, KR)' : 'Departing after production (POL: Busan, KR)'}
                     </div>
                     <div style={{ fontSize: '11px', color: '#475569' }}>
-                      현재 장비가 생산 중 단계로 부산항(KRPUS) 위치에 표시됩니다.
+                      {isKo
+                        ? '현재 장비가 생산 중 단계로 부산항(KRPUS) 위치에 표시됩니다.'
+                        : 'Currently in production stage; marked at Port of Busan (KRPUS).'}
                     </div>
                   </div>
                 </div>
