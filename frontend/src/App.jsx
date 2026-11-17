@@ -165,9 +165,7 @@ export default function App() {
     }
   }, [currentRole, activeTab]);
 
-  const isActualMobileView = windowWidth <= 768;
-  const [simulateMobile, setSimulateMobile] = useState(false);
-  const isMobileView = isActualMobileView || simulateMobile;
+  const isMobileView = windowWidth <= 768;
   const isDesktopOptimized = windowWidth >= 1024;
 
   const handleLogin = (role, userId, profileSetupNeeded = false, email = '') => {
@@ -209,9 +207,6 @@ export default function App() {
         currentUserId={currentUserId}
         isMobileOpen={isMobileOpen}
         onClose={() => setIsMobileOpen(false)}
-        isActualMobileView={isActualMobileView}
-        simulateMobile={simulateMobile}
-        setSimulateMobile={setSimulateMobile}
         onProfileClick={() => setActiveTab('profile')}
         onLogout={handleLogout}
       />

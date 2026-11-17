@@ -12,7 +12,7 @@
   },
   "stepbar": {
     "confirmed": "주문",
-    "in_production": "생산 중",
+    "in_production": "생산",
     "shipping": "배송",
     "arrived": "항구도착",
     "in_stock": "입고"

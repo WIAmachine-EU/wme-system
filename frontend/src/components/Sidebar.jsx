@@ -1,9 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
-import { LayoutDashboard, BarChart3, FileSpreadsheet, Tag, Package, Truck, ShieldAlert, X, FolderOpen, Smartphone, Monitor, RefreshCw, User, LogOut, UploadCloud, Ship } from 'lucide-react';
+import { LayoutDashboard, BarChart3, FileSpreadsheet, Tag, Package, Truck, ShieldAlert, X, FolderOpen, RefreshCw, User, LogOut, UploadCloud, Ship } from 'lucide-react';
 import WiaLogo from './WiaLogo';
 
-export default function Sidebar({ activeTab, setActiveTab, currentRole, currentUserId, isMobileOpen, onClose, isActualMobileView, simulateMobile, setSimulateMobile, onProfileClick, onLogout }) {
+export default function Sidebar({ activeTab, setActiveTab, currentRole, currentUserId, isMobileOpen, onClose, onProfileClick, onLogout }) {
   const { t } = useTranslation();
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
@@ -241,30 +241,6 @@ export default function Sidebar({ activeTab, setActiveTab, currentRole, currentU
           ))}
 
           <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-
-            {/* Mobile Simulate Controls */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '0 8px', marginBottom: '8px' }}>
-
-              {!isActualMobileView && (
-                <button
-                  onClick={() => setSimulateMobile(!simulateMobile)}
-                  className="btn btn-outline"
-                  style={{
-                    padding: '6px 14px',
-                    fontSize: '0.8rem',
-                    borderColor: simulateMobile ? 'var(--accent-cyan)' : 'var(--border-color)',
-                    background: simulateMobile ? 'rgba(6, 182, 212, 0.1)' : 'transparent',
-                    color: simulateMobile ? 'var(--accent-cyan)' : 'var(--text-primary)',
-                    display: 'flex',
-                    justifyContent: 'center'
-                  }}
-                >
-                  {simulateMobile ? <Monitor size={16} color="var(--wia-light-gold)" /> : <Smartphone size={16} />}
-                  <span>{simulateMobile ? '🖥️ 데스크탑 뷰로 복귀' : '📱 스마트폰 뷰 시뮬레이션'}</span>
-                </button>
-              )}
-            </div>
-
             <div style={{ padding: '16px', background: 'rgba(6, 182, 212, 0.1)', borderRadius: '12px', border: '1px solid var(--wia-light-gold)', fontSize: '0.8rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--wia-light-gold)', fontWeight: 700, marginBottom: '6px' }}>
                 <ShieldAlert size={16} />

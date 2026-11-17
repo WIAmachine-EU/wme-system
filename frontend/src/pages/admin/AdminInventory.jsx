@@ -2387,8 +2387,7 @@ export default function AdminInventory({ isMobileView }) {
                     { label: t('menu2.modal_plus_1month', '+1개월'), months: 1 },
                     { label: t('menu2.modal_plus_3months', '+3개월'), months: 3 },
                     { label: t('menu2.modal_plus_6months', '+6개월'), months: 6 },
-                    { label: t('menu2.modal_plus_1year', '+1년'), months: 12 },
-                    { label: t('menu2.modal_plus_2years', '+2년'), months: 24 }
+                    { label: t('menu2.modal_plus_1year', '+1년'), months: 12 }
                   ].map(p => (
                     <button
                       key={p.label}
