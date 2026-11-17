@@ -106,8 +106,17 @@ export default function AdminSalesArchive({ isMobileView }) {
     if (orders.length === 0) return;
 
     const headers = [
-      '*', '딜러', '모델', 'S/N', 'P/O', 'NC', '주문일자',
-      '판매가(€)', '구매가(€)', '매출월', '출고/픽업'
+      t('menu4.header_no', '*'),
+      t('menu4.header_dealer', '딜러'),
+      t('menu4.header_model', '모델'),
+      t('menu4.header_sn', 'S/N'),
+      t('menu4.header_po', 'P/O'),
+      t('menu4.header_nc', 'NC'),
+      t('menu4.header_order_date', '주문일자'),
+      t('menu4.label_sales_price', '판매가(€)'),
+      t('menu4.label_buying_price', '구매가(€)'),
+      t('menu4.header_sales_month', '매출월'),
+      t('menu4.header_pickup', '출고/픽업')
     ];
     const rows = sortedOrders.map((order, idx) => [
       idx + 1,
@@ -239,7 +248,7 @@ export default function AdminSalesArchive({ isMobileView }) {
         }}
         onClick={() => handleSort(key)}
         className="sortable-th"
-        title={`${label} ${isSorted ? (sortConfig.direction === 'asc' ? '내림차순 정렬' : '오름차순 정렬') : '정렬'}`}
+        title={`${label} ${isSorted ? (sortConfig.direction === 'asc' ? t('menu4.sort_desc_action', '내림차순 정렬') : t('menu4.sort_asc_action', '오름차순 정렬')) : t('menu4.sort_action', '정렬')}`}
       >
         <div style={{
           display: 'flex',
@@ -561,7 +570,7 @@ export default function AdminSalesArchive({ isMobileView }) {
                         className="btn btn-outline"
                         style={{ flex: 1, padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                       >
-                        <Edit size={14} /> 정보 수정
+                        <Edit size={14} /> {t('menu4.btn_edit', '정보 수정')}
                       </button>
                     </div>
                   </div>
@@ -580,7 +589,7 @@ export default function AdminSalesArchive({ isMobileView }) {
                   <th 
                     style={{ width: '3%', textAlign: 'center', fontWeight: 'bold', cursor: 'pointer', userSelect: 'none' }}
                     onClick={() => setSortConfig({ key: null, direction: 'asc' })}
-                    title="기본 순서로 리셋"
+                    title={t('menu4.reset_sort', '기본 순서로 리셋')}
                   >
                     {t('menu4.header_no', '*')}
                   </th>
@@ -818,7 +827,7 @@ export default function AdminSalesArchive({ isMobileView }) {
                   justifyContent: 'center',
                   transition: 'background-color 0.15s ease'
                 }}
-                title="닫기"
+                title={t('menu4.btn_close', '닫기')}
               >
                 <X size={20} />
               </button>
@@ -848,7 +857,7 @@ export default function AdminSalesArchive({ isMobileView }) {
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '14px', color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.9rem' }}>
                     <FileText size={16} color="var(--wia-blue)" />
-                    <span>기본 주문 및 장비 정보</span>
+                    <span>{t('menu4.edit_modal.section_basic', '기본 주문 및 장비 정보')}</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: isMobileView ? '1fr' : '1fr 1fr', gap: '14px' }}>
                     
@@ -873,7 +882,7 @@ export default function AdminSalesArchive({ isMobileView }) {
                           fontFamily: "'SUITE', sans-serif"
                         }}
                       >
-                        <option value="">-- 딜러 선택 --</option>
+                        <option value="">{t('menu4.edit_modal.select_dealer', '-- 딜러 선택 --')}</option>
                         {dealers.map(d => (
                           <option key={d.id} value={d.id}>{d.name}</option>
                         ))}
@@ -901,7 +910,7 @@ export default function AdminSalesArchive({ isMobileView }) {
                           fontFamily: "'SUITE', sans-serif"
                         }}
                       >
-                        <option value="">-- 모델 선택 --</option>
+                        <option value="">{t('menu4.edit_modal.select_model', '-- 모델 선택 --')}</option>
                         {models.map(m => (
                           <option key={m.id} value={m.id}>{m.model_code || m.model_name}</option>
                         ))}
@@ -917,7 +926,7 @@ export default function AdminSalesArchive({ isMobileView }) {
                         type="text"
                         value={editForm.reference_no}
                         onChange={e => setEditForm({ ...editForm, reference_no: e.target.value })}
-                        placeholder="P/O 번호 입력"
+                        placeholder={t('menu4.edit_modal.po_placeholder', 'P/O 번호 입력')}
                         style={{
                           width: '100%',
                           height: '38px',
@@ -943,7 +952,7 @@ export default function AdminSalesArchive({ isMobileView }) {
                         type="text"
                         value={editForm.serial_number}
                         onChange={e => setEditForm({ ...editForm, serial_number: e.target.value })}
-                        placeholder={t('menu1.edit_modal.sn_placeholder', 'S/N 입력')}
+                        placeholder={t('menu4.edit_modal.sn_placeholder', 'S/N 입력')}
                         style={{
                           width: '100%',
                           height: '38px',
@@ -980,7 +989,7 @@ export default function AdminSalesArchive({ isMobileView }) {
                           fontFamily: "'SUITE', sans-serif"
                         }}
                       >
-                        <option value="">-- NC 선택 --</option>
+                        <option value="">{t('menu4.edit_modal.select_nc', '-- NC 선택 --')}</option>
                         {ncCodes.map(nc => (
                           <option key={nc.nc_code} value={nc.nc_code}>{nc.nc_code}</option>
                         ))}
@@ -1022,7 +1031,7 @@ export default function AdminSalesArchive({ isMobileView }) {
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '14px', color: 'var(--wia-blue)', fontWeight: 700, fontSize: '0.92rem' }}>
                     <DollarSign size={17} />
-                    <span>판매 매출 및 출고/픽업 현황</span>
+                    <span>{t('menu4.edit_modal.section_sales', '판매 매출 및 출고/픽업 현황')}</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: isMobileView ? '1fr' : '1fr 1fr', gap: '14px' }}>
                     
@@ -1035,7 +1044,7 @@ export default function AdminSalesArchive({ isMobileView }) {
                         type="text"
                         value={editForm.sales_price}
                         onChange={e => setEditForm({ ...editForm, sales_price: e.target.value })}
-                        placeholder="판매가 입력 (예: 150000)"
+                        placeholder={t('menu4.edit_modal.sales_price_placeholder', '판매가 입력 (예: 150000)')}
                         style={{
                           width: '100%',
                           height: '38px',
@@ -1061,7 +1070,7 @@ export default function AdminSalesArchive({ isMobileView }) {
                         type="text"
                         value={editForm.price}
                         onChange={e => setEditForm({ ...editForm, price: e.target.value })}
-                        placeholder="구매가 입력 (예: 65000)"
+                        placeholder={t('menu4.edit_modal.buying_price_placeholder', '구매가 입력 (예: 65000)')}
                         style={{
                           width: '100%',
                           height: '38px',
@@ -1105,7 +1114,7 @@ export default function AdminSalesArchive({ isMobileView }) {
                         type="text"
                         value={editForm.sales_month}
                         onChange={e => setEditForm({ ...editForm, sales_month: e.target.value })}
-                        placeholder="예: 2026.11"
+                        placeholder={t('menu4.edit_modal.sales_month_placeholder', '예: 2026.11')}
                         style={{
                           width: '100%',
                           height: '38px',
@@ -1162,7 +1171,7 @@ export default function AdminSalesArchive({ isMobileView }) {
                                 whiteSpace: 'nowrap'
                               }}
                             >
-                              초기화
+                              {t('menu4.edit_modal.btn_clear_pickup', '초기화')}
                             </button>
                           )}
                         </div>
@@ -1185,7 +1194,7 @@ export default function AdminSalesArchive({ isMobileView }) {
                         }}
                       />
                       <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)', marginTop: '4px', lineHeight: 1.3 }}>
-                        * 미출고(선매출) 상태는 비워두면 '-'로 표기되며, 실물 출고 시 일자를 입력하세요.
+                        {t('menu4.edit_modal.pickup_note', "* 미출고(선매출) 상태는 비워두면 '-'로 표기되며, 실물 출고 시 일자를 입력하세요.")}
                       </div>
                     </div>
                   </div>
@@ -1200,18 +1209,20 @@ export default function AdminSalesArchive({ isMobileView }) {
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '14px', color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.9rem' }}>
                     <Truck size={16} color="var(--wia-blue)" />
-                    <span>물류 운송 및 상세 스펙</span>
+                    <span>{t('menu4.edit_modal.section_logistics', '물류 운송 및 상세 스펙')}</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: isMobileView ? '1fr' : '1fr 1fr', gap: '14px' }}>
                     
                     {/* S/O */}
                     <div>
-                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>S/O</label>
+                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        {t('menu4.edit_modal.so_label', 'S/O')}
+                      </label>
                       <input
                         type="text"
                         value={editForm.so_no}
                         onChange={e => setEditForm({ ...editForm, so_no: e.target.value })}
-                        placeholder="S/O 번호"
+                        placeholder={t('menu4.edit_modal.so_placeholder', 'S/O 번호')}
                         style={{
                           width: '100%',
                           height: '38px',
@@ -1229,7 +1240,9 @@ export default function AdminSalesArchive({ isMobileView }) {
 
                     {/* Port */}
                     <div>
-                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>도착지 항구 (Port)</label>
+                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        {t('menu4.edit_modal.port_label', '도착지 항구 (Port)')}
+                      </label>
                       <select
                         value={editForm.destination_port}
                         onChange={e => setEditForm({ ...editForm, destination_port: e.target.value })}
@@ -1246,7 +1259,7 @@ export default function AdminSalesArchive({ isMobileView }) {
                           fontFamily: "'SUITE', sans-serif"
                         }}
                       >
-                        <option value="">-- 항구 선택 --</option>
+                        <option value="">{t('menu4.edit_modal.select_port', '-- 항구 선택 --')}</option>
                         {portCodes.map(port => (
                           <option key={port.port_code} value={port.port_code}>{port.port_code}</option>
                         ))}
@@ -1255,7 +1268,9 @@ export default function AdminSalesArchive({ isMobileView }) {
 
                     {/* Incoterms */}
                     <div>
-                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Incoterms</label>
+                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        {t('menu4.edit_modal.incoterms_label', 'Incoterms')}
+                      </label>
                       <select
                         value={editForm.incoterms}
                         onChange={e => setEditForm({ ...editForm, incoterms: e.target.value })}
@@ -1272,7 +1287,7 @@ export default function AdminSalesArchive({ isMobileView }) {
                           fontFamily: "'SUITE', sans-serif"
                         }}
                       >
-                        <option value="">-- Incoterms 선택 --</option>
+                        <option value="">{t('menu4.edit_modal.select_incoterms', '-- Incoterms 선택 --')}</option>
                         {incotermCodes.map(term => (
                           <option key={term.incoterm_code} value={term.incoterm_code}>{term.incoterm_code}</option>
                         ))}
@@ -1281,12 +1296,14 @@ export default function AdminSalesArchive({ isMobileView }) {
 
                     {/* Vessel */}
                     <div>
-                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>선박명 (VESSEL)</label>
+                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        {t('menu4.edit_modal.vessel_label', '선박명 (VESSEL)')}
+                      </label>
                       <input
                         type="text"
                         value={editForm.vessel}
                         onChange={e => setEditForm({ ...editForm, vessel: e.target.value })}
-                        placeholder="선박명 입력"
+                        placeholder={t('menu4.edit_modal.vessel_placeholder', '선박명 입력')}
                         style={{
                           width: '100%',
                           height: '38px',
@@ -1304,12 +1321,14 @@ export default function AdminSalesArchive({ isMobileView }) {
 
                     {/* Detail Spec */}
                     <div style={{ gridColumn: isMobileView ? '1' : '1 / -1' }}>
-                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>DETAIL SPEC (상세 옵션 및 스펙)</label>
+                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        {t('menu4.edit_modal.detail_spec_label', 'DETAIL SPEC (상세 옵션 및 스펙)')}
+                      </label>
                       <input
                         type="text"
                         value={editForm.detail_spec}
                         onChange={e => setEditForm({ ...editForm, detail_spec: e.target.value })}
-                        placeholder="상세 스펙"
+                        placeholder={t('menu4.edit_modal.detail_spec_placeholder', '상세 스펙')}
                         style={{
                           width: '100%',
                           height: '38px',
@@ -1335,12 +1354,12 @@ export default function AdminSalesArchive({ isMobileView }) {
                   padding: '16px 18px'
                 }}>
                   <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    REMARK (비고)
+                    {t('menu4.edit_modal.remark_label', 'REMARK (비고)')}
                   </label>
                   <textarea
                     value={editForm.remark}
                     onChange={e => setEditForm({ ...editForm, remark: e.target.value })}
-                    placeholder="비고사항을 입력하세요..."
+                    placeholder={t('menu4.edit_modal.remark_placeholder', '비고사항을 입력하세요...')}
                     style={{
                       width: '100%',
                       padding: '10px 12px',

@@ -121,11 +121,14 @@
       "etd": "ETD",
       "eta": "ETA",
       "remark_placeholder": "text",
-      "cancel": "cancell",
+      "cancel": "Cancel",
       "save": "Save"
     },
     "order_date": "Order date",
-    "dealer_order_no": "Dealer Order No"
+    "dealer_order_no": "Dealer Order No",
+    "update_success": "Saved successfully.",
+    "update_fail": "Failed to save.",
+    "update_error": "An error occurred while saving."
   },
   "menu4": {
     "page_title": "Sales List",
@@ -158,7 +161,40 @@
     "label_sales_month": "Sales Month (Invoice Month)",
     "label_sales_price": "Sales Price (€)",
     "label_buying_price": "Buying Price (€)",
-    "order_date": "Order Date"
+    "order_date": "Order Date",
+    "btn_edit": "Edit Info",
+    "btn_close": "Close",
+    "reset_sort": "Reset to default order",
+    "sort_asc_action": "Sort ascending",
+    "sort_desc_action": "Sort descending",
+    "sort_action": "Sort",
+    "edit_modal": {
+      "section_basic": "Basic Order & Machine Information",
+      "select_dealer": "-- Select Dealer --",
+      "select_model": "-- Select Model --",
+      "po_placeholder": "Enter P/O No.",
+      "sn_placeholder": "Enter S/N",
+      "select_nc": "-- Select NC --",
+      "section_sales": "Sales Revenue & Dispatch / Pickup Status",
+      "sales_price_placeholder": "Enter Sales Price (e.g. 150000)",
+      "buying_price_placeholder": "Enter Buying Price (e.g. 65000)",
+      "sales_month_placeholder": "e.g. 2026.11",
+      "btn_clear_pickup": "Clear",
+      "pickup_note": "* Leave blank for Pending Pickup (Pre-sale) status (shown as '-'), and enter the date upon actual dispatch/pickup.",
+      "section_logistics": "Logistics & Detailed Specifications",
+      "so_label": "S/O",
+      "so_placeholder": "Enter S/O No.",
+      "port_label": "Destination Port",
+      "select_port": "-- Select Port --",
+      "incoterms_label": "Incoterms",
+      "select_incoterms": "-- Select Incoterms --",
+      "vessel_label": "Vessel Name (VESSEL)",
+      "vessel_placeholder": "Enter vessel name",
+      "detail_spec_label": "DETAIL SPEC (Detailed Options & Specifications)",
+      "detail_spec_placeholder": "Enter detailed specifications",
+      "remark_label": "REMARK",
+      "remark_placeholder": "Enter remarks..."
+    }
   },
   "menu2": {
     "page_title": "WIA Stock List",
