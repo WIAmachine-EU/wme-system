@@ -845,8 +845,8 @@ export default function AdminShipmentUpload({ isMobileView }) {
 
                         {/* 3. ETD / ETA */}
                         <td style={{ textAlign: 'center', padding: '12px 8px', color: 'var(--text-primary)', whiteSpace: 'nowrap', fontFamily: "'SUITE', sans-serif" }}>
-                          <div style={{ fontFamily: "'SUITE', sans-serif", fontWeight: 600, fontSize: '0.88rem' }}>
-                            {etdStr}
+                          <div style={{ fontFamily: "'SUITE', sans-serif", fontWeight: 600, fontSize: '0.74rem' }}>
+                            ETD: {etdStr}
                           </div>
                           <div style={{ fontFamily: "'SUITE', sans-serif", fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>
                             ETA: {etaStr}
