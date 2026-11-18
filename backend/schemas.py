@@ -100,6 +100,7 @@ class CustomUserOut(CustomUserBase):
     onboarding_status: Optional[str] = None
     invite_status: Optional[str] = None
     message: Optional[str] = None
+    last_login_at: Optional[datetime] = None
     created_at: datetime
     dealer_company: Optional[DealerCompanyOut] = None
     model_config = ConfigDict(from_attributes=True)

@@ -128,6 +128,17 @@ def get_current_aal2_user(
         raise HTTPException(status_code=401, detail="존재하지 않는 사용자 계정입니다.")
     if hasattr(user, "is_active") and user.is_active is False:
         raise HTTPException(status_code=403, detail="비활성화된 계정입니다. 시스템 관리자에게 문의하세요.")
+
+    iat_ts = payload.get("iat")
+    if iat_ts:
+        try:
+            token_login_dt = datetime.utcfromtimestamp(float(iat_ts))
+            if user.last_login_at is None or (token_login_dt - user.last_login_at).total_seconds() > 60:
+                user.last_login_at = token_login_dt
+                db.commit()
+        except Exception:
+            db.rollback()
+
     return user
 
 
@@ -242,12 +253,23 @@ def on_startup():
             f"ALTER TABLE orders ADD COLUMN {if_not_exists}sales_month VARCHAR",
             f"ALTER TABLE orders ADD COLUMN {if_not_exists}pickup_date {timestamp_type}",
             f"ALTER TABLE orders ADD COLUMN {if_not_exists}dealer_order_no VARCHAR",
+            f"ALTER TABLE custom_users ADD COLUMN {if_not_exists}last_login_at {timestamp_type}",
         ]:
             try:
                 db.execute(text(col_def))
                 db.commit()
             except Exception:
                 db.rollback()
+
+        # 이미 2단계 패스키 인증까지 완료(ACTIVE_AAL2)한 기존 계정에 대해 최근 접속일 초기 백필
+        try:
+            db.execute(text(
+                "UPDATE custom_users SET last_login_at = created_at "
+                "WHERE last_login_at IS NULL AND supabase_uid IS NOT NULL AND password_hash IS NOT NULL"
+            ))
+            db.commit()
+        except Exception:
+            db.rollback()
 
         # [v3.0] Schema Migration for shipments (AIS Route & Vessel Specs)
         json_type = "JSONB" if is_pg else "JSON"
@@ -374,9 +396,19 @@ def get_dealers(db: Session = Depends(get_db)):
     return sorted(dealers, key=lambda d: (0 if d.name == 'WME' else 1, d.name))
 
 @app.get("/api/users", response_model=List[schemas.CustomUserOut])
-def get_users(role: Optional[models.UserRole] = None, db: Session = Depends(get_db), current_role: Optional[str] = Depends(get_current_role)):
+def get_users(
+    role: Optional[models.UserRole] = None,
+    db: Session = Depends(get_db),
+    current_role: Optional[str] = Depends(get_current_role),
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(security)
+):
     if current_role == "RSM":
         raise HTTPException(status_code=403, detail="접근 권한이 없습니다.")
+    if credentials and credentials.credentials:
+        try:
+            get_current_aal2_user(credentials=credentials, db=db)
+        except Exception:
+            pass
     query = db.query(models.CustomUser)
     if role:
         query = query.filter(models.CustomUser.role == role)
@@ -2615,6 +2647,10 @@ def step2_verify_passkey_and_issue_session(payload: schemas.Verify2FARequest, db
 
     if not verified_2fa:
         raise HTTPException(status_code=400, detail="Step 2 passkey credentials were not provided.")
+
+    # 실제 로그인(1·2단계 인증) 완료 시 최근 접속일시 업데이트
+    user.last_login_at = datetime.utcnow()
+    db.commit()
 
     role_str = user.role.value if hasattr(user.role, "value") else str(user.role)
 

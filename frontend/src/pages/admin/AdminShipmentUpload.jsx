@@ -18,7 +18,6 @@ import {
   ChevronDown, 
   Search, 
   Copy, 
-  Package, 
   Anchor, 
   ListFilter 
 } from 'lucide-react';
@@ -748,9 +747,9 @@ export default function AdminShipmentUpload({ isMobileView }) {
                 <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
                   <th style={{ width: '45px', textAlign: 'center', padding: '10px 8px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>{isKo ? '번호' : 'No.'}</th>
                   <th style={{ textAlign: 'left', padding: '10px 10px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>{isKo ? 'B/L 번호' : 'B/L No.'}</th>
-                  <th style={{ textAlign: 'center', padding: '10px 8px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>{isKo ? 'ETD (출항일)' : 'ETD'}</th>
+                  <th style={{ textAlign: 'center', padding: '10px 8px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>ETD / ETA</th>
                   <th style={{ textAlign: 'left', padding: '10px 10px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>{isKo ? '도착지 항구' : 'POD'}</th>
-                  <th style={{ textAlign: 'center', padding: '10px 10px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>{isKo ? '장비개수 (S/N)' : 'Units (S/N)'}</th>
+                  <th style={{ textAlign: 'center', padding: '10px 10px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>{isKo ? '장비개수' : 'Units'}</th>
                 </tr>
               </thead>
               <tbody style={{ fontFamily: "'SUITE', sans-serif" }}>
@@ -785,8 +784,9 @@ export default function AdminShipmentUpload({ isMobileView }) {
                   const snCount = validSnOrders.length;
                   const totalOrderCount = shipment.orders?.length || 0;
                   
-                  // 출항일 포맷 (YYYY-MM-DD)
+                  // 출항일 / 도착예정일 포맷 (YYYY-MM-DD)
                   const etdStr = shipment.etd ? String(shipment.etd).slice(0, 10) : '-';
+                  const etaStr = shipment.eta ? String(shipment.eta).slice(0, 10) : '-';
                   
                   const isExpanded = expandedMbl === shipment.mbl_no;
 
@@ -843,11 +843,14 @@ export default function AdminShipmentUpload({ isMobileView }) {
                           )}
                         </td>
 
-                        {/* 3. ETD (출항일) */}
+                        {/* 3. ETD / ETA */}
                         <td style={{ textAlign: 'center', padding: '12px 8px', color: 'var(--text-primary)', whiteSpace: 'nowrap', fontFamily: "'SUITE', sans-serif" }}>
-                          <span style={{ fontFamily: "'SUITE', sans-serif", fontWeight: 600, fontSize: '0.88rem' }}>
+                          <div style={{ fontFamily: "'SUITE', sans-serif", fontWeight: 600, fontSize: '0.88rem' }}>
                             {etdStr}
-                          </span>
+                          </div>
+                          <div style={{ fontFamily: "'SUITE', sans-serif", fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>
+                            ETA: {etaStr}
+                          </div>
                         </td>
 
                         {/* 4. 도착지 항구 */}
@@ -855,19 +858,14 @@ export default function AdminShipmentUpload({ isMobileView }) {
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <span style={{ fontWeight: 600, fontFamily: "'SUITE', sans-serif", fontSize: '0.88rem' }}>{shipment.pod || '-'}</span>
                           </div>
-                          {shipment.carrier && (
-                            <span style={{ fontSize: '0.74rem', color: '#64748b', fontFamily: "'SUITE', sans-serif" }}>
-                              {isKo ? '선사:' : 'Carrier:'} {shipment.carrier}
-                            </span>
-                          )}
                         </td>
 
-                        {/* 5. 장비개수 (S/N개수 기준) */}
+                        {/* 5. 장비개수 */}
                         <td style={{ textAlign: 'center', padding: '12px 10px', fontFamily: "'SUITE', sans-serif" }}>
                           <span style={{
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '4px',
+                            justifyContent: 'center',
                             backgroundColor: snCount > 0 ? '#ecfdf5' : '#f1f5f9',
                             color: snCount > 0 ? '#059669' : '#475569',
                             border: `1px solid ${snCount > 0 ? '#a7f3d0' : '#e2e8f0'}`,
@@ -875,9 +873,9 @@ export default function AdminShipmentUpload({ isMobileView }) {
                             borderRadius: '9999px',
                             fontWeight: 700,
                             fontSize: '0.8rem',
+                            whiteSpace: 'nowrap',
                             fontFamily: "'SUITE', sans-serif"
                           }}>
-                            <Package size={12} />
                             {snCount > 0 ? (isKo ? `${snCount}대` : `${snCount} units`) : (isKo ? `${totalOrderCount}대` : `${totalOrderCount} units`)}
                           </span>
                         </td>
@@ -907,9 +905,6 @@ export default function AdminShipmentUpload({ isMobileView }) {
                                   {isKo
                                     ? `📦 선적 장비 상세 목록 (${shipment.orders?.length || 0}건 / S/N 부여: ${snCount}건)`
                                     : `📦 Shipped Units (${shipment.orders?.length || 0} total / S/N assigned: ${snCount})`}
-                                </span>
-                                <span style={{ fontSize: '0.75rem', color: '#64748b', fontFamily: "'SUITE', sans-serif" }}>
-                                  ETA: {shipment.eta ? String(shipment.eta).slice(0, 10) : '-'} | {isKo ? '상태:' : 'Status:'} {shipment.trackcargo_status || (isKo ? '운송중' : 'In Transit')}
                                 </span>
                               </div>
 

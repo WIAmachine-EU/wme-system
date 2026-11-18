@@ -37,7 +37,43 @@ export default function AdminUsers({ isMobileView }) {
   const [updatingUser, setUpdatingUser] = useState(false);
   const [resendingUserId, setResendingUserId] = useState(null);
 
-  const mapUserToRow = (u) => {
+  const formatDateTimeStr = (rawDate) => {
+    if (!rawDate) return null;
+    const str = String(rawDate).trim();
+    const isoStr = str.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(str) ? str : `${str.replace(' ', 'T')}Z`;
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return null;
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const formatLastLogin = (u, onboardingStatus, auditLogs = logs) => {
+    const fromBackend = formatDateTimeStr(u.last_login_at);
+    if (fromBackend) return fromBackend;
+
+    if (Array.isArray(auditLogs) && auditLogs.length > 0) {
+      const emailLower = (u.email || '').toLowerCase();
+      const nameLower = (u.username || '').toLowerCase();
+      const matchLog = auditLogs.find(l => {
+        if (l.status !== 'Success' || !l.time) return false;
+        const logUser = (l.user || '').toLowerCase();
+        const isLoginAction = l.action && (l.action.includes('Login') || l.action.includes('Verified'));
+        return isLoginAction && ((emailLower && logUser === emailLower) || (nameLower && logUser === nameLower));
+      });
+      if (matchLog && matchLog.time) {
+        return matchLog.time.slice(0, 16);
+      }
+    }
+
+    if (onboardingStatus === 'ACTIVE_AAL2' && u.created_at) {
+      const fromCreated = formatDateTimeStr(u.created_at);
+      if (fromCreated) return fromCreated;
+    }
+
+    return '-';
+  };
+
+  const mapUserToRow = (u, auditLogs = logs) => {
     const isActive = u.is_active !== false;
     const hasPassword = u.has_password !== undefined ? Boolean(u.has_password) : true;
     const hasPasskey = Boolean(u.supabase_uid);
@@ -55,7 +91,7 @@ export default function AdminUsers({ isMobileView }) {
       hasPasskey,
       onboardingStatus,
       status: isActive ? 'Active' : 'Inactive',
-      lastLogin: '-',
+      lastLogin: formatLastLogin(u, onboardingStatus, auditLogs),
       company: u.dealer_company ? u.dealer_company.name : (u.department || 'WIA HQ')
     };
   };
@@ -68,10 +104,12 @@ export default function AdminUsers({ isMobileView }) {
     // Fetch users
     const fetchUsers = async () => {
       try {
-        const res = await fetch('/api/users');
+        const token = localStorage.getItem('wme_access_token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const res = await fetch('/api/users', { headers });
         if (res.ok) {
           const data = await res.json();
-          setUsers(data.map(mapUserToRow));
+          setUsers(data.map(u => mapUserToRow(u, allLogs)));
         }
       } catch (err) {
         console.error("Failed to fetch users", err);
