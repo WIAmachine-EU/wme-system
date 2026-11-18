@@ -816,7 +816,7 @@ export default function AdminShipmentUpload({ isMobileView }) {
                         {/* 2. B/L 번호 */}
                         <td style={{ padding: '12px 10px', fontFamily: "'SUITE', sans-serif" }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ fontWeight: 700, color: '#0369a1', fontFamily: "'SUITE', sans-serif", fontSize: '0.92rem', letterSpacing: '0.2px' }}>
+                            <span style={{ fontWeight: 700, color: '#0369a1', fontFamily: "'SUITE', sans-serif", fontSize: '0.74rem', letterSpacing: '0.2px' }}>
                               {shipment.mbl_no || '-'}
                             </span>
                             <button
@@ -856,7 +856,7 @@ export default function AdminShipmentUpload({ isMobileView }) {
                         {/* 4. 도착지 항구 */}
                         <td style={{ padding: '12px 10px', color: 'var(--text-primary)', fontFamily: "'SUITE', sans-serif" }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span style={{ fontWeight: 600, fontFamily: "'SUITE', sans-serif", fontSize: '0.88rem' }}>{shipment.pod || '-'}</span>
+                            <span style={{ fontWeight: 600, fontFamily: "'SUITE', sans-serif", fontSize: '0.74rem' }}>{shipment.pod || '-'}</span>
                           </div>
                         </td>
 
