@@ -748,8 +748,8 @@ export default function AdminShipmentUpload({ isMobileView }) {
                   <th style={{ width: '45px', textAlign: 'center', padding: '10px 8px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>{isKo ? '번호' : 'No.'}</th>
                   <th style={{ textAlign: 'left', padding: '10px 10px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>{isKo ? 'B/L 번호' : 'B/L No.'}</th>
                   <th style={{ textAlign: 'center', padding: '10px 8px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>ETD / ETA</th>
-                  <th style={{ textAlign: 'left', padding: '10px 10px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>{isKo ? '도착지 항구' : 'POD'}</th>
-                  <th style={{ textAlign: 'center', padding: '10px 10px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif" }}>{isKo ? '장비개수' : 'Units'}</th>
+                  <th style={{ textAlign: 'center', padding: '10px 10px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif", whiteSpace: 'nowrap' }}>{isKo ? '도착지 항구' : 'POD'}</th>
+                  <th style={{ textAlign: 'center', padding: '10px 10px', color: 'var(--text-secondary)', fontFamily: "'SUITE', sans-serif", whiteSpace: 'nowrap' }}>{isKo ? '장비개수' : 'Units'}</th>
                 </tr>
               </thead>
               <tbody style={{ fontFamily: "'SUITE', sans-serif" }}>
@@ -854,30 +854,32 @@ export default function AdminShipmentUpload({ isMobileView }) {
                         </td>
 
                         {/* 4. 도착지 항구 */}
-                        <td style={{ padding: '12px 10px', color: 'var(--text-primary)', fontFamily: "'SUITE', sans-serif" }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <td style={{ textAlign: 'center', padding: '12px 10px', color: 'var(--text-primary)', fontFamily: "'SUITE', sans-serif" }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                             <span style={{ fontWeight: 600, fontFamily: "'SUITE', sans-serif", fontSize: '0.74rem' }}>{shipment.pod || '-'}</span>
                           </div>
                         </td>
 
                         {/* 5. 장비개수 */}
                         <td style={{ textAlign: 'center', padding: '12px 10px', fontFamily: "'SUITE', sans-serif" }}>
-                          <span style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            backgroundColor: snCount > 0 ? '#ecfdf5' : '#f1f5f9',
-                            color: snCount > 0 ? '#059669' : '#475569',
-                            border: `1px solid ${snCount > 0 ? '#a7f3d0' : '#e2e8f0'}`,
-                            padding: '3px 10px',
-                            borderRadius: '9999px',
-                            fontWeight: 700,
-                            fontSize: '0.8rem',
-                            whiteSpace: 'nowrap',
-                            fontFamily: "'SUITE', sans-serif"
-                          }}>
-                            {snCount > 0 ? (isKo ? `${snCount}대` : `${snCount} units`) : (isKo ? `${totalOrderCount}대` : `${totalOrderCount} units`)}
-                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              backgroundColor: snCount > 0 ? '#ecfdf5' : '#f1f5f9',
+                              color: snCount > 0 ? '#059669' : '#475569',
+                              border: `1px solid ${snCount > 0 ? '#a7f3d0' : '#e2e8f0'}`,
+                              padding: '3px 10px',
+                              borderRadius: '9999px',
+                              fontWeight: 700,
+                              fontSize: '0.8rem',
+                              whiteSpace: 'nowrap',
+                              fontFamily: "'SUITE', sans-serif"
+                            }}>
+                              {snCount > 0 ? (isKo ? `${snCount}대` : `${snCount} units`) : (isKo ? `${totalOrderCount}대` : `${totalOrderCount} units`)}
+                            </span>
+                          </div>
                         </td>
                       </tr>
 
