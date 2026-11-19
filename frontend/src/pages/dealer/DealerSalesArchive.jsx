@@ -1,8 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { Search, FileSpreadsheet, Download, Box, Package, ChevronRight, X, ExternalLink } from 'lucide-react';
+import { Search, FileSpreadsheet, Download, Box, Package, ChevronRight, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+const CubeIcon = ({ size = 14 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="butt"
+    strokeLinejoin="miter"
+    style={{ flexShrink: 0 }}
+    aria-hidden="true"
+  >
+    <path d="M12 2.5L20.23 7.25V16.75L12 21.5L3.77 16.75V7.25Z" />
+    <path d="M3.77 7.25L12 12L20.23 7.25" />
+    <path d="M12 12V21.5" />
+  </svg>
+);
+
 function CargoDetailModal({ isOpen, onClose, serialNumber, modelName }) {
+  const { t } = useTranslation();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -493,7 +513,7 @@ export default function DealerSalesArchive({ isMobileView, dealerCompanyId, deal
                           }}
                           className={order.serial_number ? "hover-bg-subtle" : ""}
                         >
-                          <ExternalLink size={16} /> Details
+                          <CubeIcon size={14} /> {t('dispatch.btn_dimension', 'cm / kg')}
                         </button>
                       </div>
                     </div>
@@ -523,7 +543,7 @@ export default function DealerSalesArchive({ isMobileView, dealerCompanyId, deal
                   {renderSortHeader('po', 'P/O', '11%', 'center')}
                   {renderSortHeader('status', 'Status', '10%', 'center')}
                   {renderSortHeader('port', 'PORT', '11%', 'center')}
-                  <th style={{ width: '10%', textAlign: 'center' }}>Cargo detail</th>
+                  <th style={{ width: '10%', textAlign: 'center' }}>CARGO</th>
                   {renderSortHeader('pickup', 'Pick up', '10%', 'center')}
                 </tr>
               </thead>
@@ -576,14 +596,14 @@ export default function DealerSalesArchive({ isMobileView, dealerCompanyId, deal
                               color: order.serial_number ? 'var(--text-primary)' : 'var(--text-muted)',
                               fontFamily: 'SUITE, sans-serif',
                               fontWeight: order.serial_number ? 600 : 100,
-                              padding: '4px 10px', borderRadius: '6px', fontSize: '11px',
+                              padding: '4px 8px', borderRadius: '6px', fontSize: '11px',
                               cursor: order.serial_number ? 'pointer' : 'not-allowed',
                               display: 'inline-flex', alignItems: 'center', gap: '4px',
                               transition: 'all 0.2s'
                             }}
                             className={order.serial_number ? "hover-bg-subtle" : ""}
                           >
-                            <ExternalLink size={14} /> Details
+                            <CubeIcon size={13} /> {t('dispatch.btn_dimension', 'cm / kg')}
                           </button>
                         </td>
                         <td style={{ padding: '13px 12px', textAlign: 'center', fontSize: '11px' }}>

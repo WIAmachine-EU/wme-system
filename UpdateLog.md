@@ -1,5 +1,15 @@
 # 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
+## [2026-11-20] 딜러 포털 [내 구매 내역] 화물 상세 팝업 오류 수정 및 CARGO 버튼 UI 통일
+
+### 1. [딜러 포털 - 내 구매 내역] `CargoDetailModal` 빈 페이지 오류 해결 및 `CARGO` 컬럼 UI 통일 (`DealerSalesArchive.jsx`)
+* **`◎ Machine Details` 팝업창 렌더링 오류 수정**:
+  * `CargoDetailModal` 컴포넌트 내부에서 다국어 로딩 문구(`t('common.loading')`) 호출 시 `useTranslation()` 훅(`const { t } = useTranslation();`) 선언이 누락되어 버튼 클릭 시 `ReferenceError`로 화면이 백지화되던 버그를 수정.
+* **컬럼명 및 버튼 아이콘·텍스트 관리자 포털과 동일화**:
+  * 테이블 헤더명을 기존 `Cargo detail`에서 관리자 포털과 동일한 **`CARGO`**로 변경.
+  * 데스크탑 테이블 및 모바일 카드의 상세 버튼 아이콘과 텍스트를 관리자 포털(`AdminDispatch.jsx`)과 동일한 정육면체 SVG 아이콘(`CubeIcon`) 및 **`cm / kg`**(`t('dispatch.btn_dimension', 'cm / kg')`)로 통일 적용.
+
+
 ## [2026-11-19] 딜러 포털 RBAC 권한 격리 전면 보강, 사용자 접속일(last_login_at) 실시간 추적 및 선적내역 리스트 UI/UX 정비
 
 ### 1. [권한 격리(RBAC) 보안 패치] 딜러 포털 타사 데이터 노출 차단 및 AAL2 JWT 서버단 강제 격리 (`backend/main.py`, `main.jsx`, `App.jsx`, `Login.jsx`, `DealerOrders.jsx`, `DealerDashboard.jsx`, `DealerSalesArchive.jsx`)
