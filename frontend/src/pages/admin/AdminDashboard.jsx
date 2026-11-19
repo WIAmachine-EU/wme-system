@@ -565,7 +565,7 @@ export default function AdminDashboard({ isMobileView, currentRole }) {
                       <div style={{ fontSize: '1.0rem', color: 'var(--text-secondary)' }}>{order.serial_number || '-'}</div>
                     </div>
                     <div style={{ flex: 1, textAlign: 'right' }}>
-                      <span style={{ fontSize: '1.0rem', color: '#000000', fontWeight: 600 }}>{order.dealer_company ? order.dealer_company.name : 'AK MAKINA'}</span>
+                      <span style={{ fontSize: '1.0rem', color: '#000000', fontWeight: 600 }}>{order.dealer_company ? order.dealer_company.name : 'WME'}</span>
                     </div>
                   </div>
 

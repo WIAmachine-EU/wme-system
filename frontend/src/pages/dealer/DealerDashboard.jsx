@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Ship, Calendar, Package, FileSpreadsheet, ArrowRight } from 'lucide-react';
 
-export default function DealerDashboard({ isMobileView, setActiveTab }) {
+export default function DealerDashboard({ isMobileView, setActiveTab, dealerCompanyId, dealerCompanyName }) {
   const { t } = useTranslation();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -10,18 +10,26 @@ export default function DealerDashboard({ isMobileView, setActiveTab }) {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const dealersRes = await fetch('/api/dealers');
-      const dealers = await dealersRes.json();
-      const akMakina = dealers.find(d => d.name === 'AK MAKINA');
-      const dealerId = akMakina ? akMakina.id : '';
-
-      const res = await fetch(`/api/orders?dealer_id=${dealerId}`);
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setOrders(data);
+      const ordersUrl = dealerCompanyId
+        ? `/api/orders?dealer_id=${encodeURIComponent(dealerCompanyId)}`
+        : '/api/orders';
+      const res = await fetch(ordersUrl);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          const scopedOrders = dealerCompanyId
+            ? data.filter(o => Number(o.dealer_company_id) === Number(dealerCompanyId))
+            : data;
+          setOrders(scopedOrders);
+        } else {
+          setOrders([]);
+        }
+      } else {
+        setOrders([]);
       }
     } catch (err) {
       console.error("Failed to fetch orders:", err);
+      setOrders([]);
     } finally {
       setLoading(false);
     }
@@ -29,7 +37,7 @@ export default function DealerDashboard({ isMobileView, setActiveTab }) {
 
   useEffect(() => {
     fetchOrders();
-  }, []);
+  }, [dealerCompanyId]);
 
   const activeCount = orders.filter(o => !['SOLD', 'DISPATCHED'].includes(o.current_status)).length;
   const shippingCount = orders.filter(o => o.current_status === 'SHIPPING').length;
@@ -100,7 +108,7 @@ export default function DealerDashboard({ isMobileView, setActiveTab }) {
       <div style={{ marginBottom: '24px', paddingTop: '4px', paddingLeft: '28px' }}>
         <h1 style={{ fontSize: '1.8rem', marginBottom: '4px' }}>{t('dealer_dashboard.title')}</h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
-          {t('dealer_dashboard.subtitle', { dealerName: 'AK MAKINA' })}
+          {t('dealer_dashboard.subtitle', { dealerName: dealerCompanyName || orders[0]?.dealer_company?.name || '-' })}
         </p>
       </div>
 

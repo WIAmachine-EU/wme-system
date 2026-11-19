@@ -142,6 +142,73 @@ def get_current_aal2_user(
     return user
 
 
+def _get_user_role_str(user: Optional[models.CustomUser]) -> str:
+    if not user or user.role is None:
+        return ""
+    return (user.role.value if hasattr(user.role, "value") else str(user.role)).strip().upper()
+
+
+def _is_dealer_user(user: Optional[models.CustomUser]) -> bool:
+    return _get_user_role_str(user) == "DEALER"
+
+
+def _require_admin_user(
+    current_user: models.CustomUser = Depends(get_current_aal2_user)
+) -> models.CustomUser:
+    if _get_user_role_str(current_user) != "SCM_ADMIN":
+        raise HTTPException(status_code=403, detail="관리자(SCM_ADMIN) 권한이 필요합니다.")
+    return current_user
+
+
+def _require_non_dealer(
+    current_user: models.CustomUser = Depends(get_current_aal2_user)
+) -> models.CustomUser:
+    if _is_dealer_user(current_user):
+        raise HTTPException(status_code=403, detail="딜러 계정으로는 해당 작업에 접근할 수 없습니다.")
+    return current_user
+
+
+def _serialize_shipment_with_filtered_orders(
+    shipment: models.Shipment,
+    filtered_orders: List[models.Order]
+) -> schemas.ShipmentWithOrdersOut:
+    """
+    SQLAlchemy ORM 객체의 relationship(orders)을 직접 변경하지 않고
+    권한 필터링된 주문만 담은 안전한 Pydantic DTO를 생성합니다.
+    """
+    base = schemas.ShipmentOut.model_validate(shipment)
+    return schemas.ShipmentWithOrdersOut(
+        **base.model_dump(),
+        orders=[schemas.OrderOut.model_validate(o) for o in filtered_orders]
+    )
+
+
+def _mask_corporate_stock_order_for_dealer(
+    order: models.Order,
+    dealer_company_id: Optional[int]
+) -> schemas.OrderOut:
+    """
+    딜러가 WIA 유럽법인 공용 가용재고(F번호)를 조회할 때,
+    타 딜러사의 예약/임대/거래 상세 정보가 API 응답으로 유출되지 않도록 마스킹합니다.
+    """
+    dto = schemas.OrderOut.model_validate(order)
+    is_own_dealer = bool(dealer_company_id and order.dealer_company_id == dealer_company_id)
+    is_wme = bool(order.dealer_company and str(order.dealer_company.name or "").strip().upper() == "WME")
+    updates = {}
+    if not is_own_dealer and not is_wme:
+        updates["dealer_company"] = None
+        updates["dealer_company_id"] = None
+    if order.reserved_dealer_id and order.reserved_dealer_id != dealer_company_id:
+        updates["reserved_dealer"] = None
+        updates["reserved_dealer_id"] = None
+    if not is_own_dealer:
+        updates["sales_price"] = None
+        updates["dealer_order_no"] = None
+        updates["rsm_user"] = None
+        updates["rsm_user_id"] = None
+    return dto.model_copy(update=updates) if updates else dto
+
+
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
@@ -399,16 +466,8 @@ def get_dealers(db: Session = Depends(get_db)):
 def get_users(
     role: Optional[models.UserRole] = None,
     db: Session = Depends(get_db),
-    current_role: Optional[str] = Depends(get_current_role),
-    credentials: Optional[HTTPAuthorizationCredentials] = Security(security)
+    current_user: models.CustomUser = Depends(_require_admin_user)
 ):
-    if current_role == "RSM":
-        raise HTTPException(status_code=403, detail="접근 권한이 없습니다.")
-    if credentials and credentials.credentials:
-        try:
-            get_current_aal2_user(credentials=credentials, db=db)
-        except Exception:
-            pass
     query = db.query(models.CustomUser)
     if role:
         query = query.filter(models.CustomUser.role == role)
@@ -435,10 +494,8 @@ def generate_invite_token(user: models.CustomUser) -> str:
 def create_user(
     payload: schemas.CustomUserCreate,
     db: Session = Depends(get_db),
-    current_role: Optional[str] = Depends(get_current_role)
+    current_user: models.CustomUser = Depends(_require_admin_user)
 ):
-    if current_role == "RSM":
-        raise HTTPException(status_code=403, detail="관리자(SCM_ADMIN)만 계정을 생성할 수 있습니다.")
     email_clean = payload.email.strip().lower()
     existing = db.query(models.CustomUser).filter(
         func.lower(models.CustomUser.email) == email_clean
@@ -483,11 +540,8 @@ def create_user(
 def resend_user_invitation(
     user_id: int,
     db: Session = Depends(get_db),
-    current_role: Optional[str] = Depends(get_current_role)
+    current_user: models.CustomUser = Depends(_require_admin_user)
 ):
-    if current_role == "RSM":
-        raise HTTPException(status_code=403, detail="관리자 권한이 필요합니다.")
-
     user = db.query(models.CustomUser).filter(models.CustomUser.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
@@ -513,9 +567,12 @@ def resend_user_invitation(
     }
 
 @app.patch("/api/users/{user_id}", response_model=schemas.CustomUserOut)
-def update_user_admin(user_id: int, payload: schemas.AdminUserUpdate, db: Session = Depends(get_db), current_role: Optional[str] = Depends(get_current_role)):
-    if current_role == "RSM":
-        raise HTTPException(status_code=403, detail="접근 권한이 없습니다.")
+def update_user_admin(
+    user_id: int,
+    payload: schemas.AdminUserUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.CustomUser = Depends(_require_admin_user)
+):
     user = db.query(models.CustomUser).filter(models.CustomUser.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
@@ -553,9 +610,11 @@ def update_user_admin(user_id: int, payload: schemas.AdminUserUpdate, db: Sessio
     return user
 
 @app.delete("/api/users/{user_id}")
-def delete_user_admin(user_id: int, db: Session = Depends(get_db), current_role: Optional[str] = Depends(get_current_role)):
-    if current_role == "RSM":
-        raise HTTPException(status_code=403, detail="접근 권한이 없습니다.")
+def delete_user_admin(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.CustomUser = Depends(_require_admin_user)
+):
     user = db.query(models.CustomUser).filter(models.CustomUser.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
@@ -597,18 +656,29 @@ from services.trackcargo_route_scheduler import get_last_sync_stats, sync_routes
 def get_shipments(
     dealer_id: Optional[int] = Query(None, description="DEALER 권한인 경우 본인 회사 ID에 속한 선적만 격리 조회 (Row-Level Security)"),
     include_all: bool = Query(False, description="True일 경우 도착 완료된 선적을 포함한 전체 선적 내역(업로드 이력)을 반환"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.CustomUser = Depends(get_current_aal2_user)
 ):
+    # [RBAC 강제 격리] DEALER 역할은 쿼리 파라미터를 무시하고 토큰의 본인 dealer_company_id로 강제 고정
+    if _is_dealer_user(current_user):
+        if not current_user.dealer_company_id:
+            return []
+        dealer_id = current_user.dealer_company_id
+
     # [선적내역 리스트용] 전체 선적 내역 조회 모드 (업로드된 선적 이력 전체)
     if include_all:
         if dealer_id:
-            # 딜러 권한인 경우 본인 회사 주문이 연결된 선적만 격리 조회
+            # 딜러 권한인 경우 본인 회사 주문이 연결된 선적만 격리 조회 (ORM 변형 없이 DTO로 안전 직렬화)
             shipments = db.query(models.Shipment).filter(
                 models.Shipment.orders.any(models.Order.dealer_company_id == dealer_id)
             ).order_by(models.Shipment.etd.desc().nullslast(), models.Shipment.id.desc()).all()
-            for s in shipments:
-                s.orders = [o for o in s.orders if o.dealer_company_id == dealer_id]
-            return shipments
+            return [
+                _serialize_shipment_with_filtered_orders(
+                    s,
+                    [o for o in s.orders if o.dealer_company_id == dealer_id]
+                )
+                for s in shipments
+            ]
         else:
             # 관리자 권한인 경우: 주문 매핑 여부와 무관하게 업로드된 모든 선적(Shipment)을 반환!
             shipments = db.query(models.Shipment).order_by(
@@ -627,8 +697,7 @@ def get_shipments(
             user_orders = [o for o in s.orders if o.dealer_company_id == dealer_id]
             active_orders = [o for o in user_orders if o.current_status in [models.OrderStatus.SHIPPING, models.OrderStatus.CONFIRMED, models.OrderStatus.IN_PRODUCTION]]
             if active_orders:
-                s.orders = user_orders
-                active_shipments.append(s)
+                active_shipments.append(_serialize_shipment_with_filtered_orders(s, user_orders))
         return active_shipments
     else:
         # 관리자 트래킹: 운송 중(In-Transit)인 선적
@@ -665,13 +734,19 @@ async def trigger_manual_route_sync():
 def get_shipment_route_map(
     mbl_no: str, 
     dealer_id: Optional[int] = Query(None, description="DEALER 권한 검증용 회사 ID"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.CustomUser = Depends(get_current_aal2_user)
 ):
     shipment = db.query(models.Shipment).filter(models.Shipment.mbl_no == mbl_no).first()
     if not shipment:
         raise HTTPException(status_code=404, detail="선적 정보를 찾을 수 없습니다.")
     
-    # [설계 가이드 v4.0 RBAC] 타 딜러 화물 위치 노출 차단 (Row-Level Security)
+    # [설계 가이드 v4.0 RBAC] DEALER 권한은 토큰의 본인 dealer_company_id로 강제 검증하여 타 딜러 화물 위치 노출 차단
+    if _is_dealer_user(current_user):
+        if not current_user.dealer_company_id:
+            raise HTTPException(status_code=403, detail="해당 선적의 화물 위치 정보에 대한 열람 권한이 없습니다.")
+        dealer_id = current_user.dealer_company_id
+
     if dealer_id:
         has_access = any(order.dealer_company_id == dealer_id for order in shipment.orders)
         if not has_access:
@@ -717,7 +792,11 @@ def get_shipment_route_map(
 
 
 @app.post("/api/shipments/upload")
-async def upload_shipments(rows: List[schemas.ShipmentUploadRow], db: Session = Depends(get_db)):
+async def upload_shipments(
+    rows: List[schemas.ShipmentUploadRow],
+    db: Session = Depends(get_db),
+    current_user: models.CustomUser = Depends(_require_non_dealer)
+):
     try:
         from trackcargo_api import (
             create_bulk_sea_tracking, 
@@ -841,7 +920,8 @@ async def upload_shipments(rows: List[schemas.ShipmentUploadRow], db: Session = 
 @app.post("/api/orders/sync-serial-numbers")
 def sync_orders_serial_numbers(
     payload: Optional[List[dict]] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.CustomUser = Depends(_require_non_dealer)
 ):
     """
     P/O(reference_no) 번호 기준으로 데이터베이스 내 주문(Order)의 S/N(serial_number)을 업데이트/동기화합니다.
@@ -939,9 +1019,27 @@ def get_orders(
     is_corporate_stock: Optional[bool] = Query(None, description="법인 재고 여부 필터"),
     exclude_completed: bool = Query(False, description="출고/판매완료된 항목 제외 여부"),
     sales_archive: bool = Query(False, description="판매목록 조회 여부 (A번호 주문 전체 + 판매완료된 F번호 주문)"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.CustomUser = Depends(get_current_aal2_user)
 ):
     auto_release_expired_order_reservations(db)
+    is_dealer = _is_dealer_user(current_user)
+    is_dealer_corp_stock_view = False
+
+    # [RBAC 강제 격리] DEALER 권한은 토큰의 본인 dealer_company_id 기준으로 서버에서 강제 필터링
+    if is_dealer:
+        if is_corporate_stock is True and not sales_archive:
+            # WIA 유럽법인 공용 가용재고(F번호) 조회 시 타 딜러 필터 역추적 방지
+            is_dealer_corp_stock_view = True
+            dealer_id = None
+            rsm_id = None
+        else:
+            # 본인 딜러사 주문/배송현황/구매내역만 격리 조회 (클라이언트 dealer_id 파라미터 무시)
+            if not current_user.dealer_company_id:
+                return []
+            dealer_id = current_user.dealer_company_id
+            rsm_id = None
+
     query = db.query(models.Order).join(models.DealerCompany, models.Order.dealer_company_id == models.DealerCompany.id, isouter=True)
     if dealer_id:
         query = query.filter(models.Order.dealer_company_id == dealer_id)
@@ -980,12 +1078,19 @@ def get_orders(
                     models.Order.is_corporate_stock == False
                 )
             )
-    return query.order_by(models.Order.id.desc()).all()
+    orders_result = query.order_by(models.Order.id.desc()).all()
+    if is_dealer_corp_stock_view:
+        return [
+            _mask_corporate_stock_order_for_dealer(o, current_user.dealer_company_id)
+            for o in orders_result
+        ]
+    return orders_result
 
 @app.post("/api/orders", response_model=schemas.OrderOut, status_code=status.HTTP_201_CREATED)
 def create_order(
     payload: schemas.OrderCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.CustomUser = Depends(_require_non_dealer)
 ):
     # Check if reference_no already exists
     existing = db.query(models.Order).filter(models.Order.reference_no == payload.reference_no).first()
@@ -1043,7 +1148,8 @@ def create_order(
 def update_order_info(
     order_id: int,
     payload: schemas.OrderUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.CustomUser = Depends(_require_non_dealer)
 ):
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if not order:
@@ -1177,7 +1283,8 @@ def update_order_info(
 def update_order_status(
     order_id: int,
     payload: schemas.OrderStatusUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.CustomUser = Depends(_require_non_dealer)
 ):
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if not order:
@@ -1272,17 +1379,24 @@ def update_order_status(
     return order
 
 @app.get("/api/orders/{order_id}/history", response_model=List[schemas.OrderStatusHistoryOut])
-def get_order_history(order_id: int, db: Session = Depends(get_db)):
+def get_order_history(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.CustomUser = Depends(get_current_aal2_user)
+):
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="해당 발주 건을 찾을 수 없습니다.")
+    if _is_dealer_user(current_user) and (not current_user.dealer_company_id or order.dealer_company_id != current_user.dealer_company_id):
+        raise HTTPException(status_code=403, detail="본인 딜러사 소속 주문의 이력만 조회할 수 있습니다.")
     return db.query(models.OrderStatusHistory).filter(models.OrderStatusHistory.order_id == order_id).order_by(models.OrderStatusHistory.changed_at.desc()).all()
 
 @app.patch("/api/orders/{order_id}/assign-dealer", response_model=schemas.OrderOut)
 def assign_order_to_dealer(
     order_id: int,
     payload: schemas.OrderAssignDealerUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.CustomUser = Depends(_require_non_dealer)
 ):
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if not order:
@@ -1323,7 +1437,8 @@ def assign_order_to_dealer(
 def reserve_inventory_order(
     order_id: int,
     payload: schemas.OrderReserveUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.CustomUser = Depends(_require_non_dealer)
 ):
     auto_release_expired_order_reservations(db)
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
@@ -1355,7 +1470,8 @@ def reserve_inventory_order(
 @app.patch("/api/orders/{order_id}/cancel-reservation", response_model=schemas.OrderOut)
 def cancel_inventory_reservation(
     order_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.CustomUser = Depends(_require_non_dealer)
 ):
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if not order:
@@ -1387,7 +1503,8 @@ def cancel_inventory_reservation(
 def confirm_inventory_reservation_sale(
     order_id: int,
     payload: schemas.OrderReserveSoldUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.CustomUser = Depends(_require_non_dealer)
 ):
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if not order:
@@ -1423,7 +1540,11 @@ def confirm_inventory_reservation_sale(
     return order
 
 @app.delete("/api/orders/{order_id}")
-def delete_order(order_id: int, db: Session = Depends(get_db)):
+def delete_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.CustomUser = Depends(_require_non_dealer)
+):
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="해당 발주 건을 찾을 수 없습니다.")
@@ -1436,9 +1557,10 @@ def delete_order(order_id: int, db: Session = Depends(get_db)):
 # 3. 관리자 영업 통계 및 분석 API
 # ==========================================
 @app.get("/api/stats")
-def get_sales_analytics(db: Session = Depends(get_db), current_role: Optional[str] = Depends(get_current_role)):
-    if current_role == "RSM":
-        raise HTTPException(status_code=403, detail="접근 권한이 없습니다.")
+def get_sales_analytics(
+    db: Session = Depends(get_db),
+    current_user: models.CustomUser = Depends(_require_admin_user)
+):
     orders = db.query(models.Order).all()
     total_orders = len(orders)
     
@@ -2677,6 +2799,7 @@ def step2_verify_passkey_and_issue_session(payload: schemas.Verify2FARequest, db
         "username": user.username or "",
         "role": role_str,
         "dealer_company_id": user.dealer_company_id,
+        "dealer_company_name": user.dealer_company.name if user.dealer_company else None,
         "needs_profile_setup": needs_profile_name
     }
 
@@ -2761,7 +2884,22 @@ def download_document(filename: str):
 # 11. 화물 디테일 (Cargo Details) API
 # ==========================================
 @app.get("/api/cargo-details/{serial_number}", response_model=List[schemas.CargoDetailOut])
-def get_cargo_detail(serial_number: str, db: Session = Depends(get_db)):
+def get_cargo_detail(
+    serial_number: str,
+    db: Session = Depends(get_db),
+    current_user: models.CustomUser = Depends(get_current_aal2_user)
+):
+    # [RBAC 강제 격리] DEALER 역할은 본인 딜러사 소유 장비(Order)의 CargoDetail만 조회 허용
+    if _is_dealer_user(current_user):
+        if not current_user.dealer_company_id:
+            raise HTTPException(status_code=403, detail="해당 장비의 화물 상세 정보에 대한 열람 권한이 없습니다.")
+        owns_order = db.query(models.Order.id).filter(
+            models.Order.serial_number == serial_number,
+            models.Order.dealer_company_id == current_user.dealer_company_id
+        ).first()
+        if not owns_order:
+            raise HTTPException(status_code=403, detail="본인 딜러사 소속 장비의 화물 상세 정보만 조회할 수 있습니다.")
+
     cargo_details = db.query(models.CargoDetail).filter(models.CargoDetail.serial_number == serial_number).all()
     if not cargo_details:
         raise HTTPException(status_code=404, detail="Cargo detail not found for this S/N")

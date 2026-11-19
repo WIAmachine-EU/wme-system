@@ -20,9 +20,6 @@ export default function DealerDashboard({ currentRole, isMobileView }) {
     setLoading(true);
     try {
       let url = '/api/orders?exclude_completed=true';
-      if (currentRole === 'DEALER') {
-        url += '&dealer_id=1';
-      }
       const res = await fetch(url);
       const data = await res.json();
       if (Array.isArray(data)) {

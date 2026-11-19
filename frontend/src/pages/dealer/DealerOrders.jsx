@@ -4,7 +4,7 @@ import { Search, MapPin, Clock, Smartphone, Monitor, Ship } from 'lucide-react';
 import StepBar from '../../components/StepBar';
 import DealerVesselTrackingModal from '../../components/DealerVesselTrackingModal';
 
-export default function DealerOrders({ isMobileView }) {
+export default function DealerOrders({ isMobileView, dealerCompanyId, dealerCompanyName }) {
   const { t } = useTranslation();
   const [orders, setOrders] = useState([]);
   const [portCodes, setPortCodes] = useState([]);
@@ -39,16 +39,22 @@ export default function DealerOrders({ isMobileView }) {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const [dealersRes, portsRes, shipmentsRes] = await Promise.all([
-        fetch('/api/dealers'),
-        fetch('/api/master-data/port-codes'),
-        fetch('/api/shipments?include_all=true').catch(() => null)
-      ]);
-      const dealers = await dealersRes.json();
-      const akMakina = dealers.find(d => d.name === 'AK MAKINA');
-      const dealerId = akMakina ? akMakina.id : '';
+      const ordersUrl = dealerCompanyId
+        ? `/api/orders?dealer_id=${encodeURIComponent(dealerCompanyId)}&exclude_completed=true`
+        : '/api/orders?exclude_completed=true';
+      const shipmentsUrl = dealerCompanyId
+        ? `/api/shipments?dealer_id=${encodeURIComponent(dealerCompanyId)}&include_all=true`
+        : '/api/shipments?include_all=true';
 
-      setPortCodes(await portsRes.json());
+      const [ordersRes, portsRes, shipmentsRes] = await Promise.all([
+        fetch(ordersUrl),
+        fetch('/api/master-data/port-codes'),
+        fetch(shipmentsUrl).catch(() => null)
+      ]);
+
+      if (portsRes.ok) {
+        setPortCodes(await portsRes.json());
+      }
 
       if (shipmentsRes && shipmentsRes.ok) {
         try {
@@ -72,13 +78,23 @@ export default function DealerOrders({ isMobileView }) {
         }
       }
 
-      const res = await fetch(`/api/orders?dealer_id=${dealerId}&exclude_completed=true`);
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setOrders(data);
+      if (ordersRes.ok) {
+        const data = await ordersRes.json();
+        if (Array.isArray(data)) {
+          // 백엔드 JWT 기반 RBAC 필터링에 더해 프론트엔드에서도 본인 dealerCompanyId 이중 검증
+          const scopedOrders = dealerCompanyId
+            ? data.filter(o => Number(o.dealer_company_id) === Number(dealerCompanyId))
+            : data;
+          setOrders(scopedOrders);
+        } else {
+          setOrders([]);
+        }
+      } else {
+        setOrders([]);
       }
     } catch (err) {
       console.error("Failed to fetch orders:", err);
+      setOrders([]);
     } finally {
       setLoading(false);
     }
@@ -86,7 +102,7 @@ export default function DealerOrders({ isMobileView }) {
 
   useEffect(() => {
     fetchOrders();
-  }, []);
+  }, [dealerCompanyId]);
 
   const getStandardPort = (rawPort) => {
     if (!rawPort) return '-';
@@ -417,7 +433,7 @@ export default function DealerOrders({ isMobileView }) {
                           </td>
                           <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '12px', paddingTop: '12px' }}>
                             <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                              {order.dealer_company ? order.dealer_company.name : 'WME'}
+                              {order.dealer_company ? order.dealer_company.name : (dealerCompanyName || '-')}
                             </div>
                           </td>
                           <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '12px', paddingTop: '12px' }}>

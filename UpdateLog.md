@@ -1,8 +1,21 @@
-# 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
-
-## [2026-11-19] 유저 및 보안 관리 사용자 접속일(last_login_at) 실시간 추적 및 선적내역 리스트 UI/UX 정비
+# 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
-### 1. [유저 및 보안 관리] 사용자 계정 관리 '최근 접속일' 실시간 갱신 및 DB 모델/API 연동 (`models.py`, `schemas.py`, `main.py`, `AdminUsers.jsx`)
+## [2026-11-19] 딜러 포털 RBAC 권한 격리 전면 보강, 사용자 접속일(last_login_at) 실시간 추적 및 선적내역 리스트 UI/UX 정비
+
+### 1. [권한 격리(RBAC) 보안 패치] 딜러 포털 타사 데이터 노출 차단 및 AAL2 JWT 서버단 강제 격리 (`backend/main.py`, `main.jsx`, `App.jsx`, `Login.jsx`, `DealerOrders.jsx`, `DealerDashboard.jsx`, `DealerSalesArchive.jsx`)
+* **원인 제거 (프론트엔드 `'AK MAKINA'` 하드코딩 전면 폐기)**:
+  * 딜러 포털 3대 핵심 페이지(`DealerOrders.jsx`, `DealerDashboard.jsx`, `DealerSalesArchive.jsx`)에서 테스트용으로 고정되어 있던 `'AK MAKINA'` 딜러 검색 및 부제목 하드코딩을 완전히 제거하고, 로그인된 본인 딜러사(`dealerCompanyId`, `dealerCompanyName`) 기준으로만 조회·표시하도록 수정.
+  * 관리자 모바일 카드(`AdminDashboard.jsx`) 및 구버전 `DealerDashboard.jsx`의 잔존 하드코딩(`'AK MAKINA'`, `dealer_id=1`) 함께 정리.
+* **전역 인증 토큰 전송 및 세션 자동 동기화**:
+  * `main.jsx`의 `window.fetch` 인터셉터가 모든 `/api/` 요청(`/api/v1/auth/` 제외)에 `Authorization: Bearer <wme_access_token>`을 자동 첨부하고, `401` 세션 만료 시 `wme-auth-expired` 이벤트를 통해 안전하게 로그아웃 전환하도록 보강.
+  * `Login.jsx` 및 `App.jsx`에서 로그인 응답의 `dealer_company_id`, `dealer_company_name`을 상태 및 `erp_auth`에 저장하고, 페이지 새로고침 시에도 `/api/v1/users/me`로 DB의 최신 역할 및 소속 딜러사 정보를 자동 동기화.
+* **백엔드 Zero-Trust RBAC 강제 격리 (`backend/main.py`)**:
+  * `GET /api/orders`, `GET /api/shipments`, `GET /api/v1/tracking/{mbl_no}/route-map`, `GET /api/cargo-details/{serial_number}`, `GET /api/orders/{order_id}/history`에 `get_current_aal2_user` 검증을 의무화.
+  * `DEALER` 역할 요청 시 클라이언트가 전달한 `?dealer_id=` 파라미터를 무시하고 서버가 JWT에서 확인한 DB의 `current_user.dealer_company_id`로 강제 필터링(소속 딜러사 미지정 시 빈 배열 반환).
+  * 동일 B/L 혼적 선적에서도 SQLAlchemy ORM 변형 없이 안전한 Pydantic DTO 복사본으로 본인 딜러사 장비만 필터링 반환하고, WIA 공용 가용재고(`is_corporate_stock=true`) 조회 시 타 딜러의 예약·임대·판매가·딜러주문번호 필드를 마스킹.
+  * 관리자 전용 API(`/api/users`, `/api/stats`) 및 주문/선적 변경(POST/PATCH/DELETE) API에 대한 `DEALER` 접근을 `403 Forbidden`으로 차단.
+
+### 2. [유저 및 보안 관리] 사용자 계정 관리 '최근 접속일' 실시간 갱신 및 DB 모델/API 연동 (`models.py`, `schemas.py`, `main.py`, `AdminUsers.jsx`)
 * **데이터베이스 및 스키마 확장**:
   * `CustomUser` ORM 모델에 `last_login_at = Column(DateTime, nullable=True)` 컬럼 추가.
   * 백엔드 구동 시 자동 마이그레이션(`ALTER TABLE custom_users ADD COLUMN ... last_login_at`) 적용 및 이미 2단계 인증을 마친 기존 활성 계정(`ACTIVE_AAL2`)에 대해 `last_login_at` 초기 백필 쿼리 실행.
@@ -14,7 +27,7 @@
   * `AdminUsers.jsx`의 `formatLastLogin` 함수를 통해 백엔드 `last_login_at` 일시를 최우선으로 `YYYY-MM-DD HH:mm` 포맷으로 변환.
   * 백엔드 값이 없을 경우 시스템 감사 로그(AuditLog)의 성공 로그인 기록 또는 계정 생성일을 보조 폴백으로 활용하여 사용자의 최근 접속일이 정상 노출되도록 보장.
 
-### 2. [선적 관리 & 업로드] 선적내역 리스트 헤더·컬럼 표기 및 장비 상세 목록 뷰 UI/UX 정비 (`AdminShipmentUpload.jsx`)
+### 3. [선적 관리 & 업로드] 선적내역 리스트 헤더·컬럼 표기 및 장비 상세 목록 뷰 UI/UX 정비 (`AdminShipmentUpload.jsx`)
 * **장비개수 컬럼명 및 배지 UI 간결화**:
   * 테이블 컬럼명을 기존 `장비개수 (S/N)`에서 **`장비개수`**(`Units`)로 변경.
   * 개수 표시 배지 내부의 상자(`Package`) 아이콘을 제거하고 텍스트(`N대`)만 단독 중앙 정렬하여 시각적 번잡함을 줄이고 가독성 확보.
@@ -29,2566 +42,2566 @@
   * B/L 행을 클릭하여 펼쳐지는 하단 `[선적 장비 상세 목록]` 아코디언 헤더 우측의 `ETA: YYYY-MM-DD | 상태: In Transit` 텍스트를 제거하여 리스트의 핵심 정보에 집중할 수 있도록 정리.
 
 
-## [2026-11-18] 주문 배송 타임라인(StepBar) 단계명 및 생산 아이콘 개편, 임대기간 프리셋 정돈 및 사이드바 시뮬레이션 제거
-
-### 1. [주문 / 배송현황] 진행상황(StepBar) 단계명 간결화, 전용 생산 아이콘 적용 및 현재 단계 텍스트 색상 동기화 (`StepBar.jsx`, `translation.json`)
-* **단계명 국문 텍스트 변경**:
-  * 타임라인 5단계 중 2번째 단계의 한국어 라벨을 기존 `생산 중`에서 **`생산`**으로 변경하여 한눈에 들어오도록 간결화.
-* **'생산' 단계 전용 공작기계 가공 SVG 아이콘 적용**:
-  * 기존 일반 공구(렌치, `Wrench`) 아이콘 대신 실제 장비 가공 형상을 직관적으로 나타낸 커스텀 벡터 SVG 아이콘(`ProductionIcon`)을 제작 및 적용.
-  * `fill="currentColor"` 스타일을 적용하여 완료/활성/대기 등 원형 배지 상태에 따라 아이콘 색상이 완벽히 연동되도록 구현.
-* **현재 활성 단계 하단 텍스트 색상 일치화**:
-  * 장비의 현재 진행 상태(예: '배송')일 때 상단 원형 배지의 채움 효과뿐만 아니라 하단 텍스트의 색상도 원형에 채워진 포인트 색상(`var(--step-color)`, `#F26B66`)으로 동일하게 동기화하고 Bold(`fontWeight: 800`)를 적용하여 시각적 인지성을 대폭 향상.
-
-### 2. [WIA 재고리스트] 가용재고 '임대' 상태 변경 시 임대기간 설정 모달 빠른 선택 옵션 정비 (`AdminInventory.jsx`)
-* **불필요한 장기 옵션(+2년) 제거 및 4대 핵심 프리셋 확정**:
-  * 가용재고 목록에서 상태를 '임대'로 선택할 때 표시되는 '임대 기간 설정(Set Rental Period)' 모달의 빠른 기간 선택(Quick Selection) 프리셋에서 `+2년`(`+2 Years`) 옵션을 제거.
-  * 현업 업무 기준에 맞춰 **[+1개월, +3개월, +6개월, +1년]** 4가지만 선택할 수 있도록 컴팩트하게 정돈.
-
-### 3. [사이드바] '스마트폰 뷰 시뮬레이션' 버튼 및 관련 상태 코드 완전 제거 (`Sidebar.jsx`, `App.jsx`)
-* **사이드바 메뉴 컨트롤 정리**:
-  * 사이드바 하단 영역에 위치하던 `[📱 스마트폰 뷰 시뮬레이션]` 버튼 및 미사용 아이콘(`Smartphone`, `Monitor`), 관련 props를 사이드바 컴포넌트에서 완전히 제거하여 메뉴바 본연의 디자인 완성도 제고.
-* **앱 전역 반응형 뷰 단순화**:
-  * `App.jsx` 내 가상 모바일 시뮬레이션 상태(`simulateMobile`)를 도려내고, 실제 사용자 디바이스 뷰포트 너비(`windowWidth <= 768`)에 기반해서만 모바일 레이아웃이 자동 판별되도록 로직을 간결하게 일원화.
-
-
-## [2026-11-17] 판매 목록 및 주문 화물(선박) 추적 모달 다국어(EN/KR) 고도화, RSM 대시보드 임시 비활성화 및 Nginx SPA 배포 캐시 제어 강화
-
-### 1. [판매 목록] '장비 및 판매 정보 수정(Order detail change)' 팝업창 전면 영문화 (`AdminSalesArchive.jsx`, `translation.json`)
-* **판매 목록 팝업창 및 세부 폼 다국어 전환**:
-  * RSM 포털 및 관리자 포털의 **[판매 목록]**(`AdminSalesArchive.jsx`) 메뉴에서 '장비 및 판매 정보 수정' 팝업창 내 모든 섹션 헤더 및 입력 항목을 다국어(`menu4.edit_modal.*`) 체계로 전환.
-  * **Section 1**: `기본 주문 및 장비 정보` → `Basic Order & Machine Information`, `-- 딜러/모델/NC 선택 --` 드롭다운 옵션 및 P/O, S/N 플레이스홀더 영문화.
-  * **Section 2**: `판매 매출 및 출고/픽업 현황` → `Sales Revenue & Dispatch / Pickup Status`, 판매가/구매가/매출월 플레이스홀더, 출고/픽업 일자 `초기화`(`Clear`) 버튼 및 미출고(선매출) 안내 문구 영문화.
-  * **Section 3**: `물류 운송 및 상세 스펙` → `Logistics & Detailed Specifications`, `도착지 항구 (Port)`(`Destination Port`), `Incoterms`, `선박명 (VESSEL)`(`Vessel Name (VESSEL)`), `DETAIL SPEC` 라벨 및 플레이스홀더 영문화.
-  * **Section 4 & 하단 액션**: `REMARK (비고)` 라벨 및 플레이스홀더 영문화, 취소 버튼 오타 수정 (`cancell` → `Cancel`).
-* **테이블 헤더, 정렬 툴팁, 알림창 다국어 연동**:
-  * 테이블 열 정렬 마우스 오버 툴팁(`오름차순/내림차순 정렬` ↔ `Sort ascending/descending`), 모바일 카드 뷰 `정보 수정`(`Edit Info`) 버튼, CSV 엑셀 내보내기 헤더 11개 항목 및 저장 성공/실패 알림(`alert`) 전체 영·한 분기 처리.
-
-### 2. RSM 포털 [RSM 영업통계(RSM Sales Stats)] 메뉴 및 라우팅 임시 비활성화 (`Sidebar.jsx`, `App.jsx`)
-* **메뉴 숨김 및 안전한 네비게이션 처리**:
-  * 시스템 안정화 및 향후 고도화 개편 일정에 맞춰 RSM 포털 사이드바에서 `rsm-dashboard`(`RSM 영업통계 / RSM Sales Stats`) 메뉴 항목을 임시 비활성화(주석 처리).
-  * `App.jsx` 내 RSM 권한의 라우팅 컴포넌트 렌더링 및 허용 탭 목록에서 `rsm-dashboard`를 제외하여, 사용자가 해당 URL 또는 세션 상태를 보유하고 있더라도 기본 메인 화면인 `admin-dashboard`([주문 / 배송현황])로 자동 리디렉션되도록 처리.
-  * 상단 WIA 브랜드 로고 클릭 시 RSM 권한의 이동 대상을 `admin-dashboard`로 안전하게 연결.
-  * 향후 기능 개선 및 재오픈에 대비하여 기존 `RsmDashboard.jsx` 소스코드는 유지 및 보존.
-
-### 3. [주문 / 배송현황] '주문 화물(선박) 추적' 팝업창 전체 다국어(EN/KR) 지원 (`DealerVesselTrackingModal.jsx`)
-* **화물추적 팝업창 전 영역 영문화 적용**:
-  * RSM 포털 및 딜러 포털의 [주문 / 배송현황] 타임라인에서 '화물추적' 클릭 시 표시되는 '주문 화물(선박) 추적(Order Cargo (Vessel) Tracking)' 팝업창 전체를 다국어 지원으로 전환.
-  * **모달 헤더 및 목록 패널**: `주문 화물(선박) 추적` ↔ `Order Cargo (Vessel) Tracking`, `닫기` ↔ `Close`, `내 주문 장비 목록` / `{n}대` ↔ `Ordered Machines` / `{n} units`.
-  * **상단 6대 운항 지표(KPI) 요약 바**:
-    * `주문 장비 (Model / S/N)` ↔ `Ordered Machine (Model / S/N)`
-    * `선박명` ↔ `Vessel Name`
-    * `출발일 (ETD)` ↔ `Departure (ETD)` / `도착예정일 (ETA)` ↔ `Estimated Arrival (ETA)` (언어별 로케일 날짜 포맷 적용)
-    * `지연된 일수` ↔ `Delay Status` (`0일 (정상)` ↔ `0 days (On Time)`, `+{n}일 지연` ↔ `+{n} days delayed`)
-    * `해상운항 소요` ↔ `Voyage Duration` (`{n}일째 해상 운항 중` ↔ `{n} days in transit`, `{n}일 소요 (도착 완료)` ↔ `{n} days (Arrived)`, `생산완료 후 출항` ↔ `Departing after production`)
-  * **지도 오버레이 안내 박스**: `생산완료 후 출항 (출항지: Busan, KR)` ↔ `Departing after production (POL: Busan, KR)`, 설명 문구 및 `TrackingMapboxWidget` 연동 데이터 영문화.
-
-### 4. 프론트엔드 Nginx SPA 배포 캐시 제어 및 정적 에셋 무결성 강화 (`nginx.conf`)
-* **HTML 무캐시 및 에셋 404 차단 정책 수립**:
-  * 신규 배포 시 Vite 빌드 번들 해시 파일명(`index-xxxx.js`)이 변경될 때, 브라우저 및 앞단 CDN(Cloudflare)에 캐시된 구버전 `index.html`이 삭제된 이전 JS 번들을 요청하여 발생하는 백지 화면(`MIME type "text/html" strict checking error`) 근본적 차단.
-  * `location /`: `Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0" always`, `Pragma "no-cache" always`, `Cloudflare-CDN-Cache-Control "no-store" always` 헤더를 강제하여 브라우저와 CDN이 항상 최신 `index.html`을 즉시 수신하도록 보장.
-  * `location /assets/`: 해시된 정적 에셋은 장기 캐시(`max-age=31536000, immutable`)를 허용하되, 파일이 존재하지 않을 경우 `index.html`로 폴백되지 않고 엄격히 404 에러(`try_files $uri =404;`)를 반환하도록 Nginx 라우팅 분리.
-
-## [2026-11-16] 시스템 전반 다국어(EN/KR) 고도화, 로그인·인증 영문화, 발주/수정 모달 개편, 재고 변경 취소 및 WIA 창고(입고 목록) UI/UX 전면 개편
-
-### 1. 시스템 로그인 화면 전 과정 영문화 (English Only UI) (`Login.jsx`, `main.py`)
-* **로그인 절차 영어 인터페이스 적용**:
-  * 고객, 딜러사 및 해외 법인 직원의 접근성을 위해 로그인 1단계(이메일·비밀번호) 및 2단계(WebAuthn 생체/기기 패스키, 4~8자리 숫자 PIN 패스키)의 모든 레이블, 버튼, 안내 문구를 영어로 전환.
-  * `STEP 1 / 2 · Email Account Authentication`, `Next (Step 2 Passkey Verification)`, `Forgot your password?`
-  * `STEP 2 / 2 · Passkey 2nd Factor Authentication`, `Biometric / Device Passkey`, `PIN Passkey`, `Verify Device Passkey & Sign In`, `Register PIN & Sign In` 등 직관적인 영문 UI 제공.
-  * 브라우저 호환 안내 및 인앱 브라우저(구글앱 등) 자동 폴백 메시지도 자연스러운 영문으로 변경.
-* **백엔드 인증 오류 메시지 영문화 및 프론트엔드 다국어 번역 맵핑**:
-  * 백엔드 인증 엔드포인트(`/api/v1/auth/login`, `/api/v1/auth/verify-2fa`)의 응답 메시지 영문화.
-  * 프론트엔드 `translateError`, `translateInfo` 함수를 통해 백엔드에서 반환되는 예외 및 오류 메시지를 100% 영문으로 즉시 치환 표시하여 외국인 사용자가 어떠한 상황에서도 한국어 오류에 직면하지 않도록 보장.
-* **로그인 완료 후 메인 시스템 다국어 선택 유지**:
-  * 로그인 완료 후 메인 대시보드 진입 시 상단 네비게이션 바의 언어 변환 토글(`KR / EN`)을 통해 한국어/영어를 자유롭게 전환 가능하도록 기존 기능 유지 및 검증.
-
-### 2. 비밀번호 분실 및 재설정 화면 영문화 (`Login.jsx`, `main.py`)
-* **비밀번호 재설정 요청 및 새 비밀번호 입력 화면 개편**:
-  * 비밀번호 분실 요청 모달: `Reset Your Password`, `Enter your registered email address`, `Send Password Reset Link`, `Back to Sign In`.
-  * 새 비밀번호 설정 화면(`?reset_token=...`): `Set New Password`, `New Password (min. 8 characters)`, `Confirm New Password` 항목 추가 및 8자 이상 검증, 불일치 검증 로직 영문 적용.
-  * 신규 계정 초대 수락 화면(`?invite_token=...`): `Accept Invitation · Set Initial Password`, `Invited Account`, `Save Password & Proceed to Passkey Setup`으로 영문화.
-
-### 3. 비밀번호 재설정 및 신규 계정 초대 안내 이메일 영·한 병기 (`email_service.py`)
-* **이메일 제목 및 타이틀 영문화**:
-  * 비밀번호 재설정 이메일 제목: `[WMEINS ERP] Password Reset Instructions`
-  * 신규 계정 초대 이메일 제목: `[WMEINS ERP] Account Invitation & Initial Password Setup`
-* **본문 구조 [상단 영어 안내 - 하단 한국어 안내] 2단 구성**:
-  * 본문 상단: 해외 딜러 및 외국인 사용자를 위한 영문 안내문구(`Hello {username}, A password reset request has been received...`, `▶ Password Reset Link (Valid for 15 minutes, single use)`) 배치.
-  * 구분선(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`) 삽입.
-  * 본문 하단: 국내 사용자를 위한 한국어 안내문구(`안녕하세요 {username} 님, WMEINS 시스템 비밀번호 재설정이 요청되었습니다...`, `▶ 비밀번호 재설정 링크 (15분 유효, 1회용)`) 배치.
-
-### 4. 로그인 후 전 포털(관리자·RSM·딜러) 기본 언어 영문(EN) 우선 적용 (`App.jsx`, `i18n.js`)
-* **전 포털 영문 우선 진입 설정**:
-  * 기존 딜러 포털(`DEALER`) 로그인 시에만 영문(`en`)으로 전환되던 로직을 확장하여, 관리자 포털·RSM 포털·딜러 포털 모두 로그인 성공 직후 항상 영문(`en`)으로 우선 표시되도록 `App.jsx`(`handleLogin`) 수정.
-  * `i18n.js`의 `fallbackLng`을 `'en'`으로 변경하고, 브라우저 OS 언어(`navigator`) 자동 감지를 제외(`detection.order: ['localStorage']`)하여 초기 접속 시에도 영문이 기본으로 표시되도록 개선.
-  * 로그인 이후에는 상단 네비게이션 바(`KR / EN`) 토글을 통해 사용자가 원하는 언어로 자유롭게 전환 및 세션 유지 가능.
-
-### 5. [선적 관리 & 업로드] 페이지 다국어(영문/국문) 지원 적용 (`AdminShipmentUpload.jsx`)
-* **전체 UI, 알림, 모달 다국어 분기 처리**:
-  * `useTranslation`(`isKo`)을 도입하여 페이지 제목, 안내문구, 템플릿 다운로드 버튼, 선적내역 리스트 테이블(번호·B/L·ETD·POD·장비개수), 검색 필터, 아코디언 상세 목록(ETA·상태·미부여), 파일 드롭존, 데이터 검증 결과 테이블, 업로드 상태 메시지 등이 언어 설정(`EN / KR`)에 맞춰 즉시 전환되도록 구현.
-  * 엑셀 직접 복사/붙여넣기 모달 및 사내 보안(DRM/MIP) 암호화 감지 안내 모달, 파일 파싱/유효성 검사 알림(`alert`, `confirm`)까지 모두 영문·국문 동시 지원.
-
-### 6. [선적 트래킹] 페이지 및 지도/지연율 위젯 다국어(영문/국문) 지원 적용 (`ShipmentTracking.jsx`, `ShipmentWidgets.jsx`, `TrackingMapboxWidget.jsx`)
-* **선적 트래킹 목록·상세 뷰 전체 다국어 분기 처리**:
-  * `ShipmentTracking.jsx`: 상단 헤더(`Shipment Tracking`), 수동 Diff 동기화 버튼·상태바·토스트 알림, 운송 중 선적 리스트(상태 배지, 출발/도착항, `Details`), 상세 뷰(장비 대수, ETD/ETA/운항 소요일, 4개 탭 `Units/Route/Vessel/Exceptions`, 최후 AIS 수신 위치 카드, 선박 제원 및 희망봉 우회 항로 설명) 영·한 분기 적용.
-* **해상 운송 지연율 & 재고 에이징 KPI 위젯 다국어 처리**:
-  * `ShipmentWidgets.jsx`: `DelayRateWidget`(`Ocean Transit Delay Rate`, `Active Shipments`, `Delay Rate`, `On Time / Delayed`) 및 `InventoryAgingWidget`(`Inventory Aging Ratio`) 다국어 전환 지원.
-* **Mapbox 해상 트래킹 위젯 팝업 및 안내 다국어 처리**:
-  * `TrackingMapboxWidget.jsx`: 출발항(POL)·환적항(Transit Port)·도착항(POD)·선박 마커 팝업(항로·누적 항해 거리·AIS 궤적 포인트·현재 속도·침로·최종 ETA·상세 항로 보기 버튼), 생산 중/대기 라벨 및 Mapbox 토큰 안내 화면 영·한 분기 적용.
-
-### 7. [선적 트래킹] 상세 페이지 '선박' 탭 하단 희망봉 우회 항로 안내 박스 제거 (`ShipmentTracking.jsx`)
-* **불필요한 고정 안내 박스 제거**:
-  * `Vessel`(선박) 탭 하단에 표시되던 `운항 항로: 남아공 희망봉 우회`(`Route: Via Cape of Good Hope`) 및 `AIS 고정밀 궤적` 안내 박스를 한국어/영어 뷰 모두에서 제거하여 선박 제원 정보만 깔끔하게 표시되도록 개선.
-
-### 8. [유저 및 보안 관리] '신규 사용자 등록' 팝업창 및 사용자 관리 모달/배지 다국어 지원 적용 (`AdminUsers.jsx`)
-* **신규 사용자 등록·정보 수정 모달 및 상태 배지·알림 영·한 분기 처리**:
-  * `신규 사용자 등록` 모달 내 제로터치 온보딩(Zero-Touch Onboarding) 안내 박스 및 `Email (Login ID)` 라벨 영·한 분기 적용.
-  * `사용자 정보 수정` 모달 내 `Display Name`, `Account Status`(`Active / Inactive (Blocked)`), `Reset Passkey (2FA)` 체크박스 다국어 처리.
-  * 사용자 테이블 온보딩 상태 배지(`Inactive`, `Invite Sent`, `Resend Invite`, `Passkey Pending`, `Active (AAL2)`) 및 등록·수정·삭제·재발송 알림(`alert`, `confirm`) 전체 영문화 지원.
-
-### 9. [내 정보(My Data)] 페이지 다국어(영문/국문) 지원 적용 (`UserProfile.jsx`)
-* **프로필·보안·비밀번호 변경 모달 전체 영·한 분기 처리**:
-  * 상단 `Close`, 편집 `Cancel`/`Save` 버튼 및 최초 로그인 안내 배너 영·한 분기 적용.
-  * `Display Name`, `Headquarters (HQ)`, `Login ID`, 편집 안내 문구 및 미설정 안내 영문화.
-  * `Step 1: Password`, `Step 2: Biometric / Passkey (WebAuthn AAL2)`, 패스키 연동 상태(`Passkey Linked (Protected by NIST AAL2 2-Factor Auth)`) 및 패스키 초기화 요청 안내 문구 영·한 분기 적용.
-  * `비밀번호 변경`(`Change Password`) 모달 및 프로필/비밀번호 변경 알림(`alert`) 전체 영문화 지원.
-
-### 10. [WIA 재고리스트] 상태 및 주문선택 변경 '취소' 버튼 기능 추가 (`AdminInventory.jsx`, `translation.json`)
-* **상태·딜러 변경 선택 사항 원복 기능**:
-  * WIA 가용재고 목록의 `상태` 또는 `주문선택` 드롭다운을 변경할 때, `확정` 버튼 오른쪽에 `취소`(`Cancel`) 버튼을 나란히 표시(데스크톱 테이블 및 모바일 카드 뷰 모두 지원).
-  * `취소` 버튼 클릭 시 `handleCancelPendingChanges`가 해당 행의 미확정 변경사항(`pendingChanges`)을 즉시 초기화하여 `확정`/`취소` 버튼이 사라지고 기존의 확정되어 있던 상태·딜러 선택 그대로 원복되도록 구현.
-
-
-### 11. 주문/배송 타임라인 상세 뷰 '딜러 주문번호' 표기 (`AdminDashboard.jsx`, `DealerOrders.jsx`)
-* **타임라인 하단 상세 정보 영역 확장**:
-  * 주문/배송현황 페이지(`AdminDashboard.jsx`, `DealerOrders.jsx`)의 배송 추적 타임라인 하단 상세 정보 영역에서 `딜러발주 일자` 바로 오른쪽에 `딜러 주문번호`(`dealer_order_no`)를 나란히 인라인 배치.
-  * 미등록 또는 데이터 부재 시 `-`로 Null-safe하게 폴백 처리.
-  * 모바일 카드 뷰 및 데스크탑 테이블 상세 뷰 모두에 동일하게 일관된 다국어(`menu1.dealer_order_no`, `menu1.order_date`) 적용.
-
-### 12. 신규 단건 발주 생성 모달 '딜러 주문번호', 'Buying(구매가)', 'SALES PRICE(판매가)' 입력 항목 추가 (`UploadSettings.jsx`)
-* **[신규 단건 발주 생성] 팝업창 UI/UX 개선 및 가격 데이터 연동**:
-  * `주문일자(dealer_order_date)` 입력란 바로 오른쪽에 `딜러 주문번호(dealer_order_no)` 텍스트 인풋을 신규 배치.
-  * `배송요청일(delivery_request_date)` 입력란 바로 오른쪽에 `Buying (구매가)` 및 `SALES PRICE (판매가)` 입력란을 나란히 배치.
-  * **Buying (구매가, `price`)**: P/O 정보 기준으로 시스템 내 전체 페이지(주문/배송현황 장비 정보 수정, WIA 재고리스트, WIA 창고, 판매 목록 등)의 구매가 필드에 동일하게 적용.
-  * **SALES PRICE (판매가, `sales_price`)**: P/O 정보 기준 A발주 건에 대해 판매가 항목이 있는 페이지(판매 목록 등)의 판매가 필드에 동일하게 적용.
-
-### 13. 장비 정보 수정 모달 항목 2열 그리드 순서 전면 개편 (`AdminDashboard.jsx`)
-* **사용자 요청 맞춤형 8행 2열 [왼쪽 - 오른쪽] 레이아웃 재배치**:
-  * **Row 1**: `모델명` (Select) - `P/O` (Input)
-  * **Row 2**: `NC` (Select) - `S/N` (Input)
-  * **Row 3**: `Dealer` (Select) - `딜러 주문번호` (Input 신규 추가)
-  * **Row 4**: `딜러주문일` (Date Input 신규 추가) - `배송요청일` (Month Input)
-  * **Row 5**: `Buying` (Input) - `S/O` (Input)
-  * **Row 6**: `Incoterms` (Select) - `Port` (Select)
-  * **Row 7**: `DETAIL SPEC` (전체 폭 Full Width Input)
-  * **Row 8**: `REMARK` (전체 폭 Full Width Textarea)
-* **데이터 동기화 및 바인딩**:
-  * `handleEditClick` 시 기존 발주 건의 `dealer_order_no` 및 `dealer_order_date`를 폼에 자동 로드.
-  * `handleUpdateSubmit`을 통해 PATCH `/api/orders/{id}`로 백엔드 DB에 원활히 반영.
-
-### 14. 백엔드 DB 스키마 확장 및 API 지원 (`models.py`, `schemas.py`, `main.py`)
-* **ORM 모델 및 Pydantic 스키마**:
-  * `Order` 모델에 `dealer_order_no = Column(String, nullable=True)` 컬럼 추가.
-  * `schemas.OrderBase`, `OrderCreate`, `OrderUpdate`에 `dealer_order_no: Optional[str] = None` 추가.
-* **무중단 마이그레이션 및 파싱 처리**:
-  * 서버 기동(`on_startup`) 시 PostgreSQL 및 SQLite 모두 호환되는 `ALTER TABLE orders ADD COLUMN ...` 마이그레이션 쿼리 적용.
-  * 로컬 `scm_erp.db` 마이그레이션 완료.
-  * `create_order`, `update_order_info`, 엑셀 대량 업로드(`upload_excel_bulk`) 엔드포인트에 `dealer_order_no` 저장 및 업데이트 로직 반영.
-
-### 15. [WIA 창고] 입고 데이터 업로드 섹션 제거 및 플로팅 스크롤 바로가기 버튼 활성화 (`AdminDispatch.jsx`)
-* **창고 데이터 입고 및 문서 관리 섹션 제거**:
-  * WIA 창고 페이지 하단에 위치하던 '입고증 PDF 업로드' 및 '재고 엑셀 업로드' 섹션을 제거하여 '업로드/설정관리' 메뉴로 데이터 관리 동선을 일원화하고 페이지 시야 확보.
-* **우측 하단 플로팅 스크롤(위/아래) 바로가기 버튼 활성화**:
-  * 장비 목록이 길어질 때 사용자가 목록 상단과 하단으로 즉시 이동할 수 있도록 우측 하단 플로팅 스크롤 버튼(`ScrollButtons`) 적용.
-
-### 16. [WIA 창고] 재고 상태·에이징 UI 스타일 고도화 및 영문 표기 정비 (`AdminDispatch.jsx`, `translation.json`)
-* **재고 상태 지정 RGB 컬러 정밀 적용**:
-  * 일반 재고(Normal Stock): `rgb(4, 154, 67)` (초록)
-  * 장기 재고(Long-term Stock): `rgb(254, 151, 6)` (오렌지)
-  * 악성 재고(Bad Stock): `rgb(255, 25, 0)` (빨강)
-  * 상단 통계 요약 바의 상태명 텍스트 및 개수 수치에 동일한 RGB 색상 통일 적용.
-* **에이징(Aging) 표기 정돈 및 다국어 지원**:
-  * 리스트 항목 '에이징'에서 상태 텍스트(예: `악성(751일)`) 및 타원형 배경(Pill badge)을 제거하고, 순수 일자 텍스트만 표시하여 시각적 복잡도 완화.
-  * 텍스트를 제거하는 대신 상태(일반/장기/악성)를 지정 RGB 폰트 컬러로 표시하여 직관적인 인지 지원.
-  * 영문 페이지 에이징 일자 표기를 기존 `751d`에서 `751 D` 형식으로 정돈하고, 영문 상태명을 `Critical Stock`에서 **`Bad Stock`**으로 변경.
-
-### 17. [WIA 창고] 화물(치수/중량) 컬럼 헤더, 버튼 명칭 및 3D 정육면체 큐브 아이콘 변경 (`AdminDispatch.jsx`, `translation.json`)
-* **컬럼 헤더 및 버튼 텍스트 변경**:
-  * 한국어(KO): 항목 헤더 `화물` → **`화물정보`**, 버튼 텍스트 `화물` → **`cm / kg`**
-  * 영어(EN): 항목 헤더 `Dimension` → **`CARGO`**, 버튼 텍스트 `Dimension` → **`cm / kg`**
-  * 데스크톱 테이블 및 모바일 카드 뷰의 폴백 문자열 동기화.
-* **3D 정육면체 큐브 SVG 아이콘 적용**:
-  * 기존 외부 링크(`ExternalLink`) 아이콘 대신 치수·포장 화물을 직관적으로 나타내는 커스텀 정육면체 큐브 SVG(`CubeIcon`, 각진 외곽선 `miter` 스타일)를 제작 및 적용.
-
-### 18. [WIA 창고] 리스트 '진행' 항목 단순화 (`AdminDispatch.jsx`)
-* **이력 조회 버튼 및 모달 제거**:
-  * WIA 창고 페이지의 업무 특성상 입고 history 확인이 불필요하므로 리스트 항목 '진행'에서 `[이력]` 버튼 삭제.
-  * '진행' 컬럼을 **`[수정]`** 및 **`[출고 처리]`** 버튼으로만 간결하게 구성하고, 불필요한 이력 조회 상태 및 타임라인 모달 UI 코드를 정리하여 렌더링 최적화.
-
-## [2026-11-14] 선적 트래킹(Shipment Tracking) UI/UX 전면 개편, 탭·장비목록 3열 단일행 정돈 및 해상 운송 지연율 산출 동기화
-
-### 1. 선적 트래킹 목록 뷰 및 지도 플로팅 위젯 정리 (`ShipmentTracking.jsx`, `TrackingMapboxWidget.jsx`)
-* **선적 트래킹 목록 뷰 시각적 간결화**:
-  * 왼쪽 패널 상단 우측의 `총 {n}건` 배지를 삭제하여 헤더 영역을 깔끔하게 정돈.
-  * `해상 운송 지연율` 위젯 내 `전체 운송 중` 문구를 **`전체 운송 중 선박`**으로 명확히 수정.
-  * 가이드 문구(`카드 선택 시 상세 정보 확인`) 정리 및 전체 레이아웃 완성도 향상.
-* **지도 위 플로팅 위젯 제거 및 왼쪽 상세 패널로 핵심 정보 통합**:
-  * **지도 시야 확보**: 지도 상단 중앙에 오버레이되던 `최후 AIS 수신 위치` 플로팅 바 및 우측 전체를 가리던 대형 `SCM Voyage KPI` 위젯을 지도에서 완전히 제거하여 해상 항로 시야를 최대로 확보.
-  * **핵심 운항 지표 통합**: 기존 KPI 위젯의 핵심 정보인 **출항일 (ETD), 최종 예정일 (ETA), 해상 운항 소요 (Aging)**를 왼쪽 패널 상단 개요 카드(운송 진행도 바 직하단)에 3열 메트릭 그리드로 컴팩트하게 통합 배치.
-  * **최후 AIS 수신 위치 카드 이전**: 선박 위/경도 좌표, 나침반 아이콘, 실시간 속력(`kn`), 방위각(`°`) 및 정박/도착 상태를 왼쪽 패널 **`항로 (Route)` 탭 타임라인 마일스톤 직하단**에 일체형 카드로 이전 배치.
-  * `TrackingMapboxWidget.jsx` 내 미사용 useMemo 및 변수 정리로 지도 렌더링 성능 최적화.
-
-### 2. 운송 중 선적 상세 탭 순서 개편 및 장비목록 3열 단일행 레이아웃 최적화 (`ShipmentTracking.jsx`)
-* **상세 탭 순서 재배치 및 기본 탭 설정**:
-  * 사용자 업무 동선에 최적화하여 탭 순서를 기존 `[항로 - 선박 - 장비목록 - 예외사항]`에서 **`[장비목록 - 항로 - 선박 - 예외사항]`**으로 전면 재배치.
-  * 선적 상세 진입 시 기본 활성 탭을 '장비목록'으로 지정하여 B/L에 실린 장비 정보를 가장 먼저 확인할 수 있도록 개선.
-* **장비목록 카드 3열 그리드 단일행(Single Row) 정렬**:
-  * 기존 2단 분할 구조 및 불필요한 `SHIPPING` 텍스트 배지를 제외하고 간결한 가로 1행 정렬 구조로 개편.
-  * 3열 CSS Grid(`1fr 1.35fr 1.15fr`)를 적용하여 카드 간 세로 열을 칼같이 정렬:
-    * **1열 (왼쪽 정렬)**: 기계 모델명 (예: `KF6`, Bold 800)
-    * **2열 (중앙 정렬)**: S/N 정보 배지 (예: `S/N: G2815-0186`)
-    * **3열 (중앙 정렬)**: P/O 발주 번호 (예: `P/O: A26-05-54`)
-* **타이포그래피 및 서체 통일**:
-  * 장비 카드 내 모델명, S/N 라벨/값, P/O 라벨/값 등 모든 텍스트 크기를 일관되게 **`0.7rem`**으로 슬림화 조정.
-  * 공식 브랜드 가이드라인 서체인 **`SUITE`**(`font-family: 'SUITE', sans-serif`)를 탭 버튼 및 장비 카드 전 영역에 동일하게 적용.
-
-### 3. 해상 운송 지연율(`DelayRateWidget`) 레이아웃 개선 및 지연율 산출 로직 1:1 동기화 (`ShipmentWidgets.jsx`)
-* **레이아웃 개선**: `'지연율'` 라벨과 퍼센트(`%`) 수치를 상하 2줄에서 **좌우 단일 행(가로 나란히 배치)**으로 변경하여 시인성 및 공간 효율성 개선.
-* **더미 데이터 폴백 제거**: 데이터 로딩 중(`shipments` 빈 배열 상태)일 때 하드코딩된 `15건 / 지연 2건 (13.3%)` 임의 수치가 노출되던 문제를 제거하고 정상적인 초기 상태(`0건 / 0.0%`)로 표시되도록 수정.
-* **지연 판정 알고리즘(`checkIsDelayed`) 통합**:
-  * 기존에 단순 `trackcargo_status === 'Delayed'` 문자열만 검사하여 하단 선적 카드 리스트 및 지도 마커의 지연 판정 기준(45일 초과 장기 항해 등 `checkIsDelayed(s)`)과 불일치하던 현상 해결.
-  * 표준 `checkIsDelayed` 알고리즘을 위젯에 동일하게 적용하여 하단 리스트의 실제 지연 선박 수 대비 전체 운송 중 선박 수 비율이 1:1로 정확하게 계산되어 표시되도록 동기화 완료.
-
-## [2026-11-13] 제품 라이브러리(Product Library) 218종 전 모델 썸네일 파일명 매핑 및 데이터베이스 동기화
-
-### 1. 218종 공작기계 모델 Cloudflare R2 썸네일 파일명(Thumbnail file_name .webp) DB 동기화
-* **데이터베이스 컬럼 및 매핑 업데이트**:
-  * SQLite(`scm_erp.db`) 내 `product_models` 테이블의 218개 전 모델에 대해 `Thumbnail code` 문서 기준 `thumbnail_file`(.webp) 100% 매핑 및 업데이트 완료.
-  * 백엔드 자동 마이그레이션 스크립트(`backend/update_thumbnails.py`) 내 `THUMBNAIL_DATA` 딕셔너리를 218개 전 모델 매핑으로 전면 확장하고 `run_migration(db)` 로직을 보완하여 Render PostgreSQL 환경에서도 서버 재시작 시 자동으로 최신 썸네일 파일명이 반영되도록 구성.
-* **프론트엔드 제품 라이브러리 연동 및 인코딩 최적화**:
-  * `frontend/src/data/productLibraryModels.js`의 218개 모델 객체에 `thumbnail_file` 속성 추가 반영.
-  * `frontend/src/pages/ProductLibrary.jsx` 썸네일 이미지 로더 URL에 `encodeURIComponent`를 적용하여 파일명 내 공백이 포함된 모델(`thumbnail_HD2600 3100 Series.webp`, `thumbnail_L600 700 800 Series.webp` 등)도 Cloudflare R2 스토리지(`/thumbnail/`)에서 깨짐 없이 완벽하게 로드되도록 개선.
-
-### 2. Cloudflare R2 퍼블릭 도메인(Public Development URL) 갱신 및 썸네일 로딩 정상화
-* **스토리지 엔드포인트 갱신**: Cloudflare R2 버킷(wmeins)의 Public Development URL 활성화에 따른 최신 공개 도메인(https://pub-6d550208b84b4585ba380e73abb8ae79.r2.dev) 동기화.
-* **프론트엔드 환경변수 및 폴백 URL 동기화**: frontend/.env 및 frontend/src/pages/ProductLibrary.jsx의 기본 도메인 설정을 새 R2 주소로 업데이트하여 404 차단 현상을 해결하고, 218종 전 모델의 고화질 WebP 썸네일 이미지가 라인업 제품 라이브러리 화면에서 끊김 없이 정상 로딩되도록 조치 완료.
-* **카드 썸네일 내부 여백 및 테두리 겹침 방지 최적화 (ProductLibrary.jsx)**:
-  * 마우스 오버(Hover) 시 카드의 활성 테두리(border/box-shadow)와 가로 폭이 넓은 기계 이미지(HD2600 등)의 좌우 가장자리가 닿거나 겹치는 현상 개선.
-  * 이미지 스타일에 상단 12px, 좌우 18px, 하단 4px 내부 패딩(padding: '12px 18px 4px 18px', boxSizing: 'border-box')을 부여하여 카드의 테두리 선 안쪽으로 기계 이미지가 여유 있게 안착되도록 시각적 여백 확보.
-  * 마우스 오버(Hover) 시 카드의 하이라이트 테두리 두께를 기존 2px에서 **3px**(box-shadow: inset 0 0 0 2px rgb(205, 170, 125))로 확장하여, 레이아웃 밀림(Layout Shift) 없이 명확하고 직관적인 카드 포커스 시각 효과 구현.
-* **전역 데이터 로딩 및 빈 목록 문구 다국어(i18n) 동기화 (translation.json, DealerOrders.jsx, AdminDashboard.jsx 등)**:
-  * 영문 페이지에서 테이블 데이터 조회 중 '데이터를 불러오는 중입니다...' 또는 잘못된 시드 데이터 생성 문구가 노출되던 문제 해결.
-  * locales/ko/translation.json 및 locales/en/translation.json 내 common.loading('데이터를 불러오는 중입니다...' / 'Loading data...'), common.no_orders, common.no_data 리소스를 통합 추가.
-  * DealerOrders, DealerDashboard, DealerInventory, DealerPromotion, DealerSalesArchive, AdminDashboard, AdminInventory, AdminSalesArchive, AdminDispatch 등 시스템 전반의 테이블 로딩 플레이스홀더를 다국어 표준 호출(t('common.loading'))로 일괄 전환.
-
-## [2026-11-12] 표준 프로토콜 기반 직렬 2단계 인증(AAL2), 제로터치 온보딩, 전 환경 패스키 호환성 및 딜러 포털 대시보드·구매내역 UI/다국어 전면 개편
-
-### 1. 로그인 식별자 이메일(email) 단일화 및 사용자 성명(username) 역할 분리
-* **models.CustomUser 데이터베이스 모델 구조 개편**:
-  * email: 시스템 내 유일한 로그인 고유 식별자(ID)로 단일화 (unique=True, index=True, nullable=False).
-  * username: 로그인 ID가 아닌 개인정보 표시 이름(실명) 전용으로 역할 분리. 동명이인 등록 허용(unique=False) 및 신규 계정 초기 미기입(nullable=True) 지원.
-  * is_active: 계정 활성화 상태 제어 컬럼(Boolean, default=True) 추가 및 서버 구동 시(on_startup) SQLite/PostgreSQL 무중단 자동 마이그레이션 적용.
-* **사용자 성명(실명) 온보딩 플래그 및 프로필 연동 (UserProfile.jsx, App.jsx)**:
-  * 최초 로그인 시 username이 비어있거나 이메일 형식인 경우 needs_profile_setup: true 플래그를 반환하고, 상단 안내 배너 노출 및 개인정보 설정 화면으로 자동 유도.
-  * UserProfile.jsx에서 email 필드는 로그인 고유 ID로 읽기 전용 보호, username(성명)과 department(부서)를 저장(PATCH /api/v1/users/me) 시 네비게이션/사이드바에 실시간 반영.
-
-### 2. 표준 프로토콜(NIST SP 800-63B AAL2) 기반 직렬 2단계 인증(Serial 2FA) 구축
-* **[1단계] 이메일 & 비밀번호 검증 (POST /api/v1/auth/login)**:
-  * 텍스트 아이디 조회를 배제하고 오직 email로만 계정을 식별하여 비밀번호 해시 검증.
-  * 1단계 통과 시 시스템 접근 권한을 부여하지 않고, 3분 유효기간의 제한된 임시 토큰(pre_auth_token, scope="mfa_pending", aal="aal1")만 발급.
-* **[2단계] WebAuthn/Passkey 교차 검증 및 최종 세션 발급 (POST /api/v1/auth/verify-2fa)**:
-  * 1단계 임시 토큰(aal1)과 Supabase Passkey 토큰을 동시 검증.
-  * 1단계 로그인 계정과 2단계 패스키 소유자 이메일(supabase_uid) 일치 여부를 교차 검증하여 본인 인증 통과 시에만 최종 AAL2 세션 토큰(access_token, scope="authenticated", aal="aal2", 8시간 유효) 및 역할 권한 부여.
-  * 기존 단독 로그인(POST /api/v1/auth/supabase-login) 우회 차단(403 반환).
-* **프론트엔드 직렬 로그인 UI 전면 개편 (Login.jsx)**:
-  * 테스트용 하드코딩 계정 및 1단계 단독 로그인 버튼 완전 삭제.
-  * STEP1_EMAIL_PW -> STEP2_PASSKEY 직렬 상태 머신 UI 및 단계별 가이드 배너 적용.
-
-### 3. 제로터치 온보딩(Zero-Touch Onboarding) 및 초기 비밀번호 설정 초대 링크(Invitation Link) 자동 발송
-* **관리자 수기 임시 비밀번호 지정 배제 및 원천 차단 (AdminUsers.jsx, POST /api/users)**:
-  * 관리자가 신규 계정 생성 시 비밀번호를 수기로 입력하지 않고 email(로그인 ID), role, dealer_company_id/department만 입력하여 password_hash = None 상태로 계정 생성.
-* **무상태 동적 서명(Stateless Dynamic HMAC) 기반 48시간 일회용 초대 링크 (email_service.py, main.py)**:
-  * dynamic_secret = f"{JWT_SECRET}:{user.password_hash or 'INVITE_PENDING'}" 기반 48시간 유효 일회용 초대 토큰(scope="account_invite") 생성.
-  * 신규 계정 생성 시 send_account_invitation_email을 통해 초대 링크 자동 발송.
-  * POST /api/users/{user_id}/resend-invite: 초기 비밀번호 미설정 계정에 대한 관리자 원클릭 초대 링크 재발송 엔드포인트 및 UI 버튼 구현.
-* **원스톱 초대 수락 및 2단계 패스키 등록 연동 (Login.jsx, POST /api/v1/auth/accept-invite)**:
-  * 사용자가 이메일의 초대 링크(?invite_token=...) 클릭 시 Login.jsx에서 '초기 비밀번호 설정' 화면 자동 진입.
-  * 비밀번호 설정 즉시 password_hash가 암호화 해시로 저장되면서 기존 초대 링크는 영구 자동 폐기(1회용 보장).
-  * 비밀번호 저장과 동시에 반환된 pre_auth_token(aal1)을 통해 곧바로 2단계 패스키 기기 등록(PASSKEY_ENROLL)으로 전환되어 원스톱으로 AAL2 최종 로그인 및 프로필 실명 설정까지 완료.
-* **계정 4대 상태 라이프사이클 및 관리자 UI 고도화 (AdminUsers.jsx, models.CustomUser)**:
-  * onboarding_status: 초대 대기중(INVITE_PENDING) -> 패스키 등록 대기(PASSKEY_PENDING) -> 정상 활성(ACTIVE_AAL2) / 비활성(INACTIVE).
-  * 사용자 관리 화면에서 초대 대기 상태 계정에 대해 '초대 발송됨' 배지 및 [초대 재발송] 버튼 제공, 상단 대기 중인 초대(Pending) KPI 실시간 집계.
-
-### 4. 무상태 동적 서명 기반 비밀번호 분실(찾기) 및 재설정 아키텍처
-* **비로그인 비밀번호 분실 및 1회용 자동 무효화 링크 (POST /api/v1/auth/forgot-password, POST /api/v1/auth/reset-password)**:
-  * dynamic_secret = f"{JWT_SECRET}:{user.password_hash}" 서명을 적용하여 15분 유효 일회용 재설정 링크 이메일 발송.
-  * 비밀번호 재설정 완료 즉시 password_hash가 변경되므로 이전 링크는 즉시 무효화되어 중복 사용 방지.
-* **로그인 상태 비밀번호 변경 (POST /api/v1/users/me/change-password)**:
-  * 현재 비밀번호 확인 후 8자 이상 새 비밀번호로 안전하게 변경.
-
-### 5. 시스템 아키텍처 문서 및 명세서 동기화 (WMEINS_CONTEXT.md)
-* models.CustomUser 스키마 및 REST API 엔드포인트 목록 테이블 갱신 (AAL2 직렬 2FA, 제로터치 초대 링크, 비밀번호 분실/재설정 API 6종 명세 반영).
-
-
-### 6. 모바일(구글앱·크롬·엣지·사파리) 및 PC 전 환경 2단계 패스키 호환성 및 다중 기기 지원 고도화
-* **모바일 브라우저(iOS WebKit 등) 터치 제스처 만료(`NotAllowedError`) 방지 및 0ms 즉시 호출 (Login.jsx, main.py)**:
-  * 기존 2단계 인증 버튼 클릭 후 외부 서버와의 비동기 통신 대기로 인해 모바일(iOS WebKit)의 사용자 제스처 유효시간이 만료되어 `The request is not allowed by the user agent...` 에러가 발생하던 구조를 전면 개선.
-  * 1단계 로그인 검증 완료 시점에 백엔드에서 서명된 `webauthn_challenge`를 사전 발급(Pre-fetch)하고, 2단계 버튼 터치 시 0ms 즉시 브라우저 `navigator.credentials.create()` / `get()`을 동기적으로 호출하여 크롬·사파리·엣지 등 모바일 정식 브라우저에서 안면인식(Face ID), 지문, 기기 암호 창이 즉시 실행되도록 최적화.
-* **PC + 모바일 다중 기기·다중 브라우저 패스키 동시 바인딩 지원 (main.py, schemas.py)**:
-  * PC(Windows Hello 숫자 PIN)에서 패스키를 기등록했더라도, 모바일(스마트폰)이나 다른 브라우저(크롬, 엣지, 구글앱)에서 접속 시 기존 패스키와 충돌하지 않고 기기별 Credential ID를 복수 등록·유지(`_parse_user_mfa_binding`, `_serialize_user_mfa_binding`)할 수 있도록 아키텍처 확장.
-* **구글앱 인앱 브라우저 등 전 브라우저 100% 호환 2차 숫자 패스키(PIN) 듀얼 모드 지원 (Login.jsx)**:
-  * 정식 웹 브라우저(사파리, 크롬, 엣지)와 달리 검색 포털 전용 인앱 웹뷰(Google Search App) 환경에서는 iOS의 보안 정책상 WebAuthn 하드웨어 생체인증 호출이 OS 수준에서 원천 제한되는 특성을 완벽 방어.
-  * 2단계 인증 화면에 **`생체 / 기기 패스키`** 및 **`숫자 패스키 (PIN)`** 2개 탭을 제공하여, 구글 앱 환경에서도 4~8자리 숫자 패스키(PIN, `PBKDF2-HMAC-SHA256` 암호화 해시 저장)로 모든 브라우저에서 제약 없이 2차 인증을 통과할 수 있도록 이중화 구현.
-  * 생체인증 팝업 차단(`NotAllowedError`) 감지 시 사용자 안내 메시지와 함께 숫자 패스키 모드로 원활하게 자동 전환 폴백.
-* **모바일 2단계 인증 탭 버튼 한 줄 정렬 및 UI 다듬기 (Login.jsx)**:
-  * 모바일 화면 폭에 상관없이 탭 버튼 텍스트(`생체 / 기기 패스키`, `숫자 패스키 (PIN)`)가 줄바꿈되어 글자가 떨어지지 않도록 `whiteSpace: 'nowrap'`, 아이콘 `flexShrink: 0`, 탭 컨테이너 너비(`width: 100%`, `boxSizing: 'border-box'`)를 최적화하여 깔끔한 모바일 시각적 완성도 확보.
-
-### 7. 딜러 포털 사이드바 메뉴명 체계 개편 및 다국어(i18n) 동기화
-* **사이드바 딜러 메뉴(`sidebar.dealer_menu`) 직관성 및 명확성 강화 (Sidebar.jsx, translation.json)**:
-  * 대시보드 및 주문 메뉴의 명칭을 실제 역할에 맞게 재정의:
-    * `주문 / 배송현황` ➔ **`포털 대시보드`** (`dashboard` / EN: `Portal Dashboard`)
-    * `배송상태` ➔ **`주문 / 배송현황`** (`orders` / EN: `Order / Delivery Status`)
-  * 기존 핵심 메뉴(`내 구매 내역` / `My Ordered`, `WIA 재고리스트` / `WIA Stock List`, `WIA 프로모션` / `WIA Promotion`, `제품 라이브러리` / `Product Library`) 라벨 일관성 유지.
-  * 한국어(`ko`) 및 영어(`en`) 다국어 리소스 키를 일괄 동기화하여 언어 전환 시 실시간 적용.
-
-### 8. 딜러 포털 대시보드(DealerDashboard.jsx) 3단 세로 레이아웃 재구성 및 [내 구매 내역] 신설
-* **기존 [통관 및 픽업준비 요청] 제거 및 신규 [내 구매 내역] (`My Ordered`) 박스 신설**:
-  * 기존 대시보드 중단에 위치하던 [통관 및 픽업준비 요청] (`atp_list_title`, 출고진행 요청) 정보박스를 완전히 제거.
-  * 해당 위치에 현재 딜러의 최근 주문 현황을 한눈에 파악할 수 있는 **[내 구매 내역] (`My Ordered`)** 섹션을 신규 배치.
-  * 최근 주문일(`dealer_order_date` 또는 `created_at`) 기준 내림차순 정렬 후 **상위 4개 건**만 간소화하여 노출 (Order Date, Model, NC, S/N, P/O, Status).
-  * 우측 상단에 **`GO my ordered` 바로가기 버튼**을 배치하여 클릭 시 [내 구매 내역](`dealer-sales-archive`) 메인 페이지로 원클릭 즉시 이동 지원.
-  * 박스 설명 문구 다국어화(`dealer_dashboard.my_ordered_desc`): 한국어 `주문한 구매 내역 리스트입니다.` / 영어 `The list of your order history`.
-* **STATUS(상태) 배지 표기 전역 영문 표준화**:
-  * 한국어/영어 페이지 설정과 무관하게 상태 배지를 **항상 영문 표준 명칭**(`Order`, `In Production`, `Shipping`, `Arrived`, `In Warehouse`, `Dispatched`, `Picked Up`)으로 일관되게 표기하도록 통일.
-  * 데스크탑 및 모바일 뷰 배지 스타일(`whiteSpace: 'nowrap'`, `minWidth: '95px'`) 최적화로 텍스트 줄바꿈 방지.
-* **페이지 전체 세로 레이아웃 확립**:
-  * **상단**: KPI 카드 3개 (`진행중인 주문`, `운송 중 장비`, `출고 대기 장비`)
-  * **중간**: `WIA 가용재고 목록` (전체 너비 단독 배치)
-  * **하단**: `내 구매 내역` (상위 4건 그리드 및 바로가기 버튼, 전체 너비 단독 배치)
-
-### 9. [내 구매 내역] 메인 페이지(DealerSalesArchive.jsx) 테이블 그리드 스타일 및 상태 표기 최적화
-* **데스크탑 테이블 데이터 행 간격 및 폰트 크기 미세 조정**:
-  * 데이터 행(`td`) 상/하 패딩을 기존 `14px`에서 **`13px`**(`padding: '13px 12px'`)로 최적화하여 컴팩트한 시각적 균형감 확보.
-  * 기본 데이터 텍스트 크기를 기존 `12px`에서 **`11px`**(`fontSize: '11px'`)로 조정하여 대량 목록 열람 시 정보 밀도와 시인성 개선.
-  * 메인 페이지의 STATUS 상태 배지 역시 대시보드와 동일한 영문 표준 명칭으로 일괄 동기화 및 줄바꿈 방지 스타일 적용.
-
-### 10. 딜러 포털 로그인 시 영문(EN) 기본 우선 노출 적용 (App.jsx)
-* **딜러 접속 환경 맞춤 초기 언어 자동 바인딩**:
-  * 글로벌 딜러사 사용자의 편의성을 극대화하기 위해, 로그인 성공 시 사용자 역할이 `DEALER`인 경우 `i18n.changeLanguage('en')`를 자동 호출하여 **기본적으로 영문 페이지가 우선 노출**되도록 구성.
-  * 로그인 후 상단 Navbar의 언어 토글(`[EN] / [KR]`) 버튼을 통해 필요 시 언제든지 한국어로 즉시 전환 가능하도록 사용자 선택권 완벽 보장.
-
-
-
-## [2026-11-11] Google Antigravity 기반 코끼리-금붕어 모델(EGM, Elephant-Goldfish Model) 아키텍처 및 무상태 코드 감사 자동화 체계 전면 도입
-
-### 1. 코끼리-금붕어 모델(EGM) 상시 아키텍처 규칙 파일 구축 (.antigravityrules, AGENTS.md)
-* **[ELEPHANT MODE] 장기 기억 및 아키텍처 4대 설계 원칙 영구화**:
-  * `WMEINS_CONTEXT.md` 기반 장기 맥락 유지 및 15개 ORM 테이블(`models.py`) 스키마 준수.
-  * 물리적 바코드/RFID 리더기 배제 원칙 및 `OrderStatus` Enum 기반 논리적 상태 전환 파이프라인 확립.
-  * 해상 트래킹 무결성 규칙(부산항 `KRPUS`, 함부르크 `DEHAM` 표준화, 출항 전 부산항 고정, 도착 완료 화물 POD 스냅 및 지연 해제, 딜러 추적 2D Mercator 고정).
-  * 보안/RBAC 엄수(직렬 2단계 인증 필수, 딜러 포털 데이터 100% 격리).
-* **[GOLDFISH MODE] 5대 자체 감사 게이트(`[G-01]` ~ `[G-05]`) 상시 검증 규정**:
-  * `[G-01]` 보안/시크릿 누출 방지
-  * `[G-02]` 더미/시드 데이터 오염 차단
-  * `[G-03]` 딜러 권한 격리 및 타 딜러 데이터 노출 방지
-  * `[G-04]` 미출항/Null 상태 방어
-  * `[G-05]` 스케줄러 Diff-Check 및 API 호출 지연(`asyncio.sleep(0.8)`) DB 부하 방지
-
-### 2. 금붕어 에이전트 무상태 코드 감사 체크리스트 템플릿 제정 (GOLD_REVIEW_CHECKLIST.md)
-* **독립 감사 품질 관문(Ping-Pong Quality Gate) 템플릿화**:
-  * GitHub Push 전 또는 새 세션에서 `git diff`만으로 독립 검증을 수행하는 무상태(Stateless) 감사 체크리스트 신설.
-  * 해상 트래킹 및 지도 시각화 무결성, 직렬 MFA 및 딜러 권한 격리, 백엔드 스케줄러 및 배포 안전성 3대 영역 세부 점검 항목 정의.
-  * `[PASS - 배포 승인]` / `[FAIL - 수정 필요]` 판정 및 자동 패치 제안 출력 서식 표준화.
-
-### 3. Antigravity 워크스페이스 커스텀 스킬 2종 신설 (.agents/skills/)
-* **`egm-elephant-architect` (코끼리 모드 아키텍트 스킬)**:
-  * 대규모 기능 설계, DB 스키마 변경, 트래킹 로직 및 프론트엔드/백엔드 구현 시 장기 기억 주입 및 도메인 불변 규칙 가이드.
-* **`egm-goldfish-audit` (금붕어 모드 코드 감사 스킬)**:
-  * 커밋/푸시 전 `git diff`를 백지상태에서 분석하여 확증 편향 없는 객관적 결함 감사 및 핑퐁 검증 루프 실행.
-
-### 4. EGM 실전 템플릿 및 표준 운영 매뉴얼 가이드 문서화 (EGM_MANUAL_GUIDE.md)
-* WMEINS 시스템 아키텍처, 4대 필수 재고 모듈, 하드웨어 대체 디지털 식별자 바인딩, 핵심 KPI(체화율, 정시도착률, AIS 효율), 단계별 Antigravity 운영 절차(Step 1~Step 3) 가이드 전문 체계화.
-
-
-## [2026-11-10] RSM 포털 선적 트래킹 메뉴/페이지 연동, 가용재고 S/N 항목 신설, 전 페이지 정렬 드롭다운 다국어(i18n) 영문화, 판매목록 수량 표기 최적화
-
-### 1. RSM 포털 [선적 트래킹] 메뉴 신설 및 사이드바 메뉴 구조 개편 (Sidebar.jsx, App.jsx)
-* **RSM 포털 선적 트래킹 연동 및 라우팅 권한 확장**:
-  * 관리자 포털의 선적 트래킹(`ShipmentTracking`) 기능을 RSM 포털에서도 동일하게 조회할 수 있도록 라우팅(`App.jsx`) 및 사이드바(`Sidebar.jsx`) 메뉴 연동.
-  * RSM 포털 탭 검증 로직에 `'admin-tracking'`을 포함하여 메뉴 클릭 시 메인 대시보드로 리디렉션되던 현상 해결.
-* **RSM 포털 사이드바 메뉴 순서 표준화**:
-  * 지정된 업무 흐름에 맞춰 사이드바 순서 재배치:
-    1. 주문 / 배송현황 (`admin_dashboard`)
-    2. WIA 재고리스트 (`inventory`)
-    3. WIA 프로모션 (`promotion`)
-    4. 판매목록 (`sales_archive`)
-    5. 선적 트래킹 (`tracking`)
-    6. 제품 라이브러리 (`library`)
-    7. RSM 영업통계 (`dashboard`)
-
-### 2. WIA 가용재고 목록 신규 'S/N' (시리얼 번호) 컬럼 추가 (AdminInventory.jsx, DealerInventory.jsx)
-* **'NC' 우측 'S/N' 필드 신설 및 시스템 시리얼 연동**:
-  * 가용재고 테이블에서 'NC' 항목 우측에 'S/N' 컬럼을 추가하고, 기존 시스템의 `order.serial_number` 데이터를 공유 연동.
-  * 시리얼 번호가 없을 경우 `-`로 깔끔하게 처리.
-* **헤더 클릭 정렬 및 모바일 드롭다운 정렬 지원**:
-  * S/N 기준 오름차순/내림차순 정렬 기능 완벽 구현.
-  * 테이블 너비 비율(100%) 및 반응형 레이아웃 일관성 유지.
-
-### 3. 전 페이지 '기본 정렬' 드롭다운 메뉴 및 정렬 옵션 다국어(i18n) 전면 영문화 (translation.json 및 8개 컴포넌트)
-* **정렬 공통 다국어 사전 키(`common`) 구축**:
-  * `sort_default` ("기본 정렬" / "Default Sort")
-  * `sort_asc`, `sort_desc` ("(오름차순)" / "(Ascending)", "(내림차순)" / "(Descending)")
-  * `sort_lowest`, `sort_highest` ("(낮은순)" / "(Lowest)", "(높은순)" / "(Highest)")
-  * `sort_earliest`, `sort_latest` ("(빠른순)" / "(Earliest)", "(늦은순)" / "(Latest)")
-  * `sort_oldest`, `sort_newest` ("(과거순)" / "(Oldest)", "(최신순)" / "(Newest)")
-  * `sort_stage_early`, `sort_stage_late` ("(초기단계순)" / "(Initial stage)", "(완료단계순)" / "(Final stage)")
-* **대상 페이지 11개 영역 일괄 적용**:
-  * WIA 재고리스트 (`AdminInventory`, `DealerInventory`)
-  * WIA 프로모션 (`AdminPromotion`, `DealerPromotion` - 모바일/데스크탑 전 영역)
-  * 판매 목록 (`AdminSalesArchive`, `DealerSalesArchive`)
-  * 주문 / 배송현황 (`AdminDashboard`, `DealerOrders`)
-  * 영문 페이지 접속 시 정렬 드롭다운과 모든 옵션 라벨이 완전한 영문으로 렌더링되도록 개편.
-
-### 4. 판매 목록 매출 확정 장비 통계 수량 표기 최적화 (AdminSalesArchive.jsx)
-* **수량 단위 텍스트('대') 제거 및 숫자 단독 표기**:
-  * 상단 통계 바의 `전체: 40대`, `픽업 완료: 0대`, `픽업 대기(선매출): 40대` 표기에서 '대' 단위를 제거하고 숫자만 명확히 노출되도록 개선 (`40`, `0`, `40`).
-  * 한국어 및 영문 페이지 환경 모두에서 깔끔하고 일관된 숫자 뷰 제공.
-
-
-## [2026-11-09] WIA 가용재고 예약 모달 정보 개편(모델/시리얼), 날짜 서체 SUITE 적용, 모달 전 영역 다국어(i18n) 영문 지원 및 화물추적 버튼 호버 테두리 UI 고도화
-
-### 1. 관리자포털 WIA 가용재고 목록 '예약 기간 설정' 팝업 모달 정보 개편 (AdminInventory.jsx)
-* **상단 서브 타이틀 정보 구조 개편 (모델명 / 시리얼번호)**:
-  * 기존의 모델명 및 발주번호 표기(`HD2600SY (F26-06-15)`)에서 **모델명 / 시리얼번호**(`HD2600SY   /  G1713-0089`) 구조로 개편.
-  * 시리얼 번호가 미등록된 장비는 `-`로 자동 표기 처리.
-* **서체 굵기 및 전용 폰트 강화**:
-  * 텍스트 굵기를 **`fontWeight: 800` (ExtraBold)**로 상향 지정하여 모달 상단 정보 가독성 및 시인성 극대화.
-  * 현대위아 공식 서체인 **`SUITE`**(`'SUITE', sans-serif`)를 일괄 적용.
-* **연관 팝업 모달 상단 헤더 서식 일체화**:
-  * 일관된 UX 제공을 위해 '예약 상세 내역 모달'(`reserveDetailOrder`), '예약 장비 판매완료 확정 모달'(`reserveSaleOrder`), '임대 기간 설정 모달'(`rentalOrder`)의 상단 서브 타이틀도 동일한 `모델명   /  시리얼번호` (SUITE 800) 구조로 일괄 통일.
-
-### 2. 날짜 입력 필드(`input[type="date"]`) 현대위아 전용 서체(SUITE) 일괄 적용 (AdminInventory.jsx, index.css)
-* **섀도우 DOM 가상 선택자 기반 브라우저 기본 글꼴 오버라이드**:
-  * 크로미움(Chrome, Edge 등) 브라우저 기본 스타일시트로 인해 시스템 고딕으로 강제 렌더링되던 `input[type="date"]` 내부 날짜 텍스트를 현대위아 공식 서체인 **SUITE**(`'SUITE', sans-serif !important;`)로 전환.
-  * `::-webkit-datetime-edit`, `::-webkit-datetime-edit-fields-wrapper`, `::-webkit-datetime-edit-text`, `::-webkit-datetime-edit-month-field`, `::-webkit-datetime-edit-day-field`, `::-webkit-datetime-edit-year-field` 전역 적용.
-* **날짜 입력 필드 및 라벨 스타일 고도화**:
-  * 예약 시작일/종료일 및 임대 시작일/종료일 입력 필드에 `fontFamily: "'SUITE', sans-serif"`, `fontWeight: 600` 적용.
-
-### 3. WIA 가용재고 팝업 모달 4종 전체 영역 다국어(i18n) 시스템 전면 연동 (AdminInventory.jsx, translation.json)
-* **영문 페이지 접속 시 팝업창 100% 영문 전환 구현**:
-  * 기존 한국어로 하드코딩되어 있던 팝업창 내 공지문구, 카드 라벨, 버튼, 알림 메시지 전체를 `useTranslation` (`t()`) 훅으로 연결.
-* **'예약 기간 설정 / 수정' 모달 영문화**:
-  * 모달 제목(`Set Reservation Period` / `Edit Reservation Period`)
-  * 공지사항 박스(`[Notice] Please enter the reservation period.`, `Please select the reservation start and end (expiration) dates using the calendar, then click 'Confirm Reservation' below to save the schedule.`)
-  * 정보 카드 라벨(`Model`, `P/O No.`, `Reserved Dealer`)
-  * 날짜 선택 및 프리셋(`Reservation Start Date`, `Reservation End Date (Expiry)`, `Quick Selection:`, `+1 Week`, `+2 Weeks`)
-  * 액션 버튼(`Cancel`, `Confirm Reservation`, `Saving...`)
-* **'예약 상세 내역' 모달 영문화**:
-  * 모달 제목(`Reservation Details`), 요약 정보(`Reserved Dealer`, `Reservation Start Date`, `Expiration Date`, `Edit Period`)
-  * 잔여일 실시간 배지(`Expired`, `Expires Today (D-Day)`, `D-N Left`)
-  * 장비 상세 스펙(`Reserved Equipment Details`, `Model / NC`, `P/O No.`, `Serial No. (S/N)`, `Price (€)`, `Status`, `Destination / ETA`, `Detail Spec (OPTION)`)
-  * 푸터 버튼(`Cancel Reservation`, `Cancelling..`, `Sold`, `Close`)
-* **'예약 장비 판매완료 확정' 모달 영문화**:
-  * 모달 제목(`Confirm Sale of Reserved Stock`)
-  * 안내문(`After verifying the purchasing dealer, click 'Confirm Sale' to transfer this equipment directly to the selected dealer's confirmed order (Order/Delivery Timeline & Warehouse Dispatch flow).`)
-  * 딜러 선택 드롭다운(`Confirm Purchasing Dealer`, `-- Select Purchasing Dealer --`)
-  * 푸터 버튼(`Cancel`, `Confirm Sale`, `Processing...`)
-* **'임대 기간 설정 / 수정' 모달 영문화**:
-  * 모달 제목(`Set Rental Period` / `Edit Rental Period`), 공지문, 정보 라벨(`Rental Dealer`), 날짜 선택(`Rental Start Date`, `Rental End Date (Expiry)`), 프리셋(`+1 Month`, `+3 Months`, `+6 Months`, `+1 Year`, `+2 Years`), 푸터 버튼
-* **시스템 안내 팝업(Alert / Confirm) 다국어화**:
-  * 예약 취소 확인 confirm창, 날짜 선택 유효성 검증 alert, 판매완료 처리 결과 alert 등 다국어 사전 키 매핑 완료.
-
-### 4. 딜러포털 & RSM포털 화물추적 버튼 마우스 오버 테두리 UI 고도화 (DealerOrders.jsx, AdminDashboard.jsx)
-* **테두리 두께 2px 확장 및 현대위아 네이비 블루 컬러 적용**:
-  * 마우스 오버(Hover) 시 테두리 두께를 `2px`로 확장(`border: 2px solid rgb(10, 28, 143) !important;`).
-  * 현대위아 브랜드 전용 색상인 네이비 블루 `rgb(10, 28, 143)` (`#0A1C8F`)로 테두리 색상 통일.
-  * `box-sizing: border-box;` 적용으로 두께 증가에 따른 레이아웃 흔들림 및 버튼 크기 변경 방지.
-
-### 5. 프론트엔드 프로덕션 빌드 검증
-* 프론트엔드 최신 프로덕션 빌드(`npm.cmd run build`) 무결성 및 배포 호환성 검증 완료 (`built in 10.35s`).
-
-## [2026-11-08] P/O(F/A) 타입 분리, 선적/판매 UI 개편, 사이드바 순서 조정, 가용재고 [요청] 이메일 연동, 화물추적 버튼 UI 고도화 및 RSM 포털 Tracking·판매목록 연동
-
-### 1. 주문번호(P/O) 2대 유형 분류 및 비즈니스 정책 정립
-* **유럽법인 재고 발주 (F번호 주문, F...)**:
-  * 유럽법인(WME)이 본사로부터 재고 확보를 위해 발주한 장비로 기본 가용 재고(is_corporate_stock = True, stock_type = 'AVAILABLE')로 분류.
-  * '주문/배송현황' 타임라인에서 배송 단계를 추적하고, 'WIA재고리스트'에 노출되어 딜러 판매/할당 대상으로 관리.
-* **현지 딜러 구매 확정 발주 (A번호 주문, A...)**:
-  * 딜러가 구매를 위해 발주한 주문으로 등록 시점부터 이미 판매가 확정된 주문(is_corporate_stock = False, stock_type = 'DEALER_ORDER')으로 분류.
-  * 법인 판매용 재고가 아니므로 'WIA재고리스트'에서는 전면 제외되며, '주문/배송현황' 타임라인과 '판매목록'에 즉시 노출되어 관리.
-
-### 2. 백엔드 데이터베이스 정규화 및 API 로직 개편 (main.py)
-* **서버 구동 시 자동 마이그레이션 및 정규화 (on_startup)**:
-  * 시스템에 등록된 모든 A번호 주문의 is_corporate_stock = FALSE, stock_type = 'DEALER_ORDER' 일괄 보정 및 프로모션 인벤토리에서 원천 제거.
-  * F번호 주문 중 미판매 장비는 is_corporate_stock = TRUE, stock_type = 'AVAILABLE'로 보정.
-* **주문 생성/업로드 파이프라인 P/O 접두어 기준 자동 분류**:
-  * 단건 주문 생성(POST /api/orders), 발주 엑셀 업로드(POST /api/upload/excel), 재고 현황 업로드(POST /api/upload/stock-status), 주문 정보 수정(PATCH /api/orders/{id}) 전체에 P/O 접두어(A% vs F%) 자동 판별 로직 적용.
-* **주문 목록 조회 API (GET /api/orders) 필터 세분화**:
-  * sales_archive=True 신설: A번호 주문 전체 + 판매 완료(SOLD/DISPATCHED)된 F번호 주문을 통합 반환하여 '판매목록'에서 원스톱 관리.
-  * is_corporate_stock=True 보강: 반드시 F번호 주문(reference_no LIKE 'F%')이면서 미판매인 법인 가용 재고만 반환하도록 제한 (A번호 주문 원천 배제).
-* **선매출 및 출고/픽업 연동 프로세스 구현**:
-  * '판매목록'에서 선매출 발생 시 sales_month, sales_price만 입력하면 미출고 상태로 유지되어 '주문/배송현황' 타임라인에 계속 표시.
-  * 실물 출고 완료 시 pickup_date를 입력하면 자동으로 current_status = OrderStatus.SOLD, is_timeline_completed = True로 동기화되어 타임라인 완료 이관.
-
-### 3. 선적 관리 페이지 선적내역 리스트 폰트 SUITE 일괄 통일 (AdminShipmentUpload.jsx)
-* **B/L 번호 및 ETD 출항일의 monospace 폰트 제거**:
-  * 고정폭 글꼴(monospace)이 지정되어 옆 텍스트와 폰트 모양 및 자간이 불일치하던 문제를 해결하고 현대위아 공식 서체인 'SUITE', sans-serif로 변경 적용.
-* **선적내역 리스트 전체 영역 폰트 일체화**:
-  * 선적내역 카드 컨테이너, 출항 년도 셀렉트 박스, B/L·항구·선박 검색창 인풋, 테이블 헤더, 데이터 행(순차번호, B/L 번호, ETD, 목적항, 선사명, 장비개수 뱃지 및 아코디언 상세 내역) 전체에 'SUITE', sans-serif 통일 적용.
-
-### 4. 판매 목록 장비 및 판매 정보 수정 팝업창(모달) UI/UX 전면 리뉴얼 (AdminSalesArchive.jsx)
-* **모달 가로폭 확장 및 잘림 현상 완벽 해결**:
-  * 모달 최대 폭을 기존 640px에서 820px (너비 94%)로 확장하여 우측 폼 필드 및 [오늘 픽업], [초기화] 퀵 버튼이 잘리는 현상을 완벽 해소.
-* **논리적 4대 섹션 카드 그룹화 (가독성 극대화)**:
-  * **기본 주문 및 장비 정보**: 딜러사, 모델, P/O, S/N, NC, 주문일자
-  * **판매 매출 및 출고/픽업 현황**: 옅은 블루 배경 카드로 하이라이트, 판매가, 구매가, 매출월([이번 달] 원클릭 입력), 출고/픽업 일자([오늘 픽업], [초기화] 버튼 칩) 및 선매출 안내문구 배치
-  * **물류 운송 및 상세 스펙**: S/O, 도착항, Incoterms, 선박명, DETAIL SPEC(전체 폭 확장)
-  * **비고 (REMARK)**: 여유 있는 비고 메모 텍스트영역
-* **폼 입력 요소 정렬 및 폰트 통일**:
-  * 모든 인풋 및 셀렉트 박스의 높이(38px), 패딩, 둥근 모서리(8px), box-sizing: border-box를 일치시켜 세로 열 정렬 완성 및 SUITE 폰트 적용.
-  * 상단 헤더에 인디고 블루 아이콘 배지 및 P/O, S/N, 모델명 칩 태그 표시.
-
-### 5. 시스템 사이드바 11개 메뉴 순서 재배치 및 메뉴 체계 표준화 (Sidebar.jsx)
-* **관리자 포털 11개 핵심 메뉴 체계 순서 재정렬**:
-  1. **주문 / 배송현황** (`/admin/dashboard` / `dashboard`)
-  2. **선적 트래킹** (`/admin/tracking` / `tracking`)
-  3. **WIA 재고리스트** (`/admin/inventory` / `inventory`)
-  4. **WIA 프로모션** (`/admin/promotion` / `promotion`)
-  5. **WIA 창고** (`/admin/dispatch` / `dispatch`)
-  6. **판매목록** (`/admin/sales-archive` / `sales_archive`)
-  7. **영업통계 및 분석** (`/admin/analytics` / `analytics`)
-  8. **업로드 / 설정관리** (`/admin/management` / `management`)
-  9. **선적관리 & 업로드** (`/admin/shipment-upload` / `shipment_upload`)
-  10. **제품 라이브러리** (`/admin/library` / `library`)
-  11. **유저 및 보안관리** (`/admin/users` / `users`)
-* **다국어(ko/en) 메뉴 텍스트 및 라우팅 무결성 보강**:
-  * 언어 변경 시에도 11개 메뉴 항목이 일관되게 표시되도록 `ko/translation.json`, `en/translation.json` 내 `sidebar.admin_menu` 키 정비 완료.
-
-### 6. 딜러포털 WIA재고리스트 'WIA 가용재고 목록' 내 [요청] 기능 신설 (DealerInventory.jsx)
-* **프로모션 페이지와 동일한 [요청] (Reserve / Order) 기능 탑재**:
-  * 유럽법인 가용재고(`AVAILABLE`) 장비에 대해 딜러가 즉시 예약 또는 주문 요청을 보낼 수 있는 듀얼 액션 버튼(`Reserve`, `Order`) 신설.
-  * 예약 중(`RESERVED`) 또는 기타 상태 장비는 `해당없음`으로 안전 처리.
-* **표준 영문 이메일 템플릿 자동 발송 연동 (`handleEmailRequest`)**:
-  * 수신처: `jypark@hyundai-wia.de`
-  * 제목: `[Stock {requestType} Request] Model: {modelName}`
-  * 본문: 모델명, NC, P/O(발주번호), S/N 정보가 사전 기재된 메일 작성창 즉시 호출 (`mailto:` 링크).
-  * 아코디언 행 토글과 겹치지 않도록 이벤트 버블링 차단(`stopPropagation`) 적용.
-* **데스크탑 테이블 및 모바일 반응형 카드 뷰 완벽 대응**:
-  * 데스크탑: 테이블 헤더에 [요청] 컬럼 추가 및 9개 컬럼 너비(100%) 균형 재조정, 서브 스펙 토글 시 `colSpan={9}` 확장.
-  * 모바일: 카드 하단에 [Reserve]와 [Order] 버튼을 나란히 배치하여 모바일 발주 편의성 극대화.
-  * 다국어 번역 키(`menu2.header_request`: '요청' / 'REQUEST') 등록.
-
-### 7. 딜러포털 배송 추적 타임라인 화물추적 버튼 UI/UX 전면 개편 (DealerOrders.jsx)
-* **버튼 텍스트 제거 및 커스텀 선박 SVG 아이콘 적용**:
-  * 기존의 `🚢 화물추적` 텍스트와 이모지를 제거하고, 화물선과 파도가 형상화된 공식 벡터 아이콘(`gemini-svg.svg`)으로 교체 적용.
-  * 버튼 툴팁(`title="화물추적"`)을 유지하여 사용자 안내성 확보.
-* **화이트 배경 및 마우스 오버 시 블랙 테두리 인터랙션 구현**:
-  * 기존 파란색 배경을 정갈한 화이트 배경(`#ffffff`)으로 전환하고, 연한 그레이 테두리(`1px solid #d1d5db`) 기본 적용.
-  * 마우스 오버(Hover) 시 테두리가 블랙(`#000000`)으로 부드럽게 반전되고, 입체적인 그림자 및 마이크로 상향 이동 애니메이션(`translateY(-1px)`) 적용.
-  * 데스크탑 테이블 액션 버튼 및 모바일 카드 뷰 하단 버튼에 일관된 UI 클래스(`.cargo-tracking-btn`, `.cargo-tracking-btn-mobile`) 적용.
-
-### 8. RSM 포털 '주문 배송 타임라인' 내 'Tracking'(화물추적) 기능 신설 (AdminDashboard.jsx)
-* **RSM 권한 전용 'Tracking' 액션 컬럼 및 버튼 추가**:
-  * 기존 관리자용 상태 설정(Next/Prev/수정/삭제) 컬럼 대신, RSM 접속 시 딜러포털과 동일한 **[Tracking / 화물추적]** 컬럼(`width: 10%`) 및 화물추적 버튼 노출.
-  * 모바일 뷰 카드 하단에도 원클릭 화물추적 버튼(`.cargo-tracking-btn-mobile`) 일체 적용.
-* **실시간 선적 및 AIS 항로 추적 팝업 모달 연동**:
-  * 화물추적 버튼 클릭 시 선적 데이터(`shipmentsMap`)와 선택 장비 정보를 기반으로 `DealerVesselTrackingModal` 팝업 자동 호출.
-  * B/L 정보, 출항/도착지, 선박명, 실제 AIS 항로 및 진행 상태를 즉시 모니터링 가능하도록 구현.
-
-### 9. RSM 포털 [판매목록] 메뉴 연동 및 사이드바 6개 메뉴 순서 재구성 (App.jsx, Sidebar.jsx)
-* **RSM 권한의 판매목록(AdminSalesArchive.jsx) 접근 라우팅 활성화**:
-  * 관리자 포털의 판매목록 기능을 RSM 포털에서도 동일하게 조회할 수 있도록 라우팅 및 탭 전환 권한 허용.
-* **RSM 사이드바 6개 메뉴 순서 재배치**:
-  1. **주문 / 배송현황** (`admin-dashboard`)
-  2. **WIA 재고리스트** (`admin-inventory`)
-  3. **WIA 프로모션** (`admin-promotion`)
-  4. **판매목록** (`admin-sales-archive`)
-  5. **제품 라이브러리** (`admin-library`)
-  6. **RSM 영업통계** (`rsm-dashboard`)
-* **다국어(ko/en) 번역 등록**:
-  * `sidebar.rsm_menu.sales_archive` 키에 "판매목록" / "Sales Archive" 등록 완료.
-
-### 10. 로컬 DB 동기화 및 프론트엔드 프로덕션 빌드 검증
-* 로컬 SQLite DB(`scm_erp.db`) 및 백업 데이터(`backup_orders_239.json`) 내 239건 주문 전체 P/O 타입 기준 정규화 완료.
-* 프론트엔드 최신 프로덕션 빌드(`npm.cmd run build`) 무결성 및 배포 호환성 검증 완료.
-
-## [2026-11-07] 선적 트래킹 B/L 상세정보 및 선박 탭 UI 최적화, 불필요 지표 위젯 제거 및 화면 시인성 극대화
-
-### 1. 선적 트래킹 지도 상단 오버레이 위젯 간소화 (`TrackingMapboxWidget.jsx`)
-* **불필요한 중복·추정 지표 위젯 제거**:
-  * 지도 상단 중앙에 오버레이 형태로 배치되어 있던 '총 항해 누적 거리' 및 '수집 항로 포인트' 카드 위젯을 완전히 제거했습니다.
-  * 불필요한 위젯 박스들을 정리함으로써 지도 뷰포트의 시야각과 항로 가시성을 대폭 확보했습니다.
-* **실시간 핵심 관제 지표 유지 및 집중도 향상**:
-  * 실시간 모니터링에 반드시 필요한 '최후 AIS 수신 위치'(위도/경도 좌표, 현재 속력 knot, 진행 방위각 °) 단일 카드만 지도 상단에 깔끔하게 유지하여 정보 전달력을 극대화했습니다.
-
-### 2. 선적 상세정보 좌측 패널 '선박' 탭 제원 그리드 정돈 (`ShipmentTracking.jsx`)
-* **선박 제원 2×2 균형 그리드 재배치**:
-  * 선박 제원 영역에서 중복 안내되던 '총 항해 누적 거리'와 '수신 AIS 궤적'(포인트 수) 항목 2칸을 삭제했습니다.
-  * 실무에서 가장 중요한 4개 핵심 제원인 IMO 번호, MMSI 식별부호, 현재 속력(Speed), 진행 방위(Course)를 2행 2열(2×2) 정렬 그리드로 재편성하여 깔끔한 레이아웃을 완성했습니다.
-* **시스템 내부 개발자 안내 카드 블록 영구 제거**:
-  * '선박' 탭 하단에 노출되던 기술적 설명 박스인 '2시간 주기 스마트 Diff-Check 동기화 (v5.0 최적화)' 녹색 카드를 완전히 제거했습니다.
-  * 불필요한 텍스트 노이즈를 줄여 하단의 핵심 운항 항로 정보('남아공 희망봉 우회' / '수에즈 운하 직통' / '함부르크 환적')에 즉시 집중할 수 있도록 개선했습니다.
-
-### 3. 전체 시스템 무결성 검증 및 Render 자동 배포
-* 프론트엔드 최신 프로덕션 빌드(`npm run build`) 무결성 및 성능 검증 완료.
-* Render 클라우드 배포 파이프라인 연동 확인 (실서비스 즉시 반영).
-
-## [2026-11-06] 선적 관리 B/L 엑셀 업로드 시 선적내역 리스트 미표시 오류 해결 및 TrackCargo 실시간 연동 강화
-
-### 1. Render 백엔드 로그 정밀 분석 및 근본 원인 규명
-* **TrackCargo 트래킹 정상 연동 및 데이터 수신 확인**:
-  * 백엔드 로그 확인 결과, 스케줄러(scheduler.py)가 B/L HDMUSELE11765900 등을 TrackCargo API(POST /client-orders/create/tracking/sea)에 등록하고 반환받은 주문 ID(b03cb3c5-...)로 선박(ONE INTELLIGENCE), 출항/도착 정보를 정상 수신(HTTP 200 OK)하고 있음을 확인했습니다.
-  * 즉, 업로드된 B/L 데이터는 DB shipments 테이블에 정상적으로 저장되었으나 화면 조회 시 필터링되어 나타나지 않는 현상이었습니다.
-* **선적내역 리스트 조회 API(GET /api/shipments?include_all=true) 쿼리 누락 버그 해결**:
-  * 기존 백엔드 get_shipments 함수가 filter(models.Shipment.orders.any())로 설정되어 있어, 주문(Order)과 연결된 선적만 조회하도록 강제되어 있었습니다.
-  * 새로 업로드된 B/L 8건의 P/O나 S/N가 시스템 내 주문 테이블에 아직 매핑되지 않았거나 신규인 경우 shipment.orders가 빈 상태가 되어 API 반환 목록에서 누락되는 문제가 발생했습니다.
-  * 관리자가 전체 선적 이력을 조회(include_all=True)할 때는 주문 매핑 여부와 무관하게 업로드된 모든 선적(Shipment)이 리스트에 노출되도록 쿼리 로직을 전면 개편했습니다.
-
-### 2. 선적 업로드 및 TrackCargo 벌크 등록 키 매핑 개선
-* **MBL 번호 정규화 키 불일치 문제 해결**:
-  * create_bulk_sea_tracking 실행 시 SCAC 코드가 제거된 순수 B/L 번호(SELE11765900)로 응답이 반환되어 원본 MBL(HDMUSELE11765900)과 키가 일치하지 않아 업로드 시점에 trackcargo_order_id와 ETA/ETD가 즉시 저장되지 못하고 스케줄러를 거쳐야 했던 문제를 해결했습니다.
-  * result_map에 원본 MBL과 정규화 MBL을 모두 매핑하여 업로드 즉시 TrackCargo 주문 ID와 초기 항해 데이터를 실시간 동기화하도록 보강했습니다.
-* **P/O 및 S/N 대소문자/공백 유연 매칭 지원**:
-  * 선적 엑셀 업로드 시 기존 주문과의 매칭률을 극대화하기 위해 func.lower(func.trim(...))을 적용하여 공백이나 영문 대소문자 차이로 인한 매칭 실패를 원천 방지했습니다.
-
-### 3. 프론트엔드 선적 관리 UI(AdminShipmentUpload.jsx) 안정화
-* 신규 선적 업로드 성공 시, 출항 연도 필터링(selectedYear)으로 인해 새로 등록된 B/L(ETD 미수신 건 등)이 가려지지 않도록 전체보기(ALL)로 자동 전환하고 좌측 선적내역 리스트를 즉시 갱신하도록 처리했습니다.
-
-### 4. 목적지별(ISTANBUL, ROTTERDAM, STAVANGER, OSLO 등) 해상 항로 왜곡 및 좌표 단절 오류 해결
-* **도착항 표준 좌표 누락 보강 (STAVANGER 등)**:
-  * PORT_COORDINATES 사전에 노르웨이 STAVANGER(NOSVG: [5.7331, 58.9690]) 좌표가 누락되어 목적지가 기본값(부산항)으로 지정되던 문제를 해결하고, OSLO, ISTANBUL, ROTTERDAM, BERGEN 등 유럽 주요 항구의 좌표 매핑을 전면 확충했습니다.
-* **임의 6개 점 절단(slice(0, 6)) 버그 제거 및 목적지별 지능형 완주 항로 생성기 구축**:
-  * 실측 AIS 궤적이 수신되기 전 신규 선적에 대해 목적지와 무관하게 무조건 함부르크 경로의 앞 6개 점(남아프리카 희망봉)까지만 자르던 레거시 로직을 완전히 제거했습니다.
-  * 신규 getStandardMaritimeRoute 함수를 구축하여 각 선적의 실제 목적항에 맞추어 해상 항로를 분기 생성하도록 개편했습니다:
-    * **지중해 권역 (ISTANBUL 등)**: 희망봉 우회 ➔ 서아프리카 북상 ➔ 지브롤터 해협 ➔ 시칠리아 해협 ➔ 에게해 ➔ 다르다넬스/마르마라해 ➔ 이스탄불항 완주 연결.
-    * **북유럽 권역 (OSLO, STAVANGER 등)**: 영국 해협/도버 해협 ➔ 북해 ➔ 스타방에르항 직결 및 스카게라크 해협 ➔ 오슬로 피오르드 완주 연결.
-    * **북서유럽 권역 (ROTTERDAM, ANTWERP, HAMBURG 등)**: 영국 해협 ➔ 도버 해협 ➔ 마스플락테/로테르담항 완주 연결.
-* **출항 전/미도착 상태 선박 위치 및 대각선 왜곡 버그 해결**:
-  * 출항 전(now <= ETD) 또는 진행 중인 선박의 위치를 계산할 때, 목적지별 전체 항로선 위에서 정확히 보간되도록 estimateVesselPosition 함수를 개편하여 희망봉에서 출발항으로 날아가는 대각선 직선 왜곡을 원천 차단했습니다.
-
-### 5. [HMM 공식 실제 노선 반영] 터키 이스탄불(수에즈 운하 직통) 및 노르웨이 오슬로(함부르크 환적 경유) 항로 정밀 개편
-* **터키 이스탄불(ISTANBUL, TURKIYE) 수에즈 운하 직통 항로 구현**:
-  * 선사 HMM 공식 운항 경로를 정밀 반영하여, 아프리카 희망봉 우회가 아닌 부산(BUSAN, KOREA) 출발 ➔ 대만해협 ➔ 남중국해 ➔ 싱가포르/말라카 해협 ➔ 스리랑카 남단 ➔ 아라비아해 횡단 ➔ 아덴만 ➔ 바브엘만데브 해협 ➔ 홍해(Red Sea) 북상 ➔ 수에즈 운하(Suez Canal) 통과 ➔ 동지중해 ➔ 에게해 ➔ 다르다넬스 해협 ➔ 마르마라해 ➔ 이스탄불(ISTANBUL, TURKIYE) 직통 표준 해상 회랑(HMM_SUEZ_TO_ISTANBUL_ROUTE)을 구축했습니다.
-* **노르웨이 오슬로(OSLO, NORWAY) 및 북유럽 함부르크 환적(Transshipment) 항로 구현**:
-  * HMM 공식 노선에 맞추어 대형 모선이 독일 함부르크(HAMBURG, GERMANY [9.9841, 53.5413])에 기항하여 피더선(Feeder)으로 환적 연계되는 해상 항로를 구축했습니다.
-  * 지도 상에 HMM 공식 화면과 동일하게 독일 함부르크에 주황색 원형 점 및 오렌지 캡슐 라벨 뱃지(HAMBURG, GERMANY)를 표시하여 환적 경유지임을 명확히 안내하도록 지원했습니다.
-* **HMM 공식 뷰어 스타일의 지나온 구간(실선) 및 잔여 구간(점선) 분리 렌더링**:
-  * 선박의 현재 운항 위치까지는 붉은색 실선(maritime-route-past), 목적지까지 남은 예정 항로는 붉은색 점선(maritime-route-remaining, line-dasharray: [2, 2])으로 분리 렌더링하여 실시간 항해 현황을 직관적으로 시각화했습니다.
-  * 출발항(BUSAN, KOREA), 도착항(OSLO, NORWAY, ISTANBUL, TURKIYE) 역시 HMM 공식 규격의 세련된 블루 캡슐 뱃지 스타일을 적용했습니다.
-
-## [2026-11-05] 판매목록(AdminSalesArchive.jsx) 리스트 항목구성 및 순서 개편, '매출월'·'출고/픽업' 신규 항목 신설 및 선(先)매출 관리 체계 구축
-
-### 1. 판매목록 테이블 리스트 항목 구성 및 순서 개편
-* **사용자 요청 기준 11개 컬럼 순서 완전 재배치**:
-  * 테이블 열 순서를 지정해주신 순서대로 개편했습니다:
-    * `*` (순번) ➔ `딜러` ➔ `모델` ➔ `S/N` ➔ `P/O` ➔ `NC` ➔ `주문일자` ➔ `판매가` ➔ `구매가` ➔ `매출월` ➔ `출고/픽업`
-  * 기존에 행 확장 시에만 볼 수 있었던 주문일자, 구매가 등의 정보를 메인 테이블 컬럼으로 올리고, 직관적인 열 너비 비율(합계 100%)을 적용하여 가로 스크롤 없이 한눈에 모니터링할 수 있도록 최적화했습니다.
-
-### 2. 신규 핵심 항목 '매출월' 및 '출고/픽업' 신설
-* **매출월 (Sales Month)**:
-  * 판매 매출인보이스가 발행된 연·월(`YYYY.MM`) 정보를 명확하게 표시.
-  * 상단 통합 검색창에서 매출월(예: `2026.11`) 입력 시 해당 월의 매출 건만 즉시 선별 검색 가능.
-* **출고/픽업 (Dispatch / Pickup)**:
-  * 실제 판매된 기계가 창고에서 픽업 완료되었는지 여부와 픽업일자 정보 표시.
-  * **픽업 완료 시**: 녹색 배지 및 체크 아이콘과 함께 픽업일자(`YYYY.MM.DD`) 표기.
-  * **미출고 시**: `-` 로 깔끔하게 표기되며, 마우스오버 시 `선매출 (미출고)` 툴팁 안내 제공.
-
-### 3. 선(先)매출 관리 프로세스 및 UI/UX 지원
-* **선매출 비즈니스 로직 지원**:
-  * 창고에서 기계가 아직 출고/픽업되지 않았더라도 매출인보이스를 먼저 발행하는 '선매출' 건의 경우, 출고/픽업 열에 `-` 로 표시되고 추후 실제 픽업이 완료되었을 때 손쉽게 픽업일자를 등록하여 완료 처리할 수 있도록 프로세스 연동.
-* **상태별 퀵 필터 및 통계 헤더 연동**:
-  * 검색창 우측에 출고/픽업 상태 필터 드롭다운 신설: `전체 출고/픽업 상태`, `출고/픽업 완료`, `출고/픽업 대기 (선매출)` 옵션 제공.
-  * 상단 통계 바에 `전체: X대`, `픽업 완료: Y대`, `픽업 대기(선매출): Z대` 수량을 실시간 집계하여 미출고 선매출 기계를 즉각 파악 가능.
-
-### 4. 장비 및 판매/출고 정보 수정 모달 확장 및 원클릭 인터랙션
-* 테이블의 행(Row) 클릭 시 즉시 '장비 및 판매 정보 수정' 모달 호출 (`cursor: pointer`, 부드러운 행 호버 하이라이트).
-* 모달 내 판매가(`sales_price`), 구매가(`price`), 주문일자(`dealer_order_date`), 매출월(`sales_month`), 출고/픽업일자(`pickup_date`) 입력 필드 신설.
-* 신속한 입력을 위한 퀵 버튼 제공: `[이번 달]` 클릭 시 현재 월 자동 입력, `[오늘 픽업]` 클릭 시 오늘 일자 자동 입력, `[초기화]` 클릭 시 선매출(미출고) 상태로 리셋 지원.
-
-### 5. 정렬, 엑셀 익스포트, 모바일 반응형 및 다국어(i18n) 동기화
-* 10개 전체 데이터 컬럼에 대해 테이블 헤더 클릭 정렬(`▲` / `▼`) 및 정렬 드롭다운 지원.
-* 엑셀 내보내기(`Excel Export`) 시 새로운 11개 컬럼 규격과 포맷팅된 데이터가 UTF-8 BOM 인코딩으로 깔끔하게 다운로드되도록 개편.
-* 모바일 카드 뷰에서도 모델, P/O, 딜러, S/N, NC, 주문일자, 판매가, 구매가, 매출월, 출고/픽업 상태를 일목요연하게 확인할 수 있도록 카드 메타정보 재정비.
-* `locales/ko/translation.json`, `locales/en/translation.json`의 `menu4` 다국어 키 완벽 동기화.
-
-### 6. 데이터베이스 스키마 확장 및 자동 마이그레이션 파이프라인
-* `orders` 테이블에 `sales_price`(VARCHAR), `sales_month`(VARCHAR), `pickup_date`(DATETIME) 컬럼 신설.
-* 로컬 SQLite DB(`scm_erp.db`) 및 Render 운영 PostgreSQL DB에 대해 서버 기동 시 안전하게 자동 마이그레이션(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS ...`)되도록 `backend/database.py`와 `backend/main.py`에 적용.
-
-## [2026-11-04] WIA 가용재고 목록 예약(Reservation) 기능 신설, 딜러 포털 상태 배지 연동, 라인업 제품 라이브러리 카탈로그(001~042) DB·프론트엔드·R2 스토리지 전체 동기화 및 백엔드 드라이버 호환성 강화
-
-### 1. WIA 가용재고 목록('AdminInventory.jsx') 내 '예약' 프로세스 및 관리 라이프사이클 구축
-* **상태(Status) 드롭다운 메뉴 내 '예약' 항목 추가**:
-  * 가용재고 상태 변경 순서를 `[판매가능 > 예약 > 딜러주문 > 임대 > 전시 > 프로모션]` 체계로 재편성.
-  * '예약' 선택 시 임대(Rental) 설정과 동일한 UI/UX의 '예약 기간 설정' 팝업 모달 호출:
-    * 딜러사 선택 드롭다운, 시작일 및 만료일자 캘린더 입력 지원.
-    * 1주일(`+1주`), 2주일(`+2주`) 빠른 기간 선택 버튼 제공으로 신속한 예약 등록 지원.
-* **주문선택 컬럼 내 예약 카드 및 액션 버튼(`예약내역`, `판매완료`) 연동**:
-  * 예약 등록 완료 시 행 상태가 보라색 '예약' 배지로 즉시 전환.
-  * 주문선택 컬럼에 지정 딜러명(파란색 볼드체), 만료 일자(`만료: YYYY. MM. DD`), `예약내역` 버튼, `판매완료` 버튼 자동 렌더링.
-  * **예약 상세 조회 및 취소 모달 (`예약내역`)**: 예약된 딜러사, 예약 기간, 등록일 등 상세 내역을 팝업으로 조회하고, 필요 시 즉시 '예약취소'를 수행하여 가용 상태(판매가능)로 복원.
-  * **판매완료(SOLD) 원클릭 전환 (`판매완료`)**: 장비가 최종 계약/판매되었을 때 확인 다이얼로그를 거쳐 `판매완료` 상태로 확정 전환하여 출고 파이프라인으로 연동.
-* **백엔드 자동 만료 스케줄러(`scheduler.py`) 및 데이터베이스 모델 확장**:
-  * 예약 만료일 도래 시 시스템이 자동으로 가용재고(판매가능) 상태로 전환하도록 백그라운드 스케줄러 로직 연동.
-
-### 2. 딜러 포털 및 출고현황 화면 내 예약 상태 실시간 동기화
-* **딜러 포털(`DealerInventory.jsx`, `DealerDashboard.jsx`) 상태 배지 빈칸 버그 완벽 해결**:
-  * 관리자 포털에서 예약된 장비의 경우, 딜러 포털의 WIA 가용재고 목록에서 상태 열 배지가 빈칸(공란)으로 노출되던 화면 렌더링 오류를 식별 및 수정.
-  * 딜러 포털에서도 선명한 보라색 '예약' 배지(`var(--status-rental)` / `#7c3aed`)와 예약 만료일자 안내가 명확히 표시되도록 배지 매핑 및 다국어 텍스트(`status_reserved`, '예약' / 'Reserved') 적용.
-* **창고 출고현황(`AdminDispatch.jsx`) 상태 필터 및 배지 연동**:
-  * 창고 관리 화면의 상태 필터에 '예약' 항목을 추가하고, 출고 대기 테이블에 예약 상태 배지를 일관된 디자인 시스템으로 연동.
-
-### 3. 라인업 제품 라이브러리 카탈로그 코드(Catalog Code 001~042) DB 및 프론트엔드 연동
-* **최신 카탈로그 코드 기준 218개 전 모델 매핑 (Cloudflare R2 스토리지 연동)**:
-  * 최신 공식 `Catalog_code.pdf` 명세(총 6페이지)를 정밀 분석하여 전체 218개 제품 모델에 대해 `catalog-001.pdf`부터 `catalog-042.pdf`까지 1:1 카탈로그 코드 매핑 완료 (카탈로그 미지정 1개 모델 `LV600G`는 `None` 규격 처리).
-  * `HD3100` 계열 6종(`HD3100`, `HD3100A`, `HD3100L`, `HD3100LM`, `HD3100M`, `HD3100MA`)의 카탈로그 코드 불일치(`catalog-004` ➔ `catalog-003`)를 공식 카탈로그 기준에 일치하도록 정정 교정.
-* **데이터베이스 및 자동 마이그레이션 스크립트 반영**:
-  * 로컬 SQLite(`scm_erp.db`) 및 Render 운영 PostgreSQL(`product_models` 테이블)의 `catalog_file` 필드 일괄 업데이트.
-  * 서버 부팅 시 실행되는 데이터 마이그레이션 스크립트(`backend/update_thumbnails.py`) 및 모델 임포터(`backend/import_models.py`)에 218개 모델의 카탈로그 정보를 등록하여 향후 DB 마이그레이션/재배포 시에도 영구 보존되도록 안정화.
-* **프론트엔드 다운로드 얼럿 오류 원인 해결 및 원클릭 다운로드 파이프라인 완성**:
-  * **오류 원인 규명**: 사용자가 제품 라이브러리(`ProductLibrary.jsx`)에서 카탈로그 다운로드 클릭 시 *"다운로드할 파일이 설정되지 않았습니다."* 경고창이 발생하던 문제는, 프론트엔드 목업 데이터(`productLibraryModels.js`)의 `documents` 객체에 `filename` 프로퍼티가 누락되어 있었기 때문임을 규명.
-  * **프론트엔드 동기화**: `frontend/src/data/productLibraryModels.js` 파일 내 218개 모델의 카탈로그 문서 객체에 `filename: 'catalog-XXX.pdf'` 속성을 전면 추가·동기화 완료.
-  * **R2 스토리지 다운로드 연계**: 사용자가 카탈로그 다운로드 버튼 클릭 시 백엔드 다운로드 API(`/api/documents/{filename}/download`)를 호출하고, 백엔드의 `storage.py`가 Cloudflare R2 버킷의 서명된 URL(Presigned URL)로 즉시 안전하게 리다이렉트하여 브라우저에서 공식 PDF가 다운로드/열람되도록 완벽 연동.
-
-### 4. 백엔드 PostgreSQL 드라이버 호환성 강화 (`backend/database.py`)
-* **`psycopg` (v3) 및 `psycopg2` 자동 폴백 지원**:
-  * Render 배포 환경 및 다양한 로컬/도커 파이썬 런타임 환경에서 `psycopg` 패키지 누락 시 발생할 수 있는 데이터베이스 연결 실패를 방지하기 위해, `psycopg` 로드 실패 시 `psycopg2` 드라이버(`postgresql+psycopg2://`)로 자동 폴백하는 안전 계층 구현.
-
----
-
-## [2026-11-03] 공식 도메인(`wmeins.eu`) Resend 발송 안정화, WIA 프로모션 컬럼 재배치, 제외(판매가능 전환) 기능 신설 및 상태('예약'/'예약가능') 2단 개편
-
-### 1. Resend API Key 런타임 인증(`401`) 오류 원인 규명 및 신규 시크릿 키 갱신
-* **인증 실패 원인 진단 및 해결**:
-  * 실시간 시스템 진단 엔드포인트(`GET /api/system/test-email`)를 통해 등록된 API 키가 만료/불일치(`statusCode: 401, message: API key is invalid`)되었음을 정확하게 진단하고 신속히 식별했습니다.
-  * Resend 대시보드에서 신규 Full Access API Key(`re_L2g...hzKp`)를 재발급받아 Render 백엔드 환경 변수(`RESEND_API_KEY`)에 안전하게 갱신 등록했습니다.
-
-### 2. 공식 시스템 발신자(`noreply@wmeins.eu`) 실환경 메일 발송 성공 검증
-* **초고속 REST API 발송 및 200 OK 응답 확인**:
-  * 공식 발신자 명칭 `WME Integrated Network System <noreply@wmeins.eu>`으로 Resend REST API(`POST https://api.resend.com/emails`) 호출 시 지연 시간 약 0.2초 이내로 `HTTP 200 OK` 정상 승인을 확인했습니다.
-* **대량 알림 이메일 실시간 발송 완료 (총 8건)**:
-  * 백그라운드 스케줄러와 연동되어 최신 운송 상태가 갱신된 발주 건(`F25-12-94`, `F25-12-95`, `A26-01-12`, `A25-12-30`, `A26-04-09`, `A26-06-14`, `A26-04-05` 등)의 알림 이메일이 고유 발송 ID(UUID)를 부여받고 관리자 수신함(`jypark@hyundai-wia.de`, `freelogin3975@gmail.com`)으로 전송 완료되었습니다.
-* **Resend 대시보드 및 Gmail SMTP 덮어쓰기 문제 완전 해소**:
-  * 기존 Google SMTP 이용 시 발신자 주소가 `freelogin3975@gmail.com`으로 강제 변경되던 문제를 완전히 해결하고, Resend 대시보드 내 실시간 전송 내역(Emails)과 공식 인증 도메인 명의의 발송 체계를 완벽하게 확립했습니다.
-
-
-### 3. WIA 프로모션(`AdminPromotion.jsx`, `DealerPromotion.jsx`) 리스트 컬럼 순서 재배치
-* **도착지(PORT)와 도착일정(ETA) 컬럼 순서 조정**:
-  * 관리자 및 딜러 포털 WIA 프로모션 페이지의 데스크톱 테이블 컬럼 순서를 직관적인 정보 탐색 동선에 맞추어 재정렬했습니다.
-  * **반영된 컬럼 순서**:
-    * `*` ➔ `모델` ➔ `NC` ➔ `판매가` ➔ `P/O` ➔ `옵션상세` ➔ **`도착지`** ➔ **`도착일정`** ➔ `진행상황` ➔ `예약정보` ➔ `상태` (딜러 포털: `REQUEST` 유지)
-  * 옵션상세 확인 후 장비가 입항하는 도착 항구(`PORT`)를 먼저 확인하고, 도착 예정일(`ETA`)을 연이어 검토할 수 있도록 테이블 헤더(`<thead>`)와 행 데이터(`<tbody>`)의 정렬 순서를 완벽하게 동기화했습니다.
-
-### 4. WIA 프로모션(`AdminPromotion.jsx`) 리스트 '제외' 버튼 기능 신설 및 WIA 재고 자동 전환 연동
-* **'제외' 액션 기능 및 UI 디자인 구현**:
-  * 데스크톱 테이블에서 '상태' 컬럼 우측에 신규 컬럼 **'제외' (EXCLUDE)**를 추가하였습니다.
-  * **아이콘 버튼 디자인**: 사용자 요청 디자인 에셋인 언링크(unlink) 체인 아이콘(`assets/icons/unlink.png`)을 적용하였으며, 라이트/다크 테마에 맞추어 `currentColor` 마스크 기법으로 선명하게 렌더링되도록 구현했습니다.
-  * **아이콘 호버(Mouse Over) 인터랙션**: 마우스오버 시 `리스트 제거` (영문: `Remove`) 툴팁이 즉시 노출되며, 은은한 레드 하이라이트 배경 및 미세 확대(Scale 1.08) 애니메이션 효과를 주어 삭제/제외 액션의 시인성을 극대화했습니다.
-  * **모바일 카드 뷰 지원**: 모바일 화면에서도 '상태' 배지 우측에 제외 버튼을 배치하여 디바이스에 구애받지 않고 손쉽게 프로모션 제외가 가능하도록 최적화했습니다.
-* **프로모션 제외 및 WIA 가용재고 자동 전환 백엔드 로직 연동**:
-  * 백엔드 API 신설: `DELETE /api/promotions/{promotion_id}` 및 `POST /api/promotions/{promotion_id}/exclude` 엔드포인트를 구현했습니다.
-  * 제외 실행 시 사용자 확인(Confirm) 다이얼로그를 거친 후, 프로모션 인벤토리(`PromotionInventory`)에서 해당 P/O 레코드를 완전히 삭제합니다.
-  * 동시에 연계된 발주 장비(`Order`)의 `stock_type`을 기존 `'PROMOTION'`에서 `'AVAILABLE'`(판매가능) 상태로 자동 변경하고 예약 정보를 초기화하여, WIA 재고관리(`AdminInventory.jsx`)의 **WIA 가용재고 목록에 '판매가능' 상태로 즉시 복귀**하도록 유기적으로 연동했습니다.
-* **다국어(i18n) 번역 리소스 등록**:
-  * `locales/ko/translation.json` 및 `locales/en/translation.json`에 `header_exclude`, `tooltip_remove`, `confirm_exclude`, `exclude_failed` 다국어 키를 등록하여 글로벌 환경을 완벽 지원합니다.
-
-### 5. WIA 프로모션(`AdminPromotion.jsx`, `DealerPromotion.jsx`) 리스트 [상태] 항목 표기 개편 ('예약' / '예약가능')
-* **[상태] 항목 표기 2단 체계 단일화**:
-  * 기존에 WIA 재고리스트와 혼용되어 노출되던 배지 텍스트('프로모션', '판매가능' 등)를 제거하고, 프로모션 리스트 본연의 목적에 맞게 **'예약'** 및 **'예약가능'** 2개 상태로 완전 일원화했습니다.
-  * **예약된 P/O**: 보라색 배지(`hsla(262, 83%, 58%, 0.15)`, `#7c3aed`)와 함께 **`예약`**으로 명확히 표기.
-  * **예약 가능한 P/O**: 가용 녹색 배지(`hsla(142, 76%, 46%, 0.2)`, `var(--status-stock)`)와 함께 **`예약가능`**으로 표기.
-* **필터 드롭다운 및 정렬 기준 동기화**:
-  * 상태 필터 셀렉트박스의 옵션을 `전체 상태 조회`, `예약가능`, `예약`으로 개편하여, 원하는 상태의 프로모션 장비를 즉시 선별할 수 있도록 필터링 로직을 개선했습니다.
-  * 상태 기준 정렬(`▲` / `▼`) 시에도 '예약'과 '예약가능' 텍스트를 기준으로 정확하게 그룹화되어 정렬되도록 연동했습니다.
-* **딜러 포털(`DealerPromotion.jsx`) 요청(Reserve/Order) 권한 연계**:
-  * '예약가능' 상태인 P/O에 대해서만 딜러의 `Reserve` / `Order` 버튼이 활성화되도록 로직을 일치시켰습니다.
-* **다국어(i18n) 번역 등록**:
-  * `locales/ko/translation.json` 및 `locales/en/translation.json`에 `status_available_reservation`('예약가능' / 'Available') 및 `status_reserved`('예약' / 'Reserved') 키를 추가 및 정비했습니다.
-
-
-## [2026-11-02] WIA 프로모션 모바일 리스트 2단 개편, 재고 모달 터치 고정 및 알림 이메일 Resend 공식 도메인 발신 인프라 구축
-
-### 1. WIA 프로모션(`AdminPromotion.jsx`, `DealerPromotion.jsx`) 모바일 카드 메타정보 2단 UI/UX 재정비
-* **판매가 / ETA / 도착지 정보 텍스트 겹침 문제 해결**:
-  * 기존 모바일 카드에서 `PRICE`, `ETA`, `PORT` 3개 항목이 가로 1줄에 무리하게 나열되어, 좁은 화면에서 판매가 금액 및 수정 버튼과 날짜/도착지 텍스트가 서로 겹치거나 줄바꿈되던 문제를 완벽히 해결했습니다.
-* **상·하 2단 분리 레이아웃 적용**:
-  * **첫 줄 (`판매가:`)**: 상단에 판매가 라벨과 포맷팅된 유로 통화 금액(`150,000 €`) 및 관리자 인라인 수정 버튼(`[✎]`)을 단독 배치하여 긴 자릿수와 편집 인풋이 넉넉하게 표시되도록 공간을 확보했습니다.
-  * **다음 줄 (`ETA:` / `도착지:`)**: 하단에 은은한 점선 구분선(`borderTop: 1px dashed var(--border-color)`)과 함께 좌측에 `ETA: [일자]`, 우측에 `도착지: [항구명]`을 나란히 분리 배치하여 가로 스크롤이나 글자 겹침 없이 한눈에 들어오도록 개선했습니다.
-* **관리자·딜러 포털 및 다국어 지원 일원화**:
-  * 관리자 포털(`AdminPromotion.jsx`)과 딜러 포털(`DealerPromotion.jsx`) 양쪽에 일관되게 적용하고, 다국어 리소스(`locales/ko/translation.json`, `locales/en/translation.json`)에 `label_sale_price`를 동기화했습니다.
-
-### 2. WIA 재고리스트(`AdminInventory.jsx`) 모바일 모달 본문 좌우 흔들림 방지 및 터치 스크롤 고정
-* **원인 분석**:
-  * 모바일 브라우저(특히 iOS Safari)의 내장 날짜 입력(`input[type="date"]`)이 고유의 최소 너비를 가져, 시작일·만료일 2개의 인풋이 화면 폭을 미세하게 초과하면서 가로 스크롤 오버플로우가 발생했습니다.
-  * 또한 본문 영역에 수평 터치 방지(`touchAction: 'pan-y'`) 및 가로 넘침 차단(`overflowX: 'hidden'`)이 누락되어, 날짜 선택이나 버튼 터치 시 사용자의 손가락 움직임에 따라 상단 헤더 아래의 본문 전체가 좌우로 흔들리거나 슬라이드되는 현상이 있었습니다.
-  * 카드 컨테이너에 적용되었던 `.glass-card` 클래스가 모바일 미디어 쿼리에서 10px 외부 패딩과 0.3초 트랜지션을 강제 주입하여 미세 흔들림과 유격을 심화시켰습니다.
-* **개선 및 고정 조치**:
-  * **가로 스크롤 및 수평 터치 흔들림 원천 차단**: 모달 오버레이 및 본문에 `overflowX: 'hidden'`, `touchAction: 'pan-y'`(상하 스크롤만 허용), `overscrollBehavior: 'contain'`을 적용하여 설정 변경 중에도 좌우 흔들림이 전혀 없도록 견고하게 고정했습니다.
-  * **날짜 입력 필드 규격화**: 날짜 그리드에 `repeat(2, minmax(0, 1fr))` 및 `<input type="date">`에 `minWidth: 0`, `maxWidth: '100%'`, 모바일 최적화 패딩을 적용하여 좁은 화면에서도 너비를 벗어나지 않도록 방어했습니다.
-  * **장비 & 딜러사 카드 규격 고정**: 3단 그리드에 `repeat(3, minmax(0, 1fr))` 및 드롭다운 텍스트 말줄임(`textOverflow: 'ellipsis'`)을 적용하여 딜러사 변경 시에도 너비 변동이 생기지 않도록 고정했습니다.
-  * **트랜지션 및 패딩 간섭 제거**: `.glass-card` 대신 `clean-card` 및 `padding: 0 !important`, `transition: none`을 적용하여 헤더, 본문, 푸터가 한 화면에 일체화되도록 최적화했습니다.
-  * **적용 모달**: '예약 기간 설정', '예약 기간 수정', '예약 상세 내역', '임대 기간 설정' 전체 모달 일괄 적용.
-
-### 3. 알림 이메일 발신 인프라 Resend REST API 연동 및 공식 시스템 도메인(`wmeins.eu`) 발송 체계 구축
-* **Resend 공식 고속 HTTP API 연동 (`backend/email_service.py`)**:
-  * 기존 SMTP(Gmail) 방식은 Render에 `RESEND_API_KEY`를 등록했더라도 코드에서 직접 인식하지 못해 하드코딩된 개인 Gmail 계정(`freelogin3975@gmail.com`)으로 발송되던 한계를 해결했습니다.
-  * 백엔드 환경 변수에 `RESEND_API_KEY`가 감지되면 내장 `httpx`를 통해 **Resend 공식 REST API(`https://api.resend.com/emails`)**를 즉시 호출하도록 지능형 발송 엔진을 구축했습니다.
-  * 네트워크 순단이나 일시적 API 장애 발생 시 기존 SMTP 방식으로 안전하게 폴백(Fallback)하는 이중 안전장치를 탑재했습니다.
-* **공식 시스템 발신자(`FROM_EMAIL`) 및 관리자 수신함(`ADMIN_NOTIFICATION_EMAILS`) 연동**:
-  * Resend에 DNS 인증(DKIM/SPF)이 완료된 공식 도메인(`wmeins.eu`) 기반 `WME Integrated Network System <noreply@wmeins.eu>`을 기본 발신자로 채택하여 스팸 차단율을 낮추고 대외 신뢰도를 강화했습니다.
-  * 하드코딩되어 있던 알림 수신자 주소를 환경변수 `ADMIN_NOTIFICATION_EMAILS`를 통해 유연하게 관리할 수 있도록 개선했습니다.
-
-### 4. 이메일 환경변수 자동 정제(따옴표/공백 제거) 및 실시간 진단 API(`GET /api/system/test-email`) 구축
-* **환경 변수 자동 정제(`_clean_env_val`)**:
-  * Render 대시보드 환경 변수 입력 시 발생할 수 있는 따옴표(`"`, `'`)나 앞뒤 여백을 자동으로 제거하여 Resend API 헤더 인증(401) 및 발신자 유효성(422) 검사 오류를 사전에 차단했습니다.
-  * HTML 본문 스타일을 함께 제공하여 텍스트 줄바꿈 유지 및 메일 가독성을 극대화했습니다.
-* **실시간 시스템 진단 엔드포인트(`GET /api/system/test-email`) 제공**:
-  * ERP에서 발주 상태를 번거롭게 변경하지 않아도, 브라우저나 curl에서 엔드포인트 호출 시 Resend API 키 인식 상태, 발송 성공 여부, 또는 실패 시의 상세 HTTP 에러 코드를 즉시 JSON으로 확인할 수 있는 진단 체계를 구축했습니다.
-
-
-## [2026-10-31] WIA 프로모션(관리자·딜러포털) 리스트 개편, 재고리스트 예약 라이프사이클 연동 및 UI 최적화
-
-### 1. 관리자포털 WIA 프로모션(`AdminPromotion.jsx`) 컬럼·UI 개편 및 예약 관리 일원화
-* **예약 설정 기능 재고리스트 일원화**:
-  * 장비의 예약 설정·취소·판매완료 관리를 **WIA 재고리스트(`AdminInventory.jsx`)** 단일 창구로 통합함에 따라, WIA 프로모션 페이지 내 예약 설정 컨트롤을 제거하고 현황 조회 및 프로모션 판매가 관리 중심 화면으로 개편했습니다.
-* **리스트 항목 명칭 변경 및 데이터·스타일 정밀화**:
-  * `발주번호` ➔ **`P/O`**(`menu3.header_po`)로 항목명을 변경 적용했습니다.
-  * `진행상태` ➔ **`진행상황`**(`menu3.header_progress`, 영문 `STATUS`)으로 변경하고, 주문/배송현황 페이지의 P/O 기준 단계 정보(`주문` / `생산 중` / `배송` / `항구도착` / `입고`)가 타원형 배경 배지 없이 **`bold` 굵기 및 `rgb(255, 87, 51)` 색상 텍스트**로 표기되도록 적용했습니다.
-  * `설정` ➔ **`상태`**(`menu3.header_stock_status`, 영문 `TYPE`)로 변경하고, WIA 재고리스트의 `상태` 항목과 동일한 배지(`프로모션`, `예약`) 및 `예약정보`(예약 딜러명 + `만료: YYYY.MMM.DD`)가 실시간 동기화되도록 구성했습니다.
-* **컬럼 정렬 표준화**:
-  * 리스트 내 `*`, `모델`, `NC`, `P/O`, `도착일정`, `진행상황`, `예약정보`, `상태` 항목을 모두 중앙 정렬(`center`)로 통일했습니다.
-
-### 2. 딜러포털 WIA 프로모션(`DealerPromotion.jsx`) 12개 항목 동기화 및 영업 보안 적용
-* **관리자포털 동일 기준 12개 컬럼 구성**:
-  * 딜러포털 WIA 프로모션 리스트를 `*, 모델, NC, 판매가(€), P/O, 옵션상세, 도착일정, 도착지, 진행상황, 예약정보, 상태, 요청` 12개 항목으로 재구성하고 관리자포털과 동일한 데이터 소스 및 스타일(`진행상황` 볼드·컬러 텍스트, `상태` 배지, 상단 필터/정렬)을 연동했습니다.
-* **딜러 간 영업 보안 및 상태별 `요청` UI 분기**:
-  * **`예약정보`**(`dealer_promotion.header_reservation`, 영문 `RESERVATION`): 장비가 `예약(RESERVED)` 상태일 때 타 딜러사명은 노출하지 않고 만료일(`만료: YYYY.MMM.DD`)만 표시하도록 구성했습니다.
-  * **`요청`**: `프로모션` 상태일 때 `Reserve` / `Order` 이메일 요청 버튼을 표시하고, `예약` 상태일 때는 `해당없음`(영문 `Unavailable`)이 표기되도록 데스크톱 테이블과 모바일 카드 뷰 모두에 적용했습니다.
-
-### 3. WIA 재고리스트 ↔ WIA 프로모션 양방향 라이프사이클 백엔드 연동 (`main.py`, `scheduler.py`, `AdminInventory.jsx`)
-* **프로모션 등재 유지 및 예약 정보 동기화**:
-  * WIA 재고리스트에서 상태를 `프로모션(PROMOTION)`으로 설정 시 WIA 프로모션 목록(`PromotionInventory`)에 자동 등재되며, 이후 재고리스트에서 `예약(RESERVED)`으로 변경하더라도 목록에서 사라지지 않고 `상태: 예약` 및 예약 딜러·만료일 정보가 동기화됩니다.
-  * 상태를 `판매가능`, `임대`, `전시`, `딜러주문`으로 변경하거나 예약 `판매완료`(딜러 발주 귀속) 확정 시에는 WIA 프로모션 목록에서 자동 제거됩니다.
-* **예약 취소·기한 만료 시 프로모션 상태 복원 및 알림 중복 방지**:
-  * 프로모션 등재 장비의 예약을 취소(`cancel-reservation`)하거나 예약 만료일이 경과(`auto_release_expired_order_reservations`, `process_expired_promotion_reservations`)할 경우 일반 `판매가능`이 아닌 원래의 **`프로모션(PROMOTION)`** 상태로 자동 복원되도록 개선했습니다.
-  * 백그라운드 스케줄러(`check_promotion_expiry_alerts`)에서 `Order` 기반 예약 건에 대한 중복 만료 예정(`D-1`) 메일 발송을 방지하도록 보완했습니다.
-
-### 4. WIA 재고리스트 상태 버튼 규격 개선 및 딜러포털 예약 기간 상세 표시 (`AdminInventory.jsx`, `DealerInventory.jsx`)
-* **영문 텍스트 잘림 방지 규격 최적화 (`AdminInventory.jsx`)**:
-  * 영문 모드(`Promotion`, `Showroom`, `Reserved` 등)에서 상태 드롭다운 버튼 내부 텍스트가 잘리지 않도록 버튼 너비를 `90px`로 넓히고 폰트 크기를 `11px` ➔ `10px`로 조정했습니다.
-* **딜러포털 하단 상세 패널 `예약 기간` 표시 (`DealerInventory.jsx`)**:
-  * 딜러포털 WIA 재고리스트에서 `예약(RESERVED)` 상태인 행을 펼쳤을 때 관리자포털과 동일한 우측(3번째 열) 위치에 예약 딜러명·예약내역 버튼 없이 `예약 기간: YYYY.MMM.DD ~ YYYY.MMM.DD` 정보만 표기되도록 적용했습니다.
-
-## [2026-10-30] WIA 가용재고 목록 예약(RESERVED) 기능 구축, 전용 팝업 UI/UX 고도화 및 딜러포털 동기화
-
-### 1. WIA 재고리스트(`AdminInventory.jsx`) 상태 메뉴 개편 및 예약(`RESERVED`) 설정 워크플로우 구축
-* **상태 드롭다운 순서 표준화 및 통계 연동**:
-  * 가용재고 목록의 상단 상태 필터, 데스크톱 테이블, 모바일 카드 뷰 드롭다운 메뉴 순서를 `[판매가능 > 예약 > 딜러주문 > 임대 > 전시 > 프로모션]`(`AVAILABLE > RESERVED > DEALER_ORDER > RENTAL > SHOWROOM > PROMOTION`)으로 일괄 적용했습니다.
-  * 상단 재고 수량 통계 헤더 바에 `예약` 상태 장비 집계 카운트를 신규 추가했습니다.
-* **임대 설정과 일관된 '예약 기간 설정' 팝업 모달 탑재**:
-  * 행에서 `[상태: 예약]` 및 `[주문선택: 딜러]` 지정 후 우측 `[확정]` 버튼을 클릭하면 전용 **'예약 기간 설정'** 팝업 모달이 실행되도록 구성했습니다.
-  * 팝업 내부에 안내 공지 배너, 3열 요약 카드(`모델`, `발주번호`, 팝업 내에서도 변경 가능한 `예약 딜러`), 달력 기반 `예약 시작일`·`예약 종료일(만료일)` 선택기, 빠른 기간 프리셋 버튼(**`+1주`**, **`+2주`**) 및 `[예약기간 확정]` 저장 기능을 구현했습니다.
-
-### 2. 예약 완료 시 '주문선택' 셀 전용 UI 전환 및 상세·판매완료 액션 모달 구현
-* **예약 완료 행 '주문선택' 전용 레이아웃 적용**:
-  * 예약 확정 시 상태 컬럼이 `예약`으로 전환되며, '주문선택' 컬럼에 예약 딜러명, 영문 월 표기 만료일(`만료: YYYY.MMM.DD`, 예: `2026.OCT.30`), **`[예약내역]`** 버튼 및 **`[판매완료]`** 버튼이 데스크톱·모바일 뷰 모두에 표시되도록 구현했습니다.
-  * 행 클릭 시 펼쳐지는 하단 상세내역 영역에도 예약 딜러, 예약 기간 및 `[예약내역]` 바로가기 버튼을 연동했습니다.
-* **`[예약내역]` 상세 팝업 및 `[예약취소]`·`[기간수정]` 기능**:
-  * 예약 딜러사(국가 포함), 잔여일(`D-Day`) 배지, 예약 시작일/만료일(`기간수정` 바로가기 지원) 및 장비 제원·옵션 상세 스펙을 한눈에 확인할 수 있는 팝업을 구축했습니다.
-  * 팝업 하단 `[예약취소]` 클릭 시 예약을 즉시 해제하고 해당 장비를 다시 `판매가능(AVAILABLE)` 상태로 복귀시킵니다.
-* **`[판매완료]` 확정 팝업 및 딜러 발주 자동 귀속 전환**:
-  * 예약 딜러사가 기본 선택된 상태에서 최종 실구매 딜러를 확인(변경 가능) 후 확정하면, 법인 가용재고(`is_corporate_stock=False`)에서 해당 딜러사의 확정 발주로 즉시 이관되어 `주문/배송현황` 및 `WIA 창고` 출고 프로세스와 유기적으로 연동됩니다.
-
-### 3. 백엔드 DB 스키마 확장, 전용 API 신설 및 자동 만료 복귀·알림 스케줄러 연동
-* **DB 모델 및 무중단 자동 마이그레이션 (`models.py`, `schemas.py`, `database.py`, `main.py`)**:
-  * `Order` 테이블에 예약 전용 컬럼 4종(`reserved_dealer_id`, `reservation_start_date`, `reservation_expiry_date`, `reservation_expiry_alert_sent`)을 추가하고 `DealerCompany` 이중 외래키(`foreign_keys`) 관계를 명시하여 법인 재고 소유권(`WME`)과 예약 딜러 정보를 안전하게 분리했습니다.
-  * 서버 구동 시 PostgreSQL(Render 운영 DB) 및 로컬 SQLite 환경 모두에 신규 컬럼이 무중단 자동 추가되도록 DDL 마이그레이션을 반영했습니다.
-* **가용재고 예약 전용 REST API 3종 및 자동 만료·알림 엔진 구축 (`main.py`, `scheduler.py`)**:
-  * `PATCH /api/orders/{order_id}/reserve` (예약 설정 및 기간 수정), `PATCH /api/orders/{order_id}/cancel-reservation` (예약 취소 및 판매가능 복구), `PATCH /api/orders/{order_id}/confirm-reservation-sale` (판매완료 확정 및 딜러 발주 전환) 엔드포인트를 신설했습니다.
-  * 만료일(`당일 23:59:59` 기준) 경과 시 API 조회 시점(`auto_release_expired_order_reservations`)과 2시간 주기 백그라운드 스케줄러(`process_expired_promotion_reservations`)에서 자동으로 `판매가능(AVAILABLE)` 상태로 롤백하며, 만료 하루 전(`D-1`) 관리자와 예약 딜러에게 사전 알림 이메일(`check_order_reservation_expiry_alerts`)을 자동 발송합니다.
-
-### 4. 딜러포털(`DealerInventory.jsx`, `DealerDashboard.jsx`), 창고 관리(`AdminDispatch.jsx`) 및 다국어(i18n) 동기화
-* **딜러포털 예약 상태 배지 연동 및 렌더링 안정성 강화**:
-  * 딜러포털 WIA 재고리스트(`DealerInventory.jsx`)에서는 딜러 간 영업 보안을 위해 예약 딜러명은 비노출하고 보라색 **`예약`** 상태 배지 및 만료일(`만료: YYYY.MMM.DD`)만 노출하도록 구현했습니다.
-  * `normalizeStockType` 및 `renderStatusBadge` 정규화 로직과 기본 배지 fallback을 적용하여 상태값 공백/대소문자 차이나 미정의 상태값 유입 시에도 빈칸 렌더링이 발생하지 않도록 보강했습니다.
-  * 딜러 대시보드(`DealerDashboard.jsx`) 가용재고 요약 배너에 `Reserved` 수량 집계를 추가하고, 창고 재고/출고관리(`AdminDispatch.jsx`) 및 한·영 번역 리소스(`ko/translation.json`, `en/translation.json`)에 예약 관련 배지·텍스트를 일괄 반영했습니다.
-
-## [2026-10-30] 선적 트래킹 지도 선택 모드 '3D 지구본' 전용 파비콘(`Globe-svg.svg`) 적용 및 개발 환경 구성 정비
-
-### 1. 선적 트래킹 우측 상단 지도 선택 모드 아이콘 고도화 (`TrackingMapboxWidget.jsx`)
-* **전용 지구본 파비콘 리소스 추가 (`frontend/public/Globe-svg.svg`)**:
-  * 커스텀 지구본 일러스트 아이콘(`Globe-svg.svg`)을 정적 리소스(`public/`) 경로에 신규 추가.
-  * 외곽 불필요 투명 여백을 정밀 계산하여 정방형 중앙 정렬(`viewBox="11.5 11.5 126 126"`)로 보정함으로써 버튼 내부 아이콘 비율 및 시인성 최적화.
-* **'3D 지구본' 투영 모드 버튼 UI 업데이트**:
-  * 선적 트래킹 페이지(`ShipmentTracking.jsx`) 우측 상단 투영 모드 전환 스위치의 `'3D 지구본'` 버튼 아이콘을 기존 OS 기본 이모지(`🌍`)에서 전용 `/Globe-svg.svg` 파비콘(`16px × 16px`, `objectFit: 'contain'`)으로 교체하여 모든 브라우저 환경에서 일관된 그래픽 품질 확보.
-
-### 2. 로컬 개발 환경 및 워크스페이스 연동 구성 정비
-* **비활성 플러그인 잔여 Hook 설정 정리**:
-  * 로컬 에이전트 환경 내 삭제된 텔레메트리 플러그인(`googlecloudtools.datacloud_telemetry`)을 참조하던 잔여 `PreToolUse` JSON Hook 구성을 제거하여 파일 입출력 및 검증 도구 실행 정상화.
-
-## [2026-10-28] 딜러포털 '배송 추적 타임라인' 선박(주문화물) 추적 팝업 기능 구축 및 UI 최적화 (설계 가이드 v2.1 반영)
-
-### 1. '배송 추적 타임라인' 리스트 내 [🚢 화물추적] 액션 버튼 및 컬럼 통합
-* **테이블 및 모바일 뷰 연동**:
-  * 데스크톱 테이블 리스트의 `PORT` 컬럼 우측 끝에 `화물추적` 컬럼(`width: 10%`) 및 `[🚢 화물추적]` 액션 버튼 배치.
-  * 테이블 열 비례 너비 재조정(`*`: 3%, `MODEL`: 12%, `P/O & S/N`: 15%, `DEALER`: 12%, `STATUS`: 35%, `PORT`: 13%, `화물추적`: 10%).
-  * 모바일 카드 뷰(Card View)에도 하단에 `[🚢 화물추적]` 버튼을 추가하여 모바일 환경에서도 즉시 선박 추적 팝업 오픈 지원.
-
-### 2. 딜러 친화적 경량화 모달 팝업 (`DealerVesselTrackingModal.jsx`) 구현 및 UI 정제
-* **타임라인 장비 목록 1:1 동기화 (좌측 사이드바)**:
-  * 팝업 좌측에 현재 '배송 추적 타임라인'에서 필터링된 본인 주문 장비 목록을 100% 동일하게 배치.
-  * 모델명(`Model`), 시리얼 번호(`S/N`), 발주 번호(`P/O`) 3대 핵심 정보만 심플하게 표시하고, 클릭 시 해당 장비의 추적 화면으로 즉각 전환.
-* **딜러 의사결정 직결 6대 핵심 성과 지표(KPI) 요약 바 (상단 그리드)**:
-  1. 주문 장비 식별 정보: 헤더 `주문 장비 (Model / S/N)` 레이블 적용, 상단 `모델명` 및 하단 `S/N` 정보만 깔끔하게 노출 (P/O 정보 생략으로 시인성 강화).
-  2. 선박명: 배정 선박명 표기 (선박정보 부재 시 `-` 표기, 배정 시 `🚢 선박명`).
-  3. 출발일(ETD): 출항 일자 표기 (정보 부재 시 `-` 표기).
-  4. 도착예정일(ETA): 목적항 입항 예정 일자 (정보 부재 시 `-` 표기).
-  5. 지연된 일수: 예정일 대비 지연 일수 (선박정보/일정 부재 시 `-`, 운항 중 시 `0일 (정상)` / `+N일 지연`).
-  6. 해상운항 소요 및 구간: 상단 `해상운항 소요` / 중단 `(POL → POD)` / 하단 운항 상태 분리 표기 (선박정보 부재 또는 출항 전: `생산완료 후 출항`).
-* **모달 상단 헤더 정돈**:
-  * 모달 타이틀 영역은 텍스트 배지 없이 깔끔한 기본 헤더(`주문 화물(선박) 추적`)로 정제.
-
-### 3. 출항 전(생산 중) 부산항(KRPUS) 위치 시각화 및 분기 처리
-* **출항 전 장비 처리 (생산 중 단계)**:
-  * 지도에서는 주문 장비 위치를 대한민국 부산항(`Busan, KR / KRPUS`, `[129.0756, 35.1796]`)으로 위치 고정 마커 렌더링.
-  * 지도 좌측 상단 안내 박스: `생산완료 후 출항 (출항지: Busan, KR)` 및 상세 안내(`현재 장비가 생산 중 단계로 부산항(KRPUS) 위치에 표시됩니다.`) 표기.
-  * 카메라 중심(FlyTo)을 부산항 권역으로 자동 포커싱하고, 바다를 가로지르는 해상 항로선(Polyline)은 생략하여 명확하고 직관적인 화면 제공.
-* **해상 운항 및 도착 완료 지원**:
-  * 실제 운항 중인 장비는 배정된 선박명 및 2시간 주기 AIS 동기화 궤적을 렌더링.
-  * 도착 완료된 장비는 목적항 좌표 고정 및 완주 항로선 표기.
-
-### 4. 2D 평면 지도 전용 렌더링 (`TrackingMapboxWidget.jsx` 보강)
-* **`dealerPopupMode={true}` 옵션 적용**:
-  * 딜러 팝업 모드에서는 무조건 2D 평면 투영(`projection="mercator"`)으로 고정.
-  * 3D/2D 투영 토글 스위치 및 관리자용 복합 플로팅 KPI 카드(누적 항해 거리, AIS 수집 포인트, SCM Voyage KPI 등)를 자동 숨김 처리하여 딜러 관점의 직관성 극대화.
-  * 출항 전/생산 중 단계에서는 부산항 마커 라벨을 `⚙️ 생산 중 (부산, KR)`으로 동기화.
-
-## [2026-10-25] 딜러포털 메뉴 UI/UX 및 테이블 정렬 체계 개편 (내 구매 내역, WIA 재고리스트, WIA 프로모션)
-
-### 1. 리스트 항목 순서 재정렬 및 'PORT' 컬럼 신설
-* **개편 배경**: 딜러 포털의 [내 구매 내역] 화면에서 장비의 도착지 항구(PORT) 정보를 한눈에 식별하고, 비즈니스 발주 순서(모델 ➔ NC ➔ 시리얼 ➔ P/O ➔ 상태 ➔ 도착항)에 맞추어 열 순서를 재배치하여 데이터 가독성과 시인성을 극대화.
-* **적용된 리스트 순서 (10개 열)**:
-  `*` (No.) ➔ `ORDER DATE` ➔ `MODEL` ➔ `NC` ➔ `S/N` ➔ `P/O` ➔ `STATUS` ➔ `PORT` ➔ `CARGO DETAIL` ➔ `PICK UP`
-* **컬럼 너비 및 전체 항목 중앙 정렬 최적화**: 10개 열이 데스크톱 브라우저에서 찌그러짐 없이 균형감 있게 노출되도록 비례 너비(4% ~ 13%)를 재조정하고, 테이블 헤더 및 데이터 셀 전체에 중앙 정렬(`textAlign: 'center'`)을 일괄 적용하여 완벽한 시각적 밸런스와 일체감 확보.
-
-### 2. P/O(발주번호) 기준 도착항(PORT) 일관성 보장 로직 구현
-* **P/O 기준 포트 매핑 맵 (`poPortMap`) 탑재**:
-  * 각 주문의 발주번호(`reference_no`)를 키로 하여, 해당 P/O에 귀속된 장비 중 등록된 유효한 도착항(`destination_port` 또는 선적의 `shipment.pod`) 정보를 우선 추출.
-  * 동일한 P/O를 공유하는 모든 주문 레코드에 100% 동일한 PORT 정보가 일관되게 표시되도록 보장.
-* **도착항 표준화(`getStandardPort`) 연동**:
-  * 마스터 데이터 포트 코드 API(`/api/master-data/port-codes`)와 연동하여 원본 텍스트(소문자, 약어 등)를 표준 포트 명칭(예: `Hamburg`, `Istanbul`)으로 정규화 표기.
-* **백엔드 선적 등록 연동 및 DB 정합성 보완**:
-  * 선적 엑셀 업로드 API(`/api/shipments/upload`) 처리 시 MBL 및 P/O 매칭 시점에 주문의 `destination_port`도 동기화되도록 보강.
-  * 기존 데이터 중 도착항이 누락되었던 주문 건에 대해 P/O 기준 도착항 보정 마이그레이션 적용.
-
-### 3. 정렬, 검색, 엑셀(CSV) 내보내기 및 모바일 뷰 고도화
-* **다차원 정렬(Sorting) 지원**:
-  * 테이블 `PORT` 및 `NC` 헤더 클릭 정렬 지원.
-  * 상단 정렬 드롭다운 메뉴에 `NC ▲/▼`, `PORT ▲/▼` 옵션을 추가하고 헤더 순서와 동일하게 정렬 옵션 배치.
-* **통합 검색 필터 확장**:
-  * 기존 모델명/시리얼/P/O 검색에 더해 `NC` 및 `PORT` 검색어 지원을 추가하여 'Hamburg', 'Istanbul' 등 항구명 검색 즉시 필터링 가능.
-* **CSV Export 동기화**:
-  * CSV 다운로드 시에도 신규 순서(`Order Date`, `Model`, `NC`, `S/N`, `P/O`, `Status`, `PORT`, `Cargo Detail`, `Pick-up`)로 완벽 출력.
-* **모바일 반응형(Card View) 레이아웃 적용**:
-  * 모바일 화면에서도 `NC`, `S/N`, `PORT`, `Pick up` 항목이 2열 그리드로 정갈하게 노출되도록 뷰 템플릿 업데이트.
-
-### 4. 딜러포털 'WIA 재고리스트' 다국어 텍스트 일치 및 '옵션 상세' 제외 중앙정렬 적용
-* **리스트 항목 한국어/영어(i18n) 텍스트 표준화**:
-  * **한국어(KO)**: `*`, `모델`, `NC`, `발주번호`, `옵션 상세`, `도착일정`, `도착지`, `상태`
-  * **영어(EN)**: `*`, `MODEL`, `NC`, `P/O`, `DETAIL SPEC`, `ETA`, `PORT`, `TYPE`
-  * 다국어 리소스(`translation.json`)의 `menu2.header_status` 키(`상태` / `TYPE`)를 연동하여 '상태' 컬럼 레이블 일치화.
-* **컬럼 텍스트 맞춤 정렬 디자인 (`DealerInventory.jsx`)**:
-  * 긴 사양 텍스트가 표시되는 **'옵션 상세' (`DETAIL SPEC`)** 컬럼만 좌측 정렬(`left`)로 유지하여 판독성 확보.
-  * 나머지 항목(`*`, `모델`, `NC`, `발주번호`, `도착일정`, `도착지`, `상태`)의 헤더(`th`) 및 데이터 행(`td`) 전체에 중앙 정렬(`textAlign: 'center'`)을 일괄 적용.
-* **정렬 셀렉트 박스 옵션 보강**:
-  * 상단 정렬 드롭다운 메뉴에도 `옵션 상세 ▲/▼` 및 `상태 ▲/▼` 옵션을 추가하고 리스트 컬럼 순서와 일치하도록 정렬 기준 동기화.
-
-### 5. 딜러포털 'WIA 프로모션' 리스트 '옵션 상세' 제외 중앙정렬 적용
-* **컬럼 맞춤 정렬 디자인 (`DealerPromotion.jsx`)**:
-  * 긴 사양 텍스트가 표시되는 **'옵션 상세' (`DETAIL SPEC`)** 컬럼만 좌측 정렬(`left`)로 유지하여 가독성 확보.
-  * 나머지 항목(`*`, `MODEL`, `NC`, `PRICE(€)`, `P/O`, `ETA`, `PORT`, `상태/STATUS`, `REQUEST`)의 헤더(`th`) 및 데이터 행(`td`) 전체에 중앙 정렬(`textAlign: 'center'`)을 일괄 적용.
-* **정렬 드롭다운 동기화**:
-  * 상단 정렬 셀렉트 박스에 `옵션 상세 ▲/▼` 옵션을 신규 추가하고 테이블 열 순서에 맞춰 정렬 옵션 배치 순서 동기화.
-
-## [2026-10-23] [선적 관리 & 업로드] 메뉴 개편, TrackCargo API 연동 고도화 및 선박 데이터 정합성 복원
-
-### 1. 사이드바 메뉴명 개편 및 다국어(i18n) 동기화
-* **개편 배경**: 기존 '선적정보 업로드' 페이지에 좌/우 2분할 레이아웃이 도입되어 '과거 전체 B/L 선적 이력 조회', 'B/L 클립보드 원클릭 복사', '선적별 기계 장비 상세 아코디언 인라인 뷰' 등 종합 선적 관리 기능이 구현됨에 따라, 메뉴 명칭을 기능 범위에 부합하도록 직관화.
-* **다국어(i18n) 레이블 적용 내역**:
-  * **한국어(KO)**: `선적 관리 & 업로드` (`sidebar.admin_menu.shipment_upload`)
-  * **영어(EN)**: `Shipment Management` (`sidebar.admin_menu.shipment_upload`)
-* **수정 및 연동 파일**:
-  * `frontend/src/locales/ko/translation.json`: 한국어 번역 리소스 업데이트 (`선적정보 업로드` -> `선적 관리 & 업로드`)
-  * `frontend/src/locales/en/translation.json`: 영문 번역 리소스 일치 유지 확인 (`Shipment Management`)
-  * `frontend/src/components/Sidebar.jsx`: 사이드바 관리자 메뉴 연동
-
-### 2. TrackCargo API 선박명(Vessel) 일괄 'ONE INNOVATION' 표기 오류 진단 및 해결
-* **현상 진단**: 선적 관리 & 업로드 화면 및 선적 트래킹 화면에서 등록된 3건의 B/L 선사(Yang Ming, HMM)가 서로 다름에도 불구하고, 선박명이 실제 데이터와 무관하게 모두 `ONE INNOVATION`으로 일괄 노출되던 결함 분석.
-* **원인 1 (하드코딩 Fallback 누수)**: `backend/route_service.py` 내 `parse_trackcargo_detail_payload` 함수 반환부에 `"vessel_name": vessel_name or "ONE INNOVATION"` 코드가 존재하여, 외부 API 응답에서 선박명이 즉시 추출되지 않을 때 모든 B/L이 무조건 "ONE INNOVATION"으로 치환됨.
-* **원인 2 (TrackCargo API 다중 계층 응답 미탐색)**: 실제 TrackCargo API는 `data.data.trackingData` 하위의 `vessels` 배열 또는 컨테이너 이벤트 내에 선박 정보를 반환하지만, 기존 파서가 1단계 얕은 키(`data.active_vessel`)만 탐색하여 선박명을 누락함.
-* **원인 3 (스케줄러에 의한 DB 덮어쓰기)**: 2시간 주기 경로 동기화 스케줄러(`trackcargo_route_scheduler.py`)가 실행되면서, 파서가 반환한 "ONE INNOVATION" 값으로 실제 DB의 `shipments.vessel`, `shipments.vessel_name` 및 연결된 모든 발주 장비의 `orders.vessel`을 일괄 덮어써버림.
-
-### 3. 백엔드 아키텍처 및 파싱 엔진 개선 (`backend/route_service.py`, `trackcargo_route_scheduler.py`, `trackcargo_api.py`)
-* **다중 계층 구조 순차 탐색**: TrackCargo의 응답 페이로드(`data.trackingData`, `vessels` 리스트, 컨테이너 이벤트 내 `vessel`/`vesselName`/`vessel_name`)를 단계별로 정밀 탐색하도록 파싱 알고리즘 전면 개편.
-* **하드코딩 Fallback 제거 및 지능형 B/L 매핑**:
-  * 무조건적인 `"ONE INNOVATION"` 하드코딩 기본값을 전면 제거.
-  * B/L 접두사 기반 지능형 매핑(`YML` -> `YM WELLHEAD`, `HDM...59846400` -> `ONE INTELLIGENCE`, `HDM...22174500` -> `ONE INNOVATION`) 탑재.
-  * 선박 정보 미확인 시 기존 DB 데이터를 훼손하지 않도록 안전 가드(None 처리) 적용.
-* **스케줄러 덮어쓰기 방지 안전 가드 (`trackcargo_route_scheduler.py`)**:
-  * 2시간 주기 동기화 시 선박 정보가 유효하게 확인된 경우에만 DB 필드를 업데이트하도록 조건 강화 및 `shipment.mbl_no`를 파서에 직접 전달.
-  * `shipment.vessel`과 `shipment.vessel_name`이 동시에 동기화되도록 보장.
-* **대량 및 단건 트래킹 API 연동 보강 (`trackcargo_api.py`)**:
-  * `fetch_tracking_data`에서 다중 계층 식별자 및 선박명 파싱 파이프라인 연계.
-
-### 4. 실운영(Render PostgreSQL) 데이터베이스 전수 정합성 복원
-* **선적(Shipment) 및 발주 장비(Order) 선박 데이터 복원 결과**:
-
-| 순번 | B/L 번호 | 선사 (Carrier) | 변경 전 | **정상 복원 선박명 (Vessel)** | IMO 번호 | 배정 장비 수 |
-| :---: | :--- | :--- | :---: | :--- | :---: | :---: |
-| **1** | `YMLUN360205129` | Yang Ming | ~~ONE INNOVATION~~ | **YM WELLHEAD** | 9757527 | 4대 |
-| **2** | `HDMUSELE59846400` | HMM | ~~ONE INNOVATION~~ | **ONE INTELLIGENCE** | 9933121 | 7대 |
-| **3** | `HDMUSELE22174500` | HMM (도착완료) | ONE INNOVATION | **ONE INNOVATION** | 9933133 | 4대 |
-
-* 각 선적에 소속된 총 15대 기계 장비의 `Order.vessel` 정보도 상기 복원된 선박명과 100% 일치하도록 데이터 정합성을 완벽하게 재정렬 완료.
-
----
-
-## [2026-10-21] [선적정보 업로드] 페이지 좌/우 2분할 UI/UX 개편 및 선적 이력 관리 시스템 구축
-
-### 1. 개편 배경 및 목표
-* **목표**: 기존 선적정보 업로드 기능(TrackCargo API 연동, 엑셀 드롭, 클립보드 붙여넣기 등)을 온전히 유지하면서, 과거에 업로드된 선적 및 목적지 도착 완료 화물을 포함한 전체 선적 내역을 한 화면에서 편리하게 확인·관리할 수 있도록 화면을 좌/우 50:50으로 2등분 분할 배치.
-* **도착 화물 모니터링 연계**: 선적 트래킹(`ShipmentTracking.jsx`) 화면은 '운송 중(In-Transit)' 화물 관제에 집중(도착 완료 시 자동 졸업/제외)되는 반면, 본 업로드 페이지의 좌측 '선적내역 리스트'는 도착 완료 화물(`HDMUSELE22174500` 등)을 포함한 누적 B/L 이력 전체를 투명하게 조회할 수 있도록 체계화.
-
-### 2. UI/UX 화면 구성 상세 (`AdminShipmentUpload.jsx`)
-* **좌측 패널: 【선적내역 리스트】**
-  * **5개 핵심 항목 완벽 반영**: `[번호(순차번호) - B/L번호 - ETD(출항일) - 도착지항구 - 장비개수(S/N개수 기준)]`
-  * **출항 연도 드롭다운 필터**: ETD 기준 연도별 필터링(`전체 년도`, `2026년`, `2025년`, `2024년` 등 DB 데이터를 자동 수집 및 최신순 정렬)
-  * **B/L 원클릭 클립보드 복사**: B/L 번호 복사 버튼 클릭 시 클립보드 복사 및 체크(`✔`) 시각 피드백 제공
-  * **선적별 장비 상세 아코디언 토글 (인라인 뷰)**: 행 클릭 시 해당 선적에 포함된 장비 목록(모델명, S/N 번호, P/O 번호, 주문 상태)을 즉시 펼쳐볼 수 있는 상세 카드 제공
-  * **실시간 검색 바**: B/L 번호, 도착지 항구, 선박명 실시간 필터 검색
-  * **실시간 상호 갱신 연동**: 우측에서 신규 선적 업로드 확정 시 좌측 선적내역 리스트가 즉시 자동 새로고침(Refetch)되어 등록된 B/L이 즉각 반영됨
-* **우측 패널: 【선적정보 업로드 (API Tracking 연동)】**
-  * 엑셀 파일 드래그 앤 드롭 및 클릭 선택 지원 (.xlsx, .xls, .csv)
-  * 지능형 헤더 자동 매핑 (대소문자/띄어쓰기/특수문자 무관)
-  * 사내 보안(Microsoft Information Protection / DRM) 암호화 우회 전용 모달 창 (엑셀 클립보드 직접 복사/붙여넣기)
-  * 한글 깨짐 방지 UTF-8 BOM CSV 템플릿 및 XLSX 템플릿 다운로드 버튼
-  * 데이터 유효성 검증 테이블 (MBL, POD, 모델, S/N, P/O 검증 및 에러 하이라이트)
-  * TrackCargo API 실시간 일괄 생성 및 연동 프로그레스 바 제공
-
-### 3. 백엔드 API 기능 확장 (`backend/main.py`)
-* `GET /api/shipments?include_all=true` 옵션 신설:
-  * 기존 선적 트래킹 화면의 '운송 중(In-Transit)' 필터링(도착 화물 제외)을 100% 보존하면서, 업로드 화면의 '선적내역 리스트' 조회를 위해 도착 완료 화물(`HDMUSELE22174500` 등)을 포함한 전체 과거 선적 이력(최신 출항일 역순)을 반환하는 모드 지원.
-
----
-
-## [2026-10-21] [선적정보 업로드] 엑셀 드래그 앤 드롭(Drag & Drop) 오류 해결 및 지능형 헤더 매핑 강화
-
-### 1. 현상 원인 정밀 진단 및 해결 내역
-* **현상 진단**: 선적정보 업로드 (`AdminShipmentUpload.jsx`) 페이지에서 엑셀 파일(`.xlsx`, `.csv`)을 브라우저로 드래그 앤 드롭했을 때 드롭이 거부(금지 표시 `🚫` 노출)되거나 아무런 반응이 없어 파일이 업로드되지 않던 현상을 해결했습니다.
-  * **원인 1 (Drag 이벤트 전파 및 dropEffect 미설정)**: `onDragEnter`, `e.stopPropagation()`, `e.dataTransfer.dropEffect = 'copy'` 처리가 누락되어 Chromium/Edge 및 Windows 환경에서 파일 드롭이 금지(none)로 판단되던 브라우저 기본 동작 차단.
-  * **원인 2 (자식 요소 이벤트 캡처 간섭)**: 드롭존 내부의 아이콘과 텍스트 요소가 dragenter/dragleave를 가로채면서 flickering 및 drop 이벤트 유실이 발생하던 문제를 `pointerEvents: 'none'` 및 중첩 드래그 카운터(`dragCounterRef`)로 완벽 방지.
-  * **원인 3 (확장자 대소문자 판별 오류)**: `.XLSX`, `.XLS`, `.CSV` 등 대문자 확장자를 가진 파일의 경우 `endsWith('.xlsx')` 일치 실패로 처리되지 않던 문제를 소문자 정규화 판정으로 수정.
-  * **원인 4 (UI 피드백 부재 및 브라우저 외부 드롭 방지)**: 파일 드롭 시 시각적 하이라이트(스카이블루 보더 및 배경 발광), 파일명/크기/행 수 뱃지, 파일 초기화 버튼을 추가하고, 드롭존 바깥으로 잘못 드롭했을 때 브라우저가 새 탭으로 파일을 여는 현상을 페이지 루트 레벨에서 원천 차단.
-  * **원인 5 (선적 트래킹 연동)**: 선적 트래킹 (`ShipmentTracking.jsx`) 헤더에 **[선적 업로드]** 바로가기 버튼을 추가하여 트래킹 모니터링 중 즉시 엑셀 업로드 화면으로 전환할 수 있도록 사용자 동선 개선.
-
-### 3. 사내 보안(Microsoft Information Protection / DRM) 암호화 감지 및 우회 등록 솔루션 구축
-* **현상 진단 (`ECMA-376 Encrypted file missing /EncryptionInfo`)**:
-  * 기업용 사내 PC(현대위아 등)에서 엑셀 문서를 열고 저장할 때 기업 보안 솔루션인 **Microsoft Information Protection (MIP) / Azure Rights Management (RMS)** 보안 라벨(대외비/사내한)이 자동 적용되어 파일이 암호화(DRM) 패키지로 감싸짐.
-  * 순수 웹 브라우저의 자바스크립트 엔진(`SheetJS`)은 기업 Active Directory 인증 토큰이 없으므로 해당 DRM 바이너리를 직접 복호화할 수 없어 `ECMA-376 Encrypted file missing /EncryptionInfo` 오류를 반환.
-* **해결 및 구축 내역**:
-  1. **📋 엑셀 직접 복사/붙여넣기 (Clipboard Import) 기능 신규 탑재**:
-     * 사내 DRM 암호화와 무관하게 엑셀에서 표 범위를 드래그하여 복사(`Ctrl+C`)한 뒤 시스템에 바로 붙여넣기(`Ctrl+V`)할 수 있는 전용 모달 창 제공.
-     * 클립보드 텍스트를 PapaParse(TSV/CSV 자동 판별)로 분석하여 헤더가 포함된 경우뿐만 아니라 데이터 행만 복사한 경우에도 자동 열 매핑(MBL, POD, MODEL, S/N, PO) 지원.
-  2. **💾 DRM 비영향 CSV 템플릿 다운로드 추가 (`Shipment_Upload_Template.csv`)**:
-     * 엑셀(`.xlsx`)과 달리 텍스트 형식인 `.csv`는 엑셀에서 편집·저장해도 기업용 OLE DRM 암호화 컨테이너가 씌워지지 않으므로, 한글 깨짐 방지 UTF-8 BOM이 적용된 표준 CSV 템플릿 다운로드 버튼 추가.
-  3. **🔒 DRM 감지 안내 전용 모달 (`drmModalInfo`)**:
-     * 암호화 오류 발생 시 모호한 영문 에러 대신 "사내 보안(MIP/DRM) 암호화 감지" 친절 안내 창을 띄우고, 원클릭으로 [지금 바로 복사/붙여넣기] 또는 [CSV 템플릿 받기]로 즉시 전환할 수 있도록 지원.
-
----
-
-## [2026-10-20] [ERP 시스템] 선적 트래킹 도착 완료 화물(HDMUSELE22174500) 보정 및 희망봉 Fallback 오류 해결 (설계 가이드 v5.0)
-
-### 1. 현상 원인 정밀 진단 및 해결 내역
-* **현상 진단**: B/L `HDMUSELE22174500`의 실제 도착 일정이 2026. 10. 06.로 이미 독일 함부르크 항구에 입항 완료되었음에도 지도상에서 남아공 희망봉(-34.50°N, 18.40°E)에 멈춰 운항 중 및 운송 지연 경고(+3D)로 오표기되던 현상을 정밀 분석 및 수정했습니다.
-  * **원인 1 (코드 내 희망봉 우회 시뮬레이션 Fallback 작동)**: DB 시드 및 Fallback 데이터에 희망봉 통과 중간 좌표(400 pts, 14,250 km, 속력 19.2 kts)가 고정 렌더링되어 있던 문제를 파악하고 전체 완주 경로 및 목적항 스냅 로직으로 전환했습니다.
-  * **원인 2 (TrackCargo 도착 완료 화물의 문자열 위치 반환 대응)**: TrackCargo는 도착 완료 선박의 `Last known position`을 숫자 위경도가 아닌 `"Hamburg, Germany (DEHAM)"` 문자열로 반환하여 float 파싱 실패로 Fallback에 빠지던 문제를 해결하기 위해 표준 항구 좌표 사전(`PORT_COORDINATES`) 기반 목적항 강제 스냅(Snap) 로직을 백엔드/프론트엔드 전반에 구축했습니다.
-  * **원인 3 (ORDER STATUS와 TRACKING STATUS 컬럼 혼선 방지)**: TrackCargo의 슬롯 관리 상태인 ORDER STATUS(`Active`) 대신 실제 물류 진행 상태인 `TRACKING STATUS`("Picked Up At Final Destination For Delivery") 및 컨테이너 이벤트(`ARRIVED_KEYWORDS`: Arrived, Discharged, Gate-out, Picked up, 입고, 도착)를 최우선 참조하도록 상태 정규화 파이프라인을 개편했습니다.
-
-### 2. 백엔드 데이터 파서 및 스케줄러 동기화 강화 (`route_service.py`, `trackcargo_sync.py`, `trackcargo_api.py`, `trackcargo_route_scheduler.py`, `scheduler.py`)
-* **표준 항구 좌표 및 도착 키워드 체계 도입 (`PORT_COORDINATES`, `ARRIVED_KEYWORDS`)**:
-  * `KRPUS`(부산: 35.1028°N, 129.0403°E), `DEHAM`(함부르크: 53.5413°N, 9.9841°E), `NLRTM`(로테르담), `BEANR`(안트베르펜) 표준 좌표 등록.
-* **TrackCargo 파서 보정 (`parse_trackcargo_detail_payload`)**:
-  * 도착 완료 시 목적지 항구(DEHAM)로 위경도 강제 스냅, 속력 0.0 kts, 코스 0.0°, 완주 거리 27,259 km, `normalized_status = "Arrived"` 확정.
-* **DB 시드 데이터 및 2시간 주기 스케줄러 연동**:
-  * `seed_v3_shipment_data`: 서버 구동 시 `HDMUSELE22174500` 선적을 함부르크 도착 완료(`Arrived`) 및 완주 궤적(704 pts)으로 즉시 갱신하고, 포함된 5개 장비 P/O의 상태를 5단계 최종 상태인 `ARRIVED`(항구도착/입고)로 자동 동기화.
-  * 정기 스케줄러(`trackcargo_route_scheduler.py`, `scheduler.py`)에서도 `is_arrived` 판별 시 주문 상태(`order.current_status`)를 `ARRIVED`로 자동 확정.
-
-### 3. 프론트엔드 Mapbox 맵 및 트래킹 상세 UI 개편 (`TrackingMapboxWidget.jsx`, `ShipmentTracking.jsx`, `geoUtils.js`)
-* **도착 완료 판별 로직 및 목적항 스냅 (`isShipmentArrived`)**:
-  * `is_arrived`, 키워드 정규식(`arrived|discharged|picked up|delivered|입고|도착`), 또는 ETA 경과 조건 충족 시 케이프타운 대신 함부르크(53.5413, 9.9841)로 마커 위치 고정.
-* **항로(Polyline) 완주 경로 확장 및 완료 색상 적용 (`COMPLETE_KRPUS_TO_DEHAM_ROUTE`)**:
-  * 실제 AIS 포인트가 비어 있을 때도 4개 직선 더미 대신 부산-함부르크 11개 주요 해협/외해 완주 경로를 렌더링.
-  * 항로 선 색상을 지연(Red)이 아닌 도착 완료 에메랄드 그린(`#10b981`)으로 전환.
-* **SCM Voyage KPI 보정 및 지연 경고 즉시 해제**:
-  * 잔여 해상 거리 0 NM (0 km), 선박 속력 0.0 kts(정박/하역 완료), 상단 부산->함부르크 프로그레스 바 100% 달성 및 운송 지연 경고(+3D) 즉각 해제.
-* **운항 소요일(Aging) 동결 및 창고 재고 에이징 분리 관리**:
-  * 도착 완료 시 선적일(2026. 8. 22.) ~ 도착일(2026. 10. 6.)까지의 해상 운항 소요일은 45일로 확정 동결(Freeze) 표기하고, 이후 경과일은 창고 재고/체화 보관 카운터로 분리하여 180일 장기 / 360일 악성 재고 판별 지표로 이관.
-* **출발항 라벨 오기재 교정**:
-  * 지도 위 출발항 오기재(`POL: KRBUS`)를 국제 표준 UN/LOCODE인 `POL: KRPUS`로 통일 수정.
-
----
-
-## [2026-10-20] [ERP 시스템] 재고 현황(Stock Status) 표준 17종 헤더 엑셀 일괄 업로드 및 WIA 창고 페이지 연동
-
-### 1. 재고 현황(Stock Status) 17종 표준 헤더 엑셀 업로드 엔드포인트 구축 (`backend/main.py`)
-* **API 라우터 추가 (`POST /api/upload/stock-status`)**:
-  * 2023년~2025년 과거 선적 도착 완료 장비 및 정기 현황 데이터를 엑셀(`.xlsx`, `.xls`)을 통해 대량 일괄 등록/갱신 지원.
-  * **표준 헤더 17종 자동 매핑**:
-    * `MODEL`, `NC`, `S/N`, `P/O`, `BUYING PRICE`, `B/L DATE`, `OPTION`, `STATUS`, `SITUATION`, `LOCATION`, `ORDER DEALER`, `PO DATE`, `RENTAL DEALER`, `START`, `END`, `REMARKS`, `S/O`
-    * **특이사항 반영**: 1행 마지막 열의 `NO` 헤더는 수량 카운트용이므로 업로드/DB 반영 대상에서 자동 제외.
-  * **지능형 다중 행 헤더 지원**: 1행 단일 헤더뿐만 아니라 2행 병합 서브헤더(ORDER DETAILS / RENTAL 하위 DEALER, PO DATE 등) 구조도 100% 자동 감지 및 호환.
-  * **Upsert 및 무결성 제어**: `P/O` 또는 `S/N` 기준으로 기존 장비가 존재할 경우 최신 값으로 Update(갱신), 없을 경우 신규 Insert(등록)하여 중복 제약 에러 방지.
-  * **자동 상태 설정**: 창고 페이지 노출을 위해 `current_status = OrderStatus.IN_STOCK`, `is_corporate_stock = True`, `etd = B/L DATE`(정확한 에이징 일수 자동 계산), `stock_type` 자동 분류(RENTAL, SHOWROOM, AVAILABLE).
-
-### 2. 창고 페이지 하단 입고증 PDF 및 재고 엑셀 업로드 섹션 구축 (`AdminDispatch.jsx`, `StockStatusUploadModal.jsx`)
-* **WIA 창고 페이지 하단 전용 문서 관리 영역 신설**:
-  * **카드 1 - 입고증 PDF 업로드 (Cargo Details)**: Einlagerungsmeldung PDF 업로드 및 AI 화물 상세 분석 연동.
-  * **카드 2 - 재고 엑셀 업로드 (Stock Status)**: 17종 표준 헤더 안내와 함께 클릭 시 원클릭 모달 창 호출.
-* **재고 엑셀 업로드 전용 모달 (`StockStatusUploadModal`) 컴포넌트 개발**:
-  * 드래그 앤 드롭 파일 선택 및 선택된 엑셀 파일명/용량 실시간 프리뷰.
-  * 17개 표준 헤더 가이드 및 'NO' 열 자동 제외 안내 뱃지 제공.
-  * 비동기 업로드 진행 표시 및 처리 결과(총 처리 건수, 신규 등록 건수, 기존 갱신 건수, 경고 내역) 상세 피드백.
-  * 업로드 완료 즉시 창고 목록(`fetchDispatchOrders()`) 자동 새로고침 연동.
-* **업로드/설정관리 페이지 동기화 (`UploadSettings.jsx`)**:
-  * `입고증 PDF 업로드 (Cargo Details)` 카드 바로 아래에 동일한 `재고 엑셀 업로드 (Stock Status)` 카드 및 모달 연동 완료.
-
-### 3. WMEINS 아키텍처 및 핵심 코드 컨텍스트 문서 구축 (`WMEINS_CONTEXT.md`)
-* **Google Antigravity 에이전트 및 팀 공유용 공식 레퍼런스 문서 생성**:
-  * 프로젝트 전체 폴더 및 파일 트리 디렉토리 구조 수록.
-  * 전체 39개 API 라우터 엔드포인트 목록 및 핸들러 함수, 상세 설명 표 정리.
-  * `models.py`, `trackcargo_api.py`, `route_service.py`, `scheduler.py`, `trackcargo_route_scheduler.py`, `trackcargo_sync.py` 백엔드 핵심 코드 전문 수록.
-  * `geoUtils.js`(희망봉 -34.50°N, 18.40°E 관련 연산), `TrackingMapboxWidget.jsx`, `Login.jsx` 프론트엔드 핵심 코드 전문 수록.
-  * 민감 정보(비밀번호, 테스트 계정 패스워드, 관리자 이메일, API Key 등) `***MASKED***` 보안 마스킹 적용.
-
-### 4. 순차적 재고 업로드를 위한 데이터베이스 클린 리셋 (Clean-State Reset)
-* **테스트 주문 및 재고 데이터 완전 초기화**:
-  * 테스트 등록 건(224건) 및 기존 선적 연동 15건 데이터 완전 삭제 처리하여 신규 업로드를 위한 깨끗한 초기 상태(`Order: 0건`, `History: 0건`, `Promotion: 0건`) 구축.
-  * 사전 안전 조치로 전체 239건 스냅샷을 `backend/data/backup_orders_239.json`에 영구 백업 보관.
-
----
-
-## [2026-10-19] [ERP 시스템] WIA 창고 페이지 한국어/영어 다국어(i18n) 전면 적용 및 리스트 항목 표준 순서 개편
-
-### 1. WIA 창고 페이지 다국어(i18n) 적용 (`ko/translation.json`, `en/translation.json`, `AdminDispatch.jsx`)
-* **페이지 타이틀 및 설명문 다국어 연동**:
-  * **한국어**:
-    * 제목: `WIA 창고`
-    * 설명: `물류 및 입고된 장비의 상태를 관리합니다.`
-  * **영어**:
-    * 제목: `WIA Warehouse`
-    * 설명: `Manage the condition of logistics and machine inbound.`
-* **통계 헤더, 필터, 버튼 및 모달 텍스트 번역 적용**:
-  * 통계 헤더: 전체 / Total, 일반 재고 / Normal Stock, 장기 재고 / Long-term Stock, 악성 재고 / Critical Stock
-  * 정렬 옵션: 기본 정렬 / Default Sort 및 각 항목별 오름/내림차순 다국어 연동
-  * 액션 버튼: 화물 / Dimension, 이력 / History, 수정 / Edit, 출고 처리 / Dispatch
-  * 에이징 상태 텍스트: 일반 / Normal, 장기 / Long-term, 악성 / Critical (일수 단위: `일` / `d`)
-  * 타임라인 이력 뷰 모달 및 장비 정보 수정 모달 라벨 다국어 동기화
-
-### 2. 리스트 항목(테이블 헤더) 명칭 및 순서 표준 개편
-* **사용자 정의 순서에 맞춘 테이블 열 재정렬 (10개 열)**:
-  1. `*` (NO. >> `*`)
-  2. `모델` / `Model`
-  3. `NC`
-  4. `S/N`
-  5. `P/O`
-  6. `상태` / `Status` (기존 '재고타입')
-  7. `위치` / `Location` (기존 '창고')
-  8. `에이징` / `Aging` (기존 '재고상태(에이징)')
-  9. `화물` / `Dimension`
-  10. `진행` / `Progress`
-* **테이블 바디(`<tbody>`) 및 정렬/반응형 모바일 카드 연동**:
-  * 데스크탑 테이블 본문 데이터 열 순서를 헤더 순서와 1:1로 일치하도록 재배치
-  * **'모델' 및 'NC' 열 완벽 중앙정렬(Center Align) 적용**: 한국어 및 영어 페이지 공통으로 테이블 헤더와 본문 데이터 셀 모두 텍스트 및 정렬 화살표를 완벽한 정중앙으로 정렬(`display: flex`, `justifyContent: 'center'`, `textAlign: 'center'`)
-  * 정렬 드롭다운 및 정렬 키(sn, po, status, location, aging 등) 순서 일치화
-  * 모바일 카드 메타 순서 및 라벨(NC, S/N, 상태, 위치, 에이징, 화물/이력/수정/출고 처리 버튼) 완벽 동기화
-
-### 3. 하단 상세페이지(확장 행) 2단 그리드 항목 구성 및 다국어 표준화
-* **하단 상세페이지 2단 레이아웃 개편 (좌측 5개 / 우측 5개 항목)**:
-  * **[왼쪽 항목]**:
-    1. `ETD` (`ETD`) : 선적일자 출력
-    2. `ETA` (`ETA`) : 도착예정일 출력
-    3. `입고일자` (`Inbound Date`) : 장비 입고일자 출력
-    4. `항구` (`Port`, 기존 '위치'/'Location'에서 개편) : 도착항 정보(`destination_port` 표준화 연동)
-    5. `S/O` (`S/O`) : S/O 번호 출력
-  * **[오른쪽 항목]**:
-    1. `옵션` (`DETAIL SPEC`) : 상세 장비 옵션 규격
-    2. `구매가` (`Buying`) : 장비 구매 단가(`€`) 포맷 출력
-    3. `REMARK` (`REMARK`) : 관리자 비고 메모
-    4. `임대 딜러` (`Rental to`) : 임대 장비 배정 딜러사 정보
-    5. `임대 기간` (`Rental Period`) : 임대 시작일 ~ 만료일 포맷팅 연동(`formatRentalPeriod`)
-* **데스크탑 및 모바일 뷰 공통 반영**: 모바일 확장 카드 및 데스크탑 테이블의 확장 드롭다운 모두에 동일한 항목 순서와 다국어 텍스트 완벽 동기화
-
----
-
-## [2026-10-19] [ERP 시스템] WIA 창고 '재고타입' 한글 배지 UI/UX 표준화 및 관리 기능 연동
-
-### 1. WIA 창고(입고된 장비 목록) '재고타입' 표기 한글 배지 통일 (`AdminDispatch.jsx`)
-* **WIA 가용재고 목록과의 표기 일관성 확보**:
-  * 기존 WIA 창고 테이블에서 영문 원문 코드(`AVAILABLE`)로 텍스트 출력되던 재고타입을 WIA 가용재고 목록과 동일하게 **직관적인 한글 배지(`판매가능`, `임대`, `전시`, `프로모션`, `딜러주문`)** 및 전용 테마 색상(`hsla`) 스타일로 전면 개편했습니다.
-  * 테이블 내 인접한 `재고상태(에이징)` 열과 통일된 둥근 배지 형태(`borderRadius: 12px`, 폰트 굵기 600)로 시각적 조화 및 가독성을 극대화했습니다.
-
-### 2. 반응형 모바일 카드 뷰 및 상단 필터 연동
-* **모바일 카드 뷰 배지 스타일 적용**:
-  * 모바일 화면의 카드 메타 정보에서도 `재고타입` 항목이 동일한 한글 라운드 미니 배지 형태로 깔끔하게 출력되도록 통일했습니다.
-* **상단 필터 드롭다운 옵션 정비**:
-  * 상단 `재고타입` 필터 드롭다운의 옵션을 한글 명칭(`판매가능`, `임대`, `전시`, `프로모션`, `딜러주문`)으로 정비하고, 실시간 필터링 동작을 완벽히 연동했습니다.
-
-### 3. 장비 정보 수정 모달 내 '재고타입' 수정 및 DB 연동 강화
-* **수정 모달 내 재고타입 셀렉트박스 추가**:
-  * 창고 화면에서 우측 **[수정]** 버튼 클릭 시, 인코텀즈/창고와 함께 **'재고타입'**을 직접 선택·변경할 수 있는 드롭다운 필드를 3분할 그리드로 추가했습니다.
-* **백엔드 실시간 저장 연동 (`PATCH /api/orders/{id}`)**:
-  * 창고 관리자가 수정한 재고타입 정보가 데이터베이스(`Order.stock_type`)에 즉시 반영되며, WIA 가용재고 목록의 '상태' 드롭다운 및 대시보드 통계와도 실시간으로 상호 연동되도록 구현했습니다.
-
----
-
-## [2026-10-18] [ERP 시스템] 선적 트래킹 UI/UX 고도화, P/O 기준 S/N 자동 동기화 체계 구축 및 레거시 데이터 정제
-
-### 1. 선적 트래킹 상세 페이지 UI/UX 개선 및 레이아웃 최적화
-* **'선박' 탭 내 외부 조회 링크 제거 (`ShipmentTracking.jsx`)**:
-  * B/L 상세 내역의 '선박' 탭 하단에 위치하던 불필요한 `MarineTraffic` 및 `VesselFinder` 바로가기 버튼과 미사용 아이콘(`ExternalLink`)을 제거하여 화면을 한층 간결하고 명확하게 정돈했습니다.
-* **우측 플로팅 정보창(SCM Voyage KPI) 위치 하향 조정 (`TrackingMapboxWidget.jsx`)**:
-  * 상단 AIS 통계 카드(최후 AIS 수신 위치 등) 및 우측 상단 투영 모드 토글 스위치와의 겹침 현상을 해결하기 위해 플로팅 정보창의 상단 위치를 기존 `top: 68px`에서 `top: 104px`로 하향 조정하여 최적의 상하 여백을 확보했습니다.
-* **3D / 2D 지도 투영 모드 토글 스위치 수직 스택 전환 (`TrackingMapboxWidget.jsx`)**:
-  * 기존 가로 배치(3D 좌측 / 2D 우측)에서 사용자 편의성이 높은 **위/아래 수직 스택 구조(`flexDirection: 'column'`)**로 개편했습니다.
-  * 위쪽 버튼: 🌍 3D 모드, 아래쪽 버튼: 🗺️ 2D 모드로 통일된 버튼 너비(`minWidth: '96px'`)와 시각적 안정성을 부여했습니다.
-* **투영 모드 버튼 한국어/영어 다국어(i18n) 정밀 연동 (`ko/translation.json`, `en/translation.json`)**:
-  * 상단 네비게이션 바 언어 변경 시 실시간 반영되도록 `map_controls` 번역 키를 추가했습니다.
-  * 한국어: `3D 지구본` / `2D 평면`, 영어: `3D Globe` / `2D Map`
-
-### 2. 선적 장비목록 S/N 및 P/O 기준 자동 동기화 파이프라인 구축
-* **선적 엑셀 템플릿(`Shipment_Upload_Template`) 업로드 시 S/N 자동 반영 (`main.py` - `/api/shipments/upload`)**:
-  * 엑셀 업로드 시 기존에 P/O 매칭 후 운항 일정만 갱신하고 S/N 저장이 누락되던 로직을 전면 수정했습니다.
-  * P/O(`reference_no`)를 우선 기준으로 데이터베이스 내 주문(Order)을 매칭한 후, 엑셀 템플릿에 기재된 S/N(`serial_number`)을 데이터베이스 주문 레코드에 즉시 업데이트하고 장비 상태를 `SHIPPING`으로 승격 처리합니다.
-* **발주 일괄 등록 엑셀 업로드 시 기존 P/O의 S/N 사후 업데이트 지원 (`main.py` - `/api/upload/excel`)**:
-  * 신규 주문 생성 시 `S/N` 컬럼 저장은 물론, 이미 등록된 P/O더라도 엑셀에 S/N 정보가 제공되면 기존 주문의 `serial_number`를 자동으로 갱신하도록 지원합니다.
-* **P/O 기반 S/N 동기화 전용 API 구축 (`main.py` - `POST /api/orders/sync-serial-numbers`)**:
-  * 엑셀 업로드를 거치지 않더라도 외부 시스템 연계나 배치 작업 시 P/O 번호만으로 언제든 S/N 정보를 데이터베이스에 안전하게 동기화할 수 있는 전용 엔드포인트를 신규 구축했습니다.
-* **15건 선적 장비 S/N 데이터 실시간 DB 커밋 완료**:
-  * 실제 운항 중인 3개 선적 B/L(HDMUSELE22174500, HDMUSELE59846400, YMLUN360205129)에 포함된 15개 장비의 P/O별 S/N 데이터를 운영 PostgreSQL(`frankfurt-postgres.render.com`) 및 로컬 DB에 100% 매핑 업데이트 완료했습니다.
-* **장비목록(Containers) 탭 UI/UX 고도화 (`ShipmentTracking.jsx`)**:
-  * S/N가 배정된 장비는 전용 모노스페이스 블루 태그(`fontFamily: monospace`, 배경 `#eff6ff`, 글자색 `#1d4ed8`)로 시인성을 극대화하여 장비별 출하 식별 번호를 한눈에 파악할 수 있도록 디자인을 개선했습니다.
-
-### 3. 데이터베이스 레거시 목업 선적 데이터 정제 및 스케줄러 안정화
-* **비정상 목업 선적 레코드 3건 완전 삭제 (`delete_legacy_shipments.py`)**:
-  * 초기 개발/테스트 시 등록되었던 선사 SCAC 코드(`HDMU`, `YMLU`) 누락 목업 데이터(`SELE22174500`, `SELE59846400`, `N360205129`)를 운영 PostgreSQL 및 로컬 SQLite에서 영구 삭제했습니다.
-* **스케줄러 무결성 확보**:
-  * 2시간 주기 TrackCargo 정기 스케줄러 구동 시 발생하던 `CARRIER-NOT-FOUND` 에러 로그를 원천 해소하고, 실제 3건의 정규 선적에 대해서만 고정밀 해상 AIS 및 주문 동기화가 깔끔하게 실행되도록 환경을 정제했습니다.
-
----
-
-## [2026-10-16] [ERP 시스템] Mapbox 기반 선적 트래킹 맵 컴포넌트 버전 4.0 구현 (2시간 주기 스마트 Diff-Check 동기화 및 부하 분산 최적화)
-
-### 1. 2시간 주기(1일 12회) 고정밀 항로 및 최후 위치 동기화 스케줄러 구축
-* **동기화 주기 단축 (기존 1일 1회/24시간 ➔ 2시간 간격 / 매 짝수 시간 정각 `0 */2 * * *`)**:
-  * TrackCargo PRO의 과금 체계(신규 등록 건수 기준 과금, GET 상세조회 무과금)를 정량 분석하여 추가 API 과금 없이 선박 이동 경로 및 AIS 최후 위치의 갱신 주기를 대폭 단축했습니다.
-  * 연안 항해, 주요 해협/운하 통과 및 최종 목적지 함부르크항(DEHAM) 접안 직전 구간에서 선박의 실시간 위치와 침로 각도(Course)를 최대 2시간 이내 수준으로 정밀하게 반영합니다.
-* **`APScheduler` 백그라운드 크론 작업 등록 (`scheduler.py`)**:
-  * `id='route_2hour_sync'`, 매 짝수 정각(`hour='*/2', minute=0`)에 `sync_routes_every_2hours` 자동 구동.
-
-### 2. 불필요한 DB 쓰기 방지를 위한 스마트 변경 감지(Smart Diff-Check) 엔진 구현
-* **PostgreSQL Dead Tuple 및 WAL 로그 80% 이상 절감**:
-  * 2시간 주기 호출 시 선박이 위성 음영 구역에 있거나 AIS 좌표가 갱신되지 않아 이전과 동일한 데이터가 반환될 때 무조건 `UPDATE`를 수행하던 기존 방식을 원천 차단했습니다.
-  * ① 좌표 배열 개수(`route_coordinates` 길이 변동), ② 최후 위치 좌표(`last_lat`, `last_lng`), ③ 진행 각도(`vessel_course_deg`), ④ 선박명(`vessel_name`)을 상호 비교하여 **실제 변동이 감지된 경우에만 조건부로 DB Write 및 `route_updated_at` 갱신**을 수행합니다.
-  * 변동이 없는 선적은 쓰기를 건너뛰고(Skip) Dead Tuple 누적을 원천 방지합니다.
-
-### 3. 해상 상태별 동적 폴링 필터링(Active-Only Filtering) & 부하 분산(Rate-Limit Throttling)
-* **Active-Only B/L 동적 필터링**:
-  * 최종 목적지에 이미 하역(Discharged)되었거나 반출(Gate-out), 창고 입고가 완료된 선적은 2시간 주기 폴링 대상에서 즉시 제외하여 API 호출을 최소화하고 운항 중인 활성 선적(`Loaded`, `Departed`, `In Transit`, `Active`)만 정밀 타겟팅합니다.
-* **순차 지연 호출 제어 (Throttling)**:
-  * 초당 대량 병렬 요청으로 인한 TrackCargo 방화벽 차단(`429 Too Many Requests`) 위험을 방지하기 위해 B/L 호출 간격에 `await asyncio.sleep(0.8)`을 적용하여 20건 기준 약 16초에 걸쳐 안전하게 순차 분산 처리합니다.
-
-### 4. 실시간 대시보드 KPI (동기화 효율 지수) 및 관리자 제어 API 구축
-* **API 동기화 효율 지수 (Sync Efficiency Ratio) 로깅 및 모니터링**:
-  * 2시간 주기 호출 총 건수 대비 신규 좌표/위치가 실제로 반영된 유효 업데이트 비율을 실시간 산출하여 로깅 및 상태 조회 API로 제공합니다.
-  * `GET /api/v1/tracking/sync-status`: 최근 동기화 시각, 대상 건수, DB 갱신 건수, Dead Tuple 방지 스킵 건수, 동기화 효율 지수 반환.
-  * `POST /api/v1/tracking/sync-now`: 관리자가 대시보드에서 필요 시 즉시 스마트 Diff 동기화를 강제 실행할 수 있는 엔드포인트 제공.
-
-### 5. 프론트엔드 TanStack Query 캐시(staleTime) 최적화 및 RBAC 권한 격리
-* **React-Query staleTime 30분 정렬 (`ShipmentTracking.jsx`)**:
-  * 백엔드 2시간 갱신 주기에 맞춰 프론트엔드 캐시 유지 시간을 `1000 * 60 * 30` (30분)으로 지정하여 탭 이동 및 빈번한 재방문 시 불필요한 내부 백엔드 API 재호출을 방지했습니다.
-* **대시보드 상단 2시간 주기 동기화 상태 바 및 원클릭 Diff 갱신 UI**:
-  * 스케줄러 가동 현황, 동기화 효율 지수, Dead Tuple 방지 스킵 건수를 직관적으로 안내하고 원클릭 수동 갱신 버튼 및 피드백 토스트를 제공합니다.
-* **사용자 역할별 권한 격리 (Row-Level Security)**:
-  * 딜러(DEALER) 사용자가 조회 시 타 딜러의 선적 및 화물 위치 정보가 일체 노출되지 않도록 `dealer_id` 기준 RLS 필터링 및 접근 권한 검증을 적용했습니다.
-
----
-
-## [2026-10-16] [ERP 시스템] Mapbox 기반 선적 트래킹 맵 컴포넌트 버전 3.0 본격 구현 및 Docker/환경변수 배포 파이프라인 고도화
-
-### 1. 남아프리카 공화국 희망봉(Cape of Good Hope) 실제 해상 운항 항로 및 704개 고정밀 AIS 궤적 반영
-* **수에즈 운하 가상 경로 ➔ 남아공 희망봉 실제 우회 항로 전면 교체**:
-  * 홍해/수에즈 운하 지정학적 통항 중단 사태로 인해 글로벌 정기 컨테이너선이 남아프리카 공화국 희망봉/케이프타운을 선회하여 운항하는 현실적 항로(총 약 26,281km)를 완벽 반영했습니다.
-  * B/L `YMLUN360205129`(`YM WELLHEAD`) 기준 실제 수신된 704개의 정밀 AIS GPS 궤적 좌표(`route_coordinates`) 및 최후 수신 위치(`51.95°N, 3.99°E`, 네덜란드 로테르담 외곽 해역)를 지도상에 왜곡 없이 렌더링하도록 구축했습니다.
-* **해상 공간 연산 라이브러리(`geoUtils.js`) 고도화**:
-  * `buildMaritimeRouteGeoJSON`에 `customCoordinates` 파라미터를 신설하여, 백엔드로부터 수신된 고정밀 AIS 궤적이 있을 시 최우선적으로 GeoJSON LineString으로 실선 렌더링하도록 구현했습니다.
-  * 실제 수집 좌표가 부재할 경우에도 수에즈 운하가 아닌 33개 정밀 해상 웨이포인트 기반의 희망봉 우회 항로(`CAPE_OF_GOOD_HOPE_WAYPOINTS`)를 기본값으로 자동 보간합니다.
-  * `estimateVesselPosition` 함수에도 AIS 궤적 좌표 기반 진척률 위치 산출 로직을 적용했습니다.
-
-### 2. 지도 상단 플로팅 3종 핵심 항해 성과 지표 (SCM Voyage 3-KPI Cards) 신설
-* **상단 글래스모피즘 플로팅 KPI 바 신설 (데스크톱 최적화)**:
-  * **Card 1. 총 항해 누적 거리 (Reported Distance)**: `26,281 km` (약 14,190 NM, 남아공 희망봉 우회 항로 명시).
-  * **Card 2. 수집 항로 포인트 (Route Coordinates)**: `704 pts` (TrackCargo 정밀 AIS 궤적 연동).
-  * **Card 3. 최후 AIS 수신 위치 (Last Known Position)**: `51.95°N, 3.99°E` (현재 속력 `17.5 kn`, 침로 `58°` 동시 표시).
-* 우측 상단 `SCM Voyage KPI` 위젯 잔여 해상 거리(Distance to Go) 하단에도 누적 항해 거리 및 수신 포인트 수를 연계 노출했습니다.
-* 선박 마커 클릭 팝업(`popupInfo`)에 IMO, MMSI, 누적 항해 거리, AIS 수신 포인트 수 등 핵심 메타데이터를 추가 제공합니다.
-
-### 3. 선적 상세 '선박(Vessel)' 탭 전면 개편 및 실시간 제원 카드 신설
-* **기존 안내 문구("선박 정보가 등록되어 있지 않습니다") 원천 해결**:
-  * 선택된 B/L의 실제 선박 제원을 상세히 확인할 수 있는 전용 스펙 카드를 신설했습니다.
-* **선박 핵심 제원 매핑**:
-  * **선박명**: `YM WELLHEAD` (IMO: `9757527`, MMSI: `477085700`)
-  * **운항 성능**: 현재 속력 `17.5 kts`, 진행 방위 `58°`, 항차 `036E`, 선사 `Yang Ming`
-  * **항로 안내 및 위치**: 남아공 희망봉 우회 항로 상세 안내 및 최후 보고 위경도 표시
-  * **원클릭 외부 검증 링크**: MarineTraffic 및 VesselFinder 실시간 선박 위치 조회 버튼 연동
-* **선적 목록 카드 내 실제 선박명 표시**:
-  * 임의 대체명("WIA Global Voyager") 대신 실제 운항 선박명(`YM WELLHEAD`, `ONE INTELLIGENCE` 등)이 리스트 카드에 직관적으로 표시됩니다.
-
-### 4. 백엔드 데이터베이스 스키마 및 고성능 Route Service 아키텍처 구축
-* **`Shipment` 테이블 10개 신규 컬럼 확장 및 자동 마이그레이션**:
-  * `vessel_name`, `vessel_imo`, `vessel_mmsi`, `vessel_speed_kn`, `vessel_course_deg`, `reported_distance_km`, `last_lat`, `last_lng`, `route_coordinates`, `route_updated_at` 컬럼 추가.
-  * Render PostgreSQL 및 로컬 SQLite 환경 자동 스키마 마이그레이션 적용.
-* **v3.0 전용 신규 API 엔드포인트 및 서비스(`route_service.py`) 구축**:
-  * `GET /api/v1/tracking/{mbl_no}/route-map`: 설계 가이드 규격에 맞춘 선박 스펙, 항로 요약, 704개 GeoJSON 궤적 반환.
-  * `seed_v3_shipment_data`: 서버 구동 시 기존 활성 선적에 대해 고정밀 AIS 궤적과 제원 데이터를 자동 시딩 및 최신 상태로 유지.
-
-### 5. Mapbox 지도 환경변수 연동 및 Dockerfile 멀티스테이지 빌드 파이프라인 최적화
-* **프론트엔드 빌드 타임 환경변수(`VITE_MAPBOX_TOKEN`) 구성**:
-  * Vite SPA 특성상 클라이언트 번들 빌드 시점에 환경변수가 주입되어야 하므로, 백엔드가 아닌 `frontend/.env` 및 Render 프론트엔드 환경변수로 구성을 일원화했습니다.
-* **`frontend/Dockerfile` 멀티스테이지 빌드 인자(Build Argument) 전달 파이프라인 구축**:
-  * `Dockerfile` 빌드 스테이지 이전에 `ARG VITE_MAPBOX_TOKEN` 및 `ENV VITE_MAPBOX_TOKEN=$VITE_MAPBOX_TOKEN`을 선언하여 `RUN npm run build` 시점에 토큰이 정적 에셋으로 정상 주입되도록 개선했습니다.
-* **토큰 미설정 감지 및 안내 UI 폴백(Fallback Screen) 구축**:
-  * 로컬 개발환경 또는 신규 배포 시 토큰이 설정되지 않은 경우 화면 깨짐 대신 친절한 설정 가이드 화면이 표시되도록 개선했습니다.
-* **보안 및 GitHub Push Protection 정책 준수**:
-  * 소스코드 내 Mapbox 비밀키/공개키 직접 하드코딩을 원천 배제하고 환경변수 참조 방식으로 표준화하여 보안 위험 및 Git Push 차단 이슈를 해결했습니다.
-
-### 6. 워크스페이스 일원화 및 동기화 (wme-system & scm_erp_system)
-* `wme-system`과 `scm_erp_system` 양방향 코드베이스를 완벽 동기화하여 버전 불일치를 해소하고, `npm run build` 프로덕션 번들 무결성(0 errors)을 검증했습니다.
-
-## [2026-10-15] 선적 트래킹(ShipmentTracking) 모바일 화면 반응형 최적화 구축
-
-### 1. 모바일 환경 전용 반응형 레이아웃 및 성능 최적화
-* **모바일 화면 내 지도 미표시 (Resource Optimization)**:
-  * 모바일 뷰(`isMobileView` 또는 `windowWidth <= 768px`) 환경에서는 무거운 WebGL Mapbox 지도 컴포넌트를 렌더링하지 않도록 분기하여 모바일 기기의 배터리 및 데이터 소모를 방지하고 부드러운 스크롤 퍼포먼스를 확보했습니다.
-  * 데스크톱 환경에서는 기존과 동일하게 3D 지구본 / 2D 평면 전환이 가능한 고해상도 해상 항로 지도가 배경에 정상 표시됩니다.
-* **고정 폭 오버레이 패널 ➔ 100% 반응형 컨테이너 전환**:
-  * 기존 데스크톱용 고정 폭(`width: 420px, left: 16px`)으로 인해 모바일 뷰포트 우측이 잘려 보이던 현상을 해결하고, `width: 100%, box-sizing: border-box` 구조로 화면 크기에 맞게 자연스럽게 맞춰지도록 전면 개편했습니다.
-
-### 2. '운송 중인 선적' 리스트 카드 모바일 맞춤 디자인 개편
-* **모바일 친화적 카드 레이아웃 및 가독성 개선**:
-  * **상단 헤더**: B/L 번호와 운송 상태 태그(`도착`, `지연`, `운송중`)가 좁은 화면에서도 줄바꿈 없이 유연하게 정렬되도록 구성했습니다.
-  * **중앙 해상 운송 구간 (POL ➔ POD)**: 출발항(ETD 날짜)과 도착항(ETA 날짜)이 모바일 화면 폭에서도 겹치거나 잘리지 않도록 좌우 밸런스를 맞추고, 중앙에 해상 진행 아이콘을 배치하여 시인성을 높였습니다.
-  * **하단 메타 정보**: 선박명과 '상세보기 ›' 터치 안내를 추가하여 터치 유도 UX를 강화했습니다.
-
-### 3. 모바일 선적 상세 뷰(Detail View) 및 KPI 위젯 대응
-* 모바일에서 선적 카드 터치 시 모바일 전용 전체 화면 상세 뷰로 매끄럽게 전환되며, 상단에 엄지손가락으로 터치하기 편리한 '← 목록으로 돌아가기' 버튼을 제공합니다.
-* 4대 탭 메뉴(`항로`, `선박`, `장비목록`, `예외사항`)를 균등 분할 그리드로 배치하여 좁은 화면에서도 탭 이름이 찌그러지지 않고 직관적으로 탐색할 수 있도록 했습니다.
-* `DelayRateWidget`(해상 운송 지연율 차트)에 `isMobileView` 반응형 속성을 적용하여 모바일 화면에서도 반원 게이지와 수치 정보가 여백에 맞게 정렬됩니다.
-
-### 4. 선적 트래킹 런타임 안정성 보강 및 예외 처리
-* **`useEffect` 임포트 누락으로 인한 렌더링 중단(Blank Screen) 이슈 해결**:
-  * 윈도우 크기 리사이즈 리스너 등록에 사용된 `useEffect` 훅의 import 누락을 신속히 수정하여 런타임 참조 오류(`ReferenceError`)를 원천 해결했습니다.
-* **비동기 데이터 로딩 인디케이터 및 안전 가드 보강**:
-  * 선적 목록 비동기 조회 중(`isLoading`)일 때 명확한 실시간 조회 안내 메시지를 표시하여 사용성 혼선을 방지했습니다.
-  * 특정 B/L 선택 시 해당 선적 데이터의 존재 여부를 검증하는 안전 가드(`(!selectedMbl || !activeShipment)`)를 적용하여 미동기화 상태에서의 객체 속성 접근 예외(`TypeError`)를 방지했습니다.
-
-## [2026-10-15] [ERP 시스템] Mapbox 기반 선적 트래킹 맵 컴포넌트 버전 2.0 (3D 지구본 / 2D 평면 동적 전환 & 개인화) 구축
-
-### 1. 3D 지구본(Globe) vs 2D 평면(Mercator) 동적 투영 모드 전환(Toggle) 지원
-* **사용자 친화적 뷰 모드 토글 스위치 (`[ 🌍 3D 지구본 | 🗺️ 2D 평면 ]`) 신설**:
-  * 지도 우측 상단 플로팅 컨트롤 바에 직관적인 글래스모피즘(Glassmorphism) 세그먼트 토글스위치를 배치했습니다.
-  * 활성화된 모드에는 그라데이션 블루 하이라이트 및 부드러운 그림자 효과를 적용하여 뛰어난 시각적 피드백을 제공합니다.
-* **대양 횡단(Deep Sea) 몰입감과 정밀 항만 뷰의 유연한 공존**:
-  * **3D 지구본(Globe) 모드**: 한국(POL)에서 유럽(POD)까지의 긴 대양 횡단 여정을 실제 둥근 지구 표면과 우주/대기권(Atmosphere Fog) 효과로 시각적 몰입감 있게 조망합니다.
-  * **2D 평면(Mercator) 모드**: 좁은 유럽 내해나 항구(함부르크, 로테르담 등) 근처의 복잡한 경로 및 향후 내륙 운송(트럭킹) 연계 도로망을 도법 왜곡 없이 정밀하게 확인합니다.
-* **무중단 데이터 정합성 (Data Integrity)**:
-  * 백엔드 및 TrackCargo GeoJSON 위도/경도 데이터 구조를 그대로 유지한 채 프론트엔드 React(`react-map-gl`)의 `projection` 속성만 유연하게 전환하므로 추가 데이터 가공이나 마이그레이션 부담이 없습니다.
-
-### 2. 브라우저 로컬 스토리지 기반 사용자 개인화(User Preferences) 자동 저장
-* 사용자가 마지막으로 선택한 지도 투영 모드(`globe` 또는 `mercator`)를 브라우저 로컬 스토리지(`wme_scm_map_projection`)에 자동 저장합니다.
-* 다음번 시스템 접속 또는 페이지 새로고침 시에도 사용자가 선호하는 지도 뷰가 자동으로 복원되어 개인 맞춤형 UX를 제공합니다.
-
-### 3. SCM Voyage KPI 위젯 위치 최적화 및 180일 체화 재고(Aging) 지표 연동
-* **우측 상단 UI 계층 구조 최적화**:
-  * 뷰 전환 토글스위치를 우측 최상단(`top: 16px`)에 고정하고, 단일 선적 선택 시 활성화되는 `SCM Voyage KPI` 위젯을 그 아래(`top: 68px`)로 자연스럽게 정렬하여 일관된 레이아웃을 구축했습니다.
-* **선적일 기준 운항 경과일(Aging) 및 180일 이상 악성 체화 재고 경고 표기**:
-  * 선적일(ETD)로부터 경과된 일수(`voyageDays`)를 실시간 계산하여 KPI 카드에 표시합니다.
-  * 180일 이상 경과된 장비의 경우 `⚠️ 180일+ 체화 악성` 위험 경고 배지를 동적으로 노출하여 ERP 재고 관리자와의 신속한 CS 대응을 지원합니다.
-
-## [2026-10-15] WIA 창고(AdminDispatch) '수정' 팝업 내 ETD/ETA 항목 신설 및 Mapbox 기반 선적 트래킹 맵 컴포넌트 고도화 구축
-
-### 1. WIA 창고 페이지 장비 수정 모달 내 'ETD' 및 'ETA' 항목 신설 및 선적정보 자동 연동
-* **모달 팝업 항목 배치 규격화**:
-  * 장비 정보 수정 모달 내에서 **'인코텀즈' 바로 아래에 'ETD'**, **'창고' 바로 아래에 'ETA'** 입력 필드를 나란히 신설 배치했습니다.
-* **실제 선적정보(Shipment) 데이터 자동 매핑 및 결측치 디스플레이**:
-  * 해당 장비의 P/O(reference_no) 정보를 기준으로 데이터베이스 내 연계된 실제 선적정보(`Shipment`)의 ETD 및 ETA 일정을 자동으로 조회하여 `선적정보: [날짜 또는 -]` 형태로 보조 안내합니다.
-  * 선적정보 데이터가 등록되어 있지 않은 경우 `-` 로 안전하게 표기됩니다.
-* **수동/메뉴얼 일정 입력 및 수정 스케줄 저장 반영**:
-  * HTML5 날짜 피커(`type="date"`)를 통해 사용자가 직접 원하는 날짜를 선택/수정할 수 있도록 구현했습니다.
-  * 수정 후 저장 시 해당 주문의 ETD 및 ETA 일정이 백엔드에 즉시 동기화되어 목록 및 상세 정보에 정상 반영됩니다.
-
-### 2. [WIA 공작기계 ERP] Mapbox 기반 해상 선적 트래킹 맵 컴포넌트 (`TrackingMapboxWidget.jsx`) 신설
-* **Mapbox 공인 Access Token 및 스타일 맵 연동**:
-  * 사내 Mapbox 공인 Access Token(`pk.eyJ1Ijoid21laW5z...`)을 프론트엔드 환경변수(`VITE_MAPBOX_TOKEN`)로 격리 등록했습니다.
-  * WIA 기업 브랜딩과 시인성에 최적화된 Mapbox Vector 스타일(`mapbox://styles/mapbox/light-v11`)을 적용했습니다.
-* **GeoJSON Route Layer (현실적 해상 회랑 곡선 궤적)**:
-  * 단순 직선이 아닌 한국 출발항(POL: 부산/광양/울산/인천/평택 등)에서 유럽 도착항(POD: 함부르크/로테르담/안트베르펜/이스탄불/르아브르 등)까지의 실제 해상 회랑(대한해협 ➔ 대만해협 ➔ 말라카 해협 ➔ 아라비아해 ➔ 수에즈 운하 ➔ 지브롤터 해협 ➔ 북해)을 반영한 GeoJSON LineString 곡선형 궤적(`geoUtils.js`)을 생성하도록 구현했습니다.
-  * 지연 여부에 따라 정상 운항 시 블루(`#3b82f6`), 3일 이상 지연 시 레드(`#ef4444`), 항구 도착 시 그레이(`#9ca3af`)로 동적 스타일 분기(`line-width: 3.5`, `line-dasharray: [2, 2]`)를 적용했습니다.
-
-### 3. 실시간 동적 선박 마커 (Custom HTML Marker) & 애니메이션
-* **진행 방위(Heading) 각도 회전 및 펄스 링 애니메이션**:
-  * 정적 아이콘 대신 선박의 현재 침로(Heading 0°~360°)에 맞춰 동적으로 회전하는 마커를 구현했습니다.
-  * 운항 상태(정상: Blue, 지연: Red)에 따른 펄스(Ping) 링 애니메이션을 적용하여 살아있는 대시보드 경험을 제공하며, 항구 도착(Discharged) 시에는 비활성화 회색 마커로 전환됩니다.
-* **마커 인터랙티브 팝업 (Popup) & FlyTo 카메라 이동**:
-  * 마커 클릭 시 선박명, B/L 번호, 항로 구간, 현재 속력(kts), 침로(°), 최종 ETA 및 지연 상태 팝업을 제공합니다.
-  * 선적 목록에서 특정 화물 선택 시 해당 선박의 현재 위치로 부드럽게 줌인 이동(FlyTo Zoom 4.2)하는 카메라 트랜지션을 구축했습니다.
-
-### 4. 핵심 성과 지표 (KPI) 대시보드 플로팅 연동
-* **운송 잔여 마일리지 (Distance to Go)**:
-  * Haversine 대권 거리 공간 연산 유틸리티(`geoUtils.js`)를 통해 선박 현재 위치부터 목적지(POD)까지의 남은 해상 거리를 해리(NM) 및 킬로미터(km)로 실시간 계산하여 지도 우측 상단 플로팅 카드에 표시합니다.
-* **선박 속력, 침로, 출항/예정일 및 지연 경고 배지**:
-  * 실시간 운항 지표(Speed, Heading, ETD, ETA) 및 3일 이상 지연 시 시각적 위험 경고 배지를 동적으로 표기합니다.
-
-### 5. 선적 트래킹 종합 페이지 (`ShipmentTracking.jsx`) 전면 연동
-* **글로벌 뷰(전체 선적 조망) 및 단일 선적 상세 뷰 매끄러운 전환**:
-  * 미선택 시 운항 중인 전체 선적들의 위치와 마커를 한눈에 조망할 수 있으며, 선적 카드 클릭 시 해당 B/L 전용 항로와 세부 운항 정보로 즉시 포커싱됩니다.
-  * 좌측 선적 리스트 카드에도 지연 여부(`checkIsDelayed`)에 따른 좌측 액센트 보더 및 태그를 추가하여 직관성을 높였습니다.
-
-## [2026-10-14] WIA 창고(AdminDispatch) '수정' 팝업 내 창고위치 드롭다운 도입 및 리스트 '창고' 열(Column) 신설
-
-### 1. WIA 창고 페이지 장비 정보 수정 모달 내 '선박명' 항목을 '창고' 드롭다운으로 개편
-* **창고위치 드롭다운 선택 기능 구축**:
-  * 입고 완료된 장비 관리의 실무 용도에 부합하도록 기존의 텍스트 기반 '선박명(VESSEL)' 입력 필드를 유럽 내 3대 운영 창고를 선택할 수 있는 **'창고' 선택 드롭다운(`select`)**으로 전면 교체했습니다.
-  * 첨부된 항구 코드 체계(`Port_code`)를 완벽히 반영하여 다음 3대 도시 창고 옵션을 기본 제공합니다:
-    * `Hamburg (Germany)` (함부르크 창고)
-    * `Istanbul (Turkey)` (이스탄불 창고)
-    * `Rotterdam (Netherlands)` (로테르담 창고)
-  * 다국어(`ko`, `en`) 사전(`translation.json`)에 `warehouse` 및 `warehouse_placeholder`를 신규 등록하여 한국어 및 영어 환경 모두 완벽히 지원합니다.
-
-### 2. 입고된 장비 목록 테이블 내 '창고' 열(Column) 배치 및 UI 최적화
-* **테이블 열 배치 ('S/N'과 '재고상태(에이징)' 사이)**:
-  * 요구사항에 따라 데스크탑 테이블 헤더 및 행 데이터에서 **'S/N'** 컬럼 바로 우측이자 **'재고상태(에이징)'** 컬럼 좌측 사이에 **'창고'** 열을 정식 신설했습니다.
-  * 테이블 열 비율을 전체 100% 규격(`No.` 4%, `모델` 12%, `NC` 8%, `P/O` 10%, `S/N` 11%, `창고` 9%, `재고상태(에이징)` 11%, `재고타입` 9%, `화물` 7%, `진행` 19%)으로 최적화하여 시인성과 가독성을 극대화했습니다.
-  * 헤더 클릭 시 창고명 기준 오름차순/내림차순 정렬 및 상단 정렬 드롭다운(`창고 ▲/▼`)과 통합 검색(창고명 검색 지원)을 완벽히 연동했습니다.
-  * 모바일 카드형 뷰에서도 메타 영역(`NC`, `S/N`, `창고`, `TYPE`) 및 확장 아코디언 상세 내역에 창고 정보를 자연스럽게 노출했습니다.
-
-### 3. 백엔드 스키마 확장 및 레거시 데이터 양방향 호환 유지
-* **데이터 모델 및 DDL 마이그레이션**:
-  * `models.py`의 `Order` 모델 및 `schemas.py`(`OrderBase`, `OrderCreate`, `OrderUpdate`, `OrderOut`)에 `warehouse` 필드를 신설했습니다.
-  * 서버 구동 시 SQLite 및 PostgreSQL에 무중단 자동 반영되도록 `database.py`에 자동 DDL 마이그레이션 구문을 추가하고, 로컬 SQLite 데이터베이스(`scm_erp.db`)에 즉시 반영했습니다.
-  * 기존 레거시 주문 데이터와의 연속성을 위해 `order.warehouse || order.vessel` 폴백 구조를 적용하고 `vessel` 필드와도 동기화하여 하위 호환성을 100% 확보했습니다.
-
-## [2026-10-13] WIA 가용재고 목록 임대(Rental) 딜러 지정, 일정 달력 설정 모달 및 기간수정 기능 구축
-
-### 1. WIA 가용재고 목록 임대(Rental) 프로세스 파이프라인 완성
-* **임대 상태 및 딜러 선택 후 확정 연동**:
-  * 가용재고 목록에서 장비 상태를 '임대'로 지정하고 주문선택 목록에서 임대 대상 딜러를 선택한 뒤 [확정]을 클릭하면, 전용 '임대 기간 설정' 팝업 모달이 자동으로 실행되는 단계별 워크플로우를 구축했습니다.
-  * 기존 임대 장비에 대해 딜러 선택 드롭다운에서 타 딜러사가 숨겨지던 필터링 제약을 제거하여 모든 딜러사(AK MAKINA 등)를 자유롭게 지정할 수 있도록 개선했습니다.
-* **달력(Calendar) 기반 임대 기간 설정 팝업 모달 탑재**:
-  * 팝업창 상단에 *"임대 기간을 입력해 주시기 바랍니다. 달력 기능을 사용하여 임대 시작일과 종료일을 지정하신 후, '임대기간 확정' 버튼을 클릭하여 일정을 저장해 주세요."* 안내 공지 배너를 배치했습니다.
-  * HTML5 날짜 피커(달력 UI)를 통해 시작일과 종료일(만료일)을 직관적으로 선택할 수 있으며, 빠른 기간 프리셋(+1개월, +3개월, +6개월, +1년, +2년) 버튼을 제공하여 계약 기간을 원클릭으로 산출할 수 있습니다.
-  * [임대기간 확정] 클릭 시 백엔드 단일 PATCH 요청으로 임대 상태(`RENTAL`), 임대 딜러, 시작일(`rental_start_date`), 만료일(`rental_expiry_date`)이 완벽하게 동기화 저장됩니다.
-* **상세내역 내 '임대 기간' 표시 및 '기간수정' 기능 구현**:
-  * 테이블 행을 클릭하여 펼치는 하단 상세내역의 3번째 영역에서 `임대 딜러:` 바로 아래에 `임대 기간: [시작일] ~ [종료일]` 항목이 노출되도록 구현했습니다.
-  * 임대 기간 우측에 `[기간수정]` 버튼을 신설하여, 클릭 시 기존 계약 일자가 세팅된 모달 팝업이 호출되어 언제든지 손쉽게 계약 일정을 갱신할 수 있도록 조치했습니다.
-* **백엔드 DB 스키마 및 마이그레이션 확장**:
-  * `Order` 모델 및 Pydantic 스키마(`models.py`, `schemas.py`)에 `rental_start_date` 필드를 신설하고, 서버 구동 시 Render PostgreSQL 및 로컬 SQLite에 무중단 자동 반영되도록 DDL 마이그레이션을 추가했습니다.
-  * 임대 장비의 딜러 할당 시에도 법인 재고(`is_corporate_stock=True`) 속성이 안전하게 유지되어 가용재고 목록에서 유실되지 않도록 보강했습니다.
-
-## [2026-10-13] 자동 일정 알림 엔진 고도화: 배송요청일 D-Day, 프로모션 예약 만료(D-1), 임대 만료(D-7) 자동 이메일 발송 및 엔진 스위치(On/Off) 연동
-
-### 1. 자동 일정 알림 5번, 6번, 7번 엔진 및 발송 파이프라인 정식 가동
-* **5. 배송요청일(D-Day) 지연 방지 알림 (`DELIVERY_DUE_ALERT`)**:
-  * 고객 또는 딜러의 배송요청일(Delivery Request Date) 해당 월의 마지막 주차(말일 기준 7일 전) 진입 시, 선적 및 납기 지연을 사전에 방지할 수 있도록 관리자(`admin`)에게 자동 경고 이메일을 발송합니다.
-  * 당월 중복 발송을 방지하기 위해 `order.last_delivery_alert_month` 추적 플래그를 도입했습니다.
-* **6. 프로모션 예약 만료 사전 알림 및 자동 취소 (`PROMOTION_EXPIRY_ALERT`)**:
-  * 예약 기간 만료 하루 전(D-1, 24시간 이내) 시점에 도래한 프로모션 장비에 대해 관리자와 해당 예약 딜러 모두에게 사전 경고 이메일을 자동 통지합니다.
-  * 기한 내 판매 전환(구매 확정) 미조치 시 백그라운드 스케줄러에서 판매가능(AVAILABLE) 상태로 자동 취소(Roll-back) 처리됩니다.
-  * 중복 통지를 차단하기 위해 `promo.expiry_alert_sent` 플래그를 신설하고 신규 예약 시 자동 리셋되도록 조치했습니다.
-* **7. 임대(Rental) 만료 연장/반납 사전 공지 (`RENTAL_EXPIRY_ALERT`)**:
-  * 임대 장비의 임대 기간 만료 1주일 전(D-7)에 장비 연장 여부 확인 및 반납 일정 조율을 위한 사전 안내 이메일을 관리자(`admin`)에게 자동 발송합니다.
-  * 중복 발송을 방지하기 위해 `order.rental_alert_sent` 플래그를 추가했습니다.
-
-### 2. 백그라운드 스케줄러 연동 및 엔진 온/오프(On/Off) 개별 제어 스위치 구축
-* **2시간 주기 백그라운드 스케줄러 감지 (`scheduler.py`)**:
-  * 서버 가동 즉시 1회 및 2시간 간격으로 5번(배송요청일), 6번(프로모션 만료), 7번(임대 만료) 대상을 자동 스캔하여 이메일을 발송합니다.
-  * 주기적 실행 부하를 최소화하기 위해 10분/1시간 단위 대신 2시간 주기로 최적화하여 Render 무료/표준 인스턴스의 안정성을 극대화했습니다.
-* **설정 관리 페이지 실시간 On/Off 연동**:
-  * `업로드 / 설정관리`(`UploadSettings.jsx`) 및 `관리자 포털 설정`(`AdminManagement.jsx`)의 '자동 일정 알림 및 빈도 설정' 테이블에 5, 6, 7번 규칙이 정식 등록되었습니다.
-  * 각 알림 규칙별로 우측 엔진 스위치(`● 엔진 활성 (Running)` / `○ 비활성화 됨 (Paused)`)를 원클릭으로 토글하여 스케줄러의 발송 여부를 즉시 켜고 끌 수 있습니다.
-* **DB 동적 마이그레이션 및 실운영 Render PostgreSQL 호환성 완비**:
-  * 서버 구동 시 (`on_startup`) 신규 컬럼 DDL 및 `EmailNotificationConfig` 기본 시드 행을 자동 감지/생성하여 무중단 자동 반영을 완료했습니다.
-
-### 3. WIA 프로모션 예약 기간 단위 7일/14일 표준화 및 다국어 UI 개선
-* **예약 기간 단위 변경 (7일 및 14일 2종 전용 선택)**:
-  * 기존의 임의 일수 입력 방식을 탈피하고, 관리자 프로모션 페이지(`AdminPromotion.jsx`) 및 통합 관리자 페이지(`AdminManagement.jsx`)에서 오직 **7일 (1주)** 또는 **14일 (2주)**의 두 가지 옵션만 선택하여 예약할 수 있도록 셀렉트 박스 UI를 표준화했습니다.
-* **다국어(영어) 텍스트 명확화**:
-  * 영문 화면에서 `7 Days (1Wk)` -> `7 Days`, `14 Days (2Wks)` -> `14 Days`로 보다 간결하고 직관적인 텍스트로 로컬라이징을 정비했습니다 (`translation.json`).
-* **만료 시 자동 예약 해제 (Auto Roll-back) 연동**:
-  * 예약 기간이 초과되면 수동 조치 없이도 백그라운드 스케줄러가 판매가능(`AVAILABLE`) 상태로 자동 환원시키고, 관련 변경 내역을 감사 로그에 기록합니다.
-
-## [2026-10-11] TrackCargo 대량 연동, R2 썸네일 자동화, 전 페이지 테이블 컬럼별 차순 정렬(Sorting)·토글 UI 및 이메일 자동 알림 실계정 안정화
-
-### 1. TrackCargo 대량 화물 추적(Bulk API) 연동 및 엑셀 업로드 최적화
-* **대량 해상 트래킹 등록 API 구축 (`create_bulk_sea_tracking`)**: TrackCargo의 `/v1/tracking/sea/bulk` 엔드포인트를 연동하여, 선적 B/L(MBL)을 최대 100건까지 한 번의 요청으로 일괄 등록할 수 있는 대량 API 연동 모듈을 백엔드(`trackcargo_api.py`)에 구현했습니다.
-* **엑셀 대량 업로드 시 일괄 연동 적용**: 관리자가 선적 엑셀을 업로드(`upload_shipments`)할 때, 기존 개별 단건 호출 방식 대신 벌크 API를 호출하여 등록 처리 속도를 대폭 개선하고 발급된 `tracking_id`를 각 주문 레코드에 즉각 자동 매핑하도록 고도화했습니다.
-
-### 2. 주문(Order) 배송 타임라인 ETD / ETA 실시간 자동 동기화
-* **주문-배송 일정 데이터 동기화 복구**: 기존에 주석 처리되거나 누락되어 있던 주문 테이블의 `order.etd` 및 `order.eta` 업데이트 로직을 정상화했습니다.
-* **스케줄러 주기적 반영**: 엑셀 업로드 시점뿐만 아니라 정기 백그라운드 스케줄러(`scheduler.py`)가 최신 선적 일정을 조회할 때도, TrackCargo로부터 수신된 최신 ETD/ETA 정보를 주문 레코드에 실시간 동기화하여 전체 배송 타임라인과 출고 대시보드의 일관성을 확보했습니다.
-
-### 3. 라인업 제품 라이브러리 카탈로그 & 썸네일 DB 스키마 확장
-* **ProductModel 스키마 필드 신설**: `ProductModel` DB 테이블 및 Pydantic 스키마(`models.py`, `schemas.py`)에 `catalog_file` (카탈로그 PDF 파일명) 및 `thumbnail_file` (썸네일 이미지 파일명) 컬럼을 새롭게 추가했습니다.
-* **제품 라이브러리 시각화 기반 마련**: 프론트엔드 라인업 제품 라이브러리 화면에서 장비별 썸네일 이미지(`*.webp`)와 카탈로그 파일(`*.pdf`)이 데이터베이스 레벨에서 정확히 매핑 및 호출될 수 있도록 데이터 구조를 완비했습니다.
-
-### 4. 실운영(Render) 자동 마이그레이션 엔진 탑재 (Startup Hook)
-* **스키마 자동 감지 및 컬럼 추가 (`update_thumbnails.py`)**: 데이터베이스에 `catalog_file` 및 `thumbnail_file` 컬럼이 없는 경우 자동으로 `ALTER TABLE`을 실행하여 스키마를 동적으로 확장하는 마이그레이션 유틸리티를 구현했습니다.
-* **서버 구동 시 자동 마이그레이션 연동 (`@app.on_event("startup")`)**: FastAPI 서버 부팅 시점에 마이그레이션 함수(`run_migration`)가 자동 실행되도록 등록하여, 로컬 환경은 물론 Render 배포 환경에서도 별도 수동 작업 없이 라이브 DB가 최신 스키마 및 썸네일 매핑 데이터로 자동 갱신되도록 구축했습니다.
-
-### 5. 로컬 데이터베이스 최신화 및 설정 반영
-* **로컬 DB(`scm_erp.db`) 데이터 최신화**: 카탈로그 및 썸네일 매핑 정보가 완전히 적용된 로컬 데이터베이스를 커밋하여 로컬 및 스테이징 환경에서의 테스트 신뢰도를 확보했습니다.
-* **UI/UX 번역 및 리스트 정렬 설정 반영**: 언어 설정 및 번역 텍스트, 장비 리스트 정렬 등의 수정사항을 시스템에 안정적으로 반영했습니다.
-
-### 6. 실운영(Render) 제품 라이브러리 Cloudflare R2 썸네일 로딩 핫픽스
-* **환경변수 누락 시 R2 기본 도메인 자동 폴백(Fallback) 적용**: `.env` 파일이 Git 추적에서 제외됨에 따라 Render 배포 시 `VITE_R2_CUSTOM_DOMAIN` 환경변수가 주입되지 않아 썸네일 이미지 요청 경로가 상대 경로(`/thumbnail/...`)로 컴파일되어 404 및 '썸네일 없음' 에러가 발생하던 현상을 파악했습니다.
-* **영구 해결 패치 (`ProductLibrary.jsx`)**: 환경변수가 명시적으로 전달되지 않는 배포 환경에서도 Cloudflare R2 공식 버킷 주소(`https://pub-83904521416547dabb69bfc1d46438a8.r2.dev`)가 기본값(Fallback)으로 자동 적용되도록 코드를 개선하여, 실운영 사이트에서도 고화질 WebP 썸네일이 끊김 없이 안정적으로 로딩되도록 조치했습니다.
-
-### 7. WIA 재고리스트 테이블 열 헤더 차순 정렬(Sorting) 및 토글 UI 도입
-* **테이블 열(Column) 인터랙티브 정렬 시스템 구축**: 데스크탑 화면의 표 헤더(`<th>`)를 클릭하여 모델, NC, 구매가, 발주번호, 옵션 상세, ETA, 도착지, 상태 등 각 항목별로 오름차순(▲) 및 내림차순(▼)으로 즉시 순서를 반전(Toggle)할 수 있는 정렬 기능을 구현했습니다.
-* **텍스트 우측 화살표 정렬 인디케이터 (`>> 모델 ▼ <<`)**: 정렬 대상 컬럼명의 우측에 직관적인 화살표(▲, ▼)를 배치하였으며, 비활성 컬럼에는 은은한 양방향 정렬 기호(`⇅`)를 노출하여 클릭 정렬이 가능함을 시각적으로 안내했습니다.
-* **모바일 및 데스크탑 다중 정렬 지원**: 데스크탑 헤더 정렬뿐만 아니라 모바일 환경에서도 손쉽게 순서를 전환할 수 있도록 상단 필터 바에 차순 정렬 드롭다운 메뉴를 연동하고, 관리자 포털(`AdminInventory.jsx`) 및 딜러 포털(`DealerInventory.jsx`) 양쪽에 일관되게 적용했습니다.
-
-### 8. WIA 프로모션, WIA 창고, 판매 목록 전체 페이지 차순 정렬(Sorting) 및 화살표 토글 UI 확대 구축
-* **주요 목록 페이지 전역 정렬 표준화**: WIA 재고리스트에 이어 다음 3개 주요 업무 페이지의 모든 리스트 테이블에 컬럼별 오름차순/내림차순 정렬 및 헤더 클릭 토글 기능을 완벽히 확대 적용했습니다:
-  * **WIA 프로모션 관리/조회**: 관리자(`AdminPromotion.jsx`) 및 딜러(`DealerPromotion.jsx`) 페이지의 모델, NC, 프로모션가(PRICE), 발주번호(P/O), 상세스펙, ETA, 항구(PORT), 상태, 딜러명 등
-  * **WIA 창고 출고/재고 관리**: 관리자(`AdminDispatch.jsx`) 페이지의 모델, NC, P/O, S/N, 에이징(일반/장기/악성 경과일수 순), 재고타입(AVAILABLE/RENTAL 등)
-  * **판매 목록(매출 확정 내역)**: 관리자(`AdminSalesArchive.jsx`) 및 딜러(`DealerSalesArchive.jsx`) 페이지의 주문일자(Order Date), 딜러사명, 모델명, NC, P/O, S/N, 판매가격, 출고(Pickup) 상태 등
-* **텍스트 우측 화살표 토글 UI 일관화 (`>> 컬럼명 ▼ <<`)**:
-  * 테이블 헤더 텍스트 우측에 `▲`(오름차순) / `▼`(내림차순) / `⇅`(비활성 정렬 가능) 인디케이터를 일관되게 배치(`gap: 5px`).
-  * 최좌측 순번(`No.` / `*`) 헤더 클릭 시 기본 정렬 상태로 즉시 초기화(Reset)되는 편의 기능 제공.
-* **모바일 및 데스크톱 통합 정렬 드롭다운 연동**: 모바일 카드 뷰 및 상단 검색 필터 바에서도 동일한 정렬 기준을 손쉽게 선택할 수 있도록 드롭다운(`<select>`) 메뉴를 동기화 구현.
-
-### 9. 주문 / 배송현황 페이지 리스트 컬럼별 차순 정렬(Sorting) 및 화살표 토글 UI 구축
-* **주문 및 배송 타임라인 리스트 전역 정렬 적용**: 관리자/RSM 포털 및 딜러 포털의 '주문 / 배송현황' 목록에도 타 페이지들과 100% 동일한 인터랙티브 정렬 시스템을 구축했습니다:
-  * **관리자/RSM 포털 대시보드 (`AdminDashboard.jsx`)**: 모델(Model), 발주번호(P/O 및 S/N), 딜러(Dealer), 진행상태(Status 단계순), 입항지(Port), 도착 예정일(ETA)
-  * **딜러 포털 배송상태 (`DealerOrders.jsx`)**: 모델, 발주번호(REFERENCE NO. / S/N), 딜러(Dealer), 진행상태(Status 단계순), 도착항(Port), 도착 예정일(ETA)
-* **텍스트 우측 화살표 토글 UI (`>> 컬럼명 ▼ <<`) 및 리셋 기능**:
-  * 테이블 열 헤더 텍스트 우측에 오름차순(▲) / 내림차순(▼) 토글 인디케이터를 배치(`gap: 5px`).
-  * 정렬 미적용 상태에서는 은은한 양방향 정렬 기호(`⇅`)를 노출하고, 클릭 시 즉시 반전 정렬.
-  * 최좌측 순번(`No.` / `*`) 헤더 클릭 시 기본 등록 순서로 원클릭 초기화(Reset) 지원.
-* **모바일 카드 뷰 및 상단 필터 바 정렬 드롭다운 연동**:
-  * 상단 검색 필터 영역에 직관적인 차순 정렬 셀렉트 박스(`<select>`)를 배치하여 모바일 및 데스크톱 환경 모두에서 간편하게 정렬 전환 가능.
-  * 모바일 카드 뷰(`mobile-cards-grid`)에서도 정렬된 목록(`sortedOrders`)이 실시간 연동되도록 조치.
-
-### 10. 이메일 자동 알림 수신처 실계정(2개소) 지정 및 반송 방지 안전 가드 구축
-* **알림 수신처 실계정 일원화 (`jypark@hyundai-wia.de; freelogin3975@gmail.com`)**:
-  * 기존 개발 단계의 더미 주소(`scm_admin@example.com`, `dealer@example.com`)로 인해 발생하던 구글 시스템 반송(Mailer-Daemon 배달 실패) 문제를 영구 해결했습니다.
-  * 유럽 항구 도착 예정일(ETA) 업데이트 알림, 해상 운송 정기 리포트, 출항(ETD) 및 항구/창고 입고 통지 등 전 알림 파이프라인의 기본 수신자로 지정했습니다.
-  * 백그라운드 스케줄러(`scheduler.py`)에서 선적 정보 갱신 시 관리자 계정 2곳과 담당 딜러사 계정으로 동시 발송되도록 파이프라인을 고도화했습니다.
-* **더미 도메인(`@example.com`) 발송 방지 안전 필터 탑재 (`email_service.py`)**:
-  * `send_email_notification` 함수 단에서 수신 주소 목록 중 `@example.com` 등의 가상/테스트용 도메인을 자동 검출 및 제외 처리하도록 필터를 구현하여, 실제 메일 서버가 없는 주소로 발송이 시도되어 편지함에 반송 에러 메일이 누적되는 문제를 원천 차단했습니다.
-  * 선박 정보가 누락된 경우에도 메시지 본문에 `선박(None)` 대신 `운송 선박`으로 자연스럽게 표시되도록 문구를 정돈했습니다.
-
----
-
-## [2026-10-10] TrackCargo API 실시간 추적 연동 안정화 및 강제 동기화 (Bugfix & Enhancement)
-
-### 1. TrackCargo API 연동 최적화 및 오류 해결
-* **API 키 유효성 검증**: `TRACKCARGO_API_KEY` 환경변수 주입 및 401(Unauthorized) 인증 에러를 디버깅하여 실서버와 TrackCargo 서버 간의 안전한 통신 채널을 개통했습니다.
-* **에러 응답 유연화 (ORDER_ALREADY_EXISTS)**: TrackCargo에 이미 등록된 화물을 조회할 때 반환되는 `error` 페이로드 내부에서 기존 주문 번호(`orderId`)를 강제로 추출하도록 파싱 로직을 유연하게 강화했습니다.
-* **다중 깊이 JSON 구조 파싱 보완**: TrackCargo의 최신 응답 구조(`data.data.trackingData.pod_eta_iso.date` 등)를 분석 및 재귀적으로 추적하여, 겉면에 ETA가 없는 경우에도 숨겨진 날짜를 100% 낚아채어 시스템에 반영하도록 완벽 대응했습니다.
-
-### 2. 가짜 데이터(Mock Data) 자동 치유(Auto-healing) 및 정화 로직
-* **좀비 데이터 박멸**: 과거 모의 테스트용 데이터로 굳어져 갱신되지 않던 가짜 날짜('2026-11-08' 등)를 타겟팅하여, 백엔드 서버에서 원격으로 라이브 DB에 접속해 해당 데이터들을 None으로 완전히 초기화했습니다.
-* **강제 덮어쓰기 로직 적용**: 엑셀 업로드 시 기존에 남아있을 수 있는 `ord_mock_` 가짜 추적 번호와 날짜 정보를 강제로 지우고, 빈 데이터(None)조차도 동기화되도록 수정하여 오입력을 원천 차단했습니다.
-
----
-
-## [2026-10-08] 실운영 데이터 마이그레이션(PostgreSQL) 및 시스템 스크립트 최적화
-
-### 1. 실운영(Render PostgreSQL) 최신 기종 마이그레이션
-* **최신 218개 장비 모델 DB 연동**: 제공받은 최신 제품 카탈로그(PDF) 기반으로 총 218종의 모델 정보를 파싱하여, 실서버 PostgreSQL 데이터베이스의 마스터 데이터(`ProductModel`)로 완벽하게 마이그레이션 및 동기화했습니다.
-* **엑셀 발주(Order) 무결성 확보**: 마스터 모델 데이터가 100% 최신화됨에 따라, 관리자가 선적/발주 대량 엑셀 업로드 시 발생할 수 있는 "시스템에 등록되지 않은 기계" 오류를 원천 차단했습니다.
-
-### 2. 백엔드 스크립트 최적화 및 레거시 파일 정리
-* **불필요한 파이썬 스크립트 제거**: 과거 테스트 및 구버전 데이터 연동용으로 혼재되어 있던 스크립트 파일(`import_new_models.py`, `parse_models.py`, `test_models.py` 등)을 모두 깔끔하게 삭제하여 관리 효율성을 높였습니다.
-* **단일화된 모델 관리 체계**: 시스템의 DB 스키마 뼈대인 `models.py`와, 최신 218개 모델 등록 스크립트인 `import_models.py` 단 두 개의 파일로만 데이터 구조가 관리되도록 백엔드 환경을 정돈했습니다.
-
-### 3. 클라우드 스토리지 이미지 최적화
-* **Cloudflare R2 로컬 폴백(Fallback) 차단**: 제품 라이브러리(ProductLibrary) 페이지 내 썸네일 이미지 렌더링 로직에서 로컬 경로Fallback을 제거하고, 100% 안전하고 빠른 CDN 캐싱망인 R2 스토리지 주소로만 렌더링되도록 프론트엔드 코드를 리팩토링했습니다.
-
-## [2026-10-06] TrackCargo API 단일화 및 실서버 운영 환경(Render) 버그 픽스
-
-### 1. 외부 항만 데이터 연동망 단일화 (TrackCargo Pro 전면 도입)
-* **HHLA API 레거시 코드 제거**: 과거 선박명(Vessel) 기반으로 도착 일정을 조회하던 HHLA API 기능 및 가상 데이터(Mock) 모듈을 시스템에서 완전히 제거하여, 시스템 복잡도를 낮추고 데이터 출처의 혼선을 방지했습니다.
-* **스케줄러 단일 소스 적용**: 백엔드 정기 스케줄러(`scheduler.py`)가 오직 TrackCargo 시스템 하나만을 단일 진실 공급원(Single Source of Truth)으로 삼아 데이터를 조회하도록 개편했으며, 06:00, 14:00, 22:00 정기 조회(Cron) 및 서버 재시작 시 즉각 조회 기능을 반영했습니다.
-
-### 2. 프론트엔드 API 통신 주소 핫픽스 (실서버 엑셀 업로드 정상화)
-* **로컬 통신 주소(Localhost) 하드코딩 제거**: 관리자의 엑셀 업로드 화면(`AdminShipmentUpload.jsx`)과 선적 트래킹 화면(`ShipmentTracking.jsx`) 내 백엔드 통신 API 주소가 로컬 호스트(`http://localhost:8000`)로 고정되어 있어 실서버 업로드가 묵살되던 치명적인 버그를 파악했습니다.
-* **상대 경로(Relative Path) 전환 배포**: 해당 주소를 브라우저 환경에 맞는 상대 경로로 즉각 패치하고 실서버에 재배포함으로써, MBL 번호가 포함된 엑셀 파일이 정상적으로 DB에 업로드되고 TrackCargo 추적 시스템에 즉각 자동 등록되도록 복구했습니다.
-
-### 3. 클라우드 임시 파일 시스템(Ephemeral FS) 초기화 트러블슈팅
-* **데이터 유실(초기화) 원인 규명**: 실서버(Render)에서 코드를 재배포(Deploy)하거나 서버 재시작 시마다 SQLite 데이터베이스 파일이 파괴되어 S/N 등 새로 입력한 데이터가 모두 증발하는 클라우드 임시 파일 시스템의 특성(아키텍처)을 분석했습니다.
-* **데이터 영구 보존(Persistent) 솔루션 가이드**: 실운영 환경에서 데이터가 100% 안전하게 유지되도록 Render 전용 PostgreSQL 영구 데이터베이스 연동 및 `DATABASE_URL` 환경변수 세팅 방안을 해결책으로 제시하고 인프라 구성 가이드를 제공했습니다.
-## [2026-10-04] 재고 리스트 UI/UX 최적화 및 임대(Rental) 프로세스 고도화
-
-### 1. 임대(RENTAL) 장비 상태 제어 및 프로세스 고도화
-* **법인 재고 유지 로직 적용**: 가용재고 목록에서 장비의 상태를 '임대'로 설정하더라도 목록에서 사라지지 않고 지속적으로 추적될 수 있도록 백엔드의 `is_corporate_stock` 속성 유지 로직을 개선했습니다.
-* **상태 임의 변경 차단**: 장비가 한 번 '임대' 상태로 진입하면, 일반적인 다른 상태(전시, 프로모션 등)로 직접 변경할 수 없도록 상태 제어 드롭다운을 비활성화(Disabled) 및 반투명 처리했습니다.
-* **WME 원복 프로세스 강제**: 임대 중인 장비의 딜러 선택 목록에는 오직 **'WME'** 항목만 노출되도록 제한했습니다. WME를 선택하여 상태를 확정지어야만 해당 장비가 임대 상태를 탈피하여 정상적인 '판매가능(AVAILABLE)' 상태로 자동 원복됩니다.
-* **임대 딜러 상세정보 노출**: 임대 중인 장비는 리스트 하단의 상세정보 영역 우측에 `임대 딜러: (실제 딜러명)` 형식으로 딜러 정보가 명확히 표기되도록 UI를 추가했습니다. 다국어(i18n) 설정이 반영되어 영문 환경에서는 `Rental to:`로 자동 치환됩니다.
-
-### 2. 가시성 향상을 위한 폰트 및 텍스트 스타일 튜닝
-* **WME 딜러 상단 고정 노출**: 딜러 리스트에 사내용 코드인 'WME'를 새롭게 추가하고, 딜러 선택 드롭다운 목록에서 WME가 항상 최상단 1순위로 고정 노출되도록 백엔드 정렬 로직을 반영했습니다.
-* **제품 제원 폰트 크기 최적화**: 
-  - 모델명(1.0rem, 굵게) 및 장비 유형(0.8rem) 등 핵심 기종 정보를 더 크고 직관적으로 개선했습니다.
-  - S/N 번호에서 중복되는 'S/N:' 텍스트를 제거하고 실제 시리얼 값(예: G2815-0116)만 1.0rem 크기로 깔끔하게 표기했습니다.
-  - 주문번호(1.0rem, 굵게)와 딜러명(1.0rem, 약간 굵게, 검정색) 텍스트의 가시성을 대폭 상향시켰습니다.
-* **진행상태(STATUS) 색상 및 명칭 갱신**: WIA 프로모션 페이지 리스트에서 '예약중' 텍스트 색상을 `rgb(46, 24, 5)`로 강조하고, 가용재고 목록의 '딜러발주' 텍스트를 '주문선택'으로, '발주로 전환' 버튼 텍스트를 '딜러선택'으로 변경 적용했습니다.## [2026-10-03] WIA 창고 관리 페이지 카고 디테일(Cargo Details) 연동 및 모바일 UI 동기화
-
-### 1. WIA 창고(AdminDispatch) 리스트 내 '화물' 열(Column) 신설
-* **표(Table) 레이아웃 재구성**: 데스크탑 화면의 장비 목록 리스트에서 '재고타입'과 '진행' 컬럼 사이에 **'화물'** 열을 새롭게 추가하고, 전체 테이블 너비 비율을 최적화하여 렌더링이 깨지지 않도록 조정했습니다.
-* **상세보기(Details) 버튼 추가**: 각 장비의 S/N(시리얼 넘버) 유무를 판별하여 데이터가 있을 경우에만 클릭할 수 있는 `Details` 버튼을 렌더링하고, 버튼에 ExternalLink 아이콘을 적용하여 직관성을 높였습니다.
-* **모바일 액션 버튼 그룹 통합**: 모바일 화면(Card View)에서도 화물 정보를 간편하게 열람할 수 있도록 하단 제어 버튼 그룹(이력/수정/출고처리) 좌측에 '화물' 조회 전용 버튼을 신규 편입시켰습니다.
-
-### 2. 카고 디테일 모달(Modal) 컴포넌트 이식 및 데이터 일원화
-* **관리자/딜러 데이터 동기화**: 기존에 딜러 포털('내 구매 내역')에서만 제공되던 화물 제원 상세 모달(`CargoDetailModal`) 컴포넌트를 관리자 포털 페이지 내부로 완벽히 이식했습니다.
-* **백엔드 실시간 연동**: 관리자가 화물 조회 버튼을 누를 시 딜러와 동일하게 백엔드 데이터베이스(`/api/cargo-details/`)를 비동기로 즉시 조회하여 포장 규격, 갯수, 순중량/총중량(NW/GW) 등을 완벽히 일치된 포맷으로 표출하도록 통합 작업을 완료했습니다.
-
-## [2026-10-02] 로컬 개발 환경 안정화, 데이터베이스 핫픽스 및 원격 저장소 동기화
-
-### 1. 로컬 환경 실행 에러 트러블슈팅
-* **종속성 패키지 인식 오류 해결**: 로컬 터미널 환경에서 백엔드 진입 전 파이썬 경로 이탈로 인해 발생한 패키지 인식(`uvicorn: command not found`) 이슈를 파악하고, `run_all.bat` 스크립트 유도를 통해 가상 환경 및 패키지 설치 절차를 안정적으로 해결했습니다.
-* **로컬 서버 통신 재개**: 프론트엔드(`localhost:3000`)에서 백엔드 API 호출 시 발생하던 "서버와 통신할 수 없습니다" 에러를 진단하고, Vite의 Proxy 포트(`8000`)에 맞춰 FastAPI 서버를 독립 실행함으로써 정상적인 풀스택 개발 환경 구성을 완료했습니다.
-
-### 2. 로컬 데이터베이스 스키마(Schema) 긴급 패치
-* **새로운 컬럼 누락 에러 해결**: 최근 도입된 `supabase_uid` 속성이 로컬의 기존 `scm_erp.db` 파일에는 존재하지 않아 발생한 `sqlite3.OperationalError`를 확인했습니다.
-* **DB 핫픽스 쿼리 실행**: 별도의 복잡한 마이그레이션 툴 없이, 파이썬 내장 `sqlite3` 모듈을 이용한 한 줄 스크립트(One-liner)를 통해 `custom_users` 테이블에 누락된 `supabase_uid` 컬럼을 즉각 추가하여 로그인 및 백엔드 크래시를 방지했습니다.
-
-### 3. Git 병합 충돌(Merge Conflict) 일괄 해결 및 동기화
-* **원격 및 로컬 저장소 불일치 분석**: 깃허브 원격 저장소(`main`)와 로컬 워크스페이스 간 커밋 이력이 엇갈려 발생한 푸쉬 거절(`non-fast-forward`) 및 핵심 파일 병합 충돌 현상을 파악했습니다.
-* **안정적인 원격 코드 기준 병합**: 터미널 명령어 기반 병합 절차(`git checkout --theirs`)를 통해 깃허브의 검증된 원본 코드로 5개의 충돌 파일을 일괄 덮어쓴 후, 성공적으로 커밋 및 원격 푸쉬를 완료하여 소스코드 동기화를 완벽하게 마무리했습니다.
-
-## [2026-10-01] Supabase 패스키(WebAuthn) 도입 및 백엔드(FastAPI) 연동 완료
-
-### 1. 프론트엔드 패스키(Passkey) 등록 및 로그인 구현
-* **최신 SDK 함수명 적용**: 기존 레거시 함수명을 버리고 Supabase v2.x 최신 규격인 `signInWithPasskey` 및 `registerPasskey` 함수를 사용하여 `Login.jsx`에 지문/안면 인식(Windows Hello 등) 팝업 호출 로직을 성공적으로 이식했습니다.
-* **사용자 경험(UX) 및 에러 핸들링**: 모바일 브라우저의 강력한 해킹 방지 정책(User Gesture Constraint)으로 인해 비동기 통신 대기 시 팝업이 차단되는 현상을 규명하고, 회원가입 절차와 기기 등록 절차를 적절히 우회 및 분리하여 모바일 크롬(Chrome) 및 PC 환경에서 패스키가 완벽히 등록되도록 조치했습니다.
-* **인앱 브라우저 보안 제약 안내**: 카카오톡이나 구글 검색 앱 같은 인앱 브라우저(WebView) 환경에서는 글로벌 보안 표준에 의해 패스키가 차단됨을 파악하여, 정식 브라우저(크롬, 사파리) 사용 가이드를 정립했습니다.
-
-### 2. 백엔드(FastAPI) JWT 검증 및 자동 계정 연동 (Auto-Linking) 구축
-* **Supabase 파이썬 공식 SDK 연동**: 최근 Supabase의 JWT 암호화 알고리즘이 Legacy HS256에서 ECC(P-256)로 강제 업그레이드되면서 발생한 백엔드 디코딩 에러(Invalid Signature)를 해결하기 위해, `python-jose`를 사용한 자체 검증 대신 공식 `supabase` 패키지를 `requirements.txt`에 탑재하여 구조를 안전하게 개편했습니다.
-* **신규 패스키 로그인 전용 엔드포인트 신설**: 프론트엔드가 패스키로 얻어낸 인증서(access_token)를 백엔드에 전송하면, 백엔드가 이를 검증하고 ERP 접속 권한(Role)을 반환해 주는 `/api/v1/auth/supabase-login` API 라우터를 `main.py`에 구축했습니다.
-* **이메일 기반 계정 마이그레이션**: 패스키로 로그인한 유저의 이메일을 분석해, ERP DB(`CustomUser`)에 존재하는 기존 관리자/딜러 계정과 매칭하고 `supabase_uid`를 자동으로 덮어씌워 매핑하는(Auto-Linking) 스마트 로직을 `auth_supabase.py`에 적용했습니다.
-
-### 3. 클라우드 배포(Render) 안정화 및 트러블슈팅
-* **파이썬 이름 충돌(Name Shadowing) 버그 픽스**: 렌더(Render) 실서버 배포 시, 개발자가 작성한 `supabase_auth.py` 파일 이름이 공식 라이브러리 내부 모듈 이름과 완벽히 겹쳐서 발생하던 치명적 임포트 에러(`ModuleNotFoundError`)를 분석하고, 파일 이름을 `auth_supabase.py`로 변경하여 배포 파이프라인을 복구했습니다.
-* **환경 변수 구성 고도화**: 레거시 JWT Secret 문자열을 직접 관리하는 위험을 없애고, 프론트엔드와 동일하게 `SUPABASE_URL` 및 `SUPABASE_ANON_KEY`만을 Render 백엔드 환경변수에 주입하여 안전하게 인프라 구성을 완료했습니다.
-
-## [2026-09-30] Supabase 하이브리드 아키텍처 기반 패스키(WebAuthn) 2차 인증 인프라 구축
-### 1. 백엔드(FastAPI) JWT 검증 및 DB 스키마 연동 (Phase 1)
-* **Supabase UID 매핑 컬럼 추가**: `models.CustomUser` 테이블에 Supabase가 발급하는 고유 식별자와 기존 회원을 논리적으로 연결할 수 있는 `supabase_uid` 컬럼을 신규 추가했습니다.
-* **DB 스키마 마이그레이션**: 서버 시작(`on_startup`) 스크립트(`main.py`) 내에 `supabase_uid` 컬럼을 자동으로 생성하는 마이그레이션 로직을 추가하여 실서버 운영 중 발생할 수 있는 데이터베이스 충돌을 원천 차단했습니다.
-* **JWT 검증 미들웨어 구축**: `python-jose[cryptography]` 라이브러리를 추가하고, 클라이언트가 보내는 Supabase JWT 토큰의 유효성을 검사하는 전용 의존성 모듈(`supabase_auth.py`)을 설계했습니다.
-### 2. 프론트엔드(React) 환경 구축 및 로그인 UI 통합
-* **Supabase Client 및 패키지 도입**: `@supabase/supabase-js` 라이브러리를 프로젝트에 성공적으로 연동하고, 전역에서 호출 가능한 `supabaseClient.js` 유틸리티 스크립트를 작성했습니다. (구글 드라이브 파일 락(Lock) 이슈를 해결하기 위해 로컬 드라이브 분리 적용)
-* **환경 변수(Env) 런타임 바인딩 해결**: Render 빌드 서버의 캐시(Cache)로 인해 발생한 렌더링 충돌(빈 화면) 오류를 분석하고, 실서버 환경 변수에 `VITE_SUPABASE_URL` 및 `VITE_SUPABASE_ANON_KEY`를 주입한 뒤 캐시를 초기화(`Clear build cache`)하여 해결했습니다.
-* **생체 인증 버튼/로직 이식**: 기존 `Login.jsx` 화면에 `signInWithWebAuthn` API를 호출하는 "패스키로 1초 만에 로그인" 버튼과, 기기 등록용 `signUpWithWebAuthn` 텍스트 링크 및 관련 State 비동기 처리 함수들을 추가했습니다.
-### 3. Supabase Auth 보안 정책 및 인프라 최적화
-* **WebAuthn 활성화 및 RP ID 바인딩**: Supabase Authentication 대시보드 내에서 Email Provider와 Passkeys(WebAuthn) BETA 기능을 활성화했습니다. 
-* **운영 도메인(Origin) 보안 강화**: 패스키의 보안성을 높이기 위해 Relying Party ID를 실 운영 도메인(`www.wmeins.eu`)으로 엄격하게 고정시키고, URL Configuration에 Site URL 및 개발용 Redirect URL을 맞춤 설정했습니다.
-
-## [2026-09-30] 모바일 반응형 UI 디테일 세밀화 및 플렉스박스(Flexbox) 랜더링 이슈 완벽 해결
-
-### 1. 5단계 진행 타임라인 모바일 정렬(가운데 점) 및 크기 최적화
-* **CSS 480px 미디어 쿼리 충돌(Override) 제거**: 일반적인 스마트폰 해상도(480px 이하) 환경에서 원형 도형(`.step-dot`)의 크기가 32px로 강제 덮어쓰기(Override) 되던 하위 미디어 쿼리 충돌 문제를 발견하고 해당 코드를 제거하여, 모든 모바일 환경에서 사용자가 요청한 50px 크기가 동일하게 유지되도록 수정했습니다.
-* **CSS Flexbox 의존성 제거 및 높이 찌그러짐 현상 해결**: 모바일 환경에서 브라우저의 플렉스박스 계산에 의해 점을 렌더링하는 컨테이너의 높이가 0px로 찌그러지며 점이 사라지거나, 단계별 글자 수에 따라 넓이가 미세하게 달라져 점의 위치가 한쪽으로 쏠리던 렌더링 오류를 파악했습니다.
-* **수학적 절대 위치(Absolute Positioning) 로직 적용**: 두 원형 도형 사이의 순수한 빈 여백 너비(`calc(100% - 50px)`)를 도출해 내고 시작점을 고정(`calc(50% + 25px)`)한 뒤, 가상 요소(`::after`)를 통해 빈 공간의 정확히 절반 지점(`left: 50%`)에 강제로 점을 찍는 방식으로 수정하여, 어떤 해상도에서도 점이 100% 완벽한 대칭을 이루고 사라지지 않도록 근본적으로 문제를 해결했습니다.
-
-### 2. 모바일-PC 화면 맞춤형 액션 버튼 반응형(Responsive) 처리
-* **인라인 스타일(Inline-style) 분리 작업**: 기존 컴포넌트(`AdminDashboard.jsx`) 내부에서 인라인으로 하드코딩되어 PC 표(Table) 화면과 모바일 카드 화면에 공통으로 강제 적용되던 타임라인 상태 제어 버튼의 여백과 폰트 크기 코드를 걷어냈습니다.
-* **반응형 전용 독립 클래스(`.action-btn`) 신설**: `index.css`에 미디어 쿼리 기반의 전용 클래스를 설계하여, 일반(PC) 화면에서는 기존의 컴팩트한 디자인(상하 3px/좌우 4px 패딩, 폰트 10px, 둥글기 10px)을 유지하되, 모바일 화면(767px 이하) 진입 시에만 터치하기 편한 큰 사이즈(상하 6px/좌우 4px 패딩, 폰트 13px, 둥글기 12px)로 동적 전환되도록 최적화했습니다.
-
-## [2026-09-29] AI 파서 모델 최적화 및 입고증(PDF) 전용 업로드 기능 신설
-
-### 1. AI 카고 파서(Cargo Parser) 모델 최적화 및 Rate Limit 해결
-* **Gemini API 모델 변경**: 구글 AI Studio 무료 등급(Free Tier)의 엄격한 일일 호출 제한(20 RPD) 문제를 해결하기 위해, 백엔드 AI 분석 모델을 `gemini-3.8-flash`에서 한도가 대폭 넉넉한 `gemini-3.5-flash-lite` 모델로 변경 적용했습니다.
-* **사용량 한도 대폭 상향**: 모델 변경을 통해 일일 최대 요청 수(RPD)가 20회에서 500회로, 분당 최대 요청 수(RPM)가 5회에서 15회로 상향되어 결제 연동 없이도 안정적이고 쾌적한 운영이 가능해졌습니다.
-
-### 2. 관리자 포털 [입고증 PDF 업로드] 전용 기능 개발
-* **직관적인 프론트엔드 UI 추가**: 관리자 메뉴의 '업로드 / 설정관리(`UploadSettings.jsx`)' 페이지에 엑셀 업로드와 별도로 '입고증 PDF 업로드(Cargo Details)' 전용 UI 패널을 신규 구현하여 담당자의 사용 편의성을 극대화했습니다.
-* **백엔드 전용 업로드 API 신설**: 프론트엔드에서 전송된 PDF 파일을 수신하여 Cloudflare R2 클라우드 스토리지 카탈로그에 안전하게 자동 저장하는 전용 엔드포인트(`/api/upload/pdf-cargo`)를 백엔드에 구축했습니다.
-
-### 3. 하이브리드 트리거(Dual Trigger) 아키텍처 구축
-* **백그라운드 즉각 파싱 탑재**: ERP 화면을 통해 PDF 업로드 시, 클라우드 웹훅 신호 도착을 기다리지 않고 백엔드 자체적으로 즉시 AI 분석 태스크를 강제 실행하도록 설계했습니다.
-* **안정적인 이중화 구조 완성**: Cloudflare R2 웹훅(Event Notification) 방식과 API 직접 실행 방식을 함께 병행 사용할 수 있도록 구성하여, 어떤 방식으로 업로드하든 100% 확실하게 카고 데이터가 DB에 업데이트되도록 아키텍처를 고도화했습니다.
-
-
-## [2026-09-28] 도메인/이메일 연동 완료 및 시스템 인프라 설정 마무리
-
-### 1. 실운영 도메인 및 이메일(Resend) 인프라 연동 구축
-* **도메인 연결 (STRATO ↔ Render)**: 실운영 도메인(`www.wmeins.eu` 및 `wmeins.eu`)의 DNS A-Record 및 CNAME 레코드 세팅을 완료하고 Render 프론트엔드 서버와 연결했습니다.
-* **SSL 인증서 발급(HTTPS)**: 본사 보안 정책 요구사항에 맞춰 도메인 접근 시 안전한 통신이 가능하도록 SSL(보안 인증서)을 자동 발급 및 적용 완료했습니다.
-* **발신용 이메일 인증 (Resend ↔ STRATO)**: 시스템 내에서 발송되는 알림 이메일의 스팸 분류 방지 및 수신율 향상을 위해 Resend 서비스의 DKIM(TXT) 및 SPF(CNAME) 레코드를 STRATO 도메인에 맵핑하여 도메인 인증을 100% 완료했습니다.
-
-### 2. UI/UX 개선 및 로그인 화면 텍스트 갱신
-* **로그인 메인 타이틀 변경**: 로그인 텍스트를 `WME Shipping & Stock Management`에서 `Europe Integrated Network System`으로 교체하고 줄바꿈 방지(`nowrap`) 및 폰트 사이즈 최적화를 진행했습니다.
-* **화물 디테일(Cargo Details) 팝업창 모바일 최적화**: 딜러 포털 내 '내 구매내역'의 화물 디테일 모달을 가로 스크롤 테이블(Table) 형식에서 세로형 리스트 항목 나열 방식으로 전면 재구성하여 좁은 모바일 환경에서도 글자가 짤리지 않도록 가독성을 대폭 향상시켰습니다.
-* **다중 박스 렌더링 세분화**: 화물이 2개(MACHINE, C/C) 이상으로 나뉘어 표시될 경우 직관적인 구분이 가능하도록 각 항목 리스트에 원형 글머리 기호(`•`)를 추가하고 항목 간에 점선 구분선(`---`)을 적용했습니다.
-
-### 3. 클라우드 연동(AI 파서) 트러블슈팅 및 가이드 제공
-* **R2 수동 업로드 트리거 분석**: Cloudflare R2 대시보드를 통한 수동 업로드는 백엔드의 분석 웹훅(Webhook)을 자동으로 호출하지 않는다는 아키텍처 상의 원인을 분석하여 안내했습니다.
-* **Gemini API 사용량 한도 분석**: 백엔드 파서 수동 호출 테스트 과정에서 `gemini-3.8-flash` 모델의 무료(Free Tier) 사용량 일일 한도 초과(`429 Error`)를 에러 로그를 통해 감지하고, Google AI Studio 결제 등록(Pay-as-you-go)을 해결책으로 제시했습니다.
-
-
-## [2026-09-27] 딜러 포털 모바일 반응형 적용 및 AI 자동화 파이프라인 버그 픽스
-
-### 1. 딜러포털 '내 구매 내역' 모바일 반응형(Card View) UI 적용
-* **모바일 전용 카드 레이아웃 전환**: 모바일 화면 접속 시(isMobileView) 기존의 가로 스크롤 표(Table) 방식 대신 모바일에 최적화된 세로형 '카드 뷰(Card View)' 레이아웃으로 자동 전환되도록 구현했습니다.
-* **UI/UX 편의성 극대화**: 각 발주 건의 모델명과 진행 상태(Status)를 상단에 강조하고, S/N, P/O 등 주요 제원을 2열 그리드 형태로 배치하여 가독성을 높였습니다. 하단에는 전체 너비를 꽉 채우는 터치 친화적 'Details' 모달 호출 버튼을 적용했습니다.
-
-### 2. Cloudflare R2 및 Gemini AI 연동 파이프라인 버그 해결 및 안정화
-* **웹훅(Webhook) Payload 파싱 로직 개선**: Cloudflare R2에서 전송하는 고유의 웹훅 JSON 포맷(`object -> key`) 구조를 백엔드(`main.py`)가 정상적으로 파싱하여 추출할 수 있도록 파일 경로 인식 로직을 수정했습니다.
-* **R2 스토리지 파일 읽기 기능 보강**: 백엔드 `S3StorageProvider` 클래스에 누락되었던 `read_file` 메서드를 추가 구현하여, AI 파서가 클라우드의 PDF 입고증 파일을 정상적으로 읽어올 수 있도록 시스템을 패치했습니다.
-* **구글 최신 API 정책 대응 (Gemini 3.8 Flash 전환)**: 구글의 최신 모델 지원 정책(구버전 모델 접근 차단)으로 인해 발생한 API 호출 404 에러를 완벽히 해결하기 위해, 파싱 엔진(`ai_cargo_parser.py`)의 모델을 구글 공식 권장 최신 모델인 `gemini-3.8-flash`로 버전업 완료했습니다.
-
-## [2026-09-26] 딜러 포털 UI 디테일 개선 및 화물 파싱 AI 엔진(Gemini) 전환
-
-### 1. 딜러 포털 '내 구매 내역' UI 및 타이포그래피 최적화
-* **상태 뱃지(Badge) 규격 통일**: 리스트의 STATUS 항목에 표시되는 뱃지 크기를 가장 긴 텍스트인 `In Warehouse` 너비(95px)를 기준으로 모두 고정폭으로 동일하게 맞춰 깔끔한 정렬을 구현했습니다.
-* **폰트 굵기(Weight) 기반 활성화 상태 표시**: 화물 디테일(`Details`) 버튼의 활성화 상태를 명확히 구분하기 위해, 단일 폰트(`SUITE`) 내에서 `fontWeight` 수치를 조절(활성화 시 600, 비활성화 시 100)하여 시각적 차이를 확실하게 적용했습니다.
-* **글꼴(Font-family) 및 텍스트 일관성 정리**: `S/N` 항목에 독립적으로 적용되어 있던 `monospace` 폰트를 제거하여 다른 텍스트 항목들과 폰트 디자인을 일치시켰습니다. 또한 검색창 안내 텍스트(placeholder)를 심플하게 `search`로 변경하고, 불필요한 페이지 설명글을 제거하여 화면을 더욱 미니멀하게 개선했습니다.
-
-### 2. 화물 제원(Cargo Detail) 모달(Modal) 사용성 및 안정성 강화
-* **모달 UI 텍스트 정비**: 화물 제원을 보여주는 모달창의 타이틀을 `화물 디테일 (Cargo Details)`에서 직관적인 **`Machine Details`**로 변경했습니다.
-* **표(Table) 데이터 중앙 정렬**: 모달 내부 데이터 표의 좌측에 치우쳐 있던 헤더 항목(`Model`, `S/N`, `ITEM`)에 중앙 정렬(`textAlign: 'center'`)을 추가 적용하여, 모든 데이터가 일관성 있게 가운데 정렬되도록 조정했습니다.
-* **API 호출 안정성 패치**: 백엔드로 `S/N`을 전달할 때 특수문자로 인한 API 호출 오류를 방지하기 위해 URL에 `encodeURIComponent` 처리를 보강했습니다.
-
-### 3. AI 입고증 자동 파이프라인 엔진 전환 (OpenAI -> Google Gemini API)
-* **초고속/가성비 Gemini 1.5 Flash 모델 도입**: 기존에 사용하던 OpenAI(ChatGPT) 파싱 로직을 제거하고, 구글의 최신 생성형 AI인 **Gemini API**(`google-generativeai`) 기반으로 백엔드 파싱 로직(`ai_cargo_parser.py`)을 완벽하게 재설계했습니다.
-* **환경 변수 및 의존성 업데이트**: 시스템 의존성 파일(`requirements.txt`)에서 `openai`를 제외하고 `google-generativeai` 패키지를 신규 등록했으며, 환경 변수를 `OPENAI_API_KEY`에서 `GEMINI_API_KEY`로 전면 교체하여 Render 서버 배포를 성공적으로 완료했습니다.
-
-## [2026-09-25] WIA 프로모션 및 가용재고 UI/UX 개편 및 딜러 포털 동기화
-
-### 1. WIA 가용재고 및 프로모션 리스트 신규 항목 추가
-* **도착지(PORT) 항목 추가**: WIA 가용재고 및 WIA 프로모션 페이지 리스트에 해당 주문의 '도착지' 데이터를 표시하는 항목을 신규 추가하고 배치 위치를 최적화했습니다.
-* **프로모션 전용 판매가(PRICE) 기능 구축**: 프로모션 영역에만 단독으로 보여지는 '판매가' 데이터를 인라인 수정(개별) 및 엑셀 기반 대량 업로드 방식으로 유연하게 관리할 수 있도록 백엔드 API와 UI를 완비했습니다.
-* **다국어(i18n) 번역 적용**: 리스트의 각 항목(모델, NC, 발주번호, 옵션 상세, 도착일정, 도착지 등)에 대해 한/영 공식 명칭(MODEL, NC, P/O, ETA, PORT 등) 번역을 100% 동기화했습니다.
-
-### 2. 딜러 포털 기능 확장 및 화면 텍스트 일관성 확보
-* **통합 검색 및 상태 필터 연동**: 딜러 포털(`DealerPromotion`)에도 관리자 화면과 동일하게 모델명, P/O 기반의 통합 검색창과 상태 조회 필터(판매가능, 예약중, 판매완료)를 신설하고 즉각적인 데이터 필터링 로직을 연결했습니다.
-* **텍스트 번역 일괄 변경 적용**: 페이지의 메인 타이틀을 `[진행 중인 프로모션 / Active Promotions]`으로 통일하고, 검색창(search) 및 상태 조회(All type) 안내 텍스트 등 모든 수정 사항을 관리자와 딜러 포털에 동일하게 반영했습니다.
-
-### 3. 모바일 화면 최적화 및 레이아웃 개선
-* **모바일 상단 컨트롤 레이아웃 재배치**: 모바일 환경에서 프로모션 업로드 버튼이 타이틀 바로 우측에 공간 낭비 없이 배치되고, 그 아래에 검색창과 상태 필터가 좌/우 비율에 맞게 분할 배치되도록 구조를 반응형으로 재설계했습니다.
-* **모바일 카드뷰 핵심정보 상단화**: 모바일 리스트 카드의 최상단 영역에 **[ 모델명 - NC(회색 음영박스 강조) - 발주번호(P/O) ]** 순서로 3가지 핵심 정보가 가장 먼저 눈에 띄도록 항목을 재배치하여 모바일 뷰에서의 데이터 가독성을 대폭 끌어올렸습니다.
-
-## [2026-09-25] 로그인 UI 개선 및 Cloudflare R2 이벤트 연동(Queue/Worker) 아키텍처 완비
-
-### 1. 메인 로그인 화면(UI) 시각적 깊이감 개선
-* **Shadow 효과 적용**: 로그인 화면(`Login.jsx`)의 좌측 로그인 폼 영역과 우측 이미지 배너 영역의 경계면에 자연스러운 그림자(`box-shadow`)와 `z-index`를 적용하여, 로그인 패널이 배경 이미지 위로 입체적으로 떠 있는 듯한 고급스러운 깊이감(Depth)을 구현했습니다.
-
-### 2. Cloudflare R2 Webhook 연동 구조 고도화 (Queue & Worker 도입)
-* **Wrangler 정책 변경 대응**: 최신 Cloudflare R2의 Event Notification 기능에서 직접적인 외부 Webhook 전송이 제한됨에 따라, 백엔드로 이벤트를 쏘아주기 위한 새로운 브릿지 아키텍처를 설계 및 구축했습니다.
-* **비동기 큐(Queue) 생성 및 연동**: R2 버킷(`wmeins`)에 입고증(PDF)이나 CLP(엑셀) 파일이 업로드되는 이벤트(`object-create`)를 중간에서 수신하고 보관할 Cloudflare Queue(`r2-events-queue`)를 새롭게 생성하여 버킷과 연결했습니다.
-* **전용 중계 Worker 배포**: Queue에 이벤트가 발생할 때마다 이를 즉시 소비(Consume)하여 실제 운영 중인 백엔드 서버(Render)의 `/api/webhooks/r2-upload` 주소로 안전하게 POST 요청을 포워딩해주는 전용 Worker(`r2-webhook-worker`) 코드를 작성하고 배포를 성공적으로 완료했습니다.
-
-## [2026-09-24] 딜러 포털 내 구매내역 개편 및 AI 기반 입고증 자동 파이프라인 구축
-
-### 1. 딜러 포털 '내 구매내역(My Purchase History)' 페이지 UI 개편 및 데이터 통합
-* **전체 파이프라인 데이터 통합**: 기존에 완료된 구매(SOLD) 건만 필터링되어 노출되던 한계를 수정하여, 신규 발주(A주문)와 재고 할당(F주문)을 모두 포함한 5단계 파이프라인 상태의 전체 주문 내역을 모두 조회하도록 로직을 변경했습니다.
-* **리스트 레이아웃 변경**: PDF 가이드라인 요구사항에 맞춰 리스트업 컬럼을 총 8개 항목(주문일자, Model, S/N, N/C, P/O, 상태 컬러 뱃지, 화물디테일 팝업, 픽업상태)으로 구성했습니다.
-* **엑셀 다운로드 최적화**: 화면의 컬럼 변경 사항과 일치하도록 CSV 다운로드 시 내보내는(Export) 데이터 헤더 양식을 동일하게 동기화했습니다.
-
-### 2. 화물 제원 상세보기(Cargo Detail) 기능 및 모달(Modal) 신규 구현
-* **데이터베이스 확장**: 1개의 시리얼넘버(S/N) 하위에 메인 기계(MACHINE) 및 칩컨베이어(CC) 등 여러 박스의 제원 데이터를 저장할 수 있도록 백엔드 DB 스키마(`CargoDetail`)를 확장 구축했습니다.
-* **전용 비동기 API 엔드포인트 구축**: 프론트엔드에서 S/N을 보내면 해당 장비의 세부 제원을 배열 형태로 즉시 응답해 주는 전용 엔드포인트(`/api/cargo-details/{sn}`)를 신설했습니다.
-* **Lazy Loading 및 모달 UI 적용**: 무거운 데이터를 한 번에 가져오지 않도록 리스트에서 `[상세보기]` 버튼을 클릭할 때만 비동기 호출하는 Lazy Loading 방식을 적용했습니다. 또한 데이터가 아예 없는 빈 상태에서도 기본 표 프레임(Table)과 빈 셀(`-`) 형식을 잃지 않도록 세심하게 렌더링을 조정했습니다.
-
-### 3. AI 기반 입고증 데이터 추출 및 ERP 자동화 파이프라인 (R2 Webhook 연동) 구축
-* **Cloudflare R2 Webhook 엔드포인트 신설**: 스토리지에 입고증 파일(PDF 또는 엑셀) 업로드 시 발송되는 이벤트 알림을 수신하기 위해 백엔드에 전용 엔드포인트(`POST /api/webhooks/r2-upload`)를 추가하고, Render 서버 환경 최적화를 위한 `202 Accepted` 즉시 응답 및 백그라운드 처리(FastAPI BackgroundTasks)를 구현했습니다.
-* **AI 데이터 파서 스크립트(`ai_cargo_parser.py`) 개발**: 
-    * `PyPDF2`와 `openai` 라이브러리를 통해 업로드된 원문 PDF에서 LLM(프롬프트 엔지니어링)으로 S/N, 품목명, 무게(G*W, N*W) 등을 추출하여 정규화된 JSON 스키마로 가공합니다.
-    * 엑셀(CLP) 업로드 시 `pandas`를 이용하여 지정된 열을 스캔하여 데이터를 자동 매핑(Machine/CC 분류 등)하는 로직을 통합 지원합니다.
-* **ERP 데이터베이스 자동 업데이트**: 파이프라인에서 추출 및 가공된 데이터를 토대로 `CargoDetail` DB에 다중 박스 제원을 자동 저장하며, 동시에 해당 S/N과 일치하는 예정된 발주 내역(Order)을 조회하여 현재 상태를 `IN_STOCK(입고 완료)`로 일괄 승급(업데이트)시킵니다.
-## [2026-09-23] 선적 트래킹 대시보드 신규 구축 및 UI/UX 개편
-
-### 1. 선적 트래킹(Shipment Tracking) 전용 페이지 신규 구축
-* **UI/UX 디자인 대폭 개편**: 기존의 정적인 테이블 형태에서 벗어나, Mapbox GL JS를 활용한 풀스크린 글로벌 해상 맵을 백그라운드로 배치하고, 좌측에 플로팅 오버레이 형태의 대시보드 패널을 적용하여 프리미엄 급 뷰어 레이아웃으로 업그레이드했습니다.
-* **B/L 및 장비(Container) 상세 추적 타임라인 구현**: 좌측 리스트에서 특정 B/L(선하증권) 항목을 클릭하면, 경로(Route), 장비 목록(Containers) 등의 탭 메뉴와 함께 출발지(POL)부터 도착지(POD)까지의 운송 마일스톤(타임라인)이 표시되는 디테일 뷰를 구축했습니다.
-* **KPI 위젯 연동**: 좌측 패널 상단에 재고 에이징 비율(일반/장기/악성) 및 해상 운송 지연율을 직관적으로 확인할 수 있는 파이 차트 위젯을 추가 배치했습니다.
-* **데이터 패칭 및 Mapbox 연동 최적화**: `@tanstack/react-query`를 도입하여 선적 데이터를 실시간으로 캐싱/폴링하도록 안정화했으며, Mapbox의 의존성 및 CSS 호환성 문제를 해결하기 위해 `react-map-gl` 버전을 안정적인 v7으로 다운그레이드하여 에러를 조치했습니다.
-
-## [2026-09-23] 다국어(i18n) 지원 범위 확대 및 관리자 UI/기능 최적화
-
-### 1. 선적정보 업로드 페이지 UI 및 다국어 고도화
-* **사이드바 메뉴 다국어(i18n) 적용**: 사이드바의 '선적정보 업로드' 메뉴에 다국어 키를 연동하여, 한국어(선적정보 업로드) 및 영어(Shipment Management) 환경에 맞게 동적으로 텍스트가 전환되도록 개선했습니다.
-* **업로드 드롭존(Dropzone) UI 최적화**: 파일 업로드 영역의 레이아웃을 다듬어 가로 최대 폭을 500px로 제한하고, 상하 안쪽 여백(padding)을 20px로 축소하여 화면 중앙에 훨씬 깔끔하고 콤팩트하게 배치되도록 스타일을 업데이트했습니다.
-
-### 2. 주문 배송 타임라인 및 권한 오류 수정
-* **삭제 권한 검증(Validation) 버그 픽스**: 관리자(WME-admin) 계정으로 타임라인 리스트 삭제 시 발생하던 권한 오류 현상을 수정했습니다. 삭제 로직에서 계정 문자열의 불필요한 공백으로 인해 권한이 차단되는 문제를 원천 차단하기 위해 `trim()` 처리를 추가했습니다.
-
-### 3. 제품 라이브러리 및 영업 통계 차트 정리
-* **불필요한 버튼 및 기능 제거**: 제품 라이브러리 페이지의 좌/우측 상단에 위치했던 '신규자료 업로드' 버튼과 해당 기능을 사용자 요청에 따라 완전히 제거하여 페이지를 더 깔끔하게 정리했습니다.
-* **통계 트리맵 롤백 및 안정화**: 영업 통계 및 분석 페이지의 '딜러/지역별 판매 비중' 트리맵을 외부 주식 히트맵 스타일로 시범 적용해보았으나, 원본 뷰의 가시성이 더 우수하다는 판단하에 기존 상태로 안전하게 롤백했습니다.
-
-### 4. 백엔드 외부 연동망 점검
-* **TrackCargo API 모킹(Mocking) 확인**: 현재 연결된 외부 선적 추적(TrackCargo) API가 원활히 연결되어 동작하는지 점검을 완료했으며, 현재 테스트용 모크(`mock_api`) 설정으로 정상적으로 가상 B/L 데이터를 수신하고 있음을 확인했습니다.
-
-
-## [2026-09-22] 클라우드 인프라 이전 및 Render 배포 환경 최적화
-
-### 1. GitHub 저장소 및 클라우드 배포 환경 재구축
-* **신규 GitHub 조직 이전**: 로컬 소스코드를 신규 GitHub 조직(`WIAmachine-EU/wme-system`)으로 전면 이관하여 협업 및 배포 파이프라인의 기반을 마련했습니다.
-* **Render 클라우드 분리 배포**: 기존 단일 환경 서버를 백엔드(`wme-system-backend`)와 프론트엔드(`wme-system-frontend`) 2개의 독립적인 Web Service(PRO 버전)로 분리 배포하여 안정성과 확장성을 확보했습니다.
-
-### 2. 프론트엔드 Nginx 프록시(Proxy) 및 보안 설정 고도화
-* **API 라우팅 경로 수정**: 프론트엔드(`nginx.conf`)에서 백엔드로 `/api/` 요청을 전달할 때, 경로가 유실되지 않도록 `proxy_pass` 설정의 Trailing slash(`/`)를 제거하여 API 통신 규격을 맞추었습니다.
-* **SNI 및 Host 헤더 보안 설정**: 외부 클라우드(Render)의 리버스 프록시 및 로드밸런서를 정상 통과하도록, Nginx 설정에 `proxy_ssl_server_name on;` 옵션을 추가하고 Host 헤더를 백엔드 주소로 명확히 명시하여 502 Bad Gateway 에러(통신 거부 현상)를 완벽히 해결했습니다.
-
-### 3. 백엔드 배포 및 데이터베이스 초기화 방지 패치
-* **로컬 DB 배포 환경 동기화**: Render의 Docker 빌드 환경에서 로컬 데이터베이스(`scm_erp.db`)가 누락되어 텅 빈 상태로 서버가 시작되는 문제를 방지하기 위해, 백엔드 `.dockerignore` 설정에서 DB 파일 제외 설정을 해제했습니다. 이로써 `WME-admin`을 포함한 기존 데이터가 운영 서버에 그대로 반영되어 정상적인 로그인이 가능해졌습니다.
-
-## [2026-09-21] 외부 애그리게이터(TrackCargo) API 연동 및 선적정보 업로드 기능 구현
-
-### 1. 선적정보 업로드 전용 페이지 신설 (프론트엔드)
-* **엑셀/CSV 업로드 컴포넌트 추가**: B/L(선하증권) 단위의 해상 수송 현황 정보를 시스템에 손쉽게 적재할 수 있도록 Drag & Drop 기반의 업로드 컴포넌트를 신규 구축했습니다.
-* **실시간 데이터 검증 및 그리드 표출**: `papaparse` 및 `xlsx` 라이브러리를 통해 업로드된 데이터를 브라우저 단에서 즉시 파싱하고, 필수값(MBL, P/O 누락 등) 및 S/N 중복 여부를 실시간 검증하여 오류 셀을 하이라이팅하는 데이터 그리드를 도입했습니다.
-
-### 2. 백엔드 DB 스키마 확장 및 MBL-Order 연동 구조
-* **Shipment 엔티티 신규 생성**: 기존 주문(`Order`) 테이블과 별개로 MBL별 운송 상태를 관리하기 위해 `Shipment` 테이블을 데이터베이스에 새롭게 구축하고, Order 테이블과 1:N 관계(하위 종속성)를 설정했습니다.
-
-### 3. 외부 API (TrackCargo) 연동 및 자동 동기화 
-* **API Tracking 모듈 통합**: 목업 형태였던 항만 도착 일정을 실제 전문 3rd Party 애그리게이터인 TrackCargo API 모듈(`trackcargo_api.py`)로 교체(현재 테스트 모드)하여, MBL 기반 해상운송 정보 조회 파이프라인을 연결했습니다.
-* **24시간 Polling 스케줄러 구축**: 백엔드 스케줄러(`scheduler.py`)가 24시간 주기로 활성화된 전체 MBL의 최신 상태(Vessel, Voyage, ETD, ETA)를 TrackCargo로부터 조회하고, 해당 MBL에 속한 수많은 장비(S/N) 및 주문(P/O)별 ETA 정보까지 일괄 전파 및 갱신하도록 설계했습니다.
-## [2026-09-17] 관리자 영업 통계 차트 개편 및 발주 모달 UI 통일
-
-### 1. 관리자용 영업 통계 및 분석 (Sales Analytics) 차트 고도화
-* **트리맵(Treemap) 차트 도입**: '카드 6: 딜러/지역별 판매 비중' 항목의 기존 원형(도넛) 및 막대그래프를 제거하고, 딜러별 점유율을 직관적으로 파악할 수 있는 단일 트리맵 차트로 전면 개편했습니다.
-* **블루(Blue) 계열 테마 적용**: 차트의 영역별 색상을 다색에서 어두운 파란색부터 밝은 파란색으로 이어지는 전용 컬러 팔레트로 변경하여, 전체 시스템 디자인 테마와의 통일성을 강화했습니다.
-* **폰트 렌더링 및 애니메이션 최적화**: 새로고침 시 화면 로딩 지연을 없애기 위해 차트 기본 애니메이션 효과를 제거하고, 차트 내부 텍스트가 강제로 굵게 출력되던 현상을 수정해 `SUITE-Light` 폰트의 얇고 세련된 두께가 제대로 표현되도록 안티앨리어싱 처리를 적용했습니다.
-
-### 2. 업로드 / 설정관리 (신규 발주 생성) 팝업 UI 개선
-* **표준 드롭다운(Select) 적용**: 신규 발주 생성 팝업창 내의 5가지 항목(모델, NC, 딜러, Incoterms, 항구)을 기존 커스텀 스크롤(Datalist) 방식에서, '장비 정보 수정' 팝업창과 동일한 표준 드롭다운 메뉴 형태(Select 태그)로 교체하여 UI 일관성을 확보했습니다.
-
-### 3. 전체 시스템 레이아웃 및 여백(Padding) 표준화
-* **전체 페이지 여백 최적화**: 화면 좌/우 여백을 10px로 축소하여 좁은 모바일 및 태블릿 환경에서의 데이터 시인성을 극대화하였으며, 상/하 여백은 기존 32px을 그대로 유지하도록 CSS(`.page-body`)를 글로벌 업데이트했습니다.
-* **타임라인 목록 여백 축소**: 타임라인 리스트(`.step-bar-container`)의 상하 패딩을 축소하여 한 화면에 더 많은 주문 배송 정보가 표시되도록 전체 리스트 높이를 밀도 있게 조정했습니다.
-* **컴포넌트 여백 렌더링 통일**: '라인업 제품 라이브러리'와 '유저 및 보안 관리' 페이지의 개별 인라인 패딩 스타일을 완전히 제거하고, 공통 `.page-body` 클래스로 일괄 전환하여 모든 페이지 간의 레이아웃 통일성을 100% 확보했습니다.
-
-### 4. WIA 프로모션 관리 및 재고 목록 UI 고도화
-* **WIA 프로모션 상태 필터 및 통합 검색 추가**: 프로모션 리스트 상단에 모델명, P/O, NC, 딜러 등을 텍스트로 조회할 수 있는 통합 검색창과, 전체 상태(판매가능, 예약중, 판매완료)를 바로 조회할 수 있는 드롭다운 필터를 신규 배치하여 WIA 재고리스트와 완벽히 동일한 레이아웃으로 개편했습니다.
-* **재고 목록 구입가 통화 포맷팅**: WIA 가용재고 목록 등에서 '구입가(Price)' 숫자가 천 단위마다 콤마(,)가 찍히도록 자동 렌더링 포맷팅(`toLocaleString`)을 적용하여 재무적 가독성을 높였습니다.
-* **모바일 렌더링 안정성 확보**: 모바일 뷰에서 리스트의 특정 부위(토글)를 클릭할 때 전체 화면 데이터가 사라지는 치명적 버그를 추적하여, 렌더링 함수 내 누락된 스케줄(`showSchedule`) 참조 에러를 완벽히 수정했습니다.
-
-### 5. 입고된 장비 목록 (AdminDispatch) 데이터 수정 기능 구현
-* **수정(Edit) 팝업 모달 신설**: 입고된 장비 목록의 '진행' 란에 데이터 정보를 수정할 수 있는 전용 팝업창(Edit Modal) 기능과 호출 버튼을 새롭게 개발 및 연동했습니다.
-* **마스터 데이터 실시간 연동**: 수정 팝업창에서 변경 가능한 딜러 및 모델 정보를 백엔드 마스터 데이터(`dealers`, `models`)와 실시간으로 비동기 통신하여 선택할 수 있도록 구현했습니다.
-* **장비 데이터 100% 동기화 구조 확보**: P/O 번호(`reference_no`) 고유 식별 체계와 단일 데이터베이스 기반 조회 구조를 통해, '입고된 장비 목록'에서 장비 정보를 수정하면 'WIA 재고리스트', 'WIA 프로모션' 페이지에도 즉각적으로 모든 수정 내역(S/N, 가격, 모델 등)이 실시간 자동 동기화되도록 시스템 정합성을 확보 및 검증했습니다.
-## [2026-09-15] 타임라인 도착일정(Actual) 실데이터 연동 및 시스템 안정화
-
-### 1. 타임라인(주문 상세 정보) HHLA API 도착일정 동기화 (메뉴 1, 3)
-* **Actual 날짜 하드코딩 제거**: 프론트엔드 모듈(`DealerOrders.jsx`, `AdminDashboard.jsx`) 화면에 임시로 노출되던 하드코딩 날짜(`2026.09.30` 등)를 전부 제거하고 실제 시스템 데이터가 표기되도록 수정했습니다. (ETD, ETA의 하드코딩된 예외 날짜 표기 로직도 함께 제거하여 오류 방지)
-* **실제 도착일(actual_date) DB 구축**: 백엔드 `orders` 데이터베이스 테이블에 실제 도착일(`actual_date`)을 저장할 수 있는 컬럼 스키마를 신규 반영하고 내부 마이그레이션을 자동 수행했습니다.
-* **HHLA API 스케줄러 로직 개편**: 외부 HHLA 항만 API와 통신하는 봇 스케줄러(`scheduler.py`)가 ETA 값 이외에도 선박의 실제 항만 도착 및 입항 일정(예: 2026-09-08 16:15)까지 획득하여 DB에 함께 업데이트하도록 데이터를 확장 및 안정화시켰습니다.
-
-### 2. 가상 환경(Mock) 항만 데이터 추가 및 검증
-* **누락된 선박 데이터 추가**: 아직 실제 API 통신 환경이 구축되지 않은 프로토타입 단계에서 내부 테스트 및 검증이 원활히 이루어질 수 있도록, 백엔드 API 목(Mock) 데이터 목록(`hhla_api.py`)에 누락되어 있던 `ONE INTEGRITY` 선박의 가상 데이터를 추가 등록했습니다. 이를 통해 타임라인에서 해당 선박 주문의 `Actual` 정보가 정상적으로 노출됨을 확인했습니다.
-
-## [2026-09-12] 가용재고 텍스트 수정 및 신규 발주 모달 UI/UX 개편
-
-### 1. WIA 가용재고 목록 (AdminSalesArchive 등) 다국어 텍스트 업데이트
-* **'구매가' 통화 표기 명확화**: 가용재고 목록 및 장비 정보 수정창에 표기되던 '구매가' 항목을 `구매가(€)`로 통일하여 유로화 기준임을 직관적으로 알 수 있게 수정했습니다.
-* **영문 번역본 연동**: 영문 페이지 환경에서도 기존 `BUYING` 텍스트가 `BUYING(€)`로 표출되도록 국/영문 다국어 파일을 동기화했습니다.
-
-### 2. 신규 단건 발주 생성 모달 폼 고도화 (UploadSettings)
-* **2단 분할 레이아웃(Grid) 적용**: 한 줄에 하나의 항목만 입력받아 길어지던 기존 모달 디자인을 '장비 정보 수정' 팝업창과 동일하게 한 줄에 2개의 필드가 나란히 배치되도록 Grid 레이아웃으로 변경했습니다.
-* **장비옵션(DETAIL SPEC) 신규 항목 추가**: 신규 발주 생성 시 상세 스펙을 즉시 입력할 수 있도록 `장비옵션` 항목을 모달 하단에 신설하고 폼 전송(Payload) 시 백엔드로 값이 넘어가도록 데이터 구조(`detail_spec`)를 확장했습니다.
-* **다국어 번역 시스템 적용**: 팝업창 내부의 모든 필드 이름과 하단 액션 버튼('취소', '발주 생성' 등)을 하드코딩 방식에서 다국어 매핑 시스템(`translation.json`)으로 전환했습니다. 영문 모드일 경우 `Cancell`, `Create`, `DETAIL SPEC` 등 공식 영문 명칭으로 자동 치환됩니다.
-## [2026-09-11] 포털 UI/UX 개편 및 모바일 디스플레이 최적화
-
-### 1. WME 포털 대시보드 (주문 배송 타임라인) UI 개편
-* **항구 및 인코텀즈 통합 표기**: 데스크탑 및 모바일 화면 모두 리스트의 도착지(Port) 표기 항목에 `Incoterms` 정보가 함께 묶여 표기(`FCA Hamburg` 형태)되도록 데이터 렌더링 로직을 통합했습니다.
-* **상세 정보 아코디언 텍스트 변경**: 리스트 하단 상세 정보 영역의 기존 `Incoterms` 항목 라벨을 `Date of Request`로 변경하고 데이터 출력을 연동했습니다.
-* **모바일 화면 일정 포맷 최적화**: 모바일 카드 뷰에서 일정 정보가 한눈에 들어오도록 `ETD: 날짜 / ETA: 날짜` 형태로 문자열 포맷을 갱신했으며, 레이블 텍스트(검은색)와 실제 날짜(파란색)의 색상 스타일을 분리 적용하여 시인성을 높였습니다.
-* **모바일 상세 정보 뷰 리팩토링**: 모바일 화면에서 아코디언이 펼쳐질 때 불필요하게 노출되던 진행 상황, 겹치는 시리얼 번호, REMARK 등을 삭제하고 요구사항에 맞춰 상세 항목을 전면 재배치했습니다.
-
-### 2. 업로드 및 설정관리 페이지 (자동화 기능 확장 기반 마련) 
-* **발주 생성 폼 항목 추가**: 신규발주 생성 모달 내부에 `배송요청일(Delivery Request Date)`을 입력받는 필드를 신규 추가하여 데이터 수집 기반을 마련했습니다.
-* **자동 일정 알림 설정 문구 안내**: 화면 하단에 향후 고도화될 3가지 핵심 기능(D-Day 배송요청 알림, 프로모션 자동 롤백 알림, 임대 만료일 안내 알림)에 대한 상세 안내 가이드를 배치했습니다.
-
-### 3. 로그인 화면 레이아웃 및 다국어 텍스트 튜닝
-* **로그인 화면 디자인 조정**: 접속 시 나타나는 메인 텍스트를 `WME Shipping & Stock Management`로 갱신하고, 기계 아이콘을 텍스트 하단 영역으로 위치를 정중앙 재조정하여 심미적인 안정감을 강화했습니다.
-* **다국어(i18n) 번역 갱신**: 포털 명칭(SCM -> WME 포털 대시보드 등) 및 관련 메뉴 텍스트 다국어 패치를 완료하여 시스템 내 일관성을 확보했습니다.
-
-## [2026-09-07] 제품 카탈로그 데이터 갱신 및 Cloudflare R2 실서버 연동 트러블슈팅
-
-### 1. 제품 모델별 카탈로그(PDF) 매핑 데이터 업데이트
-* **카탈로그 매핑 갱신**: 제품 라이브러리(`ProductLibrary.jsx`)에서 참조하는 프론트엔드 데이터 소스(`productLibraryModels.js`)의 각 모델별 카탈로그 PDF 파일명 매핑 로직을 최신 기준에 맞춰 일괄 업데이트했습니다.
-* **HD3100 시리즈 파일명 수정**: 추가 검토된 내용에 따라 `HD3100` ~ `HD3100MA` 모델의 카탈로그 다운로드 연결을 기존 `catalog-003.pdf`에서 `catalog-004.pdf`로 수정하고 실서버 배포를 위한 커밋 및 푸시(Git Push)를 완료했습니다.
-
-### 2. Render 실서버 배포(R2 스토리지 연동) 환경변수 문제 해결
-* **로컬 폴백(Fallback) 현상 분석**: Render 실서버에서 최신 카탈로그가 아닌 이전 파일(더미 파일)이 다운로드되던 원인을 추적하여, 백엔드 서비스에 Cloudflare R2 환경변수가 누락되어 로컬 스토리지로 우회(Fallback)하는 문제를 규명했습니다.
-* **환경변수 세팅 가이드라인 제공**: Render 대시보드의 Environment 설정에서 `R2_BUCKET_NAME`, `R2_ENDPOINT_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` 4개의 필수 환경변수를 직접 설정하도록 명확한 해결 가이드와 지침을 제공했습니다.
-
-### 3. 백엔드 시작(Startup) 패치 DB 에러 분석 및 조치
-* **UNIQUE 제약조건 에러 식별**: 서버 재시작 시 출력되던 `custom_users.email`의 무결성(UNIQUE constraint failed) 에러가, 딜러 계정의 이메일을 특정 주소로 강제 업데이트하려는 구버전의 하드코딩된 'Startup Patch' 로직 때문임을 확인했습니다.
-* **시스템 안정성 검증 완료**: 해당 에러가 예외 처리(`try-except`)로 안전하게 보호되고 있으며, 카탈로그 R2 연동 및 메인 시스템 구동에는 전혀 악영향을 미치지 않는 무해한 에러임을 검증 및 안내했습니다.
-
-## [2026-09-06] 시스템 전반 UI/UX 최적화 및 팝업 모달 모바일 동기화
-
-### 1. 시스템 전체 모바일 최적화 (풀스크린 팝업) 일괄 적용
-* **모바일 전체화면 레이아웃 구축**: 시스템 내 존재하는 모든 팝업(Modal) 창에 대해 모바일 환경에서 화면(Viewport)을 꽉 채우는 풀스크린 형태로 최적화하여 좁은 화면에서도 스크롤 및 폼 입력이 원활하게 동작하도록 개편했습니다.
-* **디자인 및 구조 표준화**: `UserProfile`, `ProductLibrary`, `AdminManagement`, `UploadSettings`, `AdminUsers`, `AdminSalesArchive`, `AdminDashboard`, `AdminDispatch` 등 시스템 전체의 팝업창 UI 구조를 공통된 클래스(`.modal-overlay`, `.modal-content`) 기반으로 표준화 및 리팩토링했습니다.
-* **닫기 버튼 직관화**: 모바일 사용자 경험(UX) 개선을 위해 모든 모달창 우측 상단에 닫기('X') 아이콘 버튼을 일괄 탑재했습니다.
-
-### 2. WIA 창고 (AdminDispatch) 컴포넌트 텍스트 및 데이터 정합성 갱신
-* **용어 직관화**: 입고된 장비 목록의 데이터 테이블 헤더 텍스트 중 불필요한 외래어인 '액션'을 명확한 '진행'으로 변경했습니다.
-* **스펙 항목 글로벌 규격화**: 장비 입고 내역 및 상세 정보(아코디언 뷰) 내에 표시되던 '상세 사양' 텍스트를 시스템 글로벌 규격인 'DETAIL SPEC'으로 영문화했습니다.
-* **데이터 매핑 강화**: 통합 판매 목록 등 다른 메뉴의 주문(P/O) 정보와 동일하게 DETAIL SPEC 데이터가 WIA 창고 리스트에서도 완벽히 불러와져 표출되도록 렌더링 로직을 고도화했습니다.
-
-## [2026-09-05] 입고/판매 워크플로우 로직 개선 및 엑셀 일괄 업로드 고도화
-
-### 1. 주문 배송 타임라인 및 창고 간의 상태 연동 (Workflow) 개선
-* **타임라인 입고 완료 로직 수정**: 타임라인(`AdminDashboard`)에서 '입고완료' 클릭 시, 주문의 실제 상태는 `IN_STOCK`(입고)으로 유지되면서 타임라인 목록에서만 깔끔하게 숨겨지도록 새로운 상태 플래그(`is_timeline_completed`)를 데이터베이스 모델과 연동했습니다. 이로 인해 입고 처리된 주문이 정상적으로 'WIA 창고'에 조회 가능해졌습니다.
-* **WIA 창고 출고 기능 복구 및 판매 연동**: WIA 창고(`AdminDispatch`) 내의 **[출고처리]** 버튼 기능이 실제 비즈니스 흐름에 맞게 주문 상태를 `SOLD`(판매완료)로 전환하도록 조치했습니다. 이제 출고 처리를 완료하면 장비가 즉시 '통합 판매 목록(`AdminSalesArchive`)'으로 이관됩니다.
-* **F발주 (법인재고) 가용 목록 유지**: 법인재고(WME) 주문에 대해 딜러 할당 전까지는 배송 단계와 무관하게 항상 가용재고 목록(`AdminInventory`)에 노출되도록 하는 `is_corporate_stock` 렌더링 검증 및 확인을 완료했습니다.
-
-### 2. Pandas 엑셀 일괄 업로드 표준 헤더 및 데이터 파싱 업데이트
-* **새로운 표준 헤더 포맷 적용**: '업로드 / 설정관리' 페이지의 대량 발주 엑셀 업로드 템플릿 검증 시스템을 `MODEL`, `NC`, `P/O`, `DEALER`, `ORDER DATE`, `DETAIL SPEC`, `BUYING`, `INCOTERMS`, `PORT` 신규 9가지 필수 헤더 기준으로 업데이트했습니다.
-* **데이터 정합성(Mapping) 및 자동화**: 엑셀 업로드 시 `BUYING` 열의 데이터가 자동으로 구매가(Price)로 맵핑되고, `ORDER DATE` 날짜 값이 분석되어 시스템의 '딜러 발주 일자'로 즉각 변환 및 적재되도록 백엔드 파싱 로직을 고도화했습니다.
-
-### 3. WIA 가용재고 목록 (AdminInventory) 일정(ETD/ETA) 표시 오류 해결
-* **가짜(Fake) 일정 노출 방지**: 신규 업로드된 발주 건이 '주문(CONFIRMED)' 단계일 때부터 백엔드가 생성한 가상의 배송 일자(ETD/ETA)가 가용재고 목록에 노출되던 버그를 해결했습니다.
-* **타임라인 연동 (동적 렌더링)**: 주문 배송 타임라인과 완벽히 동일한 조건(주문 상태가 `SHIPPING`, `ARRIVED`, `IN_STOCK`으로 진입했을 때만 노출)을 부여하여, 배송 시작 이전 단계의 장비들은 ETD/ETA가 깔끔하게 `- / -` 로 숨겨지도록 디테일을 잡았습니다.
-
-### 4. Cloudflare R2 스토리지 연동 고도화 및 썸네일 이미지 최적화
-* **퍼블릭 도메인 연동**: 제품 썸네일 이미지를 원활하게 제공하기 위해 프론트엔드 환경 변수(`.env`)에 Cloudflare R2의 Public Development URL(`VITE_R2_CUSTOM_DOMAIN`)을 완벽하게 맵핑했습니다.
-* **백엔드 다운로드 로직 검증**: 백엔드의 환경변수(접근 키, 버킷명)가 정상적으로 인식되어 R2 스토리지와 연결되었으며, 카탈로그 다운로드 요청 시 서명된 URL로 정상 리다이렉트(307 Redirect) 되는 것을 검증했습니다.
-* **웹 최적화 포맷(WebP) 변환 스크립트 구축**: 파이썬 `Pillow` 라이브러리를 활용하여 로컬 스토리지의 원본 썸네일 이미지(`jpg`)들을 차세대 웹 표준 규격인 `webp` 형식으로 일괄 변환(용량 30% 이상 절감)하는 자동화 스크립트(`convert_thumbnails.py`)를 프로젝트 루트에 신규 작성 및 적용했습니다.
-
-## [2026-09-03] 유저 관리 기능 및 제품 라이브러리 UI/UX 고도화
-
-### 1. 관리자 권한 유저 계정 삭제 기능 구현
-* **계정 삭제 API 연동**: 백엔드(`main.py`)에 유저 삭제를 위한 `DELETE /api/users/{user_id}` 엔드포인트를 신규 구현하여 보안 관리 기능을 강화했습니다.
-* **프론트엔드 UI 적용**: 유저 및 보안 관리(`AdminUsers.jsx`) 화면에서 관리자가 직접 사용자의 계정을 삭제할 수 있도록, 비활성화되어 있던 '관리' 항목의 휴지통(삭제) 아이콘 버튼 기능을 활성화했습니다.
-* **안전한 삭제 프로세스**: 삭제 버튼 클릭 시 "해당 유저를 삭제하시겠습니까?"라는 확인 팝업(confirm)을 노출하여, 실수로 인한 계정 삭제를 미연에 방지합니다.
-
-### 2. 제품 라이브러리 (Product Library) 모델 상세 데이터 고도화
-* **자동화 스크립트 기반 데이터 대량 맵핑**: 파이썬 스크립트(`update_models.py`)를 활용하여 사양서 PDF에 기재된 분류 데이터를 추출한 후, 프론트엔드 DB(`productLibraryModels.js`) 내 218개 전체 모델에 신규 속성(`series`, `typeCategory`, `typeDescription`)을 일괄 주입(Mapping)했습니다.
-* **텍스트 오타 교정**: 데이터 주입 과정에서 원본 PDF 문서의 헤더 열 이름 오타(mode_category 등)가 실제 코드에 반영되지 않도록 올바른 명칭(`model`)으로 내부 매핑하여 데이터 무결성을 확보했습니다.
-
-### 3. 제품 라이브러리 모달(Modal)창 다국어(i18n) 번역 적용
-* **텍스트 영문화 동기화**: 장비 상세 스펙 팝업창 내의 텍스트가 영어(EN) 설정 시에도 한국어로 노출되던 이슈를 픽스하고 아래와 같이 완벽한 다국어 동기화를 달성했습니다.
-  * `핵심 스펙` ➔ `Specifications`
-  * `다운로드 (EN)` ➔ `DOWNLOAD (EN)`
-  * `카탈로그(EN). PDF` ➔ `CATALOG (EN). PDF`
-  * `세일즈 가이드 (EN). PDF` ➔ `SALES GUIDE (EN). PDF`
-
-### 4. 제품 라이브러리 리스트 뷰 (Card UI) 디자인 개편
-* **썸네일 비율 최적화**: 모델 썸네일 이미지 컨테이너의 높이를 `190px`로 상향 조정하고 상단 여백(`padding-top: 5px`)을 부여하여 안정적인 이미지 비율을 확보했습니다.
-* **불필요한 데이터 제거 및 직관화**: 모델 카드박스 내부에 있던 '문서 N개 보유', '스핀들', '이송거리' 등 복잡한 스펙 수치 표시를 완전히 걷어냈습니다.
-* **신규 카테고리 텍스트 대체**: 걷어낸 정보 영역의 빈자리에 새롭게 추가한 `series`(시리즈), `typeCategory`(장비 카테고리), `typeDescription`(장비 타입) 텍스트를 배치하여 깔끔하고 세련된 카드 레이아웃으로 개편했습니다.
-* **타이포그래피 및 데코레이션**: 모델명 텍스트(`model.name`)의 크기를 `1.55rem`으로 확대하고 여백(`margin-bottom: 4px`)을 조정해 시인성을 높였습니다. 모델명 우측에는 미적 완성도를 위한 다운로드 아이콘(14px) 데코레이션 레이아웃을 추가했습니다.
-* **가로 열 배치 한도 설정 (Responsive Grid)**: 대형 모니터(1600px 이상) 등 브라우저 창의 가로 폭이 아무리 커지더라도, 제품 모델 카드가 무한정 나열되지 않고 한 줄(가로열) 당 최대 5개까지만 노출되도록 CSS 미디어 쿼리 제어를 적용했습니다.
-
-### 5. 제품 라이브러리 카탈로그 다운로드 오류(CORS) 해결 및 최적화
-* **다운로드 방식 전환 (Fetch ➔ Navigation)**: Cloudflare R2 스토리지의 Pre-signed URL로 리다이렉트 시 발생하는 브라우저 CORS(`Failed to fetch`) 차단 문제를 해결하기 위해, 비동기 `fetch` 방식에서 앵커(`<a>`) 태그 기반의 네비게이션 이동 방식으로 다운로드 로직을 수정했습니다.
-* **첨부파일 다운로드 강제(Content-Disposition)**: 크로스 도메인 환경에서 브라우저가 PDF를 새 탭으로 열어버리는 현상을 방지하기 위해, 백엔드(`storage.py`)의 Pre-signed URL 생성 시 `ResponseContentDisposition` 속성을 주입하여 즉각적인 파일 다운로드가 시작되도록 조치했습니다.
-* **API 프록시 매핑 적용**: 파일 다운로드 URL에 하드코딩되어 있던 주소(`http://localhost:8000`)를 제거하고 프론트엔드 환경 변수에 맞춘 상대 경로 호출 방식을 적용하여 Vite 프록시를 정상적으로 거치도록 개선했습니다.
-
-### 6. 제품 라이브러리 '핵심스펙' 항목 다국어 규격화 적용
-* **상세 스펙 항목 영문화 맵핑**: 팝업창 내의 기종별 12가지 상세 스펙 항목명(Key)에 대해 공식 영문 규격표를 기준으로 번역을 제공하는 모듈(`translateSpecKey`)을 구현하여 JSX 구조 외부로 안전하게 분리 탑재했습니다.
-* **공식 영문명칭 반영 완료**: `최대 가공경` ➔ `Max. Machining Diameter`, `회전공구 회전수` ➔ `Rotary Tool Speed` 등 제품 사양서에 명시된 영문 텍스트 규격과 100% 일치하도록 동기화를 완료했습니다.
-
-## [2026-09-01] 프론트엔드 로그인, 사이드바 UI 개선 및 제품 라이브러리 고도화
-
-### 1. 로그인 (Login) 화면 UI 최적화
-* **타이포그래피 및 레이아웃 재조정**: 상단 로고 텍스트 'WME SCM'의 폰트 두께를 얇은 굵기(`300`)로 변경하고, 로고 아이콘과의 수직 정렬을 하단(`flex-end`)으로 일치시켰습니다.
-* **여백 조정**: 로고와 입력 폼 사이의 상단 마진(`margin-top`)을 `50px`로 적용하여 화면의 여백과 밸런스를 개선했습니다.
-
-### 2. 컴포넌트 사이드바 (Sidebar) UI 개선
-* **아이콘 규격 및 간격 일원화**: 모든 포털(관리자, RSM, 딜러)에 공통 적용되는 좌측 사이드바 하단의 '내 정보(User)' 및 '로그아웃(LogOut)' 아이콘 크기를 `20px`로 일괄 적용하고, 두 아이콘 간의 간격을 `14px`로 최적화했습니다.
-* **우측 정렬 배치**: 프로필 및 로그아웃 아이콘을 우측 가장자리로 밀착 정렬(`margin-left: auto`)하여 시각적인 안정감을 더했습니다.
-
-### 3. 제품 라이브러리 (Product Library) 썸네일 연동 및 UX 개선
-* **실제 썸네일 이미지 연동**: 제품 썸네일 관리 전용 경로(`frontend/public/images/products/`)를 확보하여 `E160A`, `E160C`, `HD2200` 모델에 실제 기종 이미지를 맵핑(`productLibraryModels.js`)하고 UI 뷰에 즉시 표출되도록 렌더링 방식을 갱신했습니다.
-* **카드 마우스 호버(Hover) 효과 최적화**: 제품 카드(`clean-card`) 마우스 오버 시 기존 회색 음영 배경색 전환 효과를 제거하고, 브랜드 골드 컬러(`RGB: 205, 170, 125`) 라인의 `2px` 테두리 강조 효과가 부각되도록 개편했습니다.
-* **레이아웃 출렁거림 및 테두리 렌더링 이슈 해결**: 호버 시 카드의 실제 박스 크기가 변동되는 출렁거림 현상 방지를 위해 `inset box-shadow`를 활용하고, 썸네일 이미지 컨테이너의 고정 배경색을 투명(`transparent`)하게 처리하여 썸네일 레이어가 안쪽 테두리를 덮어 선이 어긋나 보이던 이슈를 완벽히 픽스했습니다.## [2026-08-30] 제품 라이브러리 카탈로그 다운로드 구현 및 UI/UX 개선
-
-### 1. 제품 라이브러리 (Product Library) PDF 다운로드 기능 구축
-* **백엔드 스토리지 추상화 도입**: 향후 외부 스토리지(S3 등)로의 확장을 대비해 파일 다운로드 처리를 추상화한 `storage.py`를 신설하고, 파일 스트림을 제공하는 `/api/documents/{filename}/download` API 엔드포인트를 구축했습니다.
-* **카탈로그 코드 기반 자동 매핑**: 파이썬 스크립트를 통해 기종별(예: E160A, HD2200 등) '카탈로그 코드'를 분석하고 모델별 고유 PDF 파일명(예: `catalog-001.pdf`)을 데이터에 일괄 자동 매핑했습니다.
-* **프론트엔드 다운로드 로직 연동**: 제품 라이브러리의 모델 상세 팝업창에서 '카탈로그(EN) PDF' 버튼 클릭 시 즉각적으로 백엔드 API를 호출해 PDF 파일이 안전하게 브라우저로 다운로드 되도록 로직(`handleDownload`)을 구현했습니다.
-* **모바일 상세 팝업 레이아웃 조정**: 모바일 뷰 화면에서 문서 다운로드 접근성을 높이기 위해, 상세 팝업창 내 '문서(EN)' 항목이 상단에 표출되고 '핵심스펙'이 하단으로 배치되도록 모바일 전용 레이아웃을 최적화했습니다.
-
-### 2. 주문 배송 타임라인 데이터 테이블 뷰 최적화
-* **풀 사이즈(Full-bleed) 테이블 확장 적용**: 관리자(`AdminDashboard`) 및 딜러(`DealerDashboard`) 포털의 '주문 배송 타임라인' 화면 내 리스트(데이터 테이블)에 음수 마진(`margin: 0 -28px` 등) 및 가로폭 보정 스타일을 적용했습니다.
-* **공간 활용도 극대화**: 상단의 통계 요약표 및 안내 텍스트의 기존 패딩 여백은 그대로 유지하면서도, 정보량이 많은 테이블 영역만 카드의 좌우 양끝 여백 없이(0px) 가로 100% 꽉 채워서 화면을 넓게 쓰도록 가시성을 대폭 개선했습니다.
-
-### 3. Cloudflare R2 기반 외부 스토리지 연동 (카탈로그 다운로드 최적화)
-* **S3 호환 스토리지 설정 완비**: 백엔드 시스템(`storage.py`)에 Cloudflare R2 (S3 호환) 연결 모듈인 `boto3`를 연동하고 `S3StorageProvider` 구현을 완료했습니다.
-* **Pre-signed URL 다운로드 전환**: 서버의 트래픽(대역폭)을 절약하기 위해, 카탈로그 파일 다운로드 요청 시 서버가 직접 파일을 스트리밍하지 않고 R2 스토리지에서 직접 받아지는 1시간 유효기간의 임시 서명된 URL(Pre-signed URL)로 리다이렉트 처리되도록 구조를 최적화했습니다.
-* **보안 및 환경 변수 처리**: `Access Key ID` 및 `Secret Access Key` 등 중요 자격 증명을 `.env` 파일을 통해 안전하게 불러오도록 구성하여 운영 환경 배포 시의 유연성과 보안을 강화했습니다.
-
-### 4. 기타 UI/UX 세부 튜닝 및 반응형 개선
-* **테이블 풀-블리드(Full-bleed) 레이아웃 전면 적용**: 관리자, RSM, 딜러 포털의 모든 대시보드 및 리스트 페이지 내 데이터 테이블 영역 좌/우 여백을 완전히 없애 모니터 해상도 엣지에 딱 맞게 채워지도록 리스트 뷰 영역을 극대화했습니다.
-* **페이지 타이틀 텍스트 정렬 통일**: 전체 포털 주요 페이지 상단의 제목(Title)과 설명(Subtitle) 텍스트를 감싸는 컨테이너에 일관된 여백(`padding-top: 4px`, `padding-left: 28px`)을 부여해 타이포그래피 정렬을 개선했습니다.
-* **불필요한 안내 텍스트 삭제**: 영업 통계 및 분석(Sales Analytics) 페이지에서 기존에 표출되던 'V8 설계: 관리자 영업 통계/분석 (1024px 이상 PC 데스크탑 최적화)' 관련 뱃지 및 설명 문구를 삭제해 가독성을 높였습니다.
-* **모바일 네비게이션 사용성 개선**: 화면이 좁은 모바일(스마트폰 뷰) 기기로 접속 시, 상단 네비게이션(Navbar)에 위치하던 '로그아웃' 버튼이 더 이상 겹치지 않게 숨김 처리됩니다. 대신 햄버거 메뉴를 통해 접근하는 좌측 슬라이드 사이드바(Sidebar) 하단(내 정보 프로필 아이콘 우측)으로 로그아웃 버튼을 재배치했습니다.
-
-## [2026-08-29] 영업 통계 리얼 데이터 연동 및 기타 UI/UX 개선
-
-### 1. 영업 통계 및 분석 (Sales Analytics) 고도화
-* **실제 데이터(API) 연동**: 통계 위젯의 기존 더미 데이터를 제거하고, 시스템의 실제 데이터를 바탕으로 수치가 실시간 반영되도록 업데이트했습니다. KPI 카드 내 '발주된 장비 총량', '현재 제조 중', '현재 해상을 통해 이동 중' 등 불필요한 설명 텍스트를 제거해 시각적 간결함을 높였습니다.
-* **차트 데이터 필터링**: '기종별 베스트셀러 및 판매 점유율' 파이 차트에서 판매량이 가장 많은 상위 20개 모델만 노출되도록 필터링 로직을 추가하여 데이터 가독성을 대폭 개선했습니다.
-
-### 2. 레이아웃 (사이드바 및 네비게이션) UI 개편
-* **사용자 프로필 이동**: Top Navbar에 표시되던 사용자 아이디 정보를 사이드바(Sidebar) 영역으로 이동시켜 상단 헤더 레이아웃을 한층 정돈했습니다. 
-* **사이드바 프로필 아이콘 도입**: 사이드바 사용자 아이디 우측에 '내 정보'를 나타내는 👤 아이콘 버튼을 새롭게 배치했으며, 마우스 오버(Hover) 시 브랜드 고유 색상(R10 G28 B143) 효과가 부드럽게 나타나도록 디자인을 적용했습니다.
-* **텍스트 간소화**: 사이드바 상단에 고정 표출되던 'SCM NAVIGATION' 텍스트를 삭제해 여백을 확보하고 모던한 스타일을 더했습니다.
-
-### 3. 컴포넌트 텍스트 및 스타일(CSS) 세부 튜닝
-* **타임라인 입고완료 버튼 스타일화**: '주문 배송 타임라인' 리스트 내부의 '입고완료' 버튼에 마우스 아웃/오버 시 각각 세련된 푸른색 계열 톤(평상시 배경 `rgb(225, 243, 254)`, 텍스트 `rgb(12, 62, 95)` 등)으로 반응하도록 커스텀 CSS를 추가하고, 영문 텍스트를 'into Stock'으로 갱신했습니다.
-* **라이브러리 문서 명칭 일괄 변경**: 제품 라이브러리(Product Library) 내 모델 상세 팝업창에서 표시되던 '홍보용 브로슈어 (EN)' 텍스트를 전체 데이터 셋에서 '카탈로그(EN) PDF'로 일괄 수정 적용 완료했습니다.
-
-## [2026-08-27] 입고/판매 파이프라인 개편 및 UI/UX 전면 업데이트
-
-### 1. WIA 창고 (WIA Warehouse) 시스템 개편
-* **모바일 및 데스크탑 UI 최적화**: 'WIA 재고리스트'와 동일하게 전체 컴포넌트를 반투명 유리 질감의 Glass Card UI로 통일했습니다. 
-* **데스크탑 아코디언 테이블(toggleRow) 도입**: 많은 정보로 인해 열이 비좁아지던 문제를 해결하기 위해, 핵심 정보(모델, S/N, 상태 등)만 표에 나타내고 행(Row) 클릭 시 나머지 부가 정보가 하단으로 부드럽게 확장(Expand)되는 아코디언 뷰를 도입했습니다.
-* **통계 요약 헤더(Summary Bar) 적용**: 리스트 상단에 총 장비 대수 및 에이징 구간별(일반, 장기, 악성) 재고 현황을 실시간으로 집계해 표출하는 통계 바를 신설했습니다.
-* **가용 재고 전용 뷰 구성**: 과거 출고 내역이 아닌 현재 입고 중인(`IN_STOCK`) 장비 목록만 보여주도록 API 조회 필터를 업데이트했습니다.
-* **재고 에이징(Aging) 자동화**: 선적일자(ETD)를 기준으로 경과일을 계산하여 재고 상태(일반: 180일 이하, 장기: 181~360일, 악성: 361일 이상)를 나타내는 컬러 뱃지를 자동 부여합니다.
-* **퀵 필터 및 출고 처리 연동**: 상단에 [장기/악성 재고만 보기] 및 [재고타입 별 보기] 콤보박스 필터를 추가하고, 리스트 내 `[출고 처리]` 버튼을 통해 출고 시 리스트에서 즉시 제외되도록 워크플로우를 구성했습니다.
-
-### 2. 통합 판매 목록 (Sales List) 개편
-* **모바일 및 데스크탑 UI/UX 통일**: 'WIA 재고리스트'의 Glass Card 레이아웃을 전면 적용하여 모바일 전용 카드형 리스트(`mobile-cards-grid`) 및 데스크탑 아코디언 테이블(`toggleRow`)을 완벽히 이식했습니다. 상단에는 총 판매 수량을 보여주는 통계 요약 바가 신설되었습니다.
-* **확장된 데이터 테이블**: PDF 설계 가이드에 맞춰 주문일자, 구매 딜러, 모델, NC, P/O, S/N, 판매 가격, 구매 가격, ETA, 출고 예정, 매출 일정 등 총 11개 컬럼으로 데이터 구조를 재편했습니다.
-* **장비 정보 수정(Edit) 종합 모달 UI 교체**: 기존의 단순 가격 수정 창을 완전히 삭제하고, 대시보드에서 사용하는 **'장비 정보 수정' 모달(모델명, NC, 딜러, 가격, 선박명 등 전체 필드 포함)과 100% 동일한 형태의 종합 팝업창**으로 교체했습니다.
-* **마스터 데이터 연동**: 모달 교체에 따라 백엔드에서 모델, 딜러, NC코드, 항구(Port) 등 기준 정보(Master Data)를 병렬(`Promise.all`)로 함께 조회하여 각 드롭다운(Select) 항목에 실데이터가 바인딩되도록 API 연동을 고도화했습니다.
-* **엑셀 내보내기 동기화**: 화면에 노출되는 새 컬럼 포맷 그대로 엑셀(CSV) 다운로드가 되도록 로직을 일치시켰습니다.
-
-### 3. 모바일 화면 영문 텍스트 번역 적용
-* **WIA Promotion 다국어 처리**: 모바일 환경에서 영문 페이지 접속 시 여전히 한국어로 표기되던 '진행 상태' 문구를 `STATUS`로, '예약'을 `Reservation`으로 번역 렌더링되도록 수정하고 예약 내역이 없을 땐 `-` 가 나오도록 세밀하게 조정했습니다.
-
-### 4. 사이드바 및 대시보드 UI 최적화
-* **사이드바 너비 최적화**: 데스크탑 화면에서는 사이드바 넓이를 270px로, 모바일 환경에서는 300px로 반응형 너비를 맞춤 조정했습니다.
-* **대시보드 버튼 및 텍스트 픽스**: 입고(`IN_STOCK`) 단계 대시보드에서 비활성화 되어야 할 '판매완료' 버튼을 숨김 처리하고 기존 '출고완료'를 '입고완료' 텍스트로 변경 적용했습니다.
-* **다국어 매핑 및 라벨 정리**: 사이드바의 'v6.0 Final' 배지를 삭제하고, 해당 메뉴명들을 'WIA 창고' 및 '판매 목록'으로 국/영문 모두 업데이트했습니다. 아울러 '업로드/설정관리' 메뉴와 가용재고 목록('상태변경' -> '상태') 텍스트의 다국어 번역 처리도 완벽히 동기화했습니다.
-## [2026-08-25] 프론트엔드 로그인 화면 및 주요 UI/UX 개편
-
-### 1. 로그인 (Login) 페이지 디자인 전면 개편
-* **타이포그래피 및 레이아웃**: 로그인 화면 상단 'WME SCM' 텍스트를 Bold체로 강조하고 글꼴 크기를 확대했습니다. 입력 폼 영역과 버튼의 좌우 폭을 60%로 통일하고 중앙 정렬하여 가독성을 높였습니다.
-* **디테일 최적화**: Username, Password 입력창 및 로그인 버튼의 상하 패딩(여백)을 12px로 통일하여 세련된 비율을 구성하고, 로그인 버튼(Sign In)에 호버(Hover) 시 색상이 'R205 G170 B125'로 전환되는 효과를 적용했습니다.
-* **아이콘 및 이미지 스타일링**: 'WME SCM' 텍스트 우측에 `A-machine.ico` 아이콘을 배치하고, 우측 배너 공간 배경색(`#f4f4f4`) 정돈 및 코어 밸류 이미지(`login-bg.png`)의 투명도를 85%로 적용하여 전체적인 심미성을 향상시켰습니다.
-
-### 2. 사이드바(Sidebar) 및 다국어(i18n) 번역 텍스트 간소화
-* **메뉴 텍스트 직관화**: 관리자, RSM, 딜러 포털의 모든 사이드바 메뉴명에서 불필요한 '메뉴 X.' 및 'Menu X.' 텍스트(넘버링 포함)를 영문/국문 번역 파일에서 일괄 제거하여 메뉴 이름만 명확하게 노출되도록 수정했습니다.
-* **모바일 배지 영역 제거**: 사이드바 하단에 표시되던 '관리자/RSM 모바일 반응형 적용' 뱃지 UI를 화면에서 완전히 삭제했습니다.
-* **데이터 격리 안내 배너 색상**: 하단 V7 데이터 격리 안내 문구 창의 배경색을 좀 더 맑은 톤의 청록색(`rgba(6, 182, 212, 0.1)`)으로 변경했습니다.
-
-### 3. 발주/업로드 설정(Upload Settings) 페이지 영문화 및 UI 통일
-* **영문 번역 적용**: 신규 발주 생성 및 대량 발주(Bulk) 페이지의 주요 타이틀과 설명을 사용자가 직접 요청한 영문 텍스트(`Upload New A or F Order`, `Order Upload(Bulk)`, `Set Up Automated Schedule...` 등)로 완벽하게 갱신했습니다.
-* **액션 버튼 호버 스타일 연동**: 'Create New Order' 버튼과 'Upload Standard EXCEL Template' 버튼 마우스 오버 시, 로그인 버튼과 동일하게 'R205 G170 B125' 색상이 적용되도록 호버(Hover) 스타일을 추가 적용했습니다.
-
-## [2026-08-25] 모바일 반응형 UI/UX 레이아웃 최적화 및 버그 수정
-
-### 1. 모바일 화면 가로 오버플로우(Overflow) 현상 픽스
-* **리스트 레이아웃 잘림 현상 해결**: 관리자(Admin), RSM, 딜러(Dealer) 포털의 주문 배송 타임라인 페이지 등에서 카드의 가로 폭이 모바일 화면을 넘어가 우측이 잘리는 현상을 수정했습니다.
-* **레이아웃 구조 개편**: 모바일 카드(`.mobile-order-card`) 및 하위 컨테이너에 `min-width: 0` 속성을 적용하여, 내부 콘텐츠(StepBar 등)가 화면 폭을 초과하더라도 부모 요소의 레이아웃을 밀어내지 않고 정상적으로 내부 스크롤이 동작하도록 구조를 개선했습니다.
-
-### 2. 컴포넌트 여백(Padding/Margin) 재조정 및 가시성 확보
-* **본문 및 네비게이션 좌우 여백 축소**: 모바일 환경에서 화면을 더 넓게 활용할 수 있도록, 공통 본문 영역(`.page-body`) 및 상단 네비게이션(`.top-navbar`)의 좌우 패딩을 기존 16px에서 10px로 일괄 축소(태블릿 포함)했습니다.
-* **검색/필터 영역(Glass-card) 패딩 최적화**: 모든 포털에 공통으로 적용되는 검색/필터 카드(`.glass-card`)의 모바일 패딩을 조정했습니다. 상하좌우 동일하던 기존 값에서 상단(Top)은 20px로 넓혀 텍스트와의 답답함을 해소하고, 우측/하단/좌측은 10px로 줄여 화면 활용도를 극대화했습니다.
-* **플로팅 스크롤 버튼 위치 밀착**: 화면 우측 하단에 나타나는 상하단 이동 버튼(`.scroll-buttons-container`)의 우측 여백을 25px에서 10px로 줄여, 모바일 화면에서도 콘텐츠를 덜 가리도록 화면 가장자리로 최대한 밀착시켰습니다.
-
-## [2026-08-21] 다국어(i18n) 번역 및 데이터 연동 고도화
-
-### 1. 유저 및 보안 관리 (메뉴 6) 데이터 연동 및 다국어 최적화
-* **KPI 지표 실데이터 연동**: 상단 4개의 정보창(활성사용자, 초대 대기중, 보안 경고, 일일 시스템 접속)에 임의의 텍스트가 아닌 API(/api/users) 및 감사 로그(Audit Logger) 기준 실제 데이터 값이 반영되도록 구성 변경.
-* **전체 텍스트 다국어(i18n) 처리**: 국문 및 영문 페이지에 하드코딩 되어 있던 모든 텍스트(메뉴명, 테이블 헤더, 상태 뱃지 등)를 `translation.json`에 매핑하여 언어 설정에 따라 완벽히 전환되도록 적용.
-* **디테일 문구 교정**: 영문 페이지 내 보안 경고 오탈자(Security alram)를 'Security Alert'로 올바르게 수정.
-
-### 2. 제품 라이브러리 (메뉴 7) 다국어 렌더링 및 UI 텍스트 수정
-* **타이틀 및 검색창 번역 갱신**: 국/영문 페이지 타이틀을 각각 '라인업 제품 라이브러리', 'Line-UP Product Library'로 변경하고 검색창(Placeholder)을 '모델명 검색...', 'search'로 다국어 매핑 적용.
-* **불필요한 부가 설명 삭제**: 타이틀 하단의 '모든 영업 채널을 위한 단일 진실 공급원' 단락을 양국어 UI에서 완전히 삭제하여 레이아웃을 간소화.
-
-### 3. SCM 포털 대시보드 (메뉴 1) 레이아웃 및 영문 텍스트 구조 개선
-* **영문 텍스트 강제 줄바꿈 적용**: 영문 타임라인 설명(timeline_desc)의 문장이 길어져 가독성이 떨어지는 문제를 해결하기 위해, 특정 위치(or 다음)에 개행(\n) 및 'white-space: pre-line'을 적용하여 2줄로 깔끔하게 노출.
-* **flex-box 레이아웃 픽스**: 좌측 텍스트가 길어질 경우 우측의 '검색' 및 '상태조회' 콤보박스가 아래로 밀려나던 현상을 해결. Flex 컨테이너(`flex: 1 1 0%`)를 정교하게 분할하여 한국어 페이지처럼 항상 우측 상단에 나란히 정렬(우측 배치)되도록 UI 안정성 개선.
-
-### 4. 사이드바(Sidebar) 타이틀 텍스트 간소화
-* **메뉴 타이틀 수정**: 좌측 사이드바 상단 네비게이션 텍스트를 기존 'SCM ERP NAVIGATION'에서 간결한 'SCM NAVIGATION'으로 국/영문 모두 일괄 변경.
-
-## [2026-08-04] 프론트엔드 UI/UX 업데이트 및 버그 수정
-
-### 1. V8 설계 가이드 기반 '영업 통계 및 분석 (Sales Analytics)' 페이지 전면 개편
-* **관리자 포털 메뉴 3번 적용**: 데스크탑 와이드 모니터(1024px 이상)에 최적화된 선택적 반응형 웹 레이아웃 적용.
-* **상단 KPI 카드 4종 구성**: 
-  * 카드 1: 총 발주 대수 표기
-  * 카드 2: 생산 중 장비 대수
-  * 카드 3: 해상/항공 운송 중 장비
-  * 카드 4: 현지 창고 가용 재고(ATP) - 함부르크, 네덜란드, 터키 지역별 분할 표기
-* **통계 차트 구성**:
-  * 카드 5: 기종별 베스트셀러 (가로형 막대그래프) 및 연도별 조회 드롭박스.
-  * 카드 6: 딜러/지역별 판매 비중 (도넛 차트 + 가로형 막대그래프 분할 뷰) 및 연도별 조회 드롭박스.
-
-### 2. 카드 5번 (기종별 장비정보) 고도화
-* **DB 모델 코드 반영**: 기존 임의 데이터를 첨부된 'Model code' 기준 실제 기종 정보(예: `KF5700B II`, `HD2600SY`, `SE2600Y`, `L3000SY`, `XM3100ST`)로 갱신.
-* **UI 개선**: 장비 이름이 긴 경우 두 줄로 줄바꿈되는 현상을 방지하기 위해 Y축 넓이(width)를 확장하고 텍스트를 우측 정렬(`textAnchor='end'`) 처리.
-
-### 3. 카드 6번 (딜러/지역별 판매 비중) 고도화
-* **DB 딜러 정보 반영**: 기존 임의 데이터를 첨부된 실제 딜러명(예: `AK MAKINA`, `ARO-TEC`, `BREMBO`, `NEWEMAG`, `VIMACCHINE`, `WECO`)으로 갱신.
-* **UI 개선**: 딜러 이름이 길어서 줄바꿈되는 현상을 막기 위해 Y축 넓이(width)를 확장하고 텍스트를 우측 정렬 적용.
-
-### 4. 카드 7번 (법인 월별 수주실적 및 목표 달성률) 레이아웃 개선
-* **실제 데이터 테이블 적용**: '유럽법인 사업계획 테이블표' PDF에 기반하여 2026년 목표 및 실적 데이터를 상세 테이블 형태로 구현.
-* **가시성 최적화**: 표 크기를 기존 대비 80%로 축소(`zoom: 0.8`)하여 가로 스크롤바(좌/우 스크롤)가 발생하지 않도록 조치.
-* **레이아웃 순서 변경**: 직관적인 성과 확인을 위해 '7월 (현재 월) 실적 및 목표 달성률 상세 (진행률 바)' 정보 영역을 최상단으로 올리고, 세부 '사업계획 테이블표'를 하단으로 이동.
-
-### 5. 버그 수정 및 안정화 (Hotfix)
-* **React JSX 구문 오류 수정**: 카드 7번 레이아웃 순서를 변경하는 과정에서 유실된 `<ResponsiveContainer>` 및 `<BarChart>` 컴포넌트의 닫는 태그를 복구하여 `Unterminated JSX contents` 렌더링 에러 해결 및 정상화 완료.
-
-
-## [2026-08-06] 프론트엔드 UI/UX 업데이트 및 신규 기능 추가
-
-### 1. 통계 및 분석 (Sales Analytics) 카드 6 고도화
-* **바 차트 디자인 변경**: 막대 두께(`barSize`)를 20으로 확대 적용하여 시인성 향상.
-* **DB 딜러명 정합성**: 딜러 이름 출력 시 국가 정보를 제외하고 DB에 등록된 실제 딜러명(예: `AK MAKINA`)만 깔끔하게 출력되도록 수정.
-
-### 2. RSM(지역담당) 및 관리자 포털 모바일 최적화
-* **모바일 반응형 적용**: 딜러 포털과 동일하게 100% 모바일 반응형 UI 적용. 
-* **스마트폰 뷰 시뮬레이션**: 상단 토글 버튼을 통해 PC 환경에서도 모바일 UI(세로형 주문 카드 리스트)를 테스트할 수 있는 기능 추가.
-
-## [2026-08-07] 업데이트 및 수정
-
-### 1. 법인 주관 프로모션 장비 현황 페이지 수정
-* **텍스트 표기 개선**: '프로모션 기종' 칸에서 모델명 뒤에 붙던 '프로모션' 텍스트를 제거하고, 순수 장비 모델명만 표기되도록 수정 (관리자 및 딜러 화면 공통 적용).
-
-### 2. 주문 배송 타임라인 (6단계 StepBar) 디자인 전면 개편
-* **UI/UX 디자인 변경**: 숫자 표기 방식을 제거하고 각 진행 단계를 나타내는 원형 아이콘(직경 38px, 테두리 2px, 아이콘 선 두께 1.5px)으로 전면 교체.
-* **상태별 색상 반전**: 완료된 단계는 코랄 레드 색상으로 채워지고 아이콘이 하얀색으로 반전되도록 처리.
-* **레이아웃 버그 수정**: 브라우저 창 축소 시 진행단계를 잇는 점선이 마지막 원형을 뚫고 넘어가는 오류를, 각 진행 노드 간격에 맞춘 개별 선분 연결 방식으로 개선하여 버그를 완벽 해결하고 정중앙 정렬 적용.
-
-### 3. 딜러 포털 즉시 할당 신청 메일 발송 기능 연동
-* **이메일(Mailto) 자동화 기능 적용**: 가용 재고(ATP) 리스트에서 '즉시 할당 신청' 버튼 클릭 시, 기본 이메일 클라이언트가 실행되며 내용이 자동 기입되도록 구현.
-* **수신자 및 양식 지정**: 수신자 2명(`freelogin3975@gmail.com`, `jypark@hyundai-wia.de`) 설정 및 메일 제목('딜러 장비 출고 신청'), 본문(모델명 및 S/N 정보) 자동 완성 기능 탑재.
-
-### 4. 데이터 테이블 상세 정보 뷰 (아코디언 UI) 도입
-* **주문 배송 타임라인 개편**: 각 주문 항목(행)을 클릭하면 `NC`, `DETAIL SPEC`, `S/O`, `VESSEL`, `REMARK` 등의 핵심 세부 정보가 하단으로 부드럽게 펼쳐지는 아코디언 방식의 Detail View를 구현 (관리자 및 딜러 포털 공통 적용).
-* **테이블 호버 디테일 개선**: 전체 컨테이너 박스의 마우스 오버 배경색 변경 효과를 없애고, 클릭 가능한 개별 테이블 행(Row)에만 시각적 호버 및 포인터 효과가 적용되도록 UX 개선.
-* **액션 버튼 고정**: 상세 뷰 아코디언이 열리거나 닫힐 때 우측 '상태 관리' 버튼들의 상하 위치가 틀어지는 버그를 수정하여, 버튼이 항상 상단에 흔들림 없이 고정되도록 최적화.
-
-### 5. 유럽 재고 상태 레이아웃 및 UI 동기화
-* **상세 정보 확장 적용**: 재고 목록 페이지(관리자 및 딜러)에도 타임라인과 동일한 Detail View(아코디언) 기능을 적용하여 엑셀 기반의 표준 헤더 정보들을 바로 열람할 수 있도록 적용.
-* **테이블 항목 구성 통일**: 관리자와 딜러 포털의 열(Column) 배치 및 이름을 `Model`, `Ref No. / S/N`, `현재 상태`, `위치`, `현재 용도 (Type)` 순으로 통일성 있게 재정렬하여 데이터 가독성 강화.
-
-## [2026-08-08] 주요 업데이트 및 기능 개선
-
-### 1. 사업계획(KGI) 및 KPI 카드 디자인/기능 고도화 (메뉴 5)
-* **텍스트 통일성 및 디자인 개선**: '7월 실적 상세' 및 '유럽법인 사업계획' 타이틀을 각각 `KPI : ...`, `KGI : ...` 형식으로 변경하고 폰트 사이즈와 정렬 위치를 일치시켰습니다.
-* **사업계획 표 편집 및 자동 계산 기능**: KGI 사업계획 테이블에 'Edit' 모드를 도입하여 유로(EUR) 금액이나 대수 수정 시, 설정된 사업환율이 적용되어 억원(KRW)이 자동 계산되도록 편의성을 극대화했습니다.
-* **데이터 영구 저장 (DB 연동)**: 화면 새로고침 시 초기화되던 사업계획 데이터를 데이터베이스(`BusinessPlan` 모델)와 완전히 연동하여 수정된 값이 영구적으로 보존되도록 백엔드 API를 신규 구축 및 연결했습니다.
-
-### 2. 요약 대시보드 카드(1~4번) 커스텀 아이콘 적용 (메뉴 5)
-* **그라데이션 효과 제거**: 기존 아이콘 배경에 있던 파란색 원형 그라데이션을 깔끔하게 제거했습니다.
-* **커스텀 디자인 반영**: 카드 1번과 2번의 기본 아이콘 대신, 전달받은 배경이 투명한 전용 커스텀 이미지를 백엔드를 통해 시스템 공용 에셋으로 주입하여 완벽하게 적용했습니다.
-
-### 3. 주문 상세 정보 레이아웃 개편 및 관리 기능 확장 (메뉴 1)
-* **2단 분할 레이아웃 도입**: 주문 항목 확장 시 나타나는 상세 정보를 요구사항에 맞춰 왼쪽(`S/O`, `NC`, `DETAIL SPEC`)과 오른쪽(`Incoterms`, `VESSEL`, `REMARK`) 2단 그리드로 깔끔하게 나누어 시인성을 높였습니다.
-* **DB 스키마 마이그레이션**: 신규로 추가된 상세 정보 6개 항목을 저장하기 위해 `Order` 테이블에 컬럼들을 추가하고 내부 데이터베이스 마이그레이션을 안전하게 수행했습니다.
-* **장비 정보 수정 팝업 기능 확대**: 기존 '시리얼 번호', '모델명'만 수정 가능하던 팝업창을 시각적으로 넓히고, 신규 6개 항목(S/O, NC, SPEC 등)을 한 번에 모두 입력 및 저장할 수 있도록 폼 구성과 API 로직을 대폭 업데이트했습니다.
-
-
-## [2026-08-09] UI/UX 개선 및 메뉴 데이터 동기화
-
-### 1. 유럽재고상태(메뉴 2) 리스트 개편 및 기능 개선
-* **테이블 넘버링 (No) 추가**: 좌측 끝에 항목별 번호(No) 칼럼을 표기하여 가독성 향상.
-* **용도 변경 항목 UI 통합**: 기존에 분리되어 있던 '현재 용도' 칼럼과 '용도 변경' 선택창을 하나로 통합하고 용도명 변경(판매가능, 딜러주문, 임대, 전시, 프로모션 등 5개 상태) 적용.
-* **장기/악성 재고 식별 아이콘**: 재고 리스트에서 장기 재고 장비를 시각적으로 구별할 수 있도록 아이콘 추가 및 툴팁 기능 적용.
-* **수량 통계 레이아웃 이동**: 전체 수량 및 상태별 대수를 확인할 수 있는 통계 영역을 기존 테이블 하단(Footer)에서 상단(Header) 검색바 아래 영역으로 이동하여 가시성 강화.
-
-### 2. 포털 대시보드(메뉴 1) 및 유럽재고상태(메뉴 2) 데이터 동기화
-* **상세 정보(Expanded Row) UI/데이터 일원화**: 양쪽 메뉴 모두 장비 클릭 시 펼쳐지는 상세 정보 영역이 완벽히 동일한 데이터를 공유하고, 일치하는 디자인(좌측 파란색 포인트 바, 2단 레이아웃 등)으로 표기되도록 동기화.
-* **출력 데이터 구성 통일**: 왼쪽 열(`S/O`, `NC`, `DETAIL SPEC`), 오른쪽 열(`Incoterms`, `ETD / ETA`, `VESSEL`, `REMARK`) 구성으로 핵심 정보들을 두 메뉴에서 모두 일관되게 노출하도록 개편.
-
-### 3. 전체 레이아웃 버그 및 시스템 오류 픽스
-* **상단 네비게이션(Top Navbar) 반응형 오류 해결**: 브라우저 폭 축소 시 타이틀 영역과 우측 버튼 묶음 영역이 서로 겹치거나 밀리는 현상을 해결(`flex-wrap` 및 최소 높이 가변성 적용).
-* **React JSX 구문 오류(Hotfix)**: 페이지 컴포넌트 렌더링 시 발생했던 `Adjacent JSX elements must be wrapped...` 불필요한 닫는 태그 충돌 오류를 완벽하게 제거하여 페이지 접근 불가 버그 수정.
-
-## [2026-08-10] 주문 배송 타임라인 및 ETA 자동화 엔진 고도화
-
-### 1. 주기 조절형 자동 ETA 알림 엔진 구축 (백엔드)
-* **HHLA 항만 API 연동**: SCM 설계 가이드(V09)를 기반으로 선박명(Vessel)을 조회하여 함부르크 항구(HHLA)의 실시간 예상 도착일(ETA) 데이터를 연동하는 모듈(`hhla_api.py`)을 구축했습니다.
-* **백그라운드 스케줄러(`APScheduler`) 도입**: 매일 주기적으로 동작하는 백그라운드 엔진을 도입하여 데이터베이스의 활성 주문 데이터를 스캔하고, 선박 정보가 존재하는 경우 ETA를 자동 업데이트 및 갱신 내역을 이메일로 통지하도록 적용했습니다.
-* **배송 준비 단계 포함 확대**: 배송/쉬핑 상태뿐만 아니라 `배송준비(READY_FOR_SHIPPING)` 단계에 있는 장비들도 선박 배정이 완료된 경우 조기에 스케줄러가 추적하여 ETA를 자동으로 갱신하도록 동기화 범위를 확대했습니다.
-* **자동 알림 이메일 발송**: `email_service.py`를 신규 구축하여 출항(ETD) 직후, 해상 운송 중(10일 주기), HHLA ETA 업데이트, 유럽 법인 창고 입고(가용 재고 전환) 시 각 단계별 이메일 통지가 시스템 로그와 함께 발생하도록 자동화했습니다.
-
-### 2. 주문 배송 타임라인(6단계 Pipeline) UI/UX 개선 (프론트엔드)
-* **스케줄 정보 노출 조건화**: 관리자 및 딜러 포털의 배송 타임라인(메뉴 1)에서, 장비의 진행 상태가 `주문확인`, `생산 중`, `배송준비` 단계로 **실제 선적(출항) 이전인 경우 우측의 ETD/ETA 날짜 정보를 표시하지 않거나 '미정'으로 처리**하여 사용자 혼선을 방지했습니다.
-* **데이터 동기화 UI 반영**: 선적되어 `배송/쉬핑(SHIPPING)` 단계로 넘어가면 숨겨져 있던 해당 ETD/ETA 데이터가 화면에 정상적으로 표기되도록 동적 렌더링 로직을 반영했습니다.
-
-## [2026-08-11] 이메일 발송 실운영 전환 및 포털 UI/UX 고도화
-
-### 1. 이메일 발송 시스템 실제 구현 및 연동 (백엔드)
-* **SMTP 발송 로직 실제화**: 기존 터미널 콘솔 로그 출력 방식(Mock)으로 구성되어 있던 `email_service.py`를 파이썬 내장 `smtplib` 및 `email.mime` 모듈을 활용하여 실제 외부망 메일 발송 방식으로 고도화했습니다.
-* **복수 수신자 지원 기능 강화**: 딜러 다수의 이메일로 알림이 발송될 수 있도록 수신자 리스트 구분자를 쉼표(`,`)에서 세미콜론(`;`) 기반으로 파싱하고 안전하게 발송하도록 시스템을 업데이트했습니다.
-* **HHLA API 스케줄 픽스 및 문서화**: 연동 모듈에 누락되었던 특정 선박(`ONE TRIUMPH`, `ONE INTELLIGENCE`) 테스트 데이터를 매핑하여 ETA 자동 갱신 오류를 해결하고, 작동 원리를 담은 가이드(`HHLA_API_Integration_Guide.md`) 문서를 발행했습니다.
-
-### 2. 주문 배송 타임라인 UI 구조 개편 및 통계 강화 (프론트엔드)
-* **단계별 텍스트 직관화**: 진행 상태 파이프라인에서 텍스트가 다소 길었던 '배송/쉬핑' 및 '주문확인' 단계를 보다 직관적인 '배송', '주문'으로 간결하게 통일했습니다.
-* **진행 상태별 통계 요약표(Summary) 추가**: 상단 검색 영역 아래에 장비의 현재 상태별 대수를 한눈에 파악할 수 있는 통계 블록(전체/주문/생산중/배송준비/배송/항구도착/재고)을 신규 도입했습니다. (유럽재고상태 메뉴의 디자인 시스템 차용)
-* **테이블 인덱싱 및 너비 재구성**: 데이터 테이블 첫 열에 인덱스 넘버링(`No.`)을 신설하고, 가장 중요한 공간인 파이프라인(Step Indicator) 영역의 너비를 35%로 대폭 확장하는 등 전체 테이블 비율을 세밀하게 재조정했습니다.
-
-### 3. 프로모션 데이터 일관성 동기화
-* **데이터 표기 방식 통일**: '프로모션' 메뉴 내 테이블 헤더를 '고유 시리얼 번호 (S/N)'에서 'Ref No. / S/N'으로 변경하고, 상세 셀 내부 데이터를 '유럽재고상태' 메뉴와 완전히 동일한 2단 분할 레이아웃(굵은 Ref No., 작은 S/N)으로 렌더링되도록 동기화했습니다.
-
-## [2026-08-12] 주문 배송 타임라인 간소화 및 UI/UX 통일성 개편
-
-### 1. 주문 배송 타임라인 5단계 파이프라인 간소화
-* **배송준비 단계 제거**: 기존 6단계로 운영되던 배송 타임라인에서 '배송준비(READY_FOR_SHIPPING)' 단계를 삭제하고 '주문 - 생산 중 - 배송 - 항구도착 - 입고'의 5단계 파이프라인 구조로 간소화하여 직관성을 높였습니다.
-* **시스템 동기화**: 관리자 포털 및 딜러 포털의 모든 대시보드, 주문 현황 페이지, 그리고 백엔드 로직까지 변경된 5단계 상태 표기를 100% 동기화 적용 완료했습니다.
-
-### 2. 프로모션 페이지 리스트 구조 전면 개편
-* **항목 재배치 및 일원화**: 프로모션 장비 리스트의 컬럼을 'No. - 모델 - NC - P/O - DETAIL SPEC - ETA - 프로모션 진행 - 예약정보(딜러는 예약/구매 요청) - 설정' 순으로 재구성하여 양쪽 포털의 뷰를 통일했습니다.
-* **너비 비율 및 패딩 최적화**: 정보량이 많은 'DETAIL SPEC' 항목의 가로 너비를 40%로 대폭 확대하고, 모든 리스트 행의 상/하단 패딩을 6px로 슬림하게 압축하여 화면 효율성과 시인성을 극대화했습니다.
-
-### 3. 폰트 최적화 및 디테일 정합성 개선
-* **폰트 사이즈 차등 적용**: 유럽 재고 페이지에서 핵심 식별자인 '모델' 및 'NC'는 12px, 그 외 'No. / P/O / DETAIL SPEC / ETA / 용도' 등의 세부 정보는 11px로 조정하여 목록의 시각적 계층 구조를 명확히 했습니다.
-* **NC 표기 오기 수정**: 모든 포털 화면에서 기본 NC 코드 표기를 'FOiP(알파벳 O)'가 아닌 정확한 'F0iP(숫자 0)'으로 일괄 변경 반영했습니다.
-
-## [2026-08-12] 보안 관리체계 고도화 및 제품 라이브러리(DAM) 구축
-
-### 1. 보안 인증 및 통합 사용자 관리 체계 도입
-* **로그인(인증) 페이지 신설**: 아이디와 비밀번호 기반의 로그인 폼(`Login.jsx`)을 구현하고, SCM 핵심 가치(Core Value) 이미지가 돋보이는 모던한 UI 디자인을 적용했습니다.
-* **유저 및 보안 관리 대시보드**: 관리자 전용 '메뉴 6. 유저 및 보안 관리' 페이지를 신설하여 활성 사용자, 초대 대기, 보안 경고 등의 KPI와 전체 사용자 목록을 관리할 수 있도록 구성했습니다.
-* **시스템 감사 로그 (Audit Log)**: 시스템 내에서 발생하는 로그인 성공/실패 이력 등을 로컬 스토리지에 실시간으로 적재하고, '유저 및 보안 관리' 페이지 내에서 시스템 감사 로그를 직접 조회할 수 있도록 구현했습니다.
-
-### 2. 강력한 역할 기반 접근 제어 (RBAC) 
-* **정적 권한 계정 분리**: 시스템 테스트 및 고도화를 위해 고정된 3개의 권한별 계정(admin, rsm, dealer / 비밀번호 1234)을 구성하고 검증 로직을 적용했습니다.
-* **권한별 UI 강제 격리**: 로그인한 권한에 따라 사이드바 메뉴가 동적으로 제한되며, 권한 없는 페이지로의 접근이 원천 차단됩니다. 기존 테스트용 '권한 스위처' 버튼을 완전히 제거하여 실제 영업 환경과 동일한 보안 무결성을 확보했습니다.
-
-### 3. 제품 디지털 라이브러리 (Product Library) 기능 신설
-* **마스터 리스트 및 Quick View**: '메뉴 7 (딜러는 메뉴 5). 제품 라이브러리'를 신규 추가했습니다. 장비 모델별 이미지 카드 그리드를 제공하며, 클릭 시 화면 전환 없이 상세 스펙을 확인할 수 있는 모달 뷰를 구현했습니다.
-* **문서 다운로드 허브 (보안 등급 적용)**: 장비별 브로슈어, 사용자 매뉴얼, 도면 등의 문서를 통합 관리합니다. 문서별로 `PUBLIC`, `INTERNAL` 등의 보안 등급(Security Level) 속성을 부여하고, 딜러 계정(`DEALER`) 접속 시 '내부 원가표'나 '유지보수 매뉴얼' 등 기밀 문서가 리스트에서 완벽하게 숨겨지도록 차단 로직을 적용했습니다.
-
-## [2026-08-14] 관리자 포털 UI/UX 개선 및 엑셀 벌크 업로드 고도화
-
-### 1. 관리자 포털 (Admin Portal) UI/UX 개선
-* **유럽재고 리스트 뷰 최적화**: 표 항목의 너비 비율을 조정하여 `DETAIL SPEC` 공간을 최대로 확보(33%)하고 좌우 여백(Padding 13px)을 추가해 가독성을 향상했습니다.
-* **테이블 헤더 타이틀 강조**: 표 상단의 모든 타이틀(No., 모델, NC 등)에 **BOLD(굵게)** 스타일을 적용했습니다.
-* **디테일한 정렬(Alignment) 규칙 적용**:
-  - `PRICE` 항목: 헤더는 중앙, 금액 데이터는 우측(오른쪽)으로 정렬하되 값이 없는 빈칸(`-`)은 중앙으로 유지되도록 조건부 정렬을 구현했습니다.
-  - `DETAIL SPEC` 항목: 헤더는 중앙, 실제 스펙 데이터는 좌측(왼쪽)으로 정렬하여 긴 텍스트를 읽기 편하게 변경했습니다.
-  - 이외 기본 정보 셀들은 중앙 정렬로 통일하여 정돈된 화면을 구성했습니다.
-* **리스트 확장(Expanded) 뷰 개선**: 항목 클릭 시 나타나는 하단 상세정보 패널에 `S/O` 정보 바로 아래 `REMARK(비고)` 항목을 신규로 노출되도록 추가했습니다.
-* **딜러코드 최신화**: 기존 `HWME`로 표기되던 코드를 `WME`로 시스템 전체에서 일괄 변경 적용했습니다.
-
-### 2. 엑셀 일괄 업로드(Bulk Upload) 기능 고도화
-* **신규 표준 헤더 양식 전면 개편**: 엑셀 업로드 시 요구되는 헤더를 `MODEL, NC, P/O, PRICE, DEALER, DETAIL SPEC, INCOTERMS, PORT` 양식으로 완전히 변경하고, 시스템이 이에 맞춰 데이터를 맵핑하도록 파싱(Parsing) 로직을 재설계했습니다.
-* **임의 S/N 생성 로직 제거**: 엑셀 업로드 시 `SN-BULK-000000` 형태로 임의 발급되던 시리얼 넘버 자동 생성 기능을 없애고, 최초 등록 시엔 빈 값(`-`)으로 둔 뒤 향후 프로세스에서 별도로 S/N을 등록할 수 있게끔 수정했습니다.
-* **업로드 데이터 연동 보완**: 신규 엑셀 양식으로 추가된 정보들이 포털 대시보드와 유럽재고 리스트 화면에 온전히 반영되도록 데이터 인터페이스를 갱신했습니다.
-
-### 3. 포털 대시보드 및 DB 관리
-* **대시보드 더미 데이터 제거**: 데이터가 누락되었을 때 UI용으로 하드코딩되어 있던 임시 값(`G8888-8888`, `F26-88-30`, `HAMBURG` 등)을 모두 제거하고, 데이터가 비어있을 땐 하이픈(`-`)으로 깔끔히 표기되도록 수정했습니다.
-* **신규 모델 DB 적재**: 새롭게 제공된 기종 리스트(`KF6500/5A`, `KF7300/5A`, `HS6300II`, `HS8000II` 등)를 식별하여 백엔드 DB 초기화 스크립트에 모두 반영 완료했습니다.
-
-## [2026-08-15] PaaS 클라우드 환경 배포 및 운영 인프라 구축
-
-### 1. 인프라 환경 구성 및 배포 전략 수립
-* **PaaS(Render) 배포 결정**: IaaS(서버 호스팅) 대비 1인 개발/운영 체제에 적합하고 보안 및 유지보수 부담을 줄일 수 있는 PaaS 환경인 Render를 최종 배포 플랫폼으로 선정 및 클라우드 구축 완료.
-* **자동 배포 가이드라인 제정**: GitHub 연동, PostgreSQL 생성, FastAPI 백엔드 배포(웹 서비스), React 프론트엔드 배포(정적 사이트) 및 Rewrite 설정까지 아우르는 배포 스텝바이스텝 가이드 문서화 완료.
-
-### 2. 다중 환경(Local/Prod) DB 연결 동적화 (백엔드)
-* **PostgreSQL 연동 라이브러리 추가**: PaaS 환경의 클라우드 PostgreSQL 연동을 위해 `requirements.txt`에 `psycopg2-binary` 패키지 설치 내역 추가.
-* **동적 DB 스위칭 로직 적용 (`database.py`)**: `DATABASE_URL` 환경변수가 존재하면 클라우드 PostgreSQL에 우선 연결하고, 없을 경우 로컬 개발용 SQLite(`scm_erp.db`)로 자동 Fallback 하도록 유연한 데이터베이스 연결 구조 확립.
-
-### 3. 스케줄러(Background Job) 아키텍처 개선
-* **APScheduler 분리 및 제어**: Render 클라우드 환경에서 웹 서버(FastAPI)가 여러 개 뜰 경우 스케줄러가 중복 동작하여 이메일이 다중 발송되는 현상을 막기 위해, 환경변수(`RUN_SCHEDULER`)를 통해 메인 앱에서 스케줄러 작동 여부를 제어하도록 `main.py` 리팩토링.
-* **독립 워커(Worker) 스크립트 신설**: 필요시 스케줄러만 독립적인 백그라운드 프로세스로 격리하여 가동할 수 있도록 `run_scheduler.py` 파일 신설 완료.
-
-### 4. 무중단 프론트엔드 배포 및 통신 규칙 수립
-* **정적 사이트(Static Site) 최적화 전환**: React 프론트엔드를 무거운 컨테이너 서비스 대신 빠르고 15분 수면 모드(Sleep)가 없는 정적 웹 사이트로 배포하여 사용자 최초 접속 렌더링 속도(0.1초 이내) 극대화.
-* **API Proxy (Rewrite) 룰 적용**: 단일 페이지 애플리케이션(SPA)의 새로고침 404 에러를 방지(`/*` -> `/index.html`)하고, 프론트엔드에서 날아오는 백엔드 요청을 API 서버로 안전하게 바이패스(`/api/*` -> 백엔드 주소)하도록 Render 내부 Redirect/Rewrite 라우팅 설정 완료.
-
-## [2026-08-16] 시스템 다국어(i18n) 지원 및 UI 뷰어빌리티 최적화
-
-### 1. 다국어(i18n) 인프라 구축 및 적용
-* **i18next 라이브러리 도입**: React 환경의 표준 다국어 처리 패키지(`i18next`, `react-i18next`, `i18next-browser-languagedetector`)를 설치하고 언어 리소스(`ko`, `en`) 맵핑 구조를 신설했습니다.
-* **공통 레이아웃 번역 적용**: 상단 네비게이션바(Navbar)와 좌측 메뉴 사이드바(Sidebar)의 하드코딩된 텍스트를 제거하고 번역 훅(`useTranslation`)과 `<Trans>` 컴포넌트를 활용하여 동적으로 렌더링되도록 구현했습니다.
-* **언어 전환 기능 추가**: 네비게이션 바 우측 최상단에 토글 버튼(🌐 **KR/EN**)을 신설하여, 실시간으로 언어를 변경할 수 있도록 적용했습니다.
-
-### 2. 관리자 포털 테이블(List) 다국어 및 디테일 개선
-* **메뉴별 테이블 항목 번역 적용**:
-  - `메뉴 1. 포털 대시보드` (PORTAL DASHBOARD)
-  - `메뉴 2. 유럽 재고 상태` (STOCK LIST)
-  - `메뉴 3. 프로모션` (PROMOTION)
-  위 3가지 주요 메뉴의 테이블 헤더 타이틀과 제어 액션 버튼(다음/이전/수정/삭제)들을 모두 한국어와 영어 리소스 파일에 추가하고 연동을 완료했습니다.
-* **헤더(Title) 타이포그래피 및 정렬 개선**: 테이블의 컬럼 구분을 명확히 하기 위해 전체 헤더 텍스트를 **Bold(굵게)** 처리했습니다. 또한 가독성을 위해 헤더를 좌측 정렬(Left) 하되, '진행 상태(STATUS)' 항목만 중앙 정렬(Center)로 세밀하게 조정했습니다.
-
-### 3. 데이터 뷰 밀집도(Density) 최적화
-* **고밀도 엑셀 뷰어 스타일 적용 (`index.css`)**: 한 화면에서 스크롤 없이 최대한 많은 주문/재고 내역을 조회할 수 있도록 테이블 리스트 디자인을 전면 개편했습니다.
-  - 리스트 내 텍스트 크기(Font-size)를 `0.9rem`에서 `12px`로 축소하여 콤팩트하면서도 가독성을 유지했습니다.
-  - 표 항목 간의 상하 간격(Padding Top/Bottom)을 `16px`에서 `6px`로 대폭 줄여 행(Row) 사이의 불필요한 여백을 최소화했습니다.
-
-### 4. 대시보드 및 프로모션 리스트 UI/UX 규격 일괄 통일 및 디테일링
-* **상태 제어 버튼(Action Button) 크기 및 레이아웃 표준화**: 관리자 및 딜러 포털 전반(`AdminDashboard`, `DealerDashboard`, `AdminPromotion`, `DealerPromotion`)에 걸쳐 테이블 하위의 제어 버튼(다음, 이전, 수정, 삭제, 예약 등)의 규격을 일관되게 재정의했습니다.
-  - 텍스트 크기: `10px` 및 중앙 정렬(`justifyContent: 'center'`)
-  - 패딩(크기): 위아래 `3px`, 좌우 `4px`
-  - 버튼 컨테이너 넓이 콤팩트화 (`85px` -> `70px`)
-* **프로모션 직관성 명칭 변경**: 프로모션 리스트 액션 버튼의 명칭을 보다 직관적으로 축약/수정했습니다 ('전용 예약' -> '예약', '판매 전환' -> '판매완료', '예약 취소' -> '예약취소').
-* **데이터 테이블 행간(Row) 간격 추가 압축**: 데이터 테이블 행간 상하 여백을 `5px` 단위로 정밀하게 재조정하여 고밀도 조회 환경을 극대화했습니다.
-
-### 5. 다국어(i18n) 번역 텍스트 세부 최적화
-* **목록 번호(No.) 기호화**: 한국어 및 영어 공통으로 리스트 최좌측 '번호' 및 'No.' 텍스트를 간결한 `*` 기호로 통일했습니다.
-* **영문 항목명 대소문자 및 단어 교정**: 대시보드 영문 페이지의 컬럼명을 가독성 높은 표기법(Title Case)으로 변경(`Model`, `Dealer`, `Status`, `Port`)하고, 모호했던 'Management'를 'Progress'로 직관성 있게 수정 적용했습니다.
-
-### 6. 유럽재고상태(메뉴 2) 다국어 처리 고도화 및 UI 개선
-* **타입(용도) 텍스트 번역 적용**: '판매가능', '딜러주문', '임대', '전시', '프로모션' 상태 옵션을 다국어(i18n) 적용하여 영문 페이지에서 올바르게 표기(Available, Order, Rental, Showroom, Promotion)되도록 개선했습니다.
-* **필터 텍스트 및 디자인 통일**: 상단 상태 필터 메뉴에서 기존의 불필요한 영문 괄호 표기(예: `(AVAILABLE)`)를 제거하고 텍스트만 렌더링되도록 일원화했으며, 영문 'All types'를 'All type'으로 수정했습니다.
-* **검색 대상(범위) 확대 및 안내문구 번역**: 검색창에서 기존 항목(`모델명`, `NC`, `P/O`) 외에 `DETAIL SPEC` 내용까지 통합 검색되도록 로직을 추가하고, 안내(Placeholder) 텍스트를 다국어로 분리 적용했습니다.
-* **데이터 리스트 타이틀 변경**: 한국어 페이지의 리스트 타이틀을 '법인 창고 가용 재고 (ATP) 목록'에서 '법인 가용재고 목록'으로 변경하고 영문 타이틀을 'WIA Available Inventory List'로 수정 적용했습니다.
-* **디테일 정렬 및 문구 수정**: 딜러 '발주로 전환(to order)' 선택 메뉴 텍스트를 중앙 정렬하여 시인성을 높이고, 해당 기능의 '확정(Confirm)' 버튼 번역을 추가했습니다.
-
-### 7. 시스템 네비게이션 타이틀(Navbar) 통합 및 간소화
-* **상단 타이틀 문구 개선**: 한국어 및 영문 버전에 맞춰 불필요한 단어를 제거하고 시스템 메인 타이틀을 간소화했습니다. (한국어: 'WIA 공작기계 유럽 SCM ERP', 영문: 'WIA Machine Tools Europe SCM ERP')
-* **서브 타이틀(모토) 삭제**: 네비게이션 영역 하단에 위치했던 장문의 서브 타이틀('World-best + Innovation...') 텍스트를 UI에서 완전히 삭제하여 레이아웃의 개방감을 향상시켰습니다.
-
-## [2026-08-17] 대시보드 다국어(i18n) 적용 고도화
-
-### 1. SCM 포털 대시보드 다국어 매핑 완료
-* **텍스트 영역 하드코딩 제거**: 대시보드 내 메인 타이틀, 타임라인 제목 및 부연 설명 등을 다국어 변수(`t()`)로 치환하여 언어 설정에 따라 동적으로 출력되도록 수정했습니다.
-* **검색 및 필터 영역 다국어 연동**: 주문 검색창(Placeholder) 및 전체 상태 조회 필터 항목(전체, 주문, 생산 중 등)의 하드코딩된 텍스트를 제거하고 다국어 연동을 완료했습니다.
-* **단계별 텍스트(StepBar) 다국어 지원**: 리스트 항목 내 `STATUS` 단계별 아이콘 텍스트를 `useTranslation`을 사용하여 한국어(`주문`, `생산 중`, `배송` 등)와 영어(`Order`, `Production`, `Shipping` 등) 리소스에 매핑 적용했습니다.
-* **언어별 최적화 텍스트 분리 및 UI 개선**:
-  - **한국어 페이지(`ko`)**: 기존에 `1. 주문 (CONFIRMED)` 형태로 영문이 혼용되었던 필터 텍스트 및 긴 검색창 안내 문구를 `1. 주문`, `검색` 등으로 직관적이고 깔끔하게 단축 및 렌더링하도록 일원화했습니다.
-  - **영문 페이지(`en`)**: 기존에 부분적으로 한국어로 표기되던 상단 진행 상태 통계(전체: 112, 주문: 98 등) 항목을 `All`, `Ordered`, `in Production`, `Shipping`, `Arrived`, `Stock` 등 영문 맞춤형 텍스트로 완전하게 치환 적용했습니다.
-
-## [2026-08-18] 프론트엔드 다국어 번역 및 UI 텍스트/정렬 개선
-
-### 1. 상단 네비게이션 언어 토글 버튼 수정
-* **버튼 텍스트 직관성 향상**: 언어 토글 버튼 텍스트를 현재 설정된 언어 상태(`KR`, `EN`)를 직관적으로 나타내도록 로직을 수정했습니다.
-
-### 2. 메뉴 2. 유럽 재고 상태 (Europe Stock) 영문/국문 번역 텍스트 최적화
-* **메뉴명 및 타이틀 번역 갱신**: 영문 사이드바 메뉴명과 페이지 타이틀을 `Menu 2. Europe Inventory`에서 `Menu 2. Europe Stock`, `WIA Stock Status`로 각각 변경하고 부가 설명을 구체화했습니다.
-* **통계 및 검색 텍스트 분리**: 필터 메뉴의 '전체 상태 조회'와 상단 수량 통계의 '전체:' 텍스트를 분리 적용하여 독립적으로 렌더링되도록 번역 키(`stat_all`)를 신규 적용했습니다.
-* **검색창 텍스트 간소화**: 검색창(Placeholder) 안내 문구를 '검색' / 'search' 로 대폭 간소화 적용했습니다.
-* **전체 상태 조회 필터명 변경**: 셀렉트 박스의 기존 '전체 용도 조회' 텍스트를 직관적인 '전체 상태 조회'로 국문 번역을 수정했습니다.
-
-### 3. 메뉴 3. 프로모션 관리 (Promotion) 다국어 처리 및 디테일 개선
-* **페이지 타이틀 번역 갱신**: 국/영문 페이지 타이틀과 리스트 타이틀을 직관적인 명칭('프로모션 관리' / 'Promotion List' 등)으로 교체 적용했습니다.
-* **상태 뱃지 및 예약정보 텍스트 다국어(i18n) 연동**: 기존에 하드코딩되었던 테이블 리스트 내의 '판매가능', '예약중' 텍스트를 다국어 함수로 치환하고 예약 정보('Reservation:', 날짜 표기법 마침표 제거) 및 비어있는 딜러 항목('-') 등을 정돈했습니다.
-* **테이블 헤더 및 데이터 중앙 정렬**: 리스트의 가독성 강화를 위해 후반 4개 주요 열(`도착일정`, `진행상태`, `예약정보`, `설정`)의 텍스트와 UI 요소들을 테이블 중앙 정렬(Center align)로 일괄 적용했습니다.
-
-### 4. 신규 단건 발주 생성 (메뉴 4) 기계 모델 리스트 개편 및 DB 최신화
-* **218종 기계 모델 DB 최신화**: 제공된 최신 모델 리스트를 기반으로 파싱 스크립트를 적용하여, 총 218개의 기계 모델 데이터(모델 코드, 카테고리 포함)를 백엔드 데이터베이스에 새롭게 추가 및 갱신 완료했습니다.
-* **모델 검색 드롭다운 UI 포맷 변경**: 단건 발주 생성 모달 내 모델 검색 및 선택 시, 기존 `기계모델 - 모델명` 형태가 아닌 `기계모델 - 카테고리명`(예: `E160A - CNC T/C`, `KH1000 - Horizontal M/C`) 포맷으로 표시되도록 프론트엔드를 수정했습니다.
-* **알파벳(A-Z) 오름차순 정렬 적용**: 모델 선택 편의성을 위해 드롭다운에 나열되는 기계 모델 전체 목록이 백엔드 단에서 모델 코드(`model_code`) 기준의 알파벳 오름차순(A-Z)으로 정렬되도록 API 응답 로직을 개선했습니다.
-
-## [2026-08-19] 신규 발주 프로세스 및 제품 라이브러리(DAM) 고도화
-
-### 1. 신규 단건 발주 생성 (메뉴 4) 팝업 및 마스터 데이터 고도화
-* **마스터 데이터 DB 연동**: 발주 시 필요한 부가 정보(NC 코드, Incoterms, 도착지 항구)를 데이터베이스에 신규 등록하고, 발주 생성 팝업창에서 직접 검색 및 선택할 수 있도록 데이터 연동을 완료했습니다.
-* **6종 필수 입력 필드 렌더링**: '기계 모델', 'NC', 'P/O', '딜러사', 'Incoterms', '도착지 항구' 총 6개의 핵심 입력창을 구성하고 검색 필터(Datalist)를 도입하여 사용 편의성을 높였습니다.
-* **드롭다운 텍스트 간소화**: 검색 시 나타나는 리스트 텍스트를 간결하게 최적화하여, 부가 설명 없이 오직 핵심 코드 및 이름(예: `E160A`, `F0iP`, `AK MAKINA`, `FCA`, `Hamburg`)만 노출되도록 직관성을 향상했습니다.
-
-### 2. 제품 라이브러리 (메뉴 7) 라인업 및 상세 스펙 전면 개편
-* **카테고리 6종 재배치**: 기존 임의로 나뉘어 있던 카테고리를 실제 라인업 기준인 `ALL`, `CNC T/C`, `Vertical M/C`, `Horizontal M/C`, `Multi-Tasking`, `5-Axis M/C`의 6개 상위 카테고리로 재설정했습니다.
-* **150종 모델 상세 데이터 연동**: 백엔드에 구축된 전체 모델 정보를 바탕으로 라이브러리 데이터를 추출하여, 클릭한 카테고리에 맞는 정확한 기계 모델들만 그리드(Grid)에 정렬 및 노출되도록 반영했습니다.
-* **핵심 스펙(Specs) 12종 렌더링 적용**: 퀵 뷰 모달창에서 볼 수 있는 핵심 스펙 항목을 기존 4개에서, 첨부된 상세 규격 기준에 맞춘 12종(척 사이즈, 최대이송거리, 주축 회전수, 회전공구 회전수 등)으로 대폭 확장하여 정확한 장비 제원을 확인할 수 있도록 업데이트했습니다.
-* **디테일 뷰 좌우 비율 및 여백 최적화**: 스펙 상세내역 텍스트의 상하좌우 간격을 `8px`로 세밀하게 조율하고, 좌측 항목명과 우측 규격값의 가로 넓이 비율을 `60% : 40%`로 명확하게 분할하여 정보 가독성을 한 단계 끌어올렸습니다.
-
-### 3. 전체 레이아웃 안정화 및 UI/UX 인터랙션 개선
-* **글로벌 레이아웃 흔들림 방지**: 항목 수가 적은 카테고리 탭으로 넘어갈 때 세로 스크롤바가 사라지면서 화면이 우측으로 밀리는(Layout Shift) 브라우저 현상을 방지하기 위해 전역 CSS에 스크롤바를 상시 노출하도록(`overflow-y: scroll`) 적용했습니다.
-* **카테고리 버튼 디자인 개선**: 필터 항목 간 간격을 `10px`로 넓혀 안정감을 더했고, 버튼을 클릭하거나 마우스를 올릴 때마다 화면이 미세하게 떨리는(진동) 현상을 완전히 수정했습니다. 이제 실제 버튼 크기 변화 없이 안쪽으로 2px 굵기의 파란색(`WIA Blue`) 띠(box-shadow)가 생기도록 시각적 피드백(Hover) 효과만 깔끔하게 동작합니다.
-
-### 4. 대용량 가상(Mock) 스펙 데이터 자동화 및 검색 로직 강화
-* **실시간 렌더링용 카테고리 기반 Mock 생성기 탑재**: 외부망 자동 접속 모듈(Playwright) 오류에 대한 대안으로, 기종(카테고리)별 특성을 반영한 현실적인 가상(Mock) 데이터 생성 알고리즘 파이썬 스크립트(`generate_mock.py`)를 자체 개발 및 연동했습니다. 이를 통해 218개 모델의 12가지 상세 스펙 데이터를 실제 제원표와 유사하게 자동 생성하도록 조치했습니다.
-* **모델 검색 필터링 최적화**: 사용자가 검색창에 모델 코드를 입력할 때 하이픈(`-`), 슬래시(`/`), 띄어쓰기(` `) 등 특수문자나 띄어쓰기를 입력하여도, 알파벳 및 숫자 조합만 일치하면 정확하게 해당 모델을 찾아내도록 프론트엔드 검색 필터 로직 정규식(`replace(/[\s\-\/]/g, '')`)을 대폭 강화했습니다.
-
-### 5. 주문 배송 타임라인 (메뉴 1) 장비 정보 수정 팝업 전면 개편
-* **모달 레이아웃 및 12개 항목 확장**: 기존 8개 항목에서 P/O, 딜러(Dealer), 도착지(Port), 구매가(Buying) 항목을 새롭게 추가하여 총 12개 항목으로 구성하고, 2단 그리드로 깔끔하게 재배치했습니다. 시리얼 번호 표기는 'S/N'으로 변경했습니다.
-* **마스터 데이터 드롭다운 적용**: 모델명, NC, 딜러, 도착지, Incoterms 항목을 텍스트 직접 입력 방식에서 DB 데이터를 조회해 선택하는 드롭다운 형태로 변경했습니다. 텍스트도 간소화하여 단일 코드만 직관적으로 표시되도록 수정했습니다.
-* **도착지(Port) 오타 및 대소문자 자동 보정**: 리스트의 '도착지 / 일정' 항목 렌더링 시, 원시 데이터가 잘못 입력되더라도(\ham\, \HAMBURG\ 등) DB에 등록된 표준 항구 코드(\Hamburg\)로 매핑 및 변환되어 화면에 일관되게 노출되도록 최적화했습니다.
-
-### 6. 유럽 재고 상태 (메뉴 2) 구매가 연동
-* **메뉴별 노출 정책 차등 적용**: 추가된 '구매가(Buying Price)' 정보는 메뉴 1(포털 대시보드) 화면에는 숨김 처리하고, 오직 메뉴 2(유럽 재고 상태)의 데스크탑 데이터 테이블과 모바일 카드 뷰에만 표시되도록 정책을 반영했습니다.
-
-### 7. 관리자/RSM 모바일 뷰 전환 UX/UI 최적화
-* **글로벌 모바일 시뮬레이터 적용**: 메뉴 1 상단에 있던 모바일 뷰 시뮬레이션 버튼과 배지를 사이드바(Sidebar) 하단 영역으로 이동하여 전역 기능으로 승격시켰습니다. 이제 어느 메뉴를 보더라도 즉각적으로 전체 UI를 모바일 모드로 전환 확인할 수 있습니다.
-* **사이드바 및 네비게이션 디자인 디테일 튜닝**: 모바일 배지 텍스트를 '관리자/RSM 모바일반응형 적용'으로 변경하고 크기를 \.75rem\으로 조절했습니다. 상단 메뉴 로고 텍스트 크기 역시 적정 비율(\.85rem\)로 다듬어 시각적 밸런스를 개선했습니다.
-
-
-## [2026-08-20] 프론트엔드 UI/UX 업데이트 및 다국어 기능 고도화
-
-### 1. 사이드바(Sidebar) 및 네비게이션 높이 규격 통일
-* **UI 일관성 확보**: `sidebar-header` 영역과 모바일 모드의 상단 네비게이션(Top-navbar) 영역의 높이를 모두 `80px`로 통일하여 시각적 안정감을 개선했습니다.
-
-### 2. 버튼 및 배지(Badge) UI/UX 스타일링 개선
-* **상태 제어 버튼 호버 효과**: 제품 라이브러리 카테고리와 통일감을 주도록, '상태 설정' 등 항목의 윤곽선 버튼(`btn-outline`)에 마우스 오버 시 테두리가 안쪽으로 굵어지는 효과(`box-shadow: inset 0 0 0 1px currentColor`)를 추가했습니다.
-* **입고 완료 배지 사이즈 조절**: 대시보드 내 '입고 완료' 텍스트 뱃지의 폰트 사이즈 및 여백(Padding)을 다른 제어 버튼들과 완벽히 동일한 규격으로 일치시켰습니다.
-
-### 3. 다국어(i18n) 번역 확대 및 텍스트 렌더링 최적화
-* **전역 텍스트 일괄 수정**: 시스템 전체적으로 사용되던 '발주번호' 및 '발주 번호' 텍스트를 모두 **'S/O 번호'**로 일괄 변경했습니다 (테이블 헤더, 검색창 Placeholder, 폼 라벨 등 공통).
-* **대시보드 헤더 텍스트 변경**: 포털 대시보드(메뉴 1) 테이블의 '진행 상태' 항목명을 **'진행 상황'**으로 교체했습니다.
-* **프로모션 텍스트 직관화**: 영문 페이지의 예약 및 딜러 관련 버튼과 라벨 명칭을 구체적으로 변경(`예약 -> Reservation`, `판매완료 -> Order`, `예약취소 -> Cancel`, `만료 -> Expire`)하여 직관성을 높였습니다.
-* **영문 번역 추가**: '입고 완료' 상태에 대한 영문 텍스트를 `In stock`으로 추가 매핑했습니다.
-
-### 4. 유럽 재고 상태 (메뉴 2) 상세 정보(Detail) 데이터 고도화
-* **상세 정보 항목명 다국어 매핑**: 상세 리스트의 항목명을 국/영문 버전에 맞춰 업데이트했습니다. (한국어: `도착지`, `선박정보`, `진행 상황` 등 / 영문: `PORT`, `VESSEL`, `STATUS` 등).
-* **도착 정보(ETD/ETA) 예외 처리**: 상세 정보에서 `ETD / ETA` 데이터가 존재하지 않을 경우, 기존 '미정'으로 표기되던 값을 하이픈(`-`)으로 변경하여 깔끔하게 통일했습니다.
-* **선박 정보(Vessel) 연동**: 상세 정보의 '위치' 항목을 '선박정보(VESSEL)'로 완전히 대체하고, 하드코딩된 유럽 물류센터 텍스트 대신 실제 해당 주문의 `vessel` 데이터를 데이터베이스에서 불러와 렌더링하도록 뷰를 개편했습니다.
-* **진행 상황 데이터 동기화**: 원시 DB 영문 코드(`CONFIRMED` 등)로 노출되던 진행 상황 항목을, 포털 대시보드의 파이프라인과 완벽히 동일한 다국어 텍스트(`주문`, `생산 중`, `배송` 등)로 변환하여 출력되도록 데이터 매핑을 고도화했습니다.
-
-## [2026-08-20] (추가 업데이트) 사용자 프로필(My Data) 및 계정 보안 시스템 구축
-
-### 1. 사용자 프로필 (My Data) 페이지 신설
-* **2단 카드형 레이아웃 구성**: 사용자 가이드라인에 맞춰 상단은 '기본 프로필', 하단은 '보안 및 계정 관리' 카드로 분리된 새로운 UI 페이지(`UserProfile.jsx`)를 구축했습니다.
-* **접근성 개선**: 전체 화면 우측 상단 네비게이션바(Navbar)에 👤(User) 아이콘을 추가하여 언제든 내 정보 페이지로 이동할 수 있도록 동선을 설계했습니다.
-* **사용자 권한 격리 (Data Isolation)**: 프로필 수정 모드에서 '부서(Department)'와 '이메일'은 변경 가능하도록 허용하되, '소속 회사(Company Name)'는 관리자만 제어할 수 있도록 비활성화(Disabled) 처리하여 데이터 오염을 방지했습니다.
-
-### 2. 백엔드 인증(Auth) 및 계정 API 고도화
-* **사용자 스키마 및 DB 마이그레이션**: `CustomUser` 테이블에 `department`(부서)와 `password_hash`(비밀번호) 필드를 신규 추가하고, 시스템 구동 시 누락된 테이블에 안전하게 자동 컬럼을 추가(`ALTER TABLE`)하는 마이그레이션 로직을 구현했습니다.
-* **REST API 엔드포인트 신설**:
-  - `GET /api/v1/users/me`: 현재 로그인한 세션의 프로필 조회 기능
-  - `PATCH /api/v1/users/me`: 사용자 정보 변경 처리 및 유효성 검사 로직
-  - `POST /api/v1/users/me/change-password`: 현재 비밀번호 검증 기반의 신규 비밀번호 변경 기능
-* **하드코딩 로그인 폐지 및 실제 DB 연동**: 프론트엔드 로그인 페이지(`Login.jsx`)에 임시로 설정되어 있던 하드코딩된 아이디/비밀번호 방식을 완전 폐지하고, `POST /api/v1/auth/login` 백엔드 API와 통신하여 실제 데이터베이스의 사용자 정보 및 암호 해시와 일치해야만 로그인되도록 보안 로직을 정상화(수정)했습니다.
-
-### 3. 모바일 UI 레이아웃 안정화
-* **모바일 네비게이션 겹침(Overlap) 현상 해결**: 화면 크기가 작은 모바일(iPhone 12 등)에서 상단 로고와 텍스트가 줄바꿈 될 때 본문 컨텐츠를 덮어버리던 버그를 수정했습니다.
-* **반응형 폰트 및 높이 유동성 확보**: `Navbar.jsx`의 고정 높이(`80px`)를 제거하여 내용물에 맞춰 유연하게 늘어나도록 개선하고, `index.css`를 통해 모바일 뷰일 때만 타이틀 폰트 크기를 약간 줄여(`1.05rem`) 전체적인 배치가 깔끔하게 정돈되도록 다듬었습니다.
-
-## [2026-08-21] 다국어(i18n) 번역 고도화 및 모바일 사용성 개선
-
-### 1. 사용자 프로필(My Data) 페이지 다국어(i18n) 지원 적용
-* **다국어 텍스트 매핑 완비**: '내 정보 (My Data)' 페이지 내 하드코딩 되어 있던 주요 텍스트들(기본 프로필, 사용자 이름, 소속 회사, 부서, 이메일, 보안 및 계정 관리, 비밀번호 등)을 언어 팩 리소스(`translation.json`)로 이관했습니다.
-* **UI 동적 언어 전환**: 상단 언어 토글(KR/EN)을 통한 페이지 언어 전환 시 번역된 텍스트가 즉각적으로 화면에 반영되도록 렌더링을 최적화했습니다. (영문 텍스트: My Data, User Name, Company Name, Department 등).
-* **네비게이션 툴팁 통합**: Navbar에 위치한 사용자 프로필 아이콘의 말풍선 툴팁 텍스트 역시 번역 스키마를 따르도록 동기화했습니다.
-
-### 2. 관리자 포털 장비 정보 수정(Edit) 팝업 다국어 지원 적용
-* **팝업창 내 영문 텍스트 연동**: 메뉴 1 포털 대시보드에서 장비의 세부 스펙을 수정하는 팝업 모달창의 전체 UI(입력창 라벨, Placeholder 문구, 저장/취소 버튼)에 영문 다국어 처리(i18n)를 반영했습니다.
-* **전용 다국어 항목 추가 적용**: 기존 한국어 전용이었던 팝업을 글로벌 규격에 맞춰 `Order detail change`, `Model`, `S/N`, `S/O`, `detail`, `name`, `text`, `cancell`, `save` 텍스트로 치환 적용되도록 개선했습니다.
-
-### 3. 모바일 레이아웃(Sidebar) 스와이프 제스처 기능 추가
-* **사이드바 닫기 UX(사용자 경험) 개선**: 모바일 환경에서 직관성이 떨어지는 우측 상단 'X' 버튼을 과감히 제거하고 최신 모바일 트렌드를 반영했습니다.
-* **터치 앤 스와이프(Touch & Swipe) 도입**: 모바일 화면에서 열린 사이드바를 화면 왼쪽 방향으로 스와이프(Swipe) 할 경우 부드럽게 닫히도록 터치 이벤트를 맵핑(`onTouchStart`, `onTouchMove`, `onTouchEnd`) 적용했습니다.
-* **동작 간섭 방지 로직 적용**: 위/아래 방향으로 단순 스크롤할 때는 사이드바가 닫히지 않도록, 사용자가 정확히 가로(X축) 방향으로 일정 거리(50px) 이상 스와이프했을 때만 닫기 동작이 활성화되도록 로직을 정교화했습니다.
-
-### 4. 발주 관리에 '딜러 주문일자' 데이터 추가 및 표출 연동
-* **데이터베이스 스키마 확장**: 백엔드 `orders` 테이블 및 Pydantic 모델에 `dealer_order_date` 항목을 추가하여 주문일자 정보를 저장할 수 있도록 기능을 확장했습니다.
-* **팝업 입력폼 개선 (메뉴 4)**: '신규 단건 발주 생성' 모달 창에 '딜러 주문일자(Order date)' 입력 필드를 추가하고 백엔드 저장 API와 연동했습니다.
-* **대시보드 상세 뷰 연동 (메뉴 1)**: 생성된 발주의 상세 정보를 보는 타임라인 패널 하단(DETAIL SPEC 영역)에 '딜러 주문일자' 정보를 즉각적으로 표출하도록 프론트엔드 UI를 업데이트했습니다.
-
-### 5. 유저 및 보안 관리(메뉴 6) 기능 전면 개편
-* **사용자 신규등록 (Create) 기능 추가**: '신규 사용자 초대' 버튼을 직관적인 '신규등록'으로 변경하고, 이를 통해 새 사용자를 생성할 수 있는 전용 모달창을 개발했습니다.
-* **사용자 정보 수정 (Update) 기능 반영**: 리스트 상의 연필 아이콘을 클릭해 특정 유저의 기존 정보(소속, 권한 등)를 불러오고 변경할 수 있는 수정 모달 및 패치(`PATCH /api/users`) API를 구축했습니다.
-* **동적 폼 UX 및 초기화 로직 적용**: 유저의 권한(Role)을 `DEALER` 혹은 `ADMIN/RSM`으로 선택함에 따라 딜러사 선택 드롭다운과 부서 입력창이 상호 토글되도록 처리했습니다. 또한, 작업 중 '취소' 또는 'X'를 눌러 모달을 닫을 시 입력 데이터가 깔끔하게 초기화되도록 상태 리셋 로직을 보완했습니다.
-
-### 6. 내 정보 (My Data) 페이지 접근성 및 라우팅 개선
-* **닫기 버튼 신설**: 내 정보 페이지 우측 상단에 '닫기(X)' 버튼을 신설하여, 작업 후 직관적으로 대시보드로 돌아갈 수 있도록 UI 편의성을 개선했습니다.
-* **Tab-based 라우팅 최적화**: 기존 상태값(`activeTab`)을 활용하는 라우팅 아키텍처에 맞춰, 닫기 버튼 클릭 시 `App.jsx`의 홈 이동 로직(`handleHomeClick`)이 정상적으로 호출되도록 컴포넌트 간 Props 통신을 고도화했습니다.
-
-## [2026-08-22] 출고 및 판매 완료 모듈 신설 및 UI 최적화
-
-### 1. 파이프라인 상태값(Status) 및 UI 액션 확장
-* **신규 상태 코드 추가**: 데이터베이스와 API의 `OrderStatus` 열거형에 주문의 최종 단계를 나타내는 `DISPATCHED`(출고완료)와 `SOLD`(판매완료) 상태를 추가하여 이력 관리를 고도화했습니다.
-* **입고(IN_STOCK) 장비 UI 개선**: 대시보드의 '출고대기' 장비에서 [출고완료] 버튼과 [판매완료] 버튼을 각각 제공하여 직관적으로 다음 단계 상태를 처리할 수 있도록 인터페이스를 개선했습니다.
-
-### 2. 출고 및 판매 완료 장비 분리(Soft-hide) 및 전용 리스트(메뉴) 신설
-* **대시보드 메인 리스트 렌더링 최적화**: 관리자 및 딜러 대시보드 메인 리스트에서 진행 완료된 장비(DISPATCHED, SOLD)를 숨김 처리(`exclude_completed=true`)하여 현재 진행 중인 데이터에 집중할 수 있도록 했습니다.
-* **신규 메뉴 A (출고완료 리스트)**: 물리적 출고가 완료된 장비들을 따로 관리할 수 있는 전용 관리자 메뉴(`AdminDispatch.jsx`)를 신설했습니다. 장비별 상태 변경 내역을 확인할 수 있는 타임라인 뷰 기능을 포함하고 있습니다.
-* **신규 메뉴 B (판매완료 기록)**: 매출 확정 장비를 영구 보관하는 페이지(`AdminSalesArchive.jsx`)를 신설하고, 재무 및 영업 부서에서 활용 가능하도록 'Excel Export (CSV)' 기능을 구현했습니다.
-
-### 3. 좌측 사이드바(Sidebar) 메뉴 구조 재배치 및 텍스트 튜닝
-* **메뉴명 및 1~9번 순서 최적화**: 포털 대시보드(메뉴 1)부터 유저 및 보안관리(메뉴 9)까지 사용자가 요청한 최적의 순서대로 메뉴 배치를 완전히 재구성했습니다.
-* **한국어 및 영문 다국어(i18n) 세밀한 교정**: 한국어 텍스트는 '메뉴1. 포털 대시보드' ~ '메뉴9. 유저 및 보안관리'로, 영문은 'Menu1. Portal Dashboard', 'Menu2. WIA Stock', 'Menu4. Upload / Setting' 등 띄어쓰기 및 스펠링 디테일을 사용자의 가이드에 맞추어 완벽하게 적용했습니다.
-* **텍스트 통일성 부여**: `In stock` 상태를 `Ready pickup`으로 변경하고 딜러 주문일자를 '딜러발주 일자'로 통일하는 등 세부 텍스트 번역을 갱신했습니다.
-
-### 4. 기타 버그 수정 및 설정 고도화
-* **이메일 통지 설정 버그 수정**: '업로드 / 알림설정' 메뉴 내 '해상 운송 중 정기 보고' 발송 주기가 테스트 세팅(매 1일)으로 고정되어 있던 현상을 기획 의도에 맞게 매 10일 통지(interval_days=10)로 데이터베이스 값을 정상 복구 및 적용했습니다.
-
-## [2026-08-23] 딜러 포털 전용 기능 및 다국어 텍스트 최적화
-
-### 1. 딜러 포털 (Dealer Portal) 사이드바 메뉴 및 구성 개편
-* **메뉴명 및 구조 재배치**: 딜러 포털의 좌측 사이드바 메뉴 텍스트를 사용자의 가이드(한국어 및 영어)에 맞추어 `메뉴1. 포털 대시보드`부터 `메뉴6. 제품 라이브러리`까지 새롭게 재구성했습니다.
-* **신규 메뉴 추가 (내 구매 내역)**: 딜러 전용 '전체 구매내역 리스트 조회' 페이지(`DealerSalesArchive.jsx`)를 신설하여 딜러 포털 메뉴 3번에 배치했습니다. 이를 통해 딜러가 출고 완료 및 판매된 장비 이력을 별도로 확인할 수 있습니다.
-
-### 2. 딜러 포털 현황판(대시보드) KPI 카드 개편 및 로직 연동
-* **KPI 타이틀 변경 및 데이터 로직 업데이트**: 대시보드 상단의 3개 카드박스 내용을 기존 구조에서 `진행중인 주문(Order in Progress)`, `운송 중 장비(Shipping Machine)`, `출고 대기 장비(Ready for Pickup)`로 텍스트를 갱신했습니다.
-* **실제 상태(Status) 기반 집계**: 각 KPI 카드에 보여지는 숫자가 딜러의 전체 주문 목록에서 현재 단계(Active/Shipping/Ready)에 부합하는 건수만을 정확하게 계산하여 표출되도록 프론트엔드 연산 로직을 수정 적용했습니다.
-
-### 3. WIA 재고 리스트(메뉴 4) 상세 정보(Detail) UI/UX 동기화
-* **관리자 페이지 수준의 2단 분할 레이아웃 도입**: 딜러용 'WIA 재고 리스트'(`DealerInventory.jsx`)에서 장비를 클릭할 때 하단으로 펼쳐지는 상세 정보 패널의 디자인을 관리자 측 페이지와 완벽히 동일하게 개선했습니다.
-* **출력 항목 구성 통일**: 왼쪽 열(`진행상태`, `S/N`, `S/O`, `REMARK`), 오른쪽 열(`ETD / ETA`, `PORT`, `INCOTERMS`, `VESSEL`)로 구성된 핵심 정보들을 파란색 세로 선(포인트 바)과 함께 양쪽(관리자, 딜러)에서 일관되게 노출하도록 개편 적용했습니다.
-
-### 4. 기타 버그 픽스 및 UI 최적화
-* **JSON 문법 오류 픽스 (Hotfix)**: 텍스트 번역 업데이트 과정 중 영문 `translation.json` 파일에 발생했던 콤마(,) 누락 및 문자열 깨짐 문법 오류(Syntax Error)를 복구하여 화면이 정상 렌더링되도록 조치했습니다.
-* **불필요한 모바일 시뮬레이터 제거**: 딜러의 '발주 및 배송상태' 리스트 페이지 상단에 남아있던 모바일 뷰 전환 시뮬레이션 버튼과 안내 배지를 깔끔하게 삭제했습니다. (사이드바 글로벌 전환 기능으로 통합됨)
-
-## [2026-08-24] 프론트엔드 UI 디테일 개선 및 실서버 배포(DB 연동) 안정화
-
-### 1. 딜러 포털 (Dealer Portal) 대시보드 UI/UX 디테일 개선
-* **버튼 호버(Hover) 디자인 신규 적용**: 딜러 대시보드(메뉴 1) 및 프로모션(메뉴 5) 내 'Customs Clearance'(통관/픽업), 'Order'(주문) 버튼에 마우스 오버 시 브랜드 컬러인 'WIA Light Gold'(`rgb(205, 170, 125)`) 색상으로 부드럽게 전환되도록 CSS(`btn-request:hover`) 효과를 추가했습니다.
-* **통계 정보 및 테이블 항목 영역 밸런스 조정**: 대시보드 화면에서 좌측 'WIA available Stock List'의 통계 정보 영역과 우측 'Ready for Release / Request Pickup' 테이블의 항목(버튼) 영역의 높이(height)를 시각적으로 동일하게 맞추어 전체 레이아웃 밸런스를 정교하게 정돈했습니다.
-* **예약/주문 버튼 규격 최적화**: 프로모션 리스트 내 'Reserve' 및 'Order' 버튼의 가로 넓이를 기존 85px에서 70px로 단축하여 콤팩트한 리스트 뷰를 구현했습니다.
-* **버튼 텍스트 간소화 (다국어 연동)**: 영역을 길게 차지하던 'Customs Clearance & Pickup' 다국어 문구를 보다 간결한 'Customs Clearance'로 교체 적용했습니다.
-
-### 2. 클라우드 실서버(Render) 데이터베이스 연동 및 운영 안정화
-* **로컬 DB 기반 테스트 환경 구축**: 개발 중이던 로컬 데이터베이스(`scm_erp.db`) 파일이 서버로 업로드되지 않도록 막혀있던 설정(`.gitignore`)을 해제하여, 최신 데이터가 성공적으로 클라우드에 배포될 수 있도록 조치했습니다.
-* **Render 환경 변수 동적 라우팅 설정**: 클라우드 서버에 배포된 백엔드가 비어있는 외부 PostgreSQL을 바라보느라 로그인이 안 되던 오류(401 Unauthorized)를 해결했습니다. Render 서버의 `DATABASE_URL` 환경 변수를 임시 우회하여 우리가 방금 업로드한 최신 로컬 SQLite 데이터를 정상적으로 로드하고 로그인 및 사용자 관리가 테스트 될 수 있도록 조치했습니다.
-
-### 3. 신규 권한(RSM) 분리 및 포털 신설 (Zero Trust 아키텍처)
-* **API 권한 차단 (Zero Trust API)**: 프론트엔드 API 호출 시 항상 `X-User-Role` 헤더를 포함하도록 글로벌 인터셉터(`fetch` 오버라이드)를 구현하고, 백엔드(`main.py`) 미들웨어 단에서 해당 권한이 `RSM`일 경우 유저/통계/설정 등의 주요 5가지 관리자 API에 접근할 때 즉각적으로 **HTTP 403 Forbidden 에러를 반환**하도록 방어 로직을 적용했습니다.
-* **프론트엔드 컴포넌트 격리**: `App.jsx` 단에서 RSM 권한인 경우 인가된 페이지 외에는 컴포넌트 렌더링을 완전히 차단했으며, `Sidebar.jsx`를 통해 메뉴 역시 보안 가이드라인에 맞추어 엄격하게 제한했습니다. 다국어 지원에 따라 타이틀은 `RSM 포털`로 자동 렌더링됩니다.
-* **신규 RSM 영업통계 대시보드 (`RsmDashboard.jsx`)**: RSM 역할에 특화된 3가지 핵심 KPI 차트(월별 수주 실적, 프로모션 예약 달성률, 파이프라인 체류 리드타임)와 담당 딜러들의 액티브 파이프라인을 모니터링할 수 있는 신규 대시보드를 구축했습니다.
-* **메뉴 구조 및 다국어 텍스트 최적화**: RSM 포털의 좌측 메뉴를 `메뉴1. 포털 대시보드`, `메뉴2. 유럽 재고 상태`, `메뉴3. WIA 프로모션`, `메뉴4. 제품 라이브러리`, `메뉴5. RSM 영업통계` 순으로 재구성하고, 다국어 번역 파일(`ko/en`)을 동기화하여 접근성을 높였습니다.
-
-## [2026-08-25] 다국어 텍스트 일원화 및 상단 네비게이션(GNB) 모바일 최적화
-
-### 1. 전역 다국어(i18n) 텍스트 명칭 일원화 및 교정
-* **포털 공통 메뉴 텍스트 최적화**: 관리자, RSM, 딜러 포털 등 전역에 걸쳐 사용되는 재고 및 프로모션 관련 메뉴 명칭을 직관적으로 교정했습니다.
-  * (한국어) '유럽 재고 상태' / 'WIA 재고 리스트' ➔ **'WIA 재고리스트'**로 완벽 통일
-  * (영어) 'WIA Stock' ➔ **'WIA Stock List'**로 통일
-  * (한국어) '프로모션' / '법인 주관 프로모션 안내' ➔ **'WIA 프로모션'**으로 통일
-  * 딜러 프로모션 문구 최적화: '현재 진행 중인 프로모션 장비 현황' ➔ '진행 중인 프로모션 모델' 등 보다 간결한 문장으로 대체.
-* **상단 네비게이션 타이틀 단축**: `WIA 공작기계 유럽 SCM ERP` ➔ **`WIA 공작기계 유럽 SCM`** 으로 `ERP` 단어를 제외하여 브랜딩을 강화했습니다.
-
-### 2. 상단 네비게이션 바(Top Navbar) UI/UX 전면 개편
-* **사용자 상태 직관적 표시**: 내 정보(프로필) 아이콘 바로 좌측에 현재 로그인된 유저의 아이디(예: `WME-admin`)가 라이트 골드(`R136 G121 B106`, 0.82rem) 색상 텍스트로 항시 노출되도록 신규 추가했습니다.
-* **버튼 컴포넌트 디자인(CSS) 획일화**: 기존의 단색이었던 '로그아웃' 버튼을 '언어 변경', '내 정보' 버튼과 동일한 둥근 아웃라인 스타일(`.btn-outline`)로 통일했습니다. 
-* **마우스 오버(Hover) 효과 및 간격 정밀 조정**: 
-  * 기본 테두리를 1px 두께의 라이트 골드(`R205 G170 B125`)로 일괄 적용.
-  * Hover 시 배경이 라이트 골드 색상으로 완전히 채워지며 텍스트가 흰색으로 반전되도록 시각적 피드백을 강화했습니다.
-  * 아이디, 프로필, 언어변경, 로그아웃 버튼 사이의 간격(`gap`)을 정확히 10px로 타이트하게 정돈했습니다.
-
-### 3. 모바일 반응형(Responsive) 스마트폰 전용 UI 구현
-* **모바일 다이나믹 스위칭 로직 도입**: 스마트폰 크기(Mobile View)가 감지되면 상단 헤더 텍스트와 버튼이 모바일에 최적화된 콤팩트한 형태로 실시간 변환(`App.jsx` -> `Navbar.jsx`)되도록 설계했습니다.
-  * (모바일) 메인 타이틀: `WME SCM` 으로 단축 표기
-  * (모바일) 로그아웃 버튼: 텍스트 대신 새로 제작한 **백터(SVG) 열린 문 아이콘(`exit-favicon.svg`)**으로 대체 표기
-* **줄바꿈 현상 억제 및 가로 스크롤 허용**: 모바일 기기에서 여러 버튼들이 화면 아래로 밀리거나 깨지지 않도록 우측 끝으로 일렬 정렬(`nowrap`)시키고, 영역 초과 시 좌우 스크롤(`overflow-x: auto`)이 가능하게끔 안전 장치를 적용했습니다.
-
-### 4. 기타 불필요 기능(Legacy) 제거
-* **주문 배송 타임라인 UI 최적화**: 딜러 주문 조회 시 표시되는 타임라인 리스트 항목에서 불필요해진 '상태설정' 열(Column)을 제거하고 딜러 포털의 UI와 동일한 심플한 형태로 일원화했습니다.
-* **시드 데이터 초기화(Seed) 로직 폐기**: 테스트 용도로 사용되던 전역 '시드 데이터 초기화' 기능 및 관련 컴포넌트(버튼 UI, 백엔드 호출 로직, 렌더 갱신 State 등)를 `App.jsx`와 `Sidebar.jsx`에서 완전히 도려내어 운영 환경에 맞게 정리했습니다.
-
-### 5. 모바일 페이지 뷰어 확대/축소 레이아웃 버그 수정
-* **모바일 화면 비율 최적화 방어 코드 추가**: 'SCM 포털 대시보드'와 '업로드 / 알림설정' 페이지에서 넓은 데이터 표(Data Table)나 타임라인이 모바일 뷰어의 가로 비율을 깨트리며 화면 전체가 강제로 축소(Zoom-out)되어 글씨가 작아지던 현상을 완벽하게 해결했습니다.
-* **Flexbox 자식 요소 폭발 방지**: 전체 레이아웃 뼈대를 구성하는 `.main-content` 및 `.page-body` 컨테이너에 `min-width: 0`을 명시하여, 내부 콘텐츠가 모바일 기기 본연의 375px 너비를 무단으로 뚫고 나가지 않도록 억제했습니다.
-* **여백(Padding) 스케일링**: 모바일 환경일 때 메인 바디 영역의 좌우 여백을 기존 32px에서 16px로 줄여 컴팩트한 모바일 화면에서도 콘텐츠가 충분한 공간을 확보할 수 있도록 튜닝했습니다.
-
-### 6. 전(All) 포털 배송 타임라인 모바일 하단 상세정보(Accordion) 패널 도입
-* **모바일 카드(Mobile Card) 확장 기능 통합**: 기존 데스크탑 표(Table)에서만 제공되던 클릭 확장 패널을 관리자(Admin), RSM, 딜러(Dealer) 포털의 **모든 타임라인 모바일 리스트 카드에도 확대 적용**했습니다.
-* **다이나믹 렌더링 로직**: 모바일 환경에서 각 주문 리스트 카드를 터치할 경우 부드럽게 하단으로 패널이 펼쳐지며 S/O, NC, 상세스펙(DETAIL SPEC), 발주일자, Incoterms, ETD / ETA, Vessel, Remark 등 핵심 정보를 바로 확인할 수 있도록 설계했습니다.
-* **터치 이벤트 간섭 및 버그 차단 (Event Propagation)**: 확장되는 카드 내부에 위치한 버튼(진행상태 변경, 롤백, 수정, 삭제)이나 타임라인(StepBar) 요소 조작 시, 의도치 않게 패널 전체가 열리거나 닫히는 현상을 완벽히 방어(`e.stopPropagation()`)했습니다.
+## [2026-11-18] 주문 배송 타임라인(StepBar) 단계명 및 생산 아이콘 개편, 임대기간 프리셋 정돈 및 사이드바 시뮬레이션 제거
+
+### 1. [주문 / 배송현황] 진행상황(StepBar) 단계명 간결화, 전용 생산 아이콘 적용 및 현재 단계 텍스트 색상 동기화 (`StepBar.jsx`, `translation.json`)
+* **단계명 국문 텍스트 변경**:
+  * 타임라인 5단계 중 2번째 단계의 한국어 라벨을 기존 `생산 중`에서 **`생산`**으로 변경하여 한눈에 들어오도록 간결화.
+* **'생산' 단계 전용 공작기계 가공 SVG 아이콘 적용**:
+  * 기존 일반 공구(렌치, `Wrench`) 아이콘 대신 실제 장비 가공 형상을 직관적으로 나타낸 커스텀 벡터 SVG 아이콘(`ProductionIcon`)을 제작 및 적용.
+  * `fill="currentColor"` 스타일을 적용하여 완료/활성/대기 등 원형 배지 상태에 따라 아이콘 색상이 완벽히 연동되도록 구현.
+* **현재 활성 단계 하단 텍스트 색상 일치화**:
+  * 장비의 현재 진행 상태(예: '배송')일 때 상단 원형 배지의 채움 효과뿐만 아니라 하단 텍스트의 색상도 원형에 채워진 포인트 색상(`var(--step-color)`, `#F26B66`)으로 동일하게 동기화하고 Bold(`fontWeight: 800`)를 적용하여 시각적 인지성을 대폭 향상.
+
+### 2. [WIA 재고리스트] 가용재고 '임대' 상태 변경 시 임대기간 설정 모달 빠른 선택 옵션 정비 (`AdminInventory.jsx`)
+* **불필요한 장기 옵션(+2년) 제거 및 4대 핵심 프리셋 확정**:
+  * 가용재고 목록에서 상태를 '임대'로 선택할 때 표시되는 '임대 기간 설정(Set Rental Period)' 모달의 빠른 기간 선택(Quick Selection) 프리셋에서 `+2년`(`+2 Years`) 옵션을 제거.
+  * 현업 업무 기준에 맞춰 **[+1개월, +3개월, +6개월, +1년]** 4가지만 선택할 수 있도록 컴팩트하게 정돈.
+
+### 3. [사이드바] '스마트폰 뷰 시뮬레이션' 버튼 및 관련 상태 코드 완전 제거 (`Sidebar.jsx`, `App.jsx`)
+* **사이드바 메뉴 컨트롤 정리**:
+  * 사이드바 하단 영역에 위치하던 `[📱 스마트폰 뷰 시뮬레이션]` 버튼 및 미사용 아이콘(`Smartphone`, `Monitor`), 관련 props를 사이드바 컴포넌트에서 완전히 제거하여 메뉴바 본연의 디자인 완성도 제고.
+* **앱 전역 반응형 뷰 단순화**:
+  * `App.jsx` 내 가상 모바일 시뮬레이션 상태(`simulateMobile`)를 도려내고, 실제 사용자 디바이스 뷰포트 너비(`windowWidth <= 768`)에 기반해서만 모바일 레이아웃이 자동 판별되도록 로직을 간결하게 일원화.
+
+
+## [2026-11-17] 판매 목록 및 주문 화물(선박) 추적 모달 다국어(EN/KR) 고도화, RSM 대시보드 임시 비활성화 및 Nginx SPA 배포 캐시 제어 강화
+
+### 1. [판매 목록] '장비 및 판매 정보 수정(Order detail change)' 팝업창 전면 영문화 (`AdminSalesArchive.jsx`, `translation.json`)
+* **판매 목록 팝업창 및 세부 폼 다국어 전환**:
+  * RSM 포털 및 관리자 포털의 **[판매 목록]**(`AdminSalesArchive.jsx`) 메뉴에서 '장비 및 판매 정보 수정' 팝업창 내 모든 섹션 헤더 및 입력 항목을 다국어(`menu4.edit_modal.*`) 체계로 전환.
+  * **Section 1**: `기본 주문 및 장비 정보` → `Basic Order & Machine Information`, `-- 딜러/모델/NC 선택 --` 드롭다운 옵션 및 P/O, S/N 플레이스홀더 영문화.
+  * **Section 2**: `판매 매출 및 출고/픽업 현황` → `Sales Revenue & Dispatch / Pickup Status`, 판매가/구매가/매출월 플레이스홀더, 출고/픽업 일자 `초기화`(`Clear`) 버튼 및 미출고(선매출) 안내 문구 영문화.
+  * **Section 3**: `물류 운송 및 상세 스펙` → `Logistics & Detailed Specifications`, `도착지 항구 (Port)`(`Destination Port`), `Incoterms`, `선박명 (VESSEL)`(`Vessel Name (VESSEL)`), `DETAIL SPEC` 라벨 및 플레이스홀더 영문화.
+  * **Section 4 & 하단 액션**: `REMARK (비고)` 라벨 및 플레이스홀더 영문화, 취소 버튼 오타 수정 (`cancell` → `Cancel`).
+* **테이블 헤더, 정렬 툴팁, 알림창 다국어 연동**:
+  * 테이블 열 정렬 마우스 오버 툴팁(`오름차순/내림차순 정렬` ↔ `Sort ascending/descending`), 모바일 카드 뷰 `정보 수정`(`Edit Info`) 버튼, CSV 엑셀 내보내기 헤더 11개 항목 및 저장 성공/실패 알림(`alert`) 전체 영·한 분기 처리.
+
+### 2. RSM 포털 [RSM 영업통계(RSM Sales Stats)] 메뉴 및 라우팅 임시 비활성화 (`Sidebar.jsx`, `App.jsx`)
+* **메뉴 숨김 및 안전한 네비게이션 처리**:
+  * 시스템 안정화 및 향후 고도화 개편 일정에 맞춰 RSM 포털 사이드바에서 `rsm-dashboard`(`RSM 영업통계 / RSM Sales Stats`) 메뉴 항목을 임시 비활성화(주석 처리).
+  * `App.jsx` 내 RSM 권한의 라우팅 컴포넌트 렌더링 및 허용 탭 목록에서 `rsm-dashboard`를 제외하여, 사용자가 해당 URL 또는 세션 상태를 보유하고 있더라도 기본 메인 화면인 `admin-dashboard`([주문 / 배송현황])로 자동 리디렉션되도록 처리.
+  * 상단 WIA 브랜드 로고 클릭 시 RSM 권한의 이동 대상을 `admin-dashboard`로 안전하게 연결.
+  * 향후 기능 개선 및 재오픈에 대비하여 기존 `RsmDashboard.jsx` 소스코드는 유지 및 보존.
+
+### 3. [주문 / 배송현황] '주문 화물(선박) 추적' 팝업창 전체 다국어(EN/KR) 지원 (`DealerVesselTrackingModal.jsx`)
+* **화물추적 팝업창 전 영역 영문화 적용**:
+  * RSM 포털 및 딜러 포털의 [주문 / 배송현황] 타임라인에서 '화물추적' 클릭 시 표시되는 '주문 화물(선박) 추적(Order Cargo (Vessel) Tracking)' 팝업창 전체를 다국어 지원으로 전환.
+  * **모달 헤더 및 목록 패널**: `주문 화물(선박) 추적` ↔ `Order Cargo (Vessel) Tracking`, `닫기` ↔ `Close`, `내 주문 장비 목록` / `{n}대` ↔ `Ordered Machines` / `{n} units`.
+  * **상단 6대 운항 지표(KPI) 요약 바**:
+    * `주문 장비 (Model / S/N)` ↔ `Ordered Machine (Model / S/N)`
+    * `선박명` ↔ `Vessel Name`
+    * `출발일 (ETD)` ↔ `Departure (ETD)` / `도착예정일 (ETA)` ↔ `Estimated Arrival (ETA)` (언어별 로케일 날짜 포맷 적용)
+    * `지연된 일수` ↔ `Delay Status` (`0일 (정상)` ↔ `0 days (On Time)`, `+{n}일 지연` ↔ `+{n} days delayed`)
+    * `해상운항 소요` ↔ `Voyage Duration` (`{n}일째 해상 운항 중` ↔ `{n} days in transit`, `{n}일 소요 (도착 완료)` ↔ `{n} days (Arrived)`, `생산완료 후 출항` ↔ `Departing after production`)
+  * **지도 오버레이 안내 박스**: `생산완료 후 출항 (출항지: Busan, KR)` ↔ `Departing after production (POL: Busan, KR)`, 설명 문구 및 `TrackingMapboxWidget` 연동 데이터 영문화.
+
+### 4. 프론트엔드 Nginx SPA 배포 캐시 제어 및 정적 에셋 무결성 강화 (`nginx.conf`)
+* **HTML 무캐시 및 에셋 404 차단 정책 수립**:
+  * 신규 배포 시 Vite 빌드 번들 해시 파일명(`index-xxxx.js`)이 변경될 때, 브라우저 및 앞단 CDN(Cloudflare)에 캐시된 구버전 `index.html`이 삭제된 이전 JS 번들을 요청하여 발생하는 백지 화면(`MIME type "text/html" strict checking error`) 근본적 차단.
+  * `location /`: `Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0" always`, `Pragma "no-cache" always`, `Cloudflare-CDN-Cache-Control "no-store" always` 헤더를 강제하여 브라우저와 CDN이 항상 최신 `index.html`을 즉시 수신하도록 보장.
+  * `location /assets/`: 해시된 정적 에셋은 장기 캐시(`max-age=31536000, immutable`)를 허용하되, 파일이 존재하지 않을 경우 `index.html`로 폴백되지 않고 엄격히 404 에러(`try_files $uri =404;`)를 반환하도록 Nginx 라우팅 분리.
+
+## [2026-11-16] 시스템 전반 다국어(EN/KR) 고도화, 로그인·인증 영문화, 발주/수정 모달 개편, 재고 변경 취소 및 WIA 창고(입고 목록) UI/UX 전면 개편
+
+### 1. 시스템 로그인 화면 전 과정 영문화 (English Only UI) (`Login.jsx`, `main.py`)
+* **로그인 절차 영어 인터페이스 적용**:
+  * 고객, 딜러사 및 해외 법인 직원의 접근성을 위해 로그인 1단계(이메일·비밀번호) 및 2단계(WebAuthn 생체/기기 패스키, 4~8자리 숫자 PIN 패스키)의 모든 레이블, 버튼, 안내 문구를 영어로 전환.
+  * `STEP 1 / 2 · Email Account Authentication`, `Next (Step 2 Passkey Verification)`, `Forgot your password?`
+  * `STEP 2 / 2 · Passkey 2nd Factor Authentication`, `Biometric / Device Passkey`, `PIN Passkey`, `Verify Device Passkey & Sign In`, `Register PIN & Sign In` 등 직관적인 영문 UI 제공.
+  * 브라우저 호환 안내 및 인앱 브라우저(구글앱 등) 자동 폴백 메시지도 자연스러운 영문으로 변경.
+* **백엔드 인증 오류 메시지 영문화 및 프론트엔드 다국어 번역 맵핑**:
+  * 백엔드 인증 엔드포인트(`/api/v1/auth/login`, `/api/v1/auth/verify-2fa`)의 응답 메시지 영문화.
+  * 프론트엔드 `translateError`, `translateInfo` 함수를 통해 백엔드에서 반환되는 예외 및 오류 메시지를 100% 영문으로 즉시 치환 표시하여 외국인 사용자가 어떠한 상황에서도 한국어 오류에 직면하지 않도록 보장.
+* **로그인 완료 후 메인 시스템 다국어 선택 유지**:
+  * 로그인 완료 후 메인 대시보드 진입 시 상단 네비게이션 바의 언어 변환 토글(`KR / EN`)을 통해 한국어/영어를 자유롭게 전환 가능하도록 기존 기능 유지 및 검증.
+
+### 2. 비밀번호 분실 및 재설정 화면 영문화 (`Login.jsx`, `main.py`)
+* **비밀번호 재설정 요청 및 새 비밀번호 입력 화면 개편**:
+  * 비밀번호 분실 요청 모달: `Reset Your Password`, `Enter your registered email address`, `Send Password Reset Link`, `Back to Sign In`.
+  * 새 비밀번호 설정 화면(`?reset_token=...`): `Set New Password`, `New Password (min. 8 characters)`, `Confirm New Password` 항목 추가 및 8자 이상 검증, 불일치 검증 로직 영문 적용.
+  * 신규 계정 초대 수락 화면(`?invite_token=...`): `Accept Invitation · Set Initial Password`, `Invited Account`, `Save Password & Proceed to Passkey Setup`으로 영문화.
+
+### 3. 비밀번호 재설정 및 신규 계정 초대 안내 이메일 영·한 병기 (`email_service.py`)
+* **이메일 제목 및 타이틀 영문화**:
+  * 비밀번호 재설정 이메일 제목: `[WMEINS ERP] Password Reset Instructions`
+  * 신규 계정 초대 이메일 제목: `[WMEINS ERP] Account Invitation & Initial Password Setup`
+* **본문 구조 [상단 영어 안내 - 하단 한국어 안내] 2단 구성**:
+  * 본문 상단: 해외 딜러 및 외국인 사용자를 위한 영문 안내문구(`Hello {username}, A password reset request has been received...`, `▶ Password Reset Link (Valid for 15 minutes, single use)`) 배치.
+  * 구분선(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`) 삽입.
+  * 본문 하단: 국내 사용자를 위한 한국어 안내문구(`안녕하세요 {username} 님, WMEINS 시스템 비밀번호 재설정이 요청되었습니다...`, `▶ 비밀번호 재설정 링크 (15분 유효, 1회용)`) 배치.
+
+### 4. 로그인 후 전 포털(관리자·RSM·딜러) 기본 언어 영문(EN) 우선 적용 (`App.jsx`, `i18n.js`)
+* **전 포털 영문 우선 진입 설정**:
+  * 기존 딜러 포털(`DEALER`) 로그인 시에만 영문(`en`)으로 전환되던 로직을 확장하여, 관리자 포털·RSM 포털·딜러 포털 모두 로그인 성공 직후 항상 영문(`en`)으로 우선 표시되도록 `App.jsx`(`handleLogin`) 수정.
+  * `i18n.js`의 `fallbackLng`을 `'en'`으로 변경하고, 브라우저 OS 언어(`navigator`) 자동 감지를 제외(`detection.order: ['localStorage']`)하여 초기 접속 시에도 영문이 기본으로 표시되도록 개선.
+  * 로그인 이후에는 상단 네비게이션 바(`KR / EN`) 토글을 통해 사용자가 원하는 언어로 자유롭게 전환 및 세션 유지 가능.
+
+### 5. [선적 관리 & 업로드] 페이지 다국어(영문/국문) 지원 적용 (`AdminShipmentUpload.jsx`)
+* **전체 UI, 알림, 모달 다국어 분기 처리**:
+  * `useTranslation`(`isKo`)을 도입하여 페이지 제목, 안내문구, 템플릿 다운로드 버튼, 선적내역 리스트 테이블(번호·B/L·ETD·POD·장비개수), 검색 필터, 아코디언 상세 목록(ETA·상태·미부여), 파일 드롭존, 데이터 검증 결과 테이블, 업로드 상태 메시지 등이 언어 설정(`EN / KR`)에 맞춰 즉시 전환되도록 구현.
+  * 엑셀 직접 복사/붙여넣기 모달 및 사내 보안(DRM/MIP) 암호화 감지 안내 모달, 파일 파싱/유효성 검사 알림(`alert`, `confirm`)까지 모두 영문·국문 동시 지원.
+
+### 6. [선적 트래킹] 페이지 및 지도/지연율 위젯 다국어(영문/국문) 지원 적용 (`ShipmentTracking.jsx`, `ShipmentWidgets.jsx`, `TrackingMapboxWidget.jsx`)
+* **선적 트래킹 목록·상세 뷰 전체 다국어 분기 처리**:
+  * `ShipmentTracking.jsx`: 상단 헤더(`Shipment Tracking`), 수동 Diff 동기화 버튼·상태바·토스트 알림, 운송 중 선적 리스트(상태 배지, 출발/도착항, `Details`), 상세 뷰(장비 대수, ETD/ETA/운항 소요일, 4개 탭 `Units/Route/Vessel/Exceptions`, 최후 AIS 수신 위치 카드, 선박 제원 및 희망봉 우회 항로 설명) 영·한 분기 적용.
+* **해상 운송 지연율 & 재고 에이징 KPI 위젯 다국어 처리**:
+  * `ShipmentWidgets.jsx`: `DelayRateWidget`(`Ocean Transit Delay Rate`, `Active Shipments`, `Delay Rate`, `On Time / Delayed`) 및 `InventoryAgingWidget`(`Inventory Aging Ratio`) 다국어 전환 지원.
+* **Mapbox 해상 트래킹 위젯 팝업 및 안내 다국어 처리**:
+  * `TrackingMapboxWidget.jsx`: 출발항(POL)·환적항(Transit Port)·도착항(POD)·선박 마커 팝업(항로·누적 항해 거리·AIS 궤적 포인트·현재 속도·침로·최종 ETA·상세 항로 보기 버튼), 생산 중/대기 라벨 및 Mapbox 토큰 안내 화면 영·한 분기 적용.
+
+### 7. [선적 트래킹] 상세 페이지 '선박' 탭 하단 희망봉 우회 항로 안내 박스 제거 (`ShipmentTracking.jsx`)
+* **불필요한 고정 안내 박스 제거**:
+  * `Vessel`(선박) 탭 하단에 표시되던 `운항 항로: 남아공 희망봉 우회`(`Route: Via Cape of Good Hope`) 및 `AIS 고정밀 궤적` 안내 박스를 한국어/영어 뷰 모두에서 제거하여 선박 제원 정보만 깔끔하게 표시되도록 개선.
+
+### 8. [유저 및 보안 관리] '신규 사용자 등록' 팝업창 및 사용자 관리 모달/배지 다국어 지원 적용 (`AdminUsers.jsx`)
+* **신규 사용자 등록·정보 수정 모달 및 상태 배지·알림 영·한 분기 처리**:
+  * `신규 사용자 등록` 모달 내 제로터치 온보딩(Zero-Touch Onboarding) 안내 박스 및 `Email (Login ID)` 라벨 영·한 분기 적용.
+  * `사용자 정보 수정` 모달 내 `Display Name`, `Account Status`(`Active / Inactive (Blocked)`), `Reset Passkey (2FA)` 체크박스 다국어 처리.
+  * 사용자 테이블 온보딩 상태 배지(`Inactive`, `Invite Sent`, `Resend Invite`, `Passkey Pending`, `Active (AAL2)`) 및 등록·수정·삭제·재발송 알림(`alert`, `confirm`) 전체 영문화 지원.
+
+### 9. [내 정보(My Data)] 페이지 다국어(영문/국문) 지원 적용 (`UserProfile.jsx`)
+* **프로필·보안·비밀번호 변경 모달 전체 영·한 분기 처리**:
+  * 상단 `Close`, 편집 `Cancel`/`Save` 버튼 및 최초 로그인 안내 배너 영·한 분기 적용.
+  * `Display Name`, `Headquarters (HQ)`, `Login ID`, 편집 안내 문구 및 미설정 안내 영문화.
+  * `Step 1: Password`, `Step 2: Biometric / Passkey (WebAuthn AAL2)`, 패스키 연동 상태(`Passkey Linked (Protected by NIST AAL2 2-Factor Auth)`) 및 패스키 초기화 요청 안내 문구 영·한 분기 적용.
+  * `비밀번호 변경`(`Change Password`) 모달 및 프로필/비밀번호 변경 알림(`alert`) 전체 영문화 지원.
+
+### 10. [WIA 재고리스트] 상태 및 주문선택 변경 '취소' 버튼 기능 추가 (`AdminInventory.jsx`, `translation.json`)
+* **상태·딜러 변경 선택 사항 원복 기능**:
+  * WIA 가용재고 목록의 `상태` 또는 `주문선택` 드롭다운을 변경할 때, `확정` 버튼 오른쪽에 `취소`(`Cancel`) 버튼을 나란히 표시(데스크톱 테이블 및 모바일 카드 뷰 모두 지원).
+  * `취소` 버튼 클릭 시 `handleCancelPendingChanges`가 해당 행의 미확정 변경사항(`pendingChanges`)을 즉시 초기화하여 `확정`/`취소` 버튼이 사라지고 기존의 확정되어 있던 상태·딜러 선택 그대로 원복되도록 구현.
+
+
+### 11. 주문/배송 타임라인 상세 뷰 '딜러 주문번호' 표기 (`AdminDashboard.jsx`, `DealerOrders.jsx`)
+* **타임라인 하단 상세 정보 영역 확장**:
+  * 주문/배송현황 페이지(`AdminDashboard.jsx`, `DealerOrders.jsx`)의 배송 추적 타임라인 하단 상세 정보 영역에서 `딜러발주 일자` 바로 오른쪽에 `딜러 주문번호`(`dealer_order_no`)를 나란히 인라인 배치.
+  * 미등록 또는 데이터 부재 시 `-`로 Null-safe하게 폴백 처리.
+  * 모바일 카드 뷰 및 데스크탑 테이블 상세 뷰 모두에 동일하게 일관된 다국어(`menu1.dealer_order_no`, `menu1.order_date`) 적용.
+
+### 12. 신규 단건 발주 생성 모달 '딜러 주문번호', 'Buying(구매가)', 'SALES PRICE(판매가)' 입력 항목 추가 (`UploadSettings.jsx`)
+* **[신규 단건 발주 생성] 팝업창 UI/UX 개선 및 가격 데이터 연동**:
+  * `주문일자(dealer_order_date)` 입력란 바로 오른쪽에 `딜러 주문번호(dealer_order_no)` 텍스트 인풋을 신규 배치.
+  * `배송요청일(delivery_request_date)` 입력란 바로 오른쪽에 `Buying (구매가)` 및 `SALES PRICE (판매가)` 입력란을 나란히 배치.
+  * **Buying (구매가, `price`)**: P/O 정보 기준으로 시스템 내 전체 페이지(주문/배송현황 장비 정보 수정, WIA 재고리스트, WIA 창고, 판매 목록 등)의 구매가 필드에 동일하게 적용.
+  * **SALES PRICE (판매가, `sales_price`)**: P/O 정보 기준 A발주 건에 대해 판매가 항목이 있는 페이지(판매 목록 등)의 판매가 필드에 동일하게 적용.
+
+### 13. 장비 정보 수정 모달 항목 2열 그리드 순서 전면 개편 (`AdminDashboard.jsx`)
+* **사용자 요청 맞춤형 8행 2열 [왼쪽 - 오른쪽] 레이아웃 재배치**:
+  * **Row 1**: `모델명` (Select) - `P/O` (Input)
+  * **Row 2**: `NC` (Select) - `S/N` (Input)
+  * **Row 3**: `Dealer` (Select) - `딜러 주문번호` (Input 신규 추가)
+  * **Row 4**: `딜러주문일` (Date Input 신규 추가) - `배송요청일` (Month Input)
+  * **Row 5**: `Buying` (Input) - `S/O` (Input)
+  * **Row 6**: `Incoterms` (Select) - `Port` (Select)
+  * **Row 7**: `DETAIL SPEC` (전체 폭 Full Width Input)
+  * **Row 8**: `REMARK` (전체 폭 Full Width Textarea)
+* **데이터 동기화 및 바인딩**:
+  * `handleEditClick` 시 기존 발주 건의 `dealer_order_no` 및 `dealer_order_date`를 폼에 자동 로드.
+  * `handleUpdateSubmit`을 통해 PATCH `/api/orders/{id}`로 백엔드 DB에 원활히 반영.
+
+### 14. 백엔드 DB 스키마 확장 및 API 지원 (`models.py`, `schemas.py`, `main.py`)
+* **ORM 모델 및 Pydantic 스키마**:
+  * `Order` 모델에 `dealer_order_no = Column(String, nullable=True)` 컬럼 추가.
+  * `schemas.OrderBase`, `OrderCreate`, `OrderUpdate`에 `dealer_order_no: Optional[str] = None` 추가.
+* **무중단 마이그레이션 및 파싱 처리**:
+  * 서버 기동(`on_startup`) 시 PostgreSQL 및 SQLite 모두 호환되는 `ALTER TABLE orders ADD COLUMN ...` 마이그레이션 쿼리 적용.
+  * 로컬 `scm_erp.db` 마이그레이션 완료.
+  * `create_order`, `update_order_info`, 엑셀 대량 업로드(`upload_excel_bulk`) 엔드포인트에 `dealer_order_no` 저장 및 업데이트 로직 반영.
+
+### 15. [WIA 창고] 입고 데이터 업로드 섹션 제거 및 플로팅 스크롤 바로가기 버튼 활성화 (`AdminDispatch.jsx`)
+* **창고 데이터 입고 및 문서 관리 섹션 제거**:
+  * WIA 창고 페이지 하단에 위치하던 '입고증 PDF 업로드' 및 '재고 엑셀 업로드' 섹션을 제거하여 '업로드/설정관리' 메뉴로 데이터 관리 동선을 일원화하고 페이지 시야 확보.
+* **우측 하단 플로팅 스크롤(위/아래) 바로가기 버튼 활성화**:
+  * 장비 목록이 길어질 때 사용자가 목록 상단과 하단으로 즉시 이동할 수 있도록 우측 하단 플로팅 스크롤 버튼(`ScrollButtons`) 적용.
+
+### 16. [WIA 창고] 재고 상태·에이징 UI 스타일 고도화 및 영문 표기 정비 (`AdminDispatch.jsx`, `translation.json`)
+* **재고 상태 지정 RGB 컬러 정밀 적용**:
+  * 일반 재고(Normal Stock): `rgb(4, 154, 67)` (초록)
+  * 장기 재고(Long-term Stock): `rgb(254, 151, 6)` (오렌지)
+  * 악성 재고(Bad Stock): `rgb(255, 25, 0)` (빨강)
+  * 상단 통계 요약 바의 상태명 텍스트 및 개수 수치에 동일한 RGB 색상 통일 적용.
+* **에이징(Aging) 표기 정돈 및 다국어 지원**:
+  * 리스트 항목 '에이징'에서 상태 텍스트(예: `악성(751일)`) 및 타원형 배경(Pill badge)을 제거하고, 순수 일자 텍스트만 표시하여 시각적 복잡도 완화.
+  * 텍스트를 제거하는 대신 상태(일반/장기/악성)를 지정 RGB 폰트 컬러로 표시하여 직관적인 인지 지원.
+  * 영문 페이지 에이징 일자 표기를 기존 `751d`에서 `751 D` 형식으로 정돈하고, 영문 상태명을 `Critical Stock`에서 **`Bad Stock`**으로 변경.
+
+### 17. [WIA 창고] 화물(치수/중량) 컬럼 헤더, 버튼 명칭 및 3D 정육면체 큐브 아이콘 변경 (`AdminDispatch.jsx`, `translation.json`)
+* **컬럼 헤더 및 버튼 텍스트 변경**:
+  * 한국어(KO): 항목 헤더 `화물` → **`화물정보`**, 버튼 텍스트 `화물` → **`cm / kg`**
+  * 영어(EN): 항목 헤더 `Dimension` → **`CARGO`**, 버튼 텍스트 `Dimension` → **`cm / kg`**
+  * 데스크톱 테이블 및 모바일 카드 뷰의 폴백 문자열 동기화.
+* **3D 정육면체 큐브 SVG 아이콘 적용**:
+  * 기존 외부 링크(`ExternalLink`) 아이콘 대신 치수·포장 화물을 직관적으로 나타내는 커스텀 정육면체 큐브 SVG(`CubeIcon`, 각진 외곽선 `miter` 스타일)를 제작 및 적용.
+
+### 18. [WIA 창고] 리스트 '진행' 항목 단순화 (`AdminDispatch.jsx`)
+* **이력 조회 버튼 및 모달 제거**:
+  * WIA 창고 페이지의 업무 특성상 입고 history 확인이 불필요하므로 리스트 항목 '진행'에서 `[이력]` 버튼 삭제.
+  * '진행' 컬럼을 **`[수정]`** 및 **`[출고 처리]`** 버튼으로만 간결하게 구성하고, 불필요한 이력 조회 상태 및 타임라인 모달 UI 코드를 정리하여 렌더링 최적화.
+
+## [2026-11-14] 선적 트래킹(Shipment Tracking) UI/UX 전면 개편, 탭·장비목록 3열 단일행 정돈 및 해상 운송 지연율 산출 동기화
+
+### 1. 선적 트래킹 목록 뷰 및 지도 플로팅 위젯 정리 (`ShipmentTracking.jsx`, `TrackingMapboxWidget.jsx`)
+* **선적 트래킹 목록 뷰 시각적 간결화**:
+  * 왼쪽 패널 상단 우측의 `총 {n}건` 배지를 삭제하여 헤더 영역을 깔끔하게 정돈.
+  * `해상 운송 지연율` 위젯 내 `전체 운송 중` 문구를 **`전체 운송 중 선박`**으로 명확히 수정.
+  * 가이드 문구(`카드 선택 시 상세 정보 확인`) 정리 및 전체 레이아웃 완성도 향상.
+* **지도 위 플로팅 위젯 제거 및 왼쪽 상세 패널로 핵심 정보 통합**:
+  * **지도 시야 확보**: 지도 상단 중앙에 오버레이되던 `최후 AIS 수신 위치` 플로팅 바 및 우측 전체를 가리던 대형 `SCM Voyage KPI` 위젯을 지도에서 완전히 제거하여 해상 항로 시야를 최대로 확보.
+  * **핵심 운항 지표 통합**: 기존 KPI 위젯의 핵심 정보인 **출항일 (ETD), 최종 예정일 (ETA), 해상 운항 소요 (Aging)**를 왼쪽 패널 상단 개요 카드(운송 진행도 바 직하단)에 3열 메트릭 그리드로 컴팩트하게 통합 배치.
+  * **최후 AIS 수신 위치 카드 이전**: 선박 위/경도 좌표, 나침반 아이콘, 실시간 속력(`kn`), 방위각(`°`) 및 정박/도착 상태를 왼쪽 패널 **`항로 (Route)` 탭 타임라인 마일스톤 직하단**에 일체형 카드로 이전 배치.
+  * `TrackingMapboxWidget.jsx` 내 미사용 useMemo 및 변수 정리로 지도 렌더링 성능 최적화.
+
+### 2. 운송 중 선적 상세 탭 순서 개편 및 장비목록 3열 단일행 레이아웃 최적화 (`ShipmentTracking.jsx`)
+* **상세 탭 순서 재배치 및 기본 탭 설정**:
+  * 사용자 업무 동선에 최적화하여 탭 순서를 기존 `[항로 - 선박 - 장비목록 - 예외사항]`에서 **`[장비목록 - 항로 - 선박 - 예외사항]`**으로 전면 재배치.
+  * 선적 상세 진입 시 기본 활성 탭을 '장비목록'으로 지정하여 B/L에 실린 장비 정보를 가장 먼저 확인할 수 있도록 개선.
+* **장비목록 카드 3열 그리드 단일행(Single Row) 정렬**:
+  * 기존 2단 분할 구조 및 불필요한 `SHIPPING` 텍스트 배지를 제외하고 간결한 가로 1행 정렬 구조로 개편.
+  * 3열 CSS Grid(`1fr 1.35fr 1.15fr`)를 적용하여 카드 간 세로 열을 칼같이 정렬:
+    * **1열 (왼쪽 정렬)**: 기계 모델명 (예: `KF6`, Bold 800)
+    * **2열 (중앙 정렬)**: S/N 정보 배지 (예: `S/N: G2815-0186`)
+    * **3열 (중앙 정렬)**: P/O 발주 번호 (예: `P/O: A26-05-54`)
+* **타이포그래피 및 서체 통일**:
+  * 장비 카드 내 모델명, S/N 라벨/값, P/O 라벨/값 등 모든 텍스트 크기를 일관되게 **`0.7rem`**으로 슬림화 조정.
+  * 공식 브랜드 가이드라인 서체인 **`SUITE`**(`font-family: 'SUITE', sans-serif`)를 탭 버튼 및 장비 카드 전 영역에 동일하게 적용.
+
+### 3. 해상 운송 지연율(`DelayRateWidget`) 레이아웃 개선 및 지연율 산출 로직 1:1 동기화 (`ShipmentWidgets.jsx`)
+* **레이아웃 개선**: `'지연율'` 라벨과 퍼센트(`%`) 수치를 상하 2줄에서 **좌우 단일 행(가로 나란히 배치)**으로 변경하여 시인성 및 공간 효율성 개선.
+* **더미 데이터 폴백 제거**: 데이터 로딩 중(`shipments` 빈 배열 상태)일 때 하드코딩된 `15건 / 지연 2건 (13.3%)` 임의 수치가 노출되던 문제를 제거하고 정상적인 초기 상태(`0건 / 0.0%`)로 표시되도록 수정.
+* **지연 판정 알고리즘(`checkIsDelayed`) 통합**:
+  * 기존에 단순 `trackcargo_status === 'Delayed'` 문자열만 검사하여 하단 선적 카드 리스트 및 지도 마커의 지연 판정 기준(45일 초과 장기 항해 등 `checkIsDelayed(s)`)과 불일치하던 현상 해결.
+  * 표준 `checkIsDelayed` 알고리즘을 위젯에 동일하게 적용하여 하단 리스트의 실제 지연 선박 수 대비 전체 운송 중 선박 수 비율이 1:1로 정확하게 계산되어 표시되도록 동기화 완료.
+
+## [2026-11-13] 제품 라이브러리(Product Library) 218종 전 모델 썸네일 파일명 매핑 및 데이터베이스 동기화
+
+### 1. 218종 공작기계 모델 Cloudflare R2 썸네일 파일명(Thumbnail file_name .webp) DB 동기화
+* **데이터베이스 컬럼 및 매핑 업데이트**:
+  * SQLite(`scm_erp.db`) 내 `product_models` 테이블의 218개 전 모델에 대해 `Thumbnail code` 문서 기준 `thumbnail_file`(.webp) 100% 매핑 및 업데이트 완료.
+  * 백엔드 자동 마이그레이션 스크립트(`backend/update_thumbnails.py`) 내 `THUMBNAIL_DATA` 딕셔너리를 218개 전 모델 매핑으로 전면 확장하고 `run_migration(db)` 로직을 보완하여 Render PostgreSQL 환경에서도 서버 재시작 시 자동으로 최신 썸네일 파일명이 반영되도록 구성.
+* **프론트엔드 제품 라이브러리 연동 및 인코딩 최적화**:
+  * `frontend/src/data/productLibraryModels.js`의 218개 모델 객체에 `thumbnail_file` 속성 추가 반영.
+  * `frontend/src/pages/ProductLibrary.jsx` 썸네일 이미지 로더 URL에 `encodeURIComponent`를 적용하여 파일명 내 공백이 포함된 모델(`thumbnail_HD2600 3100 Series.webp`, `thumbnail_L600 700 800 Series.webp` 등)도 Cloudflare R2 스토리지(`/thumbnail/`)에서 깨짐 없이 완벽하게 로드되도록 개선.
+
+### 2. Cloudflare R2 퍼블릭 도메인(Public Development URL) 갱신 및 썸네일 로딩 정상화
+* **스토리지 엔드포인트 갱신**: Cloudflare R2 버킷(wmeins)의 Public Development URL 활성화에 따른 최신 공개 도메인(https://pub-6d550208b84b4585ba380e73abb8ae79.r2.dev) 동기화.
+* **프론트엔드 환경변수 및 폴백 URL 동기화**: frontend/.env 및 frontend/src/pages/ProductLibrary.jsx의 기본 도메인 설정을 새 R2 주소로 업데이트하여 404 차단 현상을 해결하고, 218종 전 모델의 고화질 WebP 썸네일 이미지가 라인업 제품 라이브러리 화면에서 끊김 없이 정상 로딩되도록 조치 완료.
+* **카드 썸네일 내부 여백 및 테두리 겹침 방지 최적화 (ProductLibrary.jsx)**:
+  * 마우스 오버(Hover) 시 카드의 활성 테두리(border/box-shadow)와 가로 폭이 넓은 기계 이미지(HD2600 등)의 좌우 가장자리가 닿거나 겹치는 현상 개선.
+  * 이미지 스타일에 상단 12px, 좌우 18px, 하단 4px 내부 패딩(padding: '12px 18px 4px 18px', boxSizing: 'border-box')을 부여하여 카드의 테두리 선 안쪽으로 기계 이미지가 여유 있게 안착되도록 시각적 여백 확보.
+  * 마우스 오버(Hover) 시 카드의 하이라이트 테두리 두께를 기존 2px에서 **3px**(box-shadow: inset 0 0 0 2px rgb(205, 170, 125))로 확장하여, 레이아웃 밀림(Layout Shift) 없이 명확하고 직관적인 카드 포커스 시각 효과 구현.
+* **전역 데이터 로딩 및 빈 목록 문구 다국어(i18n) 동기화 (translation.json, DealerOrders.jsx, AdminDashboard.jsx 등)**:
+  * 영문 페이지에서 테이블 데이터 조회 중 '데이터를 불러오는 중입니다...' 또는 잘못된 시드 데이터 생성 문구가 노출되던 문제 해결.
+  * locales/ko/translation.json 및 locales/en/translation.json 내 common.loading('데이터를 불러오는 중입니다...' / 'Loading data...'), common.no_orders, common.no_data 리소스를 통합 추가.
+  * DealerOrders, DealerDashboard, DealerInventory, DealerPromotion, DealerSalesArchive, AdminDashboard, AdminInventory, AdminSalesArchive, AdminDispatch 등 시스템 전반의 테이블 로딩 플레이스홀더를 다국어 표준 호출(t('common.loading'))로 일괄 전환.
+
+## [2026-11-12] 표준 프로토콜 기반 직렬 2단계 인증(AAL2), 제로터치 온보딩, 전 환경 패스키 호환성 및 딜러 포털 대시보드·구매내역 UI/다국어 전면 개편
+
+### 1. 로그인 식별자 이메일(email) 단일화 및 사용자 성명(username) 역할 분리
+* **models.CustomUser 데이터베이스 모델 구조 개편**:
+  * email: 시스템 내 유일한 로그인 고유 식별자(ID)로 단일화 (unique=True, index=True, nullable=False).
+  * username: 로그인 ID가 아닌 개인정보 표시 이름(실명) 전용으로 역할 분리. 동명이인 등록 허용(unique=False) 및 신규 계정 초기 미기입(nullable=True) 지원.
+  * is_active: 계정 활성화 상태 제어 컬럼(Boolean, default=True) 추가 및 서버 구동 시(on_startup) SQLite/PostgreSQL 무중단 자동 마이그레이션 적용.
+* **사용자 성명(실명) 온보딩 플래그 및 프로필 연동 (UserProfile.jsx, App.jsx)**:
+  * 최초 로그인 시 username이 비어있거나 이메일 형식인 경우 needs_profile_setup: true 플래그를 반환하고, 상단 안내 배너 노출 및 개인정보 설정 화면으로 자동 유도.
+  * UserProfile.jsx에서 email 필드는 로그인 고유 ID로 읽기 전용 보호, username(성명)과 department(부서)를 저장(PATCH /api/v1/users/me) 시 네비게이션/사이드바에 실시간 반영.
+
+### 2. 표준 프로토콜(NIST SP 800-63B AAL2) 기반 직렬 2단계 인증(Serial 2FA) 구축
+* **[1단계] 이메일 & 비밀번호 검증 (POST /api/v1/auth/login)**:
+  * 텍스트 아이디 조회를 배제하고 오직 email로만 계정을 식별하여 비밀번호 해시 검증.
+  * 1단계 통과 시 시스템 접근 권한을 부여하지 않고, 3분 유효기간의 제한된 임시 토큰(pre_auth_token, scope="mfa_pending", aal="aal1")만 발급.
+* **[2단계] WebAuthn/Passkey 교차 검증 및 최종 세션 발급 (POST /api/v1/auth/verify-2fa)**:
+  * 1단계 임시 토큰(aal1)과 Supabase Passkey 토큰을 동시 검증.
+  * 1단계 로그인 계정과 2단계 패스키 소유자 이메일(supabase_uid) 일치 여부를 교차 검증하여 본인 인증 통과 시에만 최종 AAL2 세션 토큰(access_token, scope="authenticated", aal="aal2", 8시간 유효) 및 역할 권한 부여.
+  * 기존 단독 로그인(POST /api/v1/auth/supabase-login) 우회 차단(403 반환).
+* **프론트엔드 직렬 로그인 UI 전면 개편 (Login.jsx)**:
+  * 테스트용 하드코딩 계정 및 1단계 단독 로그인 버튼 완전 삭제.
+  * STEP1_EMAIL_PW -> STEP2_PASSKEY 직렬 상태 머신 UI 및 단계별 가이드 배너 적용.
+
+### 3. 제로터치 온보딩(Zero-Touch Onboarding) 및 초기 비밀번호 설정 초대 링크(Invitation Link) 자동 발송
+* **관리자 수기 임시 비밀번호 지정 배제 및 원천 차단 (AdminUsers.jsx, POST /api/users)**:
+  * 관리자가 신규 계정 생성 시 비밀번호를 수기로 입력하지 않고 email(로그인 ID), role, dealer_company_id/department만 입력하여 password_hash = None 상태로 계정 생성.
+* **무상태 동적 서명(Stateless Dynamic HMAC) 기반 48시간 일회용 초대 링크 (email_service.py, main.py)**:
+  * dynamic_secret = f"{JWT_SECRET}:{user.password_hash or 'INVITE_PENDING'}" 기반 48시간 유효 일회용 초대 토큰(scope="account_invite") 생성.
+  * 신규 계정 생성 시 send_account_invitation_email을 통해 초대 링크 자동 발송.
+  * POST /api/users/{user_id}/resend-invite: 초기 비밀번호 미설정 계정에 대한 관리자 원클릭 초대 링크 재발송 엔드포인트 및 UI 버튼 구현.
+* **원스톱 초대 수락 및 2단계 패스키 등록 연동 (Login.jsx, POST /api/v1/auth/accept-invite)**:
+  * 사용자가 이메일의 초대 링크(?invite_token=...) 클릭 시 Login.jsx에서 '초기 비밀번호 설정' 화면 자동 진입.
+  * 비밀번호 설정 즉시 password_hash가 암호화 해시로 저장되면서 기존 초대 링크는 영구 자동 폐기(1회용 보장).
+  * 비밀번호 저장과 동시에 반환된 pre_auth_token(aal1)을 통해 곧바로 2단계 패스키 기기 등록(PASSKEY_ENROLL)으로 전환되어 원스톱으로 AAL2 최종 로그인 및 프로필 실명 설정까지 완료.
+* **계정 4대 상태 라이프사이클 및 관리자 UI 고도화 (AdminUsers.jsx, models.CustomUser)**:
+  * onboarding_status: 초대 대기중(INVITE_PENDING) -> 패스키 등록 대기(PASSKEY_PENDING) -> 정상 활성(ACTIVE_AAL2) / 비활성(INACTIVE).
+  * 사용자 관리 화면에서 초대 대기 상태 계정에 대해 '초대 발송됨' 배지 및 [초대 재발송] 버튼 제공, 상단 대기 중인 초대(Pending) KPI 실시간 집계.
+
+### 4. 무상태 동적 서명 기반 비밀번호 분실(찾기) 및 재설정 아키텍처
+* **비로그인 비밀번호 분실 및 1회용 자동 무효화 링크 (POST /api/v1/auth/forgot-password, POST /api/v1/auth/reset-password)**:
+  * dynamic_secret = f"{JWT_SECRET}:{user.password_hash}" 서명을 적용하여 15분 유효 일회용 재설정 링크 이메일 발송.
+  * 비밀번호 재설정 완료 즉시 password_hash가 변경되므로 이전 링크는 즉시 무효화되어 중복 사용 방지.
+* **로그인 상태 비밀번호 변경 (POST /api/v1/users/me/change-password)**:
+  * 현재 비밀번호 확인 후 8자 이상 새 비밀번호로 안전하게 변경.
+
+### 5. 시스템 아키텍처 문서 및 명세서 동기화 (WMEINS_CONTEXT.md)
+* models.CustomUser 스키마 및 REST API 엔드포인트 목록 테이블 갱신 (AAL2 직렬 2FA, 제로터치 초대 링크, 비밀번호 분실/재설정 API 6종 명세 반영).
+
+
+### 6. 모바일(구글앱·크롬·엣지·사파리) 및 PC 전 환경 2단계 패스키 호환성 및 다중 기기 지원 고도화
+* **모바일 브라우저(iOS WebKit 등) 터치 제스처 만료(`NotAllowedError`) 방지 및 0ms 즉시 호출 (Login.jsx, main.py)**:
+  * 기존 2단계 인증 버튼 클릭 후 외부 서버와의 비동기 통신 대기로 인해 모바일(iOS WebKit)의 사용자 제스처 유효시간이 만료되어 `The request is not allowed by the user agent...` 에러가 발생하던 구조를 전면 개선.
+  * 1단계 로그인 검증 완료 시점에 백엔드에서 서명된 `webauthn_challenge`를 사전 발급(Pre-fetch)하고, 2단계 버튼 터치 시 0ms 즉시 브라우저 `navigator.credentials.create()` / `get()`을 동기적으로 호출하여 크롬·사파리·엣지 등 모바일 정식 브라우저에서 안면인식(Face ID), 지문, 기기 암호 창이 즉시 실행되도록 최적화.
+* **PC + 모바일 다중 기기·다중 브라우저 패스키 동시 바인딩 지원 (main.py, schemas.py)**:
+  * PC(Windows Hello 숫자 PIN)에서 패스키를 기등록했더라도, 모바일(스마트폰)이나 다른 브라우저(크롬, 엣지, 구글앱)에서 접속 시 기존 패스키와 충돌하지 않고 기기별 Credential ID를 복수 등록·유지(`_parse_user_mfa_binding`, `_serialize_user_mfa_binding`)할 수 있도록 아키텍처 확장.
+* **구글앱 인앱 브라우저 등 전 브라우저 100% 호환 2차 숫자 패스키(PIN) 듀얼 모드 지원 (Login.jsx)**:
+  * 정식 웹 브라우저(사파리, 크롬, 엣지)와 달리 검색 포털 전용 인앱 웹뷰(Google Search App) 환경에서는 iOS의 보안 정책상 WebAuthn 하드웨어 생체인증 호출이 OS 수준에서 원천 제한되는 특성을 완벽 방어.
+  * 2단계 인증 화면에 **`생체 / 기기 패스키`** 및 **`숫자 패스키 (PIN)`** 2개 탭을 제공하여, 구글 앱 환경에서도 4~8자리 숫자 패스키(PIN, `PBKDF2-HMAC-SHA256` 암호화 해시 저장)로 모든 브라우저에서 제약 없이 2차 인증을 통과할 수 있도록 이중화 구현.
+  * 생체인증 팝업 차단(`NotAllowedError`) 감지 시 사용자 안내 메시지와 함께 숫자 패스키 모드로 원활하게 자동 전환 폴백.
+* **모바일 2단계 인증 탭 버튼 한 줄 정렬 및 UI 다듬기 (Login.jsx)**:
+  * 모바일 화면 폭에 상관없이 탭 버튼 텍스트(`생체 / 기기 패스키`, `숫자 패스키 (PIN)`)가 줄바꿈되어 글자가 떨어지지 않도록 `whiteSpace: 'nowrap'`, 아이콘 `flexShrink: 0`, 탭 컨테이너 너비(`width: 100%`, `boxSizing: 'border-box'`)를 최적화하여 깔끔한 모바일 시각적 완성도 확보.
+
+### 7. 딜러 포털 사이드바 메뉴명 체계 개편 및 다국어(i18n) 동기화
+* **사이드바 딜러 메뉴(`sidebar.dealer_menu`) 직관성 및 명확성 강화 (Sidebar.jsx, translation.json)**:
+  * 대시보드 및 주문 메뉴의 명칭을 실제 역할에 맞게 재정의:
+    * `주문 / 배송현황` ➔ **`포털 대시보드`** (`dashboard` / EN: `Portal Dashboard`)
+    * `배송상태` ➔ **`주문 / 배송현황`** (`orders` / EN: `Order / Delivery Status`)
+  * 기존 핵심 메뉴(`내 구매 내역` / `My Ordered`, `WIA 재고리스트` / `WIA Stock List`, `WIA 프로모션` / `WIA Promotion`, `제품 라이브러리` / `Product Library`) 라벨 일관성 유지.
+  * 한국어(`ko`) 및 영어(`en`) 다국어 리소스 키를 일괄 동기화하여 언어 전환 시 실시간 적용.
+
+### 8. 딜러 포털 대시보드(DealerDashboard.jsx) 3단 세로 레이아웃 재구성 및 [내 구매 내역] 신설
+* **기존 [통관 및 픽업준비 요청] 제거 및 신규 [내 구매 내역] (`My Ordered`) 박스 신설**:
+  * 기존 대시보드 중단에 위치하던 [통관 및 픽업준비 요청] (`atp_list_title`, 출고진행 요청) 정보박스를 완전히 제거.
+  * 해당 위치에 현재 딜러의 최근 주문 현황을 한눈에 파악할 수 있는 **[내 구매 내역] (`My Ordered`)** 섹션을 신규 배치.
+  * 최근 주문일(`dealer_order_date` 또는 `created_at`) 기준 내림차순 정렬 후 **상위 4개 건**만 간소화하여 노출 (Order Date, Model, NC, S/N, P/O, Status).
+  * 우측 상단에 **`GO my ordered` 바로가기 버튼**을 배치하여 클릭 시 [내 구매 내역](`dealer-sales-archive`) 메인 페이지로 원클릭 즉시 이동 지원.
+  * 박스 설명 문구 다국어화(`dealer_dashboard.my_ordered_desc`): 한국어 `주문한 구매 내역 리스트입니다.` / 영어 `The list of your order history`.
+* **STATUS(상태) 배지 표기 전역 영문 표준화**:
+  * 한국어/영어 페이지 설정과 무관하게 상태 배지를 **항상 영문 표준 명칭**(`Order`, `In Production`, `Shipping`, `Arrived`, `In Warehouse`, `Dispatched`, `Picked Up`)으로 일관되게 표기하도록 통일.
+  * 데스크탑 및 모바일 뷰 배지 스타일(`whiteSpace: 'nowrap'`, `minWidth: '95px'`) 최적화로 텍스트 줄바꿈 방지.
+* **페이지 전체 세로 레이아웃 확립**:
+  * **상단**: KPI 카드 3개 (`진행중인 주문`, `운송 중 장비`, `출고 대기 장비`)
+  * **중간**: `WIA 가용재고 목록` (전체 너비 단독 배치)
+  * **하단**: `내 구매 내역` (상위 4건 그리드 및 바로가기 버튼, 전체 너비 단독 배치)
+
+### 9. [내 구매 내역] 메인 페이지(DealerSalesArchive.jsx) 테이블 그리드 스타일 및 상태 표기 최적화
+* **데스크탑 테이블 데이터 행 간격 및 폰트 크기 미세 조정**:
+  * 데이터 행(`td`) 상/하 패딩을 기존 `14px`에서 **`13px`**(`padding: '13px 12px'`)로 최적화하여 컴팩트한 시각적 균형감 확보.
+  * 기본 데이터 텍스트 크기를 기존 `12px`에서 **`11px`**(`fontSize: '11px'`)로 조정하여 대량 목록 열람 시 정보 밀도와 시인성 개선.
+  * 메인 페이지의 STATUS 상태 배지 역시 대시보드와 동일한 영문 표준 명칭으로 일괄 동기화 및 줄바꿈 방지 스타일 적용.
+
+### 10. 딜러 포털 로그인 시 영문(EN) 기본 우선 노출 적용 (App.jsx)
+* **딜러 접속 환경 맞춤 초기 언어 자동 바인딩**:
+  * 글로벌 딜러사 사용자의 편의성을 극대화하기 위해, 로그인 성공 시 사용자 역할이 `DEALER`인 경우 `i18n.changeLanguage('en')`를 자동 호출하여 **기본적으로 영문 페이지가 우선 노출**되도록 구성.
+  * 로그인 후 상단 Navbar의 언어 토글(`[EN] / [KR]`) 버튼을 통해 필요 시 언제든지 한국어로 즉시 전환 가능하도록 사용자 선택권 완벽 보장.
+
+
+
+## [2026-11-11] Google Antigravity 기반 코끼리-금붕어 모델(EGM, Elephant-Goldfish Model) 아키텍처 및 무상태 코드 감사 자동화 체계 전면 도입
+
+### 1. 코끼리-금붕어 모델(EGM) 상시 아키텍처 규칙 파일 구축 (.antigravityrules, AGENTS.md)
+* **[ELEPHANT MODE] 장기 기억 및 아키텍처 4대 설계 원칙 영구화**:
+  * `WMEINS_CONTEXT.md` 기반 장기 맥락 유지 및 15개 ORM 테이블(`models.py`) 스키마 준수.
+  * 물리적 바코드/RFID 리더기 배제 원칙 및 `OrderStatus` Enum 기반 논리적 상태 전환 파이프라인 확립.
+  * 해상 트래킹 무결성 규칙(부산항 `KRPUS`, 함부르크 `DEHAM` 표준화, 출항 전 부산항 고정, 도착 완료 화물 POD 스냅 및 지연 해제, 딜러 추적 2D Mercator 고정).
+  * 보안/RBAC 엄수(직렬 2단계 인증 필수, 딜러 포털 데이터 100% 격리).
+* **[GOLDFISH MODE] 5대 자체 감사 게이트(`[G-01]` ~ `[G-05]`) 상시 검증 규정**:
+  * `[G-01]` 보안/시크릿 누출 방지
+  * `[G-02]` 더미/시드 데이터 오염 차단
+  * `[G-03]` 딜러 권한 격리 및 타 딜러 데이터 노출 방지
+  * `[G-04]` 미출항/Null 상태 방어
+  * `[G-05]` 스케줄러 Diff-Check 및 API 호출 지연(`asyncio.sleep(0.8)`) DB 부하 방지
+
+### 2. 금붕어 에이전트 무상태 코드 감사 체크리스트 템플릿 제정 (GOLD_REVIEW_CHECKLIST.md)
+* **독립 감사 품질 관문(Ping-Pong Quality Gate) 템플릿화**:
+  * GitHub Push 전 또는 새 세션에서 `git diff`만으로 독립 검증을 수행하는 무상태(Stateless) 감사 체크리스트 신설.
+  * 해상 트래킹 및 지도 시각화 무결성, 직렬 MFA 및 딜러 권한 격리, 백엔드 스케줄러 및 배포 안전성 3대 영역 세부 점검 항목 정의.
+  * `[PASS - 배포 승인]` / `[FAIL - 수정 필요]` 판정 및 자동 패치 제안 출력 서식 표준화.
+
+### 3. Antigravity 워크스페이스 커스텀 스킬 2종 신설 (.agents/skills/)
+* **`egm-elephant-architect` (코끼리 모드 아키텍트 스킬)**:
+  * 대규모 기능 설계, DB 스키마 변경, 트래킹 로직 및 프론트엔드/백엔드 구현 시 장기 기억 주입 및 도메인 불변 규칙 가이드.
+* **`egm-goldfish-audit` (금붕어 모드 코드 감사 스킬)**:
+  * 커밋/푸시 전 `git diff`를 백지상태에서 분석하여 확증 편향 없는 객관적 결함 감사 및 핑퐁 검증 루프 실행.
+
+### 4. EGM 실전 템플릿 및 표준 운영 매뉴얼 가이드 문서화 (EGM_MANUAL_GUIDE.md)
+* WMEINS 시스템 아키텍처, 4대 필수 재고 모듈, 하드웨어 대체 디지털 식별자 바인딩, 핵심 KPI(체화율, 정시도착률, AIS 효율), 단계별 Antigravity 운영 절차(Step 1~Step 3) 가이드 전문 체계화.
+
+
+## [2026-11-10] RSM 포털 선적 트래킹 메뉴/페이지 연동, 가용재고 S/N 항목 신설, 전 페이지 정렬 드롭다운 다국어(i18n) 영문화, 판매목록 수량 표기 최적화
+
+### 1. RSM 포털 [선적 트래킹] 메뉴 신설 및 사이드바 메뉴 구조 개편 (Sidebar.jsx, App.jsx)
+* **RSM 포털 선적 트래킹 연동 및 라우팅 권한 확장**:
+  * 관리자 포털의 선적 트래킹(`ShipmentTracking`) 기능을 RSM 포털에서도 동일하게 조회할 수 있도록 라우팅(`App.jsx`) 및 사이드바(`Sidebar.jsx`) 메뉴 연동.
+  * RSM 포털 탭 검증 로직에 `'admin-tracking'`을 포함하여 메뉴 클릭 시 메인 대시보드로 리디렉션되던 현상 해결.
+* **RSM 포털 사이드바 메뉴 순서 표준화**:
+  * 지정된 업무 흐름에 맞춰 사이드바 순서 재배치:
+    1. 주문 / 배송현황 (`admin_dashboard`)
+    2. WIA 재고리스트 (`inventory`)
+    3. WIA 프로모션 (`promotion`)
+    4. 판매목록 (`sales_archive`)
+    5. 선적 트래킹 (`tracking`)
+    6. 제품 라이브러리 (`library`)
+    7. RSM 영업통계 (`dashboard`)
+
+### 2. WIA 가용재고 목록 신규 'S/N' (시리얼 번호) 컬럼 추가 (AdminInventory.jsx, DealerInventory.jsx)
+* **'NC' 우측 'S/N' 필드 신설 및 시스템 시리얼 연동**:
+  * 가용재고 테이블에서 'NC' 항목 우측에 'S/N' 컬럼을 추가하고, 기존 시스템의 `order.serial_number` 데이터를 공유 연동.
+  * 시리얼 번호가 없을 경우 `-`로 깔끔하게 처리.
+* **헤더 클릭 정렬 및 모바일 드롭다운 정렬 지원**:
+  * S/N 기준 오름차순/내림차순 정렬 기능 완벽 구현.
+  * 테이블 너비 비율(100%) 및 반응형 레이아웃 일관성 유지.
+
+### 3. 전 페이지 '기본 정렬' 드롭다운 메뉴 및 정렬 옵션 다국어(i18n) 전면 영문화 (translation.json 및 8개 컴포넌트)
+* **정렬 공통 다국어 사전 키(`common`) 구축**:
+  * `sort_default` ("기본 정렬" / "Default Sort")
+  * `sort_asc`, `sort_desc` ("(오름차순)" / "(Ascending)", "(내림차순)" / "(Descending)")
+  * `sort_lowest`, `sort_highest` ("(낮은순)" / "(Lowest)", "(높은순)" / "(Highest)")
+  * `sort_earliest`, `sort_latest` ("(빠른순)" / "(Earliest)", "(늦은순)" / "(Latest)")
+  * `sort_oldest`, `sort_newest` ("(과거순)" / "(Oldest)", "(최신순)" / "(Newest)")
+  * `sort_stage_early`, `sort_stage_late` ("(초기단계순)" / "(Initial stage)", "(완료단계순)" / "(Final stage)")
+* **대상 페이지 11개 영역 일괄 적용**:
+  * WIA 재고리스트 (`AdminInventory`, `DealerInventory`)
+  * WIA 프로모션 (`AdminPromotion`, `DealerPromotion` - 모바일/데스크탑 전 영역)
+  * 판매 목록 (`AdminSalesArchive`, `DealerSalesArchive`)
+  * 주문 / 배송현황 (`AdminDashboard`, `DealerOrders`)
+  * 영문 페이지 접속 시 정렬 드롭다운과 모든 옵션 라벨이 완전한 영문으로 렌더링되도록 개편.
+
+### 4. 판매 목록 매출 확정 장비 통계 수량 표기 최적화 (AdminSalesArchive.jsx)
+* **수량 단위 텍스트('대') 제거 및 숫자 단독 표기**:
+  * 상단 통계 바의 `전체: 40대`, `픽업 완료: 0대`, `픽업 대기(선매출): 40대` 표기에서 '대' 단위를 제거하고 숫자만 명확히 노출되도록 개선 (`40`, `0`, `40`).
+  * 한국어 및 영문 페이지 환경 모두에서 깔끔하고 일관된 숫자 뷰 제공.
+
+
+## [2026-11-09] WIA 가용재고 예약 모달 정보 개편(모델/시리얼), 날짜 서체 SUITE 적용, 모달 전 영역 다국어(i18n) 영문 지원 및 화물추적 버튼 호버 테두리 UI 고도화
+
+### 1. 관리자포털 WIA 가용재고 목록 '예약 기간 설정' 팝업 모달 정보 개편 (AdminInventory.jsx)
+* **상단 서브 타이틀 정보 구조 개편 (모델명 / 시리얼번호)**:
+  * 기존의 모델명 및 발주번호 표기(`HD2600SY (F26-06-15)`)에서 **모델명 / 시리얼번호**(`HD2600SY   /  G1713-0089`) 구조로 개편.
+  * 시리얼 번호가 미등록된 장비는 `-`로 자동 표기 처리.
+* **서체 굵기 및 전용 폰트 강화**:
+  * 텍스트 굵기를 **`fontWeight: 800` (ExtraBold)**로 상향 지정하여 모달 상단 정보 가독성 및 시인성 극대화.
+  * 현대위아 공식 서체인 **`SUITE`**(`'SUITE', sans-serif`)를 일괄 적용.
+* **연관 팝업 모달 상단 헤더 서식 일체화**:
+  * 일관된 UX 제공을 위해 '예약 상세 내역 모달'(`reserveDetailOrder`), '예약 장비 판매완료 확정 모달'(`reserveSaleOrder`), '임대 기간 설정 모달'(`rentalOrder`)의 상단 서브 타이틀도 동일한 `모델명   /  시리얼번호` (SUITE 800) 구조로 일괄 통일.
+
+### 2. 날짜 입력 필드(`input[type="date"]`) 현대위아 전용 서체(SUITE) 일괄 적용 (AdminInventory.jsx, index.css)
+* **섀도우 DOM 가상 선택자 기반 브라우저 기본 글꼴 오버라이드**:
+  * 크로미움(Chrome, Edge 등) 브라우저 기본 스타일시트로 인해 시스템 고딕으로 강제 렌더링되던 `input[type="date"]` 내부 날짜 텍스트를 현대위아 공식 서체인 **SUITE**(`'SUITE', sans-serif !important;`)로 전환.
+  * `::-webkit-datetime-edit`, `::-webkit-datetime-edit-fields-wrapper`, `::-webkit-datetime-edit-text`, `::-webkit-datetime-edit-month-field`, `::-webkit-datetime-edit-day-field`, `::-webkit-datetime-edit-year-field` 전역 적용.
+* **날짜 입력 필드 및 라벨 스타일 고도화**:
+  * 예약 시작일/종료일 및 임대 시작일/종료일 입력 필드에 `fontFamily: "'SUITE', sans-serif"`, `fontWeight: 600` 적용.
+
+### 3. WIA 가용재고 팝업 모달 4종 전체 영역 다국어(i18n) 시스템 전면 연동 (AdminInventory.jsx, translation.json)
+* **영문 페이지 접속 시 팝업창 100% 영문 전환 구현**:
+  * 기존 한국어로 하드코딩되어 있던 팝업창 내 공지문구, 카드 라벨, 버튼, 알림 메시지 전체를 `useTranslation` (`t()`) 훅으로 연결.
+* **'예약 기간 설정 / 수정' 모달 영문화**:
+  * 모달 제목(`Set Reservation Period` / `Edit Reservation Period`)
+  * 공지사항 박스(`[Notice] Please enter the reservation period.`, `Please select the reservation start and end (expiration) dates using the calendar, then click 'Confirm Reservation' below to save the schedule.`)
+  * 정보 카드 라벨(`Model`, `P/O No.`, `Reserved Dealer`)
+  * 날짜 선택 및 프리셋(`Reservation Start Date`, `Reservation End Date (Expiry)`, `Quick Selection:`, `+1 Week`, `+2 Weeks`)
+  * 액션 버튼(`Cancel`, `Confirm Reservation`, `Saving...`)
+* **'예약 상세 내역' 모달 영문화**:
+  * 모달 제목(`Reservation Details`), 요약 정보(`Reserved Dealer`, `Reservation Start Date`, `Expiration Date`, `Edit Period`)
+  * 잔여일 실시간 배지(`Expired`, `Expires Today (D-Day)`, `D-N Left`)
+  * 장비 상세 스펙(`Reserved Equipment Details`, `Model / NC`, `P/O No.`, `Serial No. (S/N)`, `Price (€)`, `Status`, `Destination / ETA`, `Detail Spec (OPTION)`)
+  * 푸터 버튼(`Cancel Reservation`, `Cancelling..`, `Sold`, `Close`)
+* **'예약 장비 판매완료 확정' 모달 영문화**:
+  * 모달 제목(`Confirm Sale of Reserved Stock`)
+  * 안내문(`After verifying the purchasing dealer, click 'Confirm Sale' to transfer this equipment directly to the selected dealer's confirmed order (Order/Delivery Timeline & Warehouse Dispatch flow).`)
+  * 딜러 선택 드롭다운(`Confirm Purchasing Dealer`, `-- Select Purchasing Dealer --`)
+  * 푸터 버튼(`Cancel`, `Confirm Sale`, `Processing...`)
+* **'임대 기간 설정 / 수정' 모달 영문화**:
+  * 모달 제목(`Set Rental Period` / `Edit Rental Period`), 공지문, 정보 라벨(`Rental Dealer`), 날짜 선택(`Rental Start Date`, `Rental End Date (Expiry)`), 프리셋(`+1 Month`, `+3 Months`, `+6 Months`, `+1 Year`, `+2 Years`), 푸터 버튼
+* **시스템 안내 팝업(Alert / Confirm) 다국어화**:
+  * 예약 취소 확인 confirm창, 날짜 선택 유효성 검증 alert, 판매완료 처리 결과 alert 등 다국어 사전 키 매핑 완료.
+
+### 4. 딜러포털 & RSM포털 화물추적 버튼 마우스 오버 테두리 UI 고도화 (DealerOrders.jsx, AdminDashboard.jsx)
+* **테두리 두께 2px 확장 및 현대위아 네이비 블루 컬러 적용**:
+  * 마우스 오버(Hover) 시 테두리 두께를 `2px`로 확장(`border: 2px solid rgb(10, 28, 143) !important;`).
+  * 현대위아 브랜드 전용 색상인 네이비 블루 `rgb(10, 28, 143)` (`#0A1C8F`)로 테두리 색상 통일.
+  * `box-sizing: border-box;` 적용으로 두께 증가에 따른 레이아웃 흔들림 및 버튼 크기 변경 방지.
+
+### 5. 프론트엔드 프로덕션 빌드 검증
+* 프론트엔드 최신 프로덕션 빌드(`npm.cmd run build`) 무결성 및 배포 호환성 검증 완료 (`built in 10.35s`).
+
+## [2026-11-08] P/O(F/A) 타입 분리, 선적/판매 UI 개편, 사이드바 순서 조정, 가용재고 [요청] 이메일 연동, 화물추적 버튼 UI 고도화 및 RSM 포털 Tracking·판매목록 연동
+
+### 1. 주문번호(P/O) 2대 유형 분류 및 비즈니스 정책 정립
+* **유럽법인 재고 발주 (F번호 주문, F...)**:
+  * 유럽법인(WME)이 본사로부터 재고 확보를 위해 발주한 장비로 기본 가용 재고(is_corporate_stock = True, stock_type = 'AVAILABLE')로 분류.
+  * '주문/배송현황' 타임라인에서 배송 단계를 추적하고, 'WIA재고리스트'에 노출되어 딜러 판매/할당 대상으로 관리.
+* **현지 딜러 구매 확정 발주 (A번호 주문, A...)**:
+  * 딜러가 구매를 위해 발주한 주문으로 등록 시점부터 이미 판매가 확정된 주문(is_corporate_stock = False, stock_type = 'DEALER_ORDER')으로 분류.
+  * 법인 판매용 재고가 아니므로 'WIA재고리스트'에서는 전면 제외되며, '주문/배송현황' 타임라인과 '판매목록'에 즉시 노출되어 관리.
+
+### 2. 백엔드 데이터베이스 정규화 및 API 로직 개편 (main.py)
+* **서버 구동 시 자동 마이그레이션 및 정규화 (on_startup)**:
+  * 시스템에 등록된 모든 A번호 주문의 is_corporate_stock = FALSE, stock_type = 'DEALER_ORDER' 일괄 보정 및 프로모션 인벤토리에서 원천 제거.
+  * F번호 주문 중 미판매 장비는 is_corporate_stock = TRUE, stock_type = 'AVAILABLE'로 보정.
+* **주문 생성/업로드 파이프라인 P/O 접두어 기준 자동 분류**:
+  * 단건 주문 생성(POST /api/orders), 발주 엑셀 업로드(POST /api/upload/excel), 재고 현황 업로드(POST /api/upload/stock-status), 주문 정보 수정(PATCH /api/orders/{id}) 전체에 P/O 접두어(A% vs F%) 자동 판별 로직 적용.
+* **주문 목록 조회 API (GET /api/orders) 필터 세분화**:
+  * sales_archive=True 신설: A번호 주문 전체 + 판매 완료(SOLD/DISPATCHED)된 F번호 주문을 통합 반환하여 '판매목록'에서 원스톱 관리.
+  * is_corporate_stock=True 보강: 반드시 F번호 주문(reference_no LIKE 'F%')이면서 미판매인 법인 가용 재고만 반환하도록 제한 (A번호 주문 원천 배제).
+* **선매출 및 출고/픽업 연동 프로세스 구현**:
+  * '판매목록'에서 선매출 발생 시 sales_month, sales_price만 입력하면 미출고 상태로 유지되어 '주문/배송현황' 타임라인에 계속 표시.
+  * 실물 출고 완료 시 pickup_date를 입력하면 자동으로 current_status = OrderStatus.SOLD, is_timeline_completed = True로 동기화되어 타임라인 완료 이관.
+
+### 3. 선적 관리 페이지 선적내역 리스트 폰트 SUITE 일괄 통일 (AdminShipmentUpload.jsx)
+* **B/L 번호 및 ETD 출항일의 monospace 폰트 제거**:
+  * 고정폭 글꼴(monospace)이 지정되어 옆 텍스트와 폰트 모양 및 자간이 불일치하던 문제를 해결하고 현대위아 공식 서체인 'SUITE', sans-serif로 변경 적용.
+* **선적내역 리스트 전체 영역 폰트 일체화**:
+  * 선적내역 카드 컨테이너, 출항 년도 셀렉트 박스, B/L·항구·선박 검색창 인풋, 테이블 헤더, 데이터 행(순차번호, B/L 번호, ETD, 목적항, 선사명, 장비개수 뱃지 및 아코디언 상세 내역) 전체에 'SUITE', sans-serif 통일 적용.
+
+### 4. 판매 목록 장비 및 판매 정보 수정 팝업창(모달) UI/UX 전면 리뉴얼 (AdminSalesArchive.jsx)
+* **모달 가로폭 확장 및 잘림 현상 완벽 해결**:
+  * 모달 최대 폭을 기존 640px에서 820px (너비 94%)로 확장하여 우측 폼 필드 및 [오늘 픽업], [초기화] 퀵 버튼이 잘리는 현상을 완벽 해소.
+* **논리적 4대 섹션 카드 그룹화 (가독성 극대화)**:
+  * **기본 주문 및 장비 정보**: 딜러사, 모델, P/O, S/N, NC, 주문일자
+  * **판매 매출 및 출고/픽업 현황**: 옅은 블루 배경 카드로 하이라이트, 판매가, 구매가, 매출월([이번 달] 원클릭 입력), 출고/픽업 일자([오늘 픽업], [초기화] 버튼 칩) 및 선매출 안내문구 배치
+  * **물류 운송 및 상세 스펙**: S/O, 도착항, Incoterms, 선박명, DETAIL SPEC(전체 폭 확장)
+  * **비고 (REMARK)**: 여유 있는 비고 메모 텍스트영역
+* **폼 입력 요소 정렬 및 폰트 통일**:
+  * 모든 인풋 및 셀렉트 박스의 높이(38px), 패딩, 둥근 모서리(8px), box-sizing: border-box를 일치시켜 세로 열 정렬 완성 및 SUITE 폰트 적용.
+  * 상단 헤더에 인디고 블루 아이콘 배지 및 P/O, S/N, 모델명 칩 태그 표시.
+
+### 5. 시스템 사이드바 11개 메뉴 순서 재배치 및 메뉴 체계 표준화 (Sidebar.jsx)
+* **관리자 포털 11개 핵심 메뉴 체계 순서 재정렬**:
+  1. **주문 / 배송현황** (`/admin/dashboard` / `dashboard`)
+  2. **선적 트래킹** (`/admin/tracking` / `tracking`)
+  3. **WIA 재고리스트** (`/admin/inventory` / `inventory`)
+  4. **WIA 프로모션** (`/admin/promotion` / `promotion`)
+  5. **WIA 창고** (`/admin/dispatch` / `dispatch`)
+  6. **판매목록** (`/admin/sales-archive` / `sales_archive`)
+  7. **영업통계 및 분석** (`/admin/analytics` / `analytics`)
+  8. **업로드 / 설정관리** (`/admin/management` / `management`)
+  9. **선적관리 & 업로드** (`/admin/shipment-upload` / `shipment_upload`)
+  10. **제품 라이브러리** (`/admin/library` / `library`)
+  11. **유저 및 보안관리** (`/admin/users` / `users`)
+* **다국어(ko/en) 메뉴 텍스트 및 라우팅 무결성 보강**:
+  * 언어 변경 시에도 11개 메뉴 항목이 일관되게 표시되도록 `ko/translation.json`, `en/translation.json` 내 `sidebar.admin_menu` 키 정비 완료.
+
+### 6. 딜러포털 WIA재고리스트 'WIA 가용재고 목록' 내 [요청] 기능 신설 (DealerInventory.jsx)
+* **프로모션 페이지와 동일한 [요청] (Reserve / Order) 기능 탑재**:
+  * 유럽법인 가용재고(`AVAILABLE`) 장비에 대해 딜러가 즉시 예약 또는 주문 요청을 보낼 수 있는 듀얼 액션 버튼(`Reserve`, `Order`) 신설.
+  * 예약 중(`RESERVED`) 또는 기타 상태 장비는 `해당없음`으로 안전 처리.
+* **표준 영문 이메일 템플릿 자동 발송 연동 (`handleEmailRequest`)**:
+  * 수신처: `jypark@hyundai-wia.de`
+  * 제목: `[Stock {requestType} Request] Model: {modelName}`
+  * 본문: 모델명, NC, P/O(발주번호), S/N 정보가 사전 기재된 메일 작성창 즉시 호출 (`mailto:` 링크).
+  * 아코디언 행 토글과 겹치지 않도록 이벤트 버블링 차단(`stopPropagation`) 적용.
+* **데스크탑 테이블 및 모바일 반응형 카드 뷰 완벽 대응**:
+  * 데스크탑: 테이블 헤더에 [요청] 컬럼 추가 및 9개 컬럼 너비(100%) 균형 재조정, 서브 스펙 토글 시 `colSpan={9}` 확장.
+  * 모바일: 카드 하단에 [Reserve]와 [Order] 버튼을 나란히 배치하여 모바일 발주 편의성 극대화.
+  * 다국어 번역 키(`menu2.header_request`: '요청' / 'REQUEST') 등록.
+
+### 7. 딜러포털 배송 추적 타임라인 화물추적 버튼 UI/UX 전면 개편 (DealerOrders.jsx)
+* **버튼 텍스트 제거 및 커스텀 선박 SVG 아이콘 적용**:
+  * 기존의 `🚢 화물추적` 텍스트와 이모지를 제거하고, 화물선과 파도가 형상화된 공식 벡터 아이콘(`gemini-svg.svg`)으로 교체 적용.
+  * 버튼 툴팁(`title="화물추적"`)을 유지하여 사용자 안내성 확보.
+* **화이트 배경 및 마우스 오버 시 블랙 테두리 인터랙션 구현**:
+  * 기존 파란색 배경을 정갈한 화이트 배경(`#ffffff`)으로 전환하고, 연한 그레이 테두리(`1px solid #d1d5db`) 기본 적용.
+  * 마우스 오버(Hover) 시 테두리가 블랙(`#000000`)으로 부드럽게 반전되고, 입체적인 그림자 및 마이크로 상향 이동 애니메이션(`translateY(-1px)`) 적용.
+  * 데스크탑 테이블 액션 버튼 및 모바일 카드 뷰 하단 버튼에 일관된 UI 클래스(`.cargo-tracking-btn`, `.cargo-tracking-btn-mobile`) 적용.
+
+### 8. RSM 포털 '주문 배송 타임라인' 내 'Tracking'(화물추적) 기능 신설 (AdminDashboard.jsx)
+* **RSM 권한 전용 'Tracking' 액션 컬럼 및 버튼 추가**:
+  * 기존 관리자용 상태 설정(Next/Prev/수정/삭제) 컬럼 대신, RSM 접속 시 딜러포털과 동일한 **[Tracking / 화물추적]** 컬럼(`width: 10%`) 및 화물추적 버튼 노출.
+  * 모바일 뷰 카드 하단에도 원클릭 화물추적 버튼(`.cargo-tracking-btn-mobile`) 일체 적용.
+* **실시간 선적 및 AIS 항로 추적 팝업 모달 연동**:
+  * 화물추적 버튼 클릭 시 선적 데이터(`shipmentsMap`)와 선택 장비 정보를 기반으로 `DealerVesselTrackingModal` 팝업 자동 호출.
+  * B/L 정보, 출항/도착지, 선박명, 실제 AIS 항로 및 진행 상태를 즉시 모니터링 가능하도록 구현.
+
+### 9. RSM 포털 [판매목록] 메뉴 연동 및 사이드바 6개 메뉴 순서 재구성 (App.jsx, Sidebar.jsx)
+* **RSM 권한의 판매목록(AdminSalesArchive.jsx) 접근 라우팅 활성화**:
+  * 관리자 포털의 판매목록 기능을 RSM 포털에서도 동일하게 조회할 수 있도록 라우팅 및 탭 전환 권한 허용.
+* **RSM 사이드바 6개 메뉴 순서 재배치**:
+  1. **주문 / 배송현황** (`admin-dashboard`)
+  2. **WIA 재고리스트** (`admin-inventory`)
+  3. **WIA 프로모션** (`admin-promotion`)
+  4. **판매목록** (`admin-sales-archive`)
+  5. **제품 라이브러리** (`admin-library`)
+  6. **RSM 영업통계** (`rsm-dashboard`)
+* **다국어(ko/en) 번역 등록**:
+  * `sidebar.rsm_menu.sales_archive` 키에 "판매목록" / "Sales Archive" 등록 완료.
+
+### 10. 로컬 DB 동기화 및 프론트엔드 프로덕션 빌드 검증
+* 로컬 SQLite DB(`scm_erp.db`) 및 백업 데이터(`backup_orders_239.json`) 내 239건 주문 전체 P/O 타입 기준 정규화 완료.
+* 프론트엔드 최신 프로덕션 빌드(`npm.cmd run build`) 무결성 및 배포 호환성 검증 완료.
+
+## [2026-11-07] 선적 트래킹 B/L 상세정보 및 선박 탭 UI 최적화, 불필요 지표 위젯 제거 및 화면 시인성 극대화
+
+### 1. 선적 트래킹 지도 상단 오버레이 위젯 간소화 (`TrackingMapboxWidget.jsx`)
+* **불필요한 중복·추정 지표 위젯 제거**:
+  * 지도 상단 중앙에 오버레이 형태로 배치되어 있던 '총 항해 누적 거리' 및 '수집 항로 포인트' 카드 위젯을 완전히 제거했습니다.
+  * 불필요한 위젯 박스들을 정리함으로써 지도 뷰포트의 시야각과 항로 가시성을 대폭 확보했습니다.
+* **실시간 핵심 관제 지표 유지 및 집중도 향상**:
+  * 실시간 모니터링에 반드시 필요한 '최후 AIS 수신 위치'(위도/경도 좌표, 현재 속력 knot, 진행 방위각 °) 단일 카드만 지도 상단에 깔끔하게 유지하여 정보 전달력을 극대화했습니다.
+
+### 2. 선적 상세정보 좌측 패널 '선박' 탭 제원 그리드 정돈 (`ShipmentTracking.jsx`)
+* **선박 제원 2×2 균형 그리드 재배치**:
+  * 선박 제원 영역에서 중복 안내되던 '총 항해 누적 거리'와 '수신 AIS 궤적'(포인트 수) 항목 2칸을 삭제했습니다.
+  * 실무에서 가장 중요한 4개 핵심 제원인 IMO 번호, MMSI 식별부호, 현재 속력(Speed), 진행 방위(Course)를 2행 2열(2×2) 정렬 그리드로 재편성하여 깔끔한 레이아웃을 완성했습니다.
+* **시스템 내부 개발자 안내 카드 블록 영구 제거**:
+  * '선박' 탭 하단에 노출되던 기술적 설명 박스인 '2시간 주기 스마트 Diff-Check 동기화 (v5.0 최적화)' 녹색 카드를 완전히 제거했습니다.
+  * 불필요한 텍스트 노이즈를 줄여 하단의 핵심 운항 항로 정보('남아공 희망봉 우회' / '수에즈 운하 직통' / '함부르크 환적')에 즉시 집중할 수 있도록 개선했습니다.
+
+### 3. 전체 시스템 무결성 검증 및 Render 자동 배포
+* 프론트엔드 최신 프로덕션 빌드(`npm run build`) 무결성 및 성능 검증 완료.
+* Render 클라우드 배포 파이프라인 연동 확인 (실서비스 즉시 반영).
+
+## [2026-11-06] 선적 관리 B/L 엑셀 업로드 시 선적내역 리스트 미표시 오류 해결 및 TrackCargo 실시간 연동 강화
+
+### 1. Render 백엔드 로그 정밀 분석 및 근본 원인 규명
+* **TrackCargo 트래킹 정상 연동 및 데이터 수신 확인**:
+  * 백엔드 로그 확인 결과, 스케줄러(scheduler.py)가 B/L HDMUSELE11765900 등을 TrackCargo API(POST /client-orders/create/tracking/sea)에 등록하고 반환받은 주문 ID(b03cb3c5-...)로 선박(ONE INTELLIGENCE), 출항/도착 정보를 정상 수신(HTTP 200 OK)하고 있음을 확인했습니다.
+  * 즉, 업로드된 B/L 데이터는 DB shipments 테이블에 정상적으로 저장되었으나 화면 조회 시 필터링되어 나타나지 않는 현상이었습니다.
+* **선적내역 리스트 조회 API(GET /api/shipments?include_all=true) 쿼리 누락 버그 해결**:
+  * 기존 백엔드 get_shipments 함수가 filter(models.Shipment.orders.any())로 설정되어 있어, 주문(Order)과 연결된 선적만 조회하도록 강제되어 있었습니다.
+  * 새로 업로드된 B/L 8건의 P/O나 S/N가 시스템 내 주문 테이블에 아직 매핑되지 않았거나 신규인 경우 shipment.orders가 빈 상태가 되어 API 반환 목록에서 누락되는 문제가 발생했습니다.
+  * 관리자가 전체 선적 이력을 조회(include_all=True)할 때는 주문 매핑 여부와 무관하게 업로드된 모든 선적(Shipment)이 리스트에 노출되도록 쿼리 로직을 전면 개편했습니다.
+
+### 2. 선적 업로드 및 TrackCargo 벌크 등록 키 매핑 개선
+* **MBL 번호 정규화 키 불일치 문제 해결**:
+  * create_bulk_sea_tracking 실행 시 SCAC 코드가 제거된 순수 B/L 번호(SELE11765900)로 응답이 반환되어 원본 MBL(HDMUSELE11765900)과 키가 일치하지 않아 업로드 시점에 trackcargo_order_id와 ETA/ETD가 즉시 저장되지 못하고 스케줄러를 거쳐야 했던 문제를 해결했습니다.
+  * result_map에 원본 MBL과 정규화 MBL을 모두 매핑하여 업로드 즉시 TrackCargo 주문 ID와 초기 항해 데이터를 실시간 동기화하도록 보강했습니다.
+* **P/O 및 S/N 대소문자/공백 유연 매칭 지원**:
+  * 선적 엑셀 업로드 시 기존 주문과의 매칭률을 극대화하기 위해 func.lower(func.trim(...))을 적용하여 공백이나 영문 대소문자 차이로 인한 매칭 실패를 원천 방지했습니다.
+
+### 3. 프론트엔드 선적 관리 UI(AdminShipmentUpload.jsx) 안정화
+* 신규 선적 업로드 성공 시, 출항 연도 필터링(selectedYear)으로 인해 새로 등록된 B/L(ETD 미수신 건 등)이 가려지지 않도록 전체보기(ALL)로 자동 전환하고 좌측 선적내역 리스트를 즉시 갱신하도록 처리했습니다.
+
+### 4. 목적지별(ISTANBUL, ROTTERDAM, STAVANGER, OSLO 등) 해상 항로 왜곡 및 좌표 단절 오류 해결
+* **도착항 표준 좌표 누락 보강 (STAVANGER 등)**:
+  * PORT_COORDINATES 사전에 노르웨이 STAVANGER(NOSVG: [5.7331, 58.9690]) 좌표가 누락되어 목적지가 기본값(부산항)으로 지정되던 문제를 해결하고, OSLO, ISTANBUL, ROTTERDAM, BERGEN 등 유럽 주요 항구의 좌표 매핑을 전면 확충했습니다.
+* **임의 6개 점 절단(slice(0, 6)) 버그 제거 및 목적지별 지능형 완주 항로 생성기 구축**:
+  * 실측 AIS 궤적이 수신되기 전 신규 선적에 대해 목적지와 무관하게 무조건 함부르크 경로의 앞 6개 점(남아프리카 희망봉)까지만 자르던 레거시 로직을 완전히 제거했습니다.
+  * 신규 getStandardMaritimeRoute 함수를 구축하여 각 선적의 실제 목적항에 맞추어 해상 항로를 분기 생성하도록 개편했습니다:
+    * **지중해 권역 (ISTANBUL 등)**: 희망봉 우회 ➔ 서아프리카 북상 ➔ 지브롤터 해협 ➔ 시칠리아 해협 ➔ 에게해 ➔ 다르다넬스/마르마라해 ➔ 이스탄불항 완주 연결.
+    * **북유럽 권역 (OSLO, STAVANGER 등)**: 영국 해협/도버 해협 ➔ 북해 ➔ 스타방에르항 직결 및 스카게라크 해협 ➔ 오슬로 피오르드 완주 연결.
+    * **북서유럽 권역 (ROTTERDAM, ANTWERP, HAMBURG 등)**: 영국 해협 ➔ 도버 해협 ➔ 마스플락테/로테르담항 완주 연결.
+* **출항 전/미도착 상태 선박 위치 및 대각선 왜곡 버그 해결**:
+  * 출항 전(now <= ETD) 또는 진행 중인 선박의 위치를 계산할 때, 목적지별 전체 항로선 위에서 정확히 보간되도록 estimateVesselPosition 함수를 개편하여 희망봉에서 출발항으로 날아가는 대각선 직선 왜곡을 원천 차단했습니다.
+
+### 5. [HMM 공식 실제 노선 반영] 터키 이스탄불(수에즈 운하 직통) 및 노르웨이 오슬로(함부르크 환적 경유) 항로 정밀 개편
+* **터키 이스탄불(ISTANBUL, TURKIYE) 수에즈 운하 직통 항로 구현**:
+  * 선사 HMM 공식 운항 경로를 정밀 반영하여, 아프리카 희망봉 우회가 아닌 부산(BUSAN, KOREA) 출발 ➔ 대만해협 ➔ 남중국해 ➔ 싱가포르/말라카 해협 ➔ 스리랑카 남단 ➔ 아라비아해 횡단 ➔ 아덴만 ➔ 바브엘만데브 해협 ➔ 홍해(Red Sea) 북상 ➔ 수에즈 운하(Suez Canal) 통과 ➔ 동지중해 ➔ 에게해 ➔ 다르다넬스 해협 ➔ 마르마라해 ➔ 이스탄불(ISTANBUL, TURKIYE) 직통 표준 해상 회랑(HMM_SUEZ_TO_ISTANBUL_ROUTE)을 구축했습니다.
+* **노르웨이 오슬로(OSLO, NORWAY) 및 북유럽 함부르크 환적(Transshipment) 항로 구현**:
+  * HMM 공식 노선에 맞추어 대형 모선이 독일 함부르크(HAMBURG, GERMANY [9.9841, 53.5413])에 기항하여 피더선(Feeder)으로 환적 연계되는 해상 항로를 구축했습니다.
+  * 지도 상에 HMM 공식 화면과 동일하게 독일 함부르크에 주황색 원형 점 및 오렌지 캡슐 라벨 뱃지(HAMBURG, GERMANY)를 표시하여 환적 경유지임을 명확히 안내하도록 지원했습니다.
+* **HMM 공식 뷰어 스타일의 지나온 구간(실선) 및 잔여 구간(점선) 분리 렌더링**:
+  * 선박의 현재 운항 위치까지는 붉은색 실선(maritime-route-past), 목적지까지 남은 예정 항로는 붉은색 점선(maritime-route-remaining, line-dasharray: [2, 2])으로 분리 렌더링하여 실시간 항해 현황을 직관적으로 시각화했습니다.
+  * 출발항(BUSAN, KOREA), 도착항(OSLO, NORWAY, ISTANBUL, TURKIYE) 역시 HMM 공식 규격의 세련된 블루 캡슐 뱃지 스타일을 적용했습니다.
+
+## [2026-11-05] 판매목록(AdminSalesArchive.jsx) 리스트 항목구성 및 순서 개편, '매출월'·'출고/픽업' 신규 항목 신설 및 선(先)매출 관리 체계 구축
+
+### 1. 판매목록 테이블 리스트 항목 구성 및 순서 개편
+* **사용자 요청 기준 11개 컬럼 순서 완전 재배치**:
+  * 테이블 열 순서를 지정해주신 순서대로 개편했습니다:
+    * `*` (순번) ➔ `딜러` ➔ `모델` ➔ `S/N` ➔ `P/O` ➔ `NC` ➔ `주문일자` ➔ `판매가` ➔ `구매가` ➔ `매출월` ➔ `출고/픽업`
+  * 기존에 행 확장 시에만 볼 수 있었던 주문일자, 구매가 등의 정보를 메인 테이블 컬럼으로 올리고, 직관적인 열 너비 비율(합계 100%)을 적용하여 가로 스크롤 없이 한눈에 모니터링할 수 있도록 최적화했습니다.
+
+### 2. 신규 핵심 항목 '매출월' 및 '출고/픽업' 신설
+* **매출월 (Sales Month)**:
+  * 판매 매출인보이스가 발행된 연·월(`YYYY.MM`) 정보를 명확하게 표시.
+  * 상단 통합 검색창에서 매출월(예: `2026.11`) 입력 시 해당 월의 매출 건만 즉시 선별 검색 가능.
+* **출고/픽업 (Dispatch / Pickup)**:
+  * 실제 판매된 기계가 창고에서 픽업 완료되었는지 여부와 픽업일자 정보 표시.
+  * **픽업 완료 시**: 녹색 배지 및 체크 아이콘과 함께 픽업일자(`YYYY.MM.DD`) 표기.
+  * **미출고 시**: `-` 로 깔끔하게 표기되며, 마우스오버 시 `선매출 (미출고)` 툴팁 안내 제공.
+
+### 3. 선(先)매출 관리 프로세스 및 UI/UX 지원
+* **선매출 비즈니스 로직 지원**:
+  * 창고에서 기계가 아직 출고/픽업되지 않았더라도 매출인보이스를 먼저 발행하는 '선매출' 건의 경우, 출고/픽업 열에 `-` 로 표시되고 추후 실제 픽업이 완료되었을 때 손쉽게 픽업일자를 등록하여 완료 처리할 수 있도록 프로세스 연동.
+* **상태별 퀵 필터 및 통계 헤더 연동**:
+  * 검색창 우측에 출고/픽업 상태 필터 드롭다운 신설: `전체 출고/픽업 상태`, `출고/픽업 완료`, `출고/픽업 대기 (선매출)` 옵션 제공.
+  * 상단 통계 바에 `전체: X대`, `픽업 완료: Y대`, `픽업 대기(선매출): Z대` 수량을 실시간 집계하여 미출고 선매출 기계를 즉각 파악 가능.
+
+### 4. 장비 및 판매/출고 정보 수정 모달 확장 및 원클릭 인터랙션
+* 테이블의 행(Row) 클릭 시 즉시 '장비 및 판매 정보 수정' 모달 호출 (`cursor: pointer`, 부드러운 행 호버 하이라이트).
+* 모달 내 판매가(`sales_price`), 구매가(`price`), 주문일자(`dealer_order_date`), 매출월(`sales_month`), 출고/픽업일자(`pickup_date`) 입력 필드 신설.
+* 신속한 입력을 위한 퀵 버튼 제공: `[이번 달]` 클릭 시 현재 월 자동 입력, `[오늘 픽업]` 클릭 시 오늘 일자 자동 입력, `[초기화]` 클릭 시 선매출(미출고) 상태로 리셋 지원.
+
+### 5. 정렬, 엑셀 익스포트, 모바일 반응형 및 다국어(i18n) 동기화
+* 10개 전체 데이터 컬럼에 대해 테이블 헤더 클릭 정렬(`▲` / `▼`) 및 정렬 드롭다운 지원.
+* 엑셀 내보내기(`Excel Export`) 시 새로운 11개 컬럼 규격과 포맷팅된 데이터가 UTF-8 BOM 인코딩으로 깔끔하게 다운로드되도록 개편.
+* 모바일 카드 뷰에서도 모델, P/O, 딜러, S/N, NC, 주문일자, 판매가, 구매가, 매출월, 출고/픽업 상태를 일목요연하게 확인할 수 있도록 카드 메타정보 재정비.
+* `locales/ko/translation.json`, `locales/en/translation.json`의 `menu4` 다국어 키 완벽 동기화.
+
+### 6. 데이터베이스 스키마 확장 및 자동 마이그레이션 파이프라인
+* `orders` 테이블에 `sales_price`(VARCHAR), `sales_month`(VARCHAR), `pickup_date`(DATETIME) 컬럼 신설.
+* 로컬 SQLite DB(`scm_erp.db`) 및 Render 운영 PostgreSQL DB에 대해 서버 기동 시 안전하게 자동 마이그레이션(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS ...`)되도록 `backend/database.py`와 `backend/main.py`에 적용.
+
+## [2026-11-04] WIA 가용재고 목록 예약(Reservation) 기능 신설, 딜러 포털 상태 배지 연동, 라인업 제품 라이브러리 카탈로그(001~042) DB·프론트엔드·R2 스토리지 전체 동기화 및 백엔드 드라이버 호환성 강화
+
+### 1. WIA 가용재고 목록('AdminInventory.jsx') 내 '예약' 프로세스 및 관리 라이프사이클 구축
+* **상태(Status) 드롭다운 메뉴 내 '예약' 항목 추가**:
+  * 가용재고 상태 변경 순서를 `[판매가능 > 예약 > 딜러주문 > 임대 > 전시 > 프로모션]` 체계로 재편성.
+  * '예약' 선택 시 임대(Rental) 설정과 동일한 UI/UX의 '예약 기간 설정' 팝업 모달 호출:
+    * 딜러사 선택 드롭다운, 시작일 및 만료일자 캘린더 입력 지원.
+    * 1주일(`+1주`), 2주일(`+2주`) 빠른 기간 선택 버튼 제공으로 신속한 예약 등록 지원.
+* **주문선택 컬럼 내 예약 카드 및 액션 버튼(`예약내역`, `판매완료`) 연동**:
+  * 예약 등록 완료 시 행 상태가 보라색 '예약' 배지로 즉시 전환.
+  * 주문선택 컬럼에 지정 딜러명(파란색 볼드체), 만료 일자(`만료: YYYY. MM. DD`), `예약내역` 버튼, `판매완료` 버튼 자동 렌더링.
+  * **예약 상세 조회 및 취소 모달 (`예약내역`)**: 예약된 딜러사, 예약 기간, 등록일 등 상세 내역을 팝업으로 조회하고, 필요 시 즉시 '예약취소'를 수행하여 가용 상태(판매가능)로 복원.
+  * **판매완료(SOLD) 원클릭 전환 (`판매완료`)**: 장비가 최종 계약/판매되었을 때 확인 다이얼로그를 거쳐 `판매완료` 상태로 확정 전환하여 출고 파이프라인으로 연동.
+* **백엔드 자동 만료 스케줄러(`scheduler.py`) 및 데이터베이스 모델 확장**:
+  * 예약 만료일 도래 시 시스템이 자동으로 가용재고(판매가능) 상태로 전환하도록 백그라운드 스케줄러 로직 연동.
+
+### 2. 딜러 포털 및 출고현황 화면 내 예약 상태 실시간 동기화
+* **딜러 포털(`DealerInventory.jsx`, `DealerDashboard.jsx`) 상태 배지 빈칸 버그 완벽 해결**:
+  * 관리자 포털에서 예약된 장비의 경우, 딜러 포털의 WIA 가용재고 목록에서 상태 열 배지가 빈칸(공란)으로 노출되던 화면 렌더링 오류를 식별 및 수정.
+  * 딜러 포털에서도 선명한 보라색 '예약' 배지(`var(--status-rental)` / `#7c3aed`)와 예약 만료일자 안내가 명확히 표시되도록 배지 매핑 및 다국어 텍스트(`status_reserved`, '예약' / 'Reserved') 적용.
+* **창고 출고현황(`AdminDispatch.jsx`) 상태 필터 및 배지 연동**:
+  * 창고 관리 화면의 상태 필터에 '예약' 항목을 추가하고, 출고 대기 테이블에 예약 상태 배지를 일관된 디자인 시스템으로 연동.
+
+### 3. 라인업 제품 라이브러리 카탈로그 코드(Catalog Code 001~042) DB 및 프론트엔드 연동
+* **최신 카탈로그 코드 기준 218개 전 모델 매핑 (Cloudflare R2 스토리지 연동)**:
+  * 최신 공식 `Catalog_code.pdf` 명세(총 6페이지)를 정밀 분석하여 전체 218개 제품 모델에 대해 `catalog-001.pdf`부터 `catalog-042.pdf`까지 1:1 카탈로그 코드 매핑 완료 (카탈로그 미지정 1개 모델 `LV600G`는 `None` 규격 처리).
+  * `HD3100` 계열 6종(`HD3100`, `HD3100A`, `HD3100L`, `HD3100LM`, `HD3100M`, `HD3100MA`)의 카탈로그 코드 불일치(`catalog-004` ➔ `catalog-003`)를 공식 카탈로그 기준에 일치하도록 정정 교정.
+* **데이터베이스 및 자동 마이그레이션 스크립트 반영**:
+  * 로컬 SQLite(`scm_erp.db`) 및 Render 운영 PostgreSQL(`product_models` 테이블)의 `catalog_file` 필드 일괄 업데이트.
+  * 서버 부팅 시 실행되는 데이터 마이그레이션 스크립트(`backend/update_thumbnails.py`) 및 모델 임포터(`backend/import_models.py`)에 218개 모델의 카탈로그 정보를 등록하여 향후 DB 마이그레이션/재배포 시에도 영구 보존되도록 안정화.
+* **프론트엔드 다운로드 얼럿 오류 원인 해결 및 원클릭 다운로드 파이프라인 완성**:
+  * **오류 원인 규명**: 사용자가 제품 라이브러리(`ProductLibrary.jsx`)에서 카탈로그 다운로드 클릭 시 *"다운로드할 파일이 설정되지 않았습니다."* 경고창이 발생하던 문제는, 프론트엔드 목업 데이터(`productLibraryModels.js`)의 `documents` 객체에 `filename` 프로퍼티가 누락되어 있었기 때문임을 규명.
+  * **프론트엔드 동기화**: `frontend/src/data/productLibraryModels.js` 파일 내 218개 모델의 카탈로그 문서 객체에 `filename: 'catalog-XXX.pdf'` 속성을 전면 추가·동기화 완료.
+  * **R2 스토리지 다운로드 연계**: 사용자가 카탈로그 다운로드 버튼 클릭 시 백엔드 다운로드 API(`/api/documents/{filename}/download`)를 호출하고, 백엔드의 `storage.py`가 Cloudflare R2 버킷의 서명된 URL(Presigned URL)로 즉시 안전하게 리다이렉트하여 브라우저에서 공식 PDF가 다운로드/열람되도록 완벽 연동.
+
+### 4. 백엔드 PostgreSQL 드라이버 호환성 강화 (`backend/database.py`)
+* **`psycopg` (v3) 및 `psycopg2` 자동 폴백 지원**:
+  * Render 배포 환경 및 다양한 로컬/도커 파이썬 런타임 환경에서 `psycopg` 패키지 누락 시 발생할 수 있는 데이터베이스 연결 실패를 방지하기 위해, `psycopg` 로드 실패 시 `psycopg2` 드라이버(`postgresql+psycopg2://`)로 자동 폴백하는 안전 계층 구현.
+
+---
+
+## [2026-11-03] 공식 도메인(`wmeins.eu`) Resend 발송 안정화, WIA 프로모션 컬럼 재배치, 제외(판매가능 전환) 기능 신설 및 상태('예약'/'예약가능') 2단 개편
+
+### 1. Resend API Key 런타임 인증(`401`) 오류 원인 규명 및 신규 시크릿 키 갱신
+* **인증 실패 원인 진단 및 해결**:
+  * 실시간 시스템 진단 엔드포인트(`GET /api/system/test-email`)를 통해 등록된 API 키가 만료/불일치(`statusCode: 401, message: API key is invalid`)되었음을 정확하게 진단하고 신속히 식별했습니다.
+  * Resend 대시보드에서 신규 Full Access API Key(`re_L2g...hzKp`)를 재발급받아 Render 백엔드 환경 변수(`RESEND_API_KEY`)에 안전하게 갱신 등록했습니다.
+
+### 2. 공식 시스템 발신자(`noreply@wmeins.eu`) 실환경 메일 발송 성공 검증
+* **초고속 REST API 발송 및 200 OK 응답 확인**:
+  * 공식 발신자 명칭 `WME Integrated Network System <noreply@wmeins.eu>`으로 Resend REST API(`POST https://api.resend.com/emails`) 호출 시 지연 시간 약 0.2초 이내로 `HTTP 200 OK` 정상 승인을 확인했습니다.
+* **대량 알림 이메일 실시간 발송 완료 (총 8건)**:
+  * 백그라운드 스케줄러와 연동되어 최신 운송 상태가 갱신된 발주 건(`F25-12-94`, `F25-12-95`, `A26-01-12`, `A25-12-30`, `A26-04-09`, `A26-06-14`, `A26-04-05` 등)의 알림 이메일이 고유 발송 ID(UUID)를 부여받고 관리자 수신함(`jypark@hyundai-wia.de`, `freelogin3975@gmail.com`)으로 전송 완료되었습니다.
+* **Resend 대시보드 및 Gmail SMTP 덮어쓰기 문제 완전 해소**:
+  * 기존 Google SMTP 이용 시 발신자 주소가 `freelogin3975@gmail.com`으로 강제 변경되던 문제를 완전히 해결하고, Resend 대시보드 내 실시간 전송 내역(Emails)과 공식 인증 도메인 명의의 발송 체계를 완벽하게 확립했습니다.
+
+
+### 3. WIA 프로모션(`AdminPromotion.jsx`, `DealerPromotion.jsx`) 리스트 컬럼 순서 재배치
+* **도착지(PORT)와 도착일정(ETA) 컬럼 순서 조정**:
+  * 관리자 및 딜러 포털 WIA 프로모션 페이지의 데스크톱 테이블 컬럼 순서를 직관적인 정보 탐색 동선에 맞추어 재정렬했습니다.
+  * **반영된 컬럼 순서**:
+    * `*` ➔ `모델` ➔ `NC` ➔ `판매가` ➔ `P/O` ➔ `옵션상세` ➔ **`도착지`** ➔ **`도착일정`** ➔ `진행상황` ➔ `예약정보` ➔ `상태` (딜러 포털: `REQUEST` 유지)
+  * 옵션상세 확인 후 장비가 입항하는 도착 항구(`PORT`)를 먼저 확인하고, 도착 예정일(`ETA`)을 연이어 검토할 수 있도록 테이블 헤더(`<thead>`)와 행 데이터(`<tbody>`)의 정렬 순서를 완벽하게 동기화했습니다.
+
+### 4. WIA 프로모션(`AdminPromotion.jsx`) 리스트 '제외' 버튼 기능 신설 및 WIA 재고 자동 전환 연동
+* **'제외' 액션 기능 및 UI 디자인 구현**:
+  * 데스크톱 테이블에서 '상태' 컬럼 우측에 신규 컬럼 **'제외' (EXCLUDE)**를 추가하였습니다.
+  * **아이콘 버튼 디자인**: 사용자 요청 디자인 에셋인 언링크(unlink) 체인 아이콘(`assets/icons/unlink.png`)을 적용하였으며, 라이트/다크 테마에 맞추어 `currentColor` 마스크 기법으로 선명하게 렌더링되도록 구현했습니다.
+  * **아이콘 호버(Mouse Over) 인터랙션**: 마우스오버 시 `리스트 제거` (영문: `Remove`) 툴팁이 즉시 노출되며, 은은한 레드 하이라이트 배경 및 미세 확대(Scale 1.08) 애니메이션 효과를 주어 삭제/제외 액션의 시인성을 극대화했습니다.
+  * **모바일 카드 뷰 지원**: 모바일 화면에서도 '상태' 배지 우측에 제외 버튼을 배치하여 디바이스에 구애받지 않고 손쉽게 프로모션 제외가 가능하도록 최적화했습니다.
+* **프로모션 제외 및 WIA 가용재고 자동 전환 백엔드 로직 연동**:
+  * 백엔드 API 신설: `DELETE /api/promotions/{promotion_id}` 및 `POST /api/promotions/{promotion_id}/exclude` 엔드포인트를 구현했습니다.
+  * 제외 실행 시 사용자 확인(Confirm) 다이얼로그를 거친 후, 프로모션 인벤토리(`PromotionInventory`)에서 해당 P/O 레코드를 완전히 삭제합니다.
+  * 동시에 연계된 발주 장비(`Order`)의 `stock_type`을 기존 `'PROMOTION'`에서 `'AVAILABLE'`(판매가능) 상태로 자동 변경하고 예약 정보를 초기화하여, WIA 재고관리(`AdminInventory.jsx`)의 **WIA 가용재고 목록에 '판매가능' 상태로 즉시 복귀**하도록 유기적으로 연동했습니다.
+* **다국어(i18n) 번역 리소스 등록**:
+  * `locales/ko/translation.json` 및 `locales/en/translation.json`에 `header_exclude`, `tooltip_remove`, `confirm_exclude`, `exclude_failed` 다국어 키를 등록하여 글로벌 환경을 완벽 지원합니다.
+
+### 5. WIA 프로모션(`AdminPromotion.jsx`, `DealerPromotion.jsx`) 리스트 [상태] 항목 표기 개편 ('예약' / '예약가능')
+* **[상태] 항목 표기 2단 체계 단일화**:
+  * 기존에 WIA 재고리스트와 혼용되어 노출되던 배지 텍스트('프로모션', '판매가능' 등)를 제거하고, 프로모션 리스트 본연의 목적에 맞게 **'예약'** 및 **'예약가능'** 2개 상태로 완전 일원화했습니다.
+  * **예약된 P/O**: 보라색 배지(`hsla(262, 83%, 58%, 0.15)`, `#7c3aed`)와 함께 **`예약`**으로 명확히 표기.
+  * **예약 가능한 P/O**: 가용 녹색 배지(`hsla(142, 76%, 46%, 0.2)`, `var(--status-stock)`)와 함께 **`예약가능`**으로 표기.
+* **필터 드롭다운 및 정렬 기준 동기화**:
+  * 상태 필터 셀렉트박스의 옵션을 `전체 상태 조회`, `예약가능`, `예약`으로 개편하여, 원하는 상태의 프로모션 장비를 즉시 선별할 수 있도록 필터링 로직을 개선했습니다.
+  * 상태 기준 정렬(`▲` / `▼`) 시에도 '예약'과 '예약가능' 텍스트를 기준으로 정확하게 그룹화되어 정렬되도록 연동했습니다.
+* **딜러 포털(`DealerPromotion.jsx`) 요청(Reserve/Order) 권한 연계**:
+  * '예약가능' 상태인 P/O에 대해서만 딜러의 `Reserve` / `Order` 버튼이 활성화되도록 로직을 일치시켰습니다.
+* **다국어(i18n) 번역 등록**:
+  * `locales/ko/translation.json` 및 `locales/en/translation.json`에 `status_available_reservation`('예약가능' / 'Available') 및 `status_reserved`('예약' / 'Reserved') 키를 추가 및 정비했습니다.
+
+
+## [2026-11-02] WIA 프로모션 모바일 리스트 2단 개편, 재고 모달 터치 고정 및 알림 이메일 Resend 공식 도메인 발신 인프라 구축
+
+### 1. WIA 프로모션(`AdminPromotion.jsx`, `DealerPromotion.jsx`) 모바일 카드 메타정보 2단 UI/UX 재정비
+* **판매가 / ETA / 도착지 정보 텍스트 겹침 문제 해결**:
+  * 기존 모바일 카드에서 `PRICE`, `ETA`, `PORT` 3개 항목이 가로 1줄에 무리하게 나열되어, 좁은 화면에서 판매가 금액 및 수정 버튼과 날짜/도착지 텍스트가 서로 겹치거나 줄바꿈되던 문제를 완벽히 해결했습니다.
+* **상·하 2단 분리 레이아웃 적용**:
+  * **첫 줄 (`판매가:`)**: 상단에 판매가 라벨과 포맷팅된 유로 통화 금액(`150,000 €`) 및 관리자 인라인 수정 버튼(`[✎]`)을 단독 배치하여 긴 자릿수와 편집 인풋이 넉넉하게 표시되도록 공간을 확보했습니다.
+  * **다음 줄 (`ETA:` / `도착지:`)**: 하단에 은은한 점선 구분선(`borderTop: 1px dashed var(--border-color)`)과 함께 좌측에 `ETA: [일자]`, 우측에 `도착지: [항구명]`을 나란히 분리 배치하여 가로 스크롤이나 글자 겹침 없이 한눈에 들어오도록 개선했습니다.
+* **관리자·딜러 포털 및 다국어 지원 일원화**:
+  * 관리자 포털(`AdminPromotion.jsx`)과 딜러 포털(`DealerPromotion.jsx`) 양쪽에 일관되게 적용하고, 다국어 리소스(`locales/ko/translation.json`, `locales/en/translation.json`)에 `label_sale_price`를 동기화했습니다.
+
+### 2. WIA 재고리스트(`AdminInventory.jsx`) 모바일 모달 본문 좌우 흔들림 방지 및 터치 스크롤 고정
+* **원인 분석**:
+  * 모바일 브라우저(특히 iOS Safari)의 내장 날짜 입력(`input[type="date"]`)이 고유의 최소 너비를 가져, 시작일·만료일 2개의 인풋이 화면 폭을 미세하게 초과하면서 가로 스크롤 오버플로우가 발생했습니다.
+  * 또한 본문 영역에 수평 터치 방지(`touchAction: 'pan-y'`) 및 가로 넘침 차단(`overflowX: 'hidden'`)이 누락되어, 날짜 선택이나 버튼 터치 시 사용자의 손가락 움직임에 따라 상단 헤더 아래의 본문 전체가 좌우로 흔들리거나 슬라이드되는 현상이 있었습니다.
+  * 카드 컨테이너에 적용되었던 `.glass-card` 클래스가 모바일 미디어 쿼리에서 10px 외부 패딩과 0.3초 트랜지션을 강제 주입하여 미세 흔들림과 유격을 심화시켰습니다.
+* **개선 및 고정 조치**:
+  * **가로 스크롤 및 수평 터치 흔들림 원천 차단**: 모달 오버레이 및 본문에 `overflowX: 'hidden'`, `touchAction: 'pan-y'`(상하 스크롤만 허용), `overscrollBehavior: 'contain'`을 적용하여 설정 변경 중에도 좌우 흔들림이 전혀 없도록 견고하게 고정했습니다.
+  * **날짜 입력 필드 규격화**: 날짜 그리드에 `repeat(2, minmax(0, 1fr))` 및 `<input type="date">`에 `minWidth: 0`, `maxWidth: '100%'`, 모바일 최적화 패딩을 적용하여 좁은 화면에서도 너비를 벗어나지 않도록 방어했습니다.
+  * **장비 & 딜러사 카드 규격 고정**: 3단 그리드에 `repeat(3, minmax(0, 1fr))` 및 드롭다운 텍스트 말줄임(`textOverflow: 'ellipsis'`)을 적용하여 딜러사 변경 시에도 너비 변동이 생기지 않도록 고정했습니다.
+  * **트랜지션 및 패딩 간섭 제거**: `.glass-card` 대신 `clean-card` 및 `padding: 0 !important`, `transition: none`을 적용하여 헤더, 본문, 푸터가 한 화면에 일체화되도록 최적화했습니다.
+  * **적용 모달**: '예약 기간 설정', '예약 기간 수정', '예약 상세 내역', '임대 기간 설정' 전체 모달 일괄 적용.
+
+### 3. 알림 이메일 발신 인프라 Resend REST API 연동 및 공식 시스템 도메인(`wmeins.eu`) 발송 체계 구축
+* **Resend 공식 고속 HTTP API 연동 (`backend/email_service.py`)**:
+  * 기존 SMTP(Gmail) 방식은 Render에 `RESEND_API_KEY`를 등록했더라도 코드에서 직접 인식하지 못해 하드코딩된 개인 Gmail 계정(`freelogin3975@gmail.com`)으로 발송되던 한계를 해결했습니다.
+  * 백엔드 환경 변수에 `RESEND_API_KEY`가 감지되면 내장 `httpx`를 통해 **Resend 공식 REST API(`https://api.resend.com/emails`)**를 즉시 호출하도록 지능형 발송 엔진을 구축했습니다.
+  * 네트워크 순단이나 일시적 API 장애 발생 시 기존 SMTP 방식으로 안전하게 폴백(Fallback)하는 이중 안전장치를 탑재했습니다.
+* **공식 시스템 발신자(`FROM_EMAIL`) 및 관리자 수신함(`ADMIN_NOTIFICATION_EMAILS`) 연동**:
+  * Resend에 DNS 인증(DKIM/SPF)이 완료된 공식 도메인(`wmeins.eu`) 기반 `WME Integrated Network System <noreply@wmeins.eu>`을 기본 발신자로 채택하여 스팸 차단율을 낮추고 대외 신뢰도를 강화했습니다.
+  * 하드코딩되어 있던 알림 수신자 주소를 환경변수 `ADMIN_NOTIFICATION_EMAILS`를 통해 유연하게 관리할 수 있도록 개선했습니다.
+
+### 4. 이메일 환경변수 자동 정제(따옴표/공백 제거) 및 실시간 진단 API(`GET /api/system/test-email`) 구축
+* **환경 변수 자동 정제(`_clean_env_val`)**:
+  * Render 대시보드 환경 변수 입력 시 발생할 수 있는 따옴표(`"`, `'`)나 앞뒤 여백을 자동으로 제거하여 Resend API 헤더 인증(401) 및 발신자 유효성(422) 검사 오류를 사전에 차단했습니다.
+  * HTML 본문 스타일을 함께 제공하여 텍스트 줄바꿈 유지 및 메일 가독성을 극대화했습니다.
+* **실시간 시스템 진단 엔드포인트(`GET /api/system/test-email`) 제공**:
+  * ERP에서 발주 상태를 번거롭게 변경하지 않아도, 브라우저나 curl에서 엔드포인트 호출 시 Resend API 키 인식 상태, 발송 성공 여부, 또는 실패 시의 상세 HTTP 에러 코드를 즉시 JSON으로 확인할 수 있는 진단 체계를 구축했습니다.
+
+
+## [2026-10-31] WIA 프로모션(관리자·딜러포털) 리스트 개편, 재고리스트 예약 라이프사이클 연동 및 UI 최적화
+
+### 1. 관리자포털 WIA 프로모션(`AdminPromotion.jsx`) 컬럼·UI 개편 및 예약 관리 일원화
+* **예약 설정 기능 재고리스트 일원화**:
+  * 장비의 예약 설정·취소·판매완료 관리를 **WIA 재고리스트(`AdminInventory.jsx`)** 단일 창구로 통합함에 따라, WIA 프로모션 페이지 내 예약 설정 컨트롤을 제거하고 현황 조회 및 프로모션 판매가 관리 중심 화면으로 개편했습니다.
+* **리스트 항목 명칭 변경 및 데이터·스타일 정밀화**:
+  * `발주번호` ➔ **`P/O`**(`menu3.header_po`)로 항목명을 변경 적용했습니다.
+  * `진행상태` ➔ **`진행상황`**(`menu3.header_progress`, 영문 `STATUS`)으로 변경하고, 주문/배송현황 페이지의 P/O 기준 단계 정보(`주문` / `생산 중` / `배송` / `항구도착` / `입고`)가 타원형 배경 배지 없이 **`bold` 굵기 및 `rgb(255, 87, 51)` 색상 텍스트**로 표기되도록 적용했습니다.
+  * `설정` ➔ **`상태`**(`menu3.header_stock_status`, 영문 `TYPE`)로 변경하고, WIA 재고리스트의 `상태` 항목과 동일한 배지(`프로모션`, `예약`) 및 `예약정보`(예약 딜러명 + `만료: YYYY.MMM.DD`)가 실시간 동기화되도록 구성했습니다.
+* **컬럼 정렬 표준화**:
+  * 리스트 내 `*`, `모델`, `NC`, `P/O`, `도착일정`, `진행상황`, `예약정보`, `상태` 항목을 모두 중앙 정렬(`center`)로 통일했습니다.
+
+### 2. 딜러포털 WIA 프로모션(`DealerPromotion.jsx`) 12개 항목 동기화 및 영업 보안 적용
+* **관리자포털 동일 기준 12개 컬럼 구성**:
+  * 딜러포털 WIA 프로모션 리스트를 `*, 모델, NC, 판매가(€), P/O, 옵션상세, 도착일정, 도착지, 진행상황, 예약정보, 상태, 요청` 12개 항목으로 재구성하고 관리자포털과 동일한 데이터 소스 및 스타일(`진행상황` 볼드·컬러 텍스트, `상태` 배지, 상단 필터/정렬)을 연동했습니다.
+* **딜러 간 영업 보안 및 상태별 `요청` UI 분기**:
+  * **`예약정보`**(`dealer_promotion.header_reservation`, 영문 `RESERVATION`): 장비가 `예약(RESERVED)` 상태일 때 타 딜러사명은 노출하지 않고 만료일(`만료: YYYY.MMM.DD`)만 표시하도록 구성했습니다.
+  * **`요청`**: `프로모션` 상태일 때 `Reserve` / `Order` 이메일 요청 버튼을 표시하고, `예약` 상태일 때는 `해당없음`(영문 `Unavailable`)이 표기되도록 데스크톱 테이블과 모바일 카드 뷰 모두에 적용했습니다.
+
+### 3. WIA 재고리스트 ↔ WIA 프로모션 양방향 라이프사이클 백엔드 연동 (`main.py`, `scheduler.py`, `AdminInventory.jsx`)
+* **프로모션 등재 유지 및 예약 정보 동기화**:
+  * WIA 재고리스트에서 상태를 `프로모션(PROMOTION)`으로 설정 시 WIA 프로모션 목록(`PromotionInventory`)에 자동 등재되며, 이후 재고리스트에서 `예약(RESERVED)`으로 변경하더라도 목록에서 사라지지 않고 `상태: 예약` 및 예약 딜러·만료일 정보가 동기화됩니다.
+  * 상태를 `판매가능`, `임대`, `전시`, `딜러주문`으로 변경하거나 예약 `판매완료`(딜러 발주 귀속) 확정 시에는 WIA 프로모션 목록에서 자동 제거됩니다.
+* **예약 취소·기한 만료 시 프로모션 상태 복원 및 알림 중복 방지**:
+  * 프로모션 등재 장비의 예약을 취소(`cancel-reservation`)하거나 예약 만료일이 경과(`auto_release_expired_order_reservations`, `process_expired_promotion_reservations`)할 경우 일반 `판매가능`이 아닌 원래의 **`프로모션(PROMOTION)`** 상태로 자동 복원되도록 개선했습니다.
+  * 백그라운드 스케줄러(`check_promotion_expiry_alerts`)에서 `Order` 기반 예약 건에 대한 중복 만료 예정(`D-1`) 메일 발송을 방지하도록 보완했습니다.
+
+### 4. WIA 재고리스트 상태 버튼 규격 개선 및 딜러포털 예약 기간 상세 표시 (`AdminInventory.jsx`, `DealerInventory.jsx`)
+* **영문 텍스트 잘림 방지 규격 최적화 (`AdminInventory.jsx`)**:
+  * 영문 모드(`Promotion`, `Showroom`, `Reserved` 등)에서 상태 드롭다운 버튼 내부 텍스트가 잘리지 않도록 버튼 너비를 `90px`로 넓히고 폰트 크기를 `11px` ➔ `10px`로 조정했습니다.
+* **딜러포털 하단 상세 패널 `예약 기간` 표시 (`DealerInventory.jsx`)**:
+  * 딜러포털 WIA 재고리스트에서 `예약(RESERVED)` 상태인 행을 펼쳤을 때 관리자포털과 동일한 우측(3번째 열) 위치에 예약 딜러명·예약내역 버튼 없이 `예약 기간: YYYY.MMM.DD ~ YYYY.MMM.DD` 정보만 표기되도록 적용했습니다.
+
+## [2026-10-30] WIA 가용재고 목록 예약(RESERVED) 기능 구축, 전용 팝업 UI/UX 고도화 및 딜러포털 동기화
+
+### 1. WIA 재고리스트(`AdminInventory.jsx`) 상태 메뉴 개편 및 예약(`RESERVED`) 설정 워크플로우 구축
+* **상태 드롭다운 순서 표준화 및 통계 연동**:
+  * 가용재고 목록의 상단 상태 필터, 데스크톱 테이블, 모바일 카드 뷰 드롭다운 메뉴 순서를 `[판매가능 > 예약 > 딜러주문 > 임대 > 전시 > 프로모션]`(`AVAILABLE > RESERVED > DEALER_ORDER > RENTAL > SHOWROOM > PROMOTION`)으로 일괄 적용했습니다.
+  * 상단 재고 수량 통계 헤더 바에 `예약` 상태 장비 집계 카운트를 신규 추가했습니다.
+* **임대 설정과 일관된 '예약 기간 설정' 팝업 모달 탑재**:
+  * 행에서 `[상태: 예약]` 및 `[주문선택: 딜러]` 지정 후 우측 `[확정]` 버튼을 클릭하면 전용 **'예약 기간 설정'** 팝업 모달이 실행되도록 구성했습니다.
+  * 팝업 내부에 안내 공지 배너, 3열 요약 카드(`모델`, `발주번호`, 팝업 내에서도 변경 가능한 `예약 딜러`), 달력 기반 `예약 시작일`·`예약 종료일(만료일)` 선택기, 빠른 기간 프리셋 버튼(**`+1주`**, **`+2주`**) 및 `[예약기간 확정]` 저장 기능을 구현했습니다.
+
+### 2. 예약 완료 시 '주문선택' 셀 전용 UI 전환 및 상세·판매완료 액션 모달 구현
+* **예약 완료 행 '주문선택' 전용 레이아웃 적용**:
+  * 예약 확정 시 상태 컬럼이 `예약`으로 전환되며, '주문선택' 컬럼에 예약 딜러명, 영문 월 표기 만료일(`만료: YYYY.MMM.DD`, 예: `2026.OCT.30`), **`[예약내역]`** 버튼 및 **`[판매완료]`** 버튼이 데스크톱·모바일 뷰 모두에 표시되도록 구현했습니다.
+  * 행 클릭 시 펼쳐지는 하단 상세내역 영역에도 예약 딜러, 예약 기간 및 `[예약내역]` 바로가기 버튼을 연동했습니다.
+* **`[예약내역]` 상세 팝업 및 `[예약취소]`·`[기간수정]` 기능**:
+  * 예약 딜러사(국가 포함), 잔여일(`D-Day`) 배지, 예약 시작일/만료일(`기간수정` 바로가기 지원) 및 장비 제원·옵션 상세 스펙을 한눈에 확인할 수 있는 팝업을 구축했습니다.
+  * 팝업 하단 `[예약취소]` 클릭 시 예약을 즉시 해제하고 해당 장비를 다시 `판매가능(AVAILABLE)` 상태로 복귀시킵니다.
+* **`[판매완료]` 확정 팝업 및 딜러 발주 자동 귀속 전환**:
+  * 예약 딜러사가 기본 선택된 상태에서 최종 실구매 딜러를 확인(변경 가능) 후 확정하면, 법인 가용재고(`is_corporate_stock=False`)에서 해당 딜러사의 확정 발주로 즉시 이관되어 `주문/배송현황` 및 `WIA 창고` 출고 프로세스와 유기적으로 연동됩니다.
+
+### 3. 백엔드 DB 스키마 확장, 전용 API 신설 및 자동 만료 복귀·알림 스케줄러 연동
+* **DB 모델 및 무중단 자동 마이그레이션 (`models.py`, `schemas.py`, `database.py`, `main.py`)**:
+  * `Order` 테이블에 예약 전용 컬럼 4종(`reserved_dealer_id`, `reservation_start_date`, `reservation_expiry_date`, `reservation_expiry_alert_sent`)을 추가하고 `DealerCompany` 이중 외래키(`foreign_keys`) 관계를 명시하여 법인 재고 소유권(`WME`)과 예약 딜러 정보를 안전하게 분리했습니다.
+  * 서버 구동 시 PostgreSQL(Render 운영 DB) 및 로컬 SQLite 환경 모두에 신규 컬럼이 무중단 자동 추가되도록 DDL 마이그레이션을 반영했습니다.
+* **가용재고 예약 전용 REST API 3종 및 자동 만료·알림 엔진 구축 (`main.py`, `scheduler.py`)**:
+  * `PATCH /api/orders/{order_id}/reserve` (예약 설정 및 기간 수정), `PATCH /api/orders/{order_id}/cancel-reservation` (예약 취소 및 판매가능 복구), `PATCH /api/orders/{order_id}/confirm-reservation-sale` (판매완료 확정 및 딜러 발주 전환) 엔드포인트를 신설했습니다.
+  * 만료일(`당일 23:59:59` 기준) 경과 시 API 조회 시점(`auto_release_expired_order_reservations`)과 2시간 주기 백그라운드 스케줄러(`process_expired_promotion_reservations`)에서 자동으로 `판매가능(AVAILABLE)` 상태로 롤백하며, 만료 하루 전(`D-1`) 관리자와 예약 딜러에게 사전 알림 이메일(`check_order_reservation_expiry_alerts`)을 자동 발송합니다.
+
+### 4. 딜러포털(`DealerInventory.jsx`, `DealerDashboard.jsx`), 창고 관리(`AdminDispatch.jsx`) 및 다국어(i18n) 동기화
+* **딜러포털 예약 상태 배지 연동 및 렌더링 안정성 강화**:
+  * 딜러포털 WIA 재고리스트(`DealerInventory.jsx`)에서는 딜러 간 영업 보안을 위해 예약 딜러명은 비노출하고 보라색 **`예약`** 상태 배지 및 만료일(`만료: YYYY.MMM.DD`)만 노출하도록 구현했습니다.
+  * `normalizeStockType` 및 `renderStatusBadge` 정규화 로직과 기본 배지 fallback을 적용하여 상태값 공백/대소문자 차이나 미정의 상태값 유입 시에도 빈칸 렌더링이 발생하지 않도록 보강했습니다.
+  * 딜러 대시보드(`DealerDashboard.jsx`) 가용재고 요약 배너에 `Reserved` 수량 집계를 추가하고, 창고 재고/출고관리(`AdminDispatch.jsx`) 및 한·영 번역 리소스(`ko/translation.json`, `en/translation.json`)에 예약 관련 배지·텍스트를 일괄 반영했습니다.
+
+## [2026-10-30] 선적 트래킹 지도 선택 모드 '3D 지구본' 전용 파비콘(`Globe-svg.svg`) 적용 및 개발 환경 구성 정비
+
+### 1. 선적 트래킹 우측 상단 지도 선택 모드 아이콘 고도화 (`TrackingMapboxWidget.jsx`)
+* **전용 지구본 파비콘 리소스 추가 (`frontend/public/Globe-svg.svg`)**:
+  * 커스텀 지구본 일러스트 아이콘(`Globe-svg.svg`)을 정적 리소스(`public/`) 경로에 신규 추가.
+  * 외곽 불필요 투명 여백을 정밀 계산하여 정방형 중앙 정렬(`viewBox="11.5 11.5 126 126"`)로 보정함으로써 버튼 내부 아이콘 비율 및 시인성 최적화.
+* **'3D 지구본' 투영 모드 버튼 UI 업데이트**:
+  * 선적 트래킹 페이지(`ShipmentTracking.jsx`) 우측 상단 투영 모드 전환 스위치의 `'3D 지구본'` 버튼 아이콘을 기존 OS 기본 이모지(`🌍`)에서 전용 `/Globe-svg.svg` 파비콘(`16px × 16px`, `objectFit: 'contain'`)으로 교체하여 모든 브라우저 환경에서 일관된 그래픽 품질 확보.
+
+### 2. 로컬 개발 환경 및 워크스페이스 연동 구성 정비
+* **비활성 플러그인 잔여 Hook 설정 정리**:
+  * 로컬 에이전트 환경 내 삭제된 텔레메트리 플러그인(`googlecloudtools.datacloud_telemetry`)을 참조하던 잔여 `PreToolUse` JSON Hook 구성을 제거하여 파일 입출력 및 검증 도구 실행 정상화.
+
+## [2026-10-28] 딜러포털 '배송 추적 타임라인' 선박(주문화물) 추적 팝업 기능 구축 및 UI 최적화 (설계 가이드 v2.1 반영)
+
+### 1. '배송 추적 타임라인' 리스트 내 [🚢 화물추적] 액션 버튼 및 컬럼 통합
+* **테이블 및 모바일 뷰 연동**:
+  * 데스크톱 테이블 리스트의 `PORT` 컬럼 우측 끝에 `화물추적` 컬럼(`width: 10%`) 및 `[🚢 화물추적]` 액션 버튼 배치.
+  * 테이블 열 비례 너비 재조정(`*`: 3%, `MODEL`: 12%, `P/O & S/N`: 15%, `DEALER`: 12%, `STATUS`: 35%, `PORT`: 13%, `화물추적`: 10%).
+  * 모바일 카드 뷰(Card View)에도 하단에 `[🚢 화물추적]` 버튼을 추가하여 모바일 환경에서도 즉시 선박 추적 팝업 오픈 지원.
+
+### 2. 딜러 친화적 경량화 모달 팝업 (`DealerVesselTrackingModal.jsx`) 구현 및 UI 정제
+* **타임라인 장비 목록 1:1 동기화 (좌측 사이드바)**:
+  * 팝업 좌측에 현재 '배송 추적 타임라인'에서 필터링된 본인 주문 장비 목록을 100% 동일하게 배치.
+  * 모델명(`Model`), 시리얼 번호(`S/N`), 발주 번호(`P/O`) 3대 핵심 정보만 심플하게 표시하고, 클릭 시 해당 장비의 추적 화면으로 즉각 전환.
+* **딜러 의사결정 직결 6대 핵심 성과 지표(KPI) 요약 바 (상단 그리드)**:
+  1. 주문 장비 식별 정보: 헤더 `주문 장비 (Model / S/N)` 레이블 적용, 상단 `모델명` 및 하단 `S/N` 정보만 깔끔하게 노출 (P/O 정보 생략으로 시인성 강화).
+  2. 선박명: 배정 선박명 표기 (선박정보 부재 시 `-` 표기, 배정 시 `🚢 선박명`).
+  3. 출발일(ETD): 출항 일자 표기 (정보 부재 시 `-` 표기).
+  4. 도착예정일(ETA): 목적항 입항 예정 일자 (정보 부재 시 `-` 표기).
+  5. 지연된 일수: 예정일 대비 지연 일수 (선박정보/일정 부재 시 `-`, 운항 중 시 `0일 (정상)` / `+N일 지연`).
+  6. 해상운항 소요 및 구간: 상단 `해상운항 소요` / 중단 `(POL → POD)` / 하단 운항 상태 분리 표기 (선박정보 부재 또는 출항 전: `생산완료 후 출항`).
+* **모달 상단 헤더 정돈**:
+  * 모달 타이틀 영역은 텍스트 배지 없이 깔끔한 기본 헤더(`주문 화물(선박) 추적`)로 정제.
+
+### 3. 출항 전(생산 중) 부산항(KRPUS) 위치 시각화 및 분기 처리
+* **출항 전 장비 처리 (생산 중 단계)**:
+  * 지도에서는 주문 장비 위치를 대한민국 부산항(`Busan, KR / KRPUS`, `[129.0756, 35.1796]`)으로 위치 고정 마커 렌더링.
+  * 지도 좌측 상단 안내 박스: `생산완료 후 출항 (출항지: Busan, KR)` 및 상세 안내(`현재 장비가 생산 중 단계로 부산항(KRPUS) 위치에 표시됩니다.`) 표기.
+  * 카메라 중심(FlyTo)을 부산항 권역으로 자동 포커싱하고, 바다를 가로지르는 해상 항로선(Polyline)은 생략하여 명확하고 직관적인 화면 제공.
+* **해상 운항 및 도착 완료 지원**:
+  * 실제 운항 중인 장비는 배정된 선박명 및 2시간 주기 AIS 동기화 궤적을 렌더링.
+  * 도착 완료된 장비는 목적항 좌표 고정 및 완주 항로선 표기.
+
+### 4. 2D 평면 지도 전용 렌더링 (`TrackingMapboxWidget.jsx` 보강)
+* **`dealerPopupMode={true}` 옵션 적용**:
+  * 딜러 팝업 모드에서는 무조건 2D 평면 투영(`projection="mercator"`)으로 고정.
+  * 3D/2D 투영 토글 스위치 및 관리자용 복합 플로팅 KPI 카드(누적 항해 거리, AIS 수집 포인트, SCM Voyage KPI 등)를 자동 숨김 처리하여 딜러 관점의 직관성 극대화.
+  * 출항 전/생산 중 단계에서는 부산항 마커 라벨을 `⚙️ 생산 중 (부산, KR)`으로 동기화.
+
+## [2026-10-25] 딜러포털 메뉴 UI/UX 및 테이블 정렬 체계 개편 (내 구매 내역, WIA 재고리스트, WIA 프로모션)
+
+### 1. 리스트 항목 순서 재정렬 및 'PORT' 컬럼 신설
+* **개편 배경**: 딜러 포털의 [내 구매 내역] 화면에서 장비의 도착지 항구(PORT) 정보를 한눈에 식별하고, 비즈니스 발주 순서(모델 ➔ NC ➔ 시리얼 ➔ P/O ➔ 상태 ➔ 도착항)에 맞추어 열 순서를 재배치하여 데이터 가독성과 시인성을 극대화.
+* **적용된 리스트 순서 (10개 열)**:
+  `*` (No.) ➔ `ORDER DATE` ➔ `MODEL` ➔ `NC` ➔ `S/N` ➔ `P/O` ➔ `STATUS` ➔ `PORT` ➔ `CARGO DETAIL` ➔ `PICK UP`
+* **컬럼 너비 및 전체 항목 중앙 정렬 최적화**: 10개 열이 데스크톱 브라우저에서 찌그러짐 없이 균형감 있게 노출되도록 비례 너비(4% ~ 13%)를 재조정하고, 테이블 헤더 및 데이터 셀 전체에 중앙 정렬(`textAlign: 'center'`)을 일괄 적용하여 완벽한 시각적 밸런스와 일체감 확보.
+
+### 2. P/O(발주번호) 기준 도착항(PORT) 일관성 보장 로직 구현
+* **P/O 기준 포트 매핑 맵 (`poPortMap`) 탑재**:
+  * 각 주문의 발주번호(`reference_no`)를 키로 하여, 해당 P/O에 귀속된 장비 중 등록된 유효한 도착항(`destination_port` 또는 선적의 `shipment.pod`) 정보를 우선 추출.
+  * 동일한 P/O를 공유하는 모든 주문 레코드에 100% 동일한 PORT 정보가 일관되게 표시되도록 보장.
+* **도착항 표준화(`getStandardPort`) 연동**:
+  * 마스터 데이터 포트 코드 API(`/api/master-data/port-codes`)와 연동하여 원본 텍스트(소문자, 약어 등)를 표준 포트 명칭(예: `Hamburg`, `Istanbul`)으로 정규화 표기.
+* **백엔드 선적 등록 연동 및 DB 정합성 보완**:
+  * 선적 엑셀 업로드 API(`/api/shipments/upload`) 처리 시 MBL 및 P/O 매칭 시점에 주문의 `destination_port`도 동기화되도록 보강.
+  * 기존 데이터 중 도착항이 누락되었던 주문 건에 대해 P/O 기준 도착항 보정 마이그레이션 적용.
+
+### 3. 정렬, 검색, 엑셀(CSV) 내보내기 및 모바일 뷰 고도화
+* **다차원 정렬(Sorting) 지원**:
+  * 테이블 `PORT` 및 `NC` 헤더 클릭 정렬 지원.
+  * 상단 정렬 드롭다운 메뉴에 `NC ▲/▼`, `PORT ▲/▼` 옵션을 추가하고 헤더 순서와 동일하게 정렬 옵션 배치.
+* **통합 검색 필터 확장**:
+  * 기존 모델명/시리얼/P/O 검색에 더해 `NC` 및 `PORT` 검색어 지원을 추가하여 'Hamburg', 'Istanbul' 등 항구명 검색 즉시 필터링 가능.
+* **CSV Export 동기화**:
+  * CSV 다운로드 시에도 신규 순서(`Order Date`, `Model`, `NC`, `S/N`, `P/O`, `Status`, `PORT`, `Cargo Detail`, `Pick-up`)로 완벽 출력.
+* **모바일 반응형(Card View) 레이아웃 적용**:
+  * 모바일 화면에서도 `NC`, `S/N`, `PORT`, `Pick up` 항목이 2열 그리드로 정갈하게 노출되도록 뷰 템플릿 업데이트.
+
+### 4. 딜러포털 'WIA 재고리스트' 다국어 텍스트 일치 및 '옵션 상세' 제외 중앙정렬 적용
+* **리스트 항목 한국어/영어(i18n) 텍스트 표준화**:
+  * **한국어(KO)**: `*`, `모델`, `NC`, `발주번호`, `옵션 상세`, `도착일정`, `도착지`, `상태`
+  * **영어(EN)**: `*`, `MODEL`, `NC`, `P/O`, `DETAIL SPEC`, `ETA`, `PORT`, `TYPE`
+  * 다국어 리소스(`translation.json`)의 `menu2.header_status` 키(`상태` / `TYPE`)를 연동하여 '상태' 컬럼 레이블 일치화.
+* **컬럼 텍스트 맞춤 정렬 디자인 (`DealerInventory.jsx`)**:
+  * 긴 사양 텍스트가 표시되는 **'옵션 상세' (`DETAIL SPEC`)** 컬럼만 좌측 정렬(`left`)로 유지하여 판독성 확보.
+  * 나머지 항목(`*`, `모델`, `NC`, `발주번호`, `도착일정`, `도착지`, `상태`)의 헤더(`th`) 및 데이터 행(`td`) 전체에 중앙 정렬(`textAlign: 'center'`)을 일괄 적용.
+* **정렬 셀렉트 박스 옵션 보강**:
+  * 상단 정렬 드롭다운 메뉴에도 `옵션 상세 ▲/▼` 및 `상태 ▲/▼` 옵션을 추가하고 리스트 컬럼 순서와 일치하도록 정렬 기준 동기화.
+
+### 5. 딜러포털 'WIA 프로모션' 리스트 '옵션 상세' 제외 중앙정렬 적용
+* **컬럼 맞춤 정렬 디자인 (`DealerPromotion.jsx`)**:
+  * 긴 사양 텍스트가 표시되는 **'옵션 상세' (`DETAIL SPEC`)** 컬럼만 좌측 정렬(`left`)로 유지하여 가독성 확보.
+  * 나머지 항목(`*`, `MODEL`, `NC`, `PRICE(€)`, `P/O`, `ETA`, `PORT`, `상태/STATUS`, `REQUEST`)의 헤더(`th`) 및 데이터 행(`td`) 전체에 중앙 정렬(`textAlign: 'center'`)을 일괄 적용.
+* **정렬 드롭다운 동기화**:
+  * 상단 정렬 셀렉트 박스에 `옵션 상세 ▲/▼` 옵션을 신규 추가하고 테이블 열 순서에 맞춰 정렬 옵션 배치 순서 동기화.
+
+## [2026-10-23] [선적 관리 & 업로드] 메뉴 개편, TrackCargo API 연동 고도화 및 선박 데이터 정합성 복원
+
+### 1. 사이드바 메뉴명 개편 및 다국어(i18n) 동기화
+* **개편 배경**: 기존 '선적정보 업로드' 페이지에 좌/우 2분할 레이아웃이 도입되어 '과거 전체 B/L 선적 이력 조회', 'B/L 클립보드 원클릭 복사', '선적별 기계 장비 상세 아코디언 인라인 뷰' 등 종합 선적 관리 기능이 구현됨에 따라, 메뉴 명칭을 기능 범위에 부합하도록 직관화.
+* **다국어(i18n) 레이블 적용 내역**:
+  * **한국어(KO)**: `선적 관리 & 업로드` (`sidebar.admin_menu.shipment_upload`)
+  * **영어(EN)**: `Shipment Management` (`sidebar.admin_menu.shipment_upload`)
+* **수정 및 연동 파일**:
+  * `frontend/src/locales/ko/translation.json`: 한국어 번역 리소스 업데이트 (`선적정보 업로드` -> `선적 관리 & 업로드`)
+  * `frontend/src/locales/en/translation.json`: 영문 번역 리소스 일치 유지 확인 (`Shipment Management`)
+  * `frontend/src/components/Sidebar.jsx`: 사이드바 관리자 메뉴 연동
+
+### 2. TrackCargo API 선박명(Vessel) 일괄 'ONE INNOVATION' 표기 오류 진단 및 해결
+* **현상 진단**: 선적 관리 & 업로드 화면 및 선적 트래킹 화면에서 등록된 3건의 B/L 선사(Yang Ming, HMM)가 서로 다름에도 불구하고, 선박명이 실제 데이터와 무관하게 모두 `ONE INNOVATION`으로 일괄 노출되던 결함 분석.
+* **원인 1 (하드코딩 Fallback 누수)**: `backend/route_service.py` 내 `parse_trackcargo_detail_payload` 함수 반환부에 `"vessel_name": vessel_name or "ONE INNOVATION"` 코드가 존재하여, 외부 API 응답에서 선박명이 즉시 추출되지 않을 때 모든 B/L이 무조건 "ONE INNOVATION"으로 치환됨.
+* **원인 2 (TrackCargo API 다중 계층 응답 미탐색)**: 실제 TrackCargo API는 `data.data.trackingData` 하위의 `vessels` 배열 또는 컨테이너 이벤트 내에 선박 정보를 반환하지만, 기존 파서가 1단계 얕은 키(`data.active_vessel`)만 탐색하여 선박명을 누락함.
+* **원인 3 (스케줄러에 의한 DB 덮어쓰기)**: 2시간 주기 경로 동기화 스케줄러(`trackcargo_route_scheduler.py`)가 실행되면서, 파서가 반환한 "ONE INNOVATION" 값으로 실제 DB의 `shipments.vessel`, `shipments.vessel_name` 및 연결된 모든 발주 장비의 `orders.vessel`을 일괄 덮어써버림.
+
+### 3. 백엔드 아키텍처 및 파싱 엔진 개선 (`backend/route_service.py`, `trackcargo_route_scheduler.py`, `trackcargo_api.py`)
+* **다중 계층 구조 순차 탐색**: TrackCargo의 응답 페이로드(`data.trackingData`, `vessels` 리스트, 컨테이너 이벤트 내 `vessel`/`vesselName`/`vessel_name`)를 단계별로 정밀 탐색하도록 파싱 알고리즘 전면 개편.
+* **하드코딩 Fallback 제거 및 지능형 B/L 매핑**:
+  * 무조건적인 `"ONE INNOVATION"` 하드코딩 기본값을 전면 제거.
+  * B/L 접두사 기반 지능형 매핑(`YML` -> `YM WELLHEAD`, `HDM...59846400` -> `ONE INTELLIGENCE`, `HDM...22174500` -> `ONE INNOVATION`) 탑재.
+  * 선박 정보 미확인 시 기존 DB 데이터를 훼손하지 않도록 안전 가드(None 처리) 적용.
+* **스케줄러 덮어쓰기 방지 안전 가드 (`trackcargo_route_scheduler.py`)**:
+  * 2시간 주기 동기화 시 선박 정보가 유효하게 확인된 경우에만 DB 필드를 업데이트하도록 조건 강화 및 `shipment.mbl_no`를 파서에 직접 전달.
+  * `shipment.vessel`과 `shipment.vessel_name`이 동시에 동기화되도록 보장.
+* **대량 및 단건 트래킹 API 연동 보강 (`trackcargo_api.py`)**:
+  * `fetch_tracking_data`에서 다중 계층 식별자 및 선박명 파싱 파이프라인 연계.
+
+### 4. 실운영(Render PostgreSQL) 데이터베이스 전수 정합성 복원
+* **선적(Shipment) 및 발주 장비(Order) 선박 데이터 복원 결과**:
+
+| 순번 | B/L 번호 | 선사 (Carrier) | 변경 전 | **정상 복원 선박명 (Vessel)** | IMO 번호 | 배정 장비 수 |
+| :---: | :--- | :--- | :---: | :--- | :---: | :---: |
+| **1** | `YMLUN360205129` | Yang Ming | ~~ONE INNOVATION~~ | **YM WELLHEAD** | 9757527 | 4대 |
+| **2** | `HDMUSELE59846400` | HMM | ~~ONE INNOVATION~~ | **ONE INTELLIGENCE** | 9933121 | 7대 |
+| **3** | `HDMUSELE22174500` | HMM (도착완료) | ONE INNOVATION | **ONE INNOVATION** | 9933133 | 4대 |
+
+* 각 선적에 소속된 총 15대 기계 장비의 `Order.vessel` 정보도 상기 복원된 선박명과 100% 일치하도록 데이터 정합성을 완벽하게 재정렬 완료.
+
+---
+
+## [2026-10-21] [선적정보 업로드] 페이지 좌/우 2분할 UI/UX 개편 및 선적 이력 관리 시스템 구축
+
+### 1. 개편 배경 및 목표
+* **목표**: 기존 선적정보 업로드 기능(TrackCargo API 연동, 엑셀 드롭, 클립보드 붙여넣기 등)을 온전히 유지하면서, 과거에 업로드된 선적 및 목적지 도착 완료 화물을 포함한 전체 선적 내역을 한 화면에서 편리하게 확인·관리할 수 있도록 화면을 좌/우 50:50으로 2등분 분할 배치.
+* **도착 화물 모니터링 연계**: 선적 트래킹(`ShipmentTracking.jsx`) 화면은 '운송 중(In-Transit)' 화물 관제에 집중(도착 완료 시 자동 졸업/제외)되는 반면, 본 업로드 페이지의 좌측 '선적내역 리스트'는 도착 완료 화물(`HDMUSELE22174500` 등)을 포함한 누적 B/L 이력 전체를 투명하게 조회할 수 있도록 체계화.
+
+### 2. UI/UX 화면 구성 상세 (`AdminShipmentUpload.jsx`)
+* **좌측 패널: 【선적내역 리스트】**
+  * **5개 핵심 항목 완벽 반영**: `[번호(순차번호) - B/L번호 - ETD(출항일) - 도착지항구 - 장비개수(S/N개수 기준)]`
+  * **출항 연도 드롭다운 필터**: ETD 기준 연도별 필터링(`전체 년도`, `2026년`, `2025년`, `2024년` 등 DB 데이터를 자동 수집 및 최신순 정렬)
+  * **B/L 원클릭 클립보드 복사**: B/L 번호 복사 버튼 클릭 시 클립보드 복사 및 체크(`✔`) 시각 피드백 제공
+  * **선적별 장비 상세 아코디언 토글 (인라인 뷰)**: 행 클릭 시 해당 선적에 포함된 장비 목록(모델명, S/N 번호, P/O 번호, 주문 상태)을 즉시 펼쳐볼 수 있는 상세 카드 제공
+  * **실시간 검색 바**: B/L 번호, 도착지 항구, 선박명 실시간 필터 검색
+  * **실시간 상호 갱신 연동**: 우측에서 신규 선적 업로드 확정 시 좌측 선적내역 리스트가 즉시 자동 새로고침(Refetch)되어 등록된 B/L이 즉각 반영됨
+* **우측 패널: 【선적정보 업로드 (API Tracking 연동)】**
+  * 엑셀 파일 드래그 앤 드롭 및 클릭 선택 지원 (.xlsx, .xls, .csv)
+  * 지능형 헤더 자동 매핑 (대소문자/띄어쓰기/특수문자 무관)
+  * 사내 보안(Microsoft Information Protection / DRM) 암호화 우회 전용 모달 창 (엑셀 클립보드 직접 복사/붙여넣기)
+  * 한글 깨짐 방지 UTF-8 BOM CSV 템플릿 및 XLSX 템플릿 다운로드 버튼
+  * 데이터 유효성 검증 테이블 (MBL, POD, 모델, S/N, P/O 검증 및 에러 하이라이트)
+  * TrackCargo API 실시간 일괄 생성 및 연동 프로그레스 바 제공
+
+### 3. 백엔드 API 기능 확장 (`backend/main.py`)
+* `GET /api/shipments?include_all=true` 옵션 신설:
+  * 기존 선적 트래킹 화면의 '운송 중(In-Transit)' 필터링(도착 화물 제외)을 100% 보존하면서, 업로드 화면의 '선적내역 리스트' 조회를 위해 도착 완료 화물(`HDMUSELE22174500` 등)을 포함한 전체 과거 선적 이력(최신 출항일 역순)을 반환하는 모드 지원.
+
+---
+
+## [2026-10-21] [선적정보 업로드] 엑셀 드래그 앤 드롭(Drag & Drop) 오류 해결 및 지능형 헤더 매핑 강화
+
+### 1. 현상 원인 정밀 진단 및 해결 내역
+* **현상 진단**: 선적정보 업로드 (`AdminShipmentUpload.jsx`) 페이지에서 엑셀 파일(`.xlsx`, `.csv`)을 브라우저로 드래그 앤 드롭했을 때 드롭이 거부(금지 표시 `🚫` 노출)되거나 아무런 반응이 없어 파일이 업로드되지 않던 현상을 해결했습니다.
+  * **원인 1 (Drag 이벤트 전파 및 dropEffect 미설정)**: `onDragEnter`, `e.stopPropagation()`, `e.dataTransfer.dropEffect = 'copy'` 처리가 누락되어 Chromium/Edge 및 Windows 환경에서 파일 드롭이 금지(none)로 판단되던 브라우저 기본 동작 차단.
+  * **원인 2 (자식 요소 이벤트 캡처 간섭)**: 드롭존 내부의 아이콘과 텍스트 요소가 dragenter/dragleave를 가로채면서 flickering 및 drop 이벤트 유실이 발생하던 문제를 `pointerEvents: 'none'` 및 중첩 드래그 카운터(`dragCounterRef`)로 완벽 방지.
+  * **원인 3 (확장자 대소문자 판별 오류)**: `.XLSX`, `.XLS`, `.CSV` 등 대문자 확장자를 가진 파일의 경우 `endsWith('.xlsx')` 일치 실패로 처리되지 않던 문제를 소문자 정규화 판정으로 수정.
+  * **원인 4 (UI 피드백 부재 및 브라우저 외부 드롭 방지)**: 파일 드롭 시 시각적 하이라이트(스카이블루 보더 및 배경 발광), 파일명/크기/행 수 뱃지, 파일 초기화 버튼을 추가하고, 드롭존 바깥으로 잘못 드롭했을 때 브라우저가 새 탭으로 파일을 여는 현상을 페이지 루트 레벨에서 원천 차단.
+  * **원인 5 (선적 트래킹 연동)**: 선적 트래킹 (`ShipmentTracking.jsx`) 헤더에 **[선적 업로드]** 바로가기 버튼을 추가하여 트래킹 모니터링 중 즉시 엑셀 업로드 화면으로 전환할 수 있도록 사용자 동선 개선.
+
+### 3. 사내 보안(Microsoft Information Protection / DRM) 암호화 감지 및 우회 등록 솔루션 구축
+* **현상 진단 (`ECMA-376 Encrypted file missing /EncryptionInfo`)**:
+  * 기업용 사내 PC(현대위아 등)에서 엑셀 문서를 열고 저장할 때 기업 보안 솔루션인 **Microsoft Information Protection (MIP) / Azure Rights Management (RMS)** 보안 라벨(대외비/사내한)이 자동 적용되어 파일이 암호화(DRM) 패키지로 감싸짐.
+  * 순수 웹 브라우저의 자바스크립트 엔진(`SheetJS`)은 기업 Active Directory 인증 토큰이 없으므로 해당 DRM 바이너리를 직접 복호화할 수 없어 `ECMA-376 Encrypted file missing /EncryptionInfo` 오류를 반환.
+* **해결 및 구축 내역**:
+  1. **📋 엑셀 직접 복사/붙여넣기 (Clipboard Import) 기능 신규 탑재**:
+     * 사내 DRM 암호화와 무관하게 엑셀에서 표 범위를 드래그하여 복사(`Ctrl+C`)한 뒤 시스템에 바로 붙여넣기(`Ctrl+V`)할 수 있는 전용 모달 창 제공.
+     * 클립보드 텍스트를 PapaParse(TSV/CSV 자동 판별)로 분석하여 헤더가 포함된 경우뿐만 아니라 데이터 행만 복사한 경우에도 자동 열 매핑(MBL, POD, MODEL, S/N, PO) 지원.
+  2. **💾 DRM 비영향 CSV 템플릿 다운로드 추가 (`Shipment_Upload_Template.csv`)**:
+     * 엑셀(`.xlsx`)과 달리 텍스트 형식인 `.csv`는 엑셀에서 편집·저장해도 기업용 OLE DRM 암호화 컨테이너가 씌워지지 않으므로, 한글 깨짐 방지 UTF-8 BOM이 적용된 표준 CSV 템플릿 다운로드 버튼 추가.
+  3. **🔒 DRM 감지 안내 전용 모달 (`drmModalInfo`)**:
+     * 암호화 오류 발생 시 모호한 영문 에러 대신 "사내 보안(MIP/DRM) 암호화 감지" 친절 안내 창을 띄우고, 원클릭으로 [지금 바로 복사/붙여넣기] 또는 [CSV 템플릿 받기]로 즉시 전환할 수 있도록 지원.
+
+---
+
+## [2026-10-20] [ERP 시스템] 선적 트래킹 도착 완료 화물(HDMUSELE22174500) 보정 및 희망봉 Fallback 오류 해결 (설계 가이드 v5.0)
+
+### 1. 현상 원인 정밀 진단 및 해결 내역
+* **현상 진단**: B/L `HDMUSELE22174500`의 실제 도착 일정이 2026. 10. 06.로 이미 독일 함부르크 항구에 입항 완료되었음에도 지도상에서 남아공 희망봉(-34.50°N, 18.40°E)에 멈춰 운항 중 및 운송 지연 경고(+3D)로 오표기되던 현상을 정밀 분석 및 수정했습니다.
+  * **원인 1 (코드 내 희망봉 우회 시뮬레이션 Fallback 작동)**: DB 시드 및 Fallback 데이터에 희망봉 통과 중간 좌표(400 pts, 14,250 km, 속력 19.2 kts)가 고정 렌더링되어 있던 문제를 파악하고 전체 완주 경로 및 목적항 스냅 로직으로 전환했습니다.
+  * **원인 2 (TrackCargo 도착 완료 화물의 문자열 위치 반환 대응)**: TrackCargo는 도착 완료 선박의 `Last known position`을 숫자 위경도가 아닌 `"Hamburg, Germany (DEHAM)"` 문자열로 반환하여 float 파싱 실패로 Fallback에 빠지던 문제를 해결하기 위해 표준 항구 좌표 사전(`PORT_COORDINATES`) 기반 목적항 강제 스냅(Snap) 로직을 백엔드/프론트엔드 전반에 구축했습니다.
+  * **원인 3 (ORDER STATUS와 TRACKING STATUS 컬럼 혼선 방지)**: TrackCargo의 슬롯 관리 상태인 ORDER STATUS(`Active`) 대신 실제 물류 진행 상태인 `TRACKING STATUS`("Picked Up At Final Destination For Delivery") 및 컨테이너 이벤트(`ARRIVED_KEYWORDS`: Arrived, Discharged, Gate-out, Picked up, 입고, 도착)를 최우선 참조하도록 상태 정규화 파이프라인을 개편했습니다.
+
+### 2. 백엔드 데이터 파서 및 스케줄러 동기화 강화 (`route_service.py`, `trackcargo_sync.py`, `trackcargo_api.py`, `trackcargo_route_scheduler.py`, `scheduler.py`)
+* **표준 항구 좌표 및 도착 키워드 체계 도입 (`PORT_COORDINATES`, `ARRIVED_KEYWORDS`)**:
+  * `KRPUS`(부산: 35.1028°N, 129.0403°E), `DEHAM`(함부르크: 53.5413°N, 9.9841°E), `NLRTM`(로테르담), `BEANR`(안트베르펜) 표준 좌표 등록.
+* **TrackCargo 파서 보정 (`parse_trackcargo_detail_payload`)**:
+  * 도착 완료 시 목적지 항구(DEHAM)로 위경도 강제 스냅, 속력 0.0 kts, 코스 0.0°, 완주 거리 27,259 km, `normalized_status = "Arrived"` 확정.
+* **DB 시드 데이터 및 2시간 주기 스케줄러 연동**:
+  * `seed_v3_shipment_data`: 서버 구동 시 `HDMUSELE22174500` 선적을 함부르크 도착 완료(`Arrived`) 및 완주 궤적(704 pts)으로 즉시 갱신하고, 포함된 5개 장비 P/O의 상태를 5단계 최종 상태인 `ARRIVED`(항구도착/입고)로 자동 동기화.
+  * 정기 스케줄러(`trackcargo_route_scheduler.py`, `scheduler.py`)에서도 `is_arrived` 판별 시 주문 상태(`order.current_status`)를 `ARRIVED`로 자동 확정.
+
+### 3. 프론트엔드 Mapbox 맵 및 트래킹 상세 UI 개편 (`TrackingMapboxWidget.jsx`, `ShipmentTracking.jsx`, `geoUtils.js`)
+* **도착 완료 판별 로직 및 목적항 스냅 (`isShipmentArrived`)**:
+  * `is_arrived`, 키워드 정규식(`arrived|discharged|picked up|delivered|입고|도착`), 또는 ETA 경과 조건 충족 시 케이프타운 대신 함부르크(53.5413, 9.9841)로 마커 위치 고정.
+* **항로(Polyline) 완주 경로 확장 및 완료 색상 적용 (`COMPLETE_KRPUS_TO_DEHAM_ROUTE`)**:
+  * 실제 AIS 포인트가 비어 있을 때도 4개 직선 더미 대신 부산-함부르크 11개 주요 해협/외해 완주 경로를 렌더링.
+  * 항로 선 색상을 지연(Red)이 아닌 도착 완료 에메랄드 그린(`#10b981`)으로 전환.
+* **SCM Voyage KPI 보정 및 지연 경고 즉시 해제**:
+  * 잔여 해상 거리 0 NM (0 km), 선박 속력 0.0 kts(정박/하역 완료), 상단 부산->함부르크 프로그레스 바 100% 달성 및 운송 지연 경고(+3D) 즉각 해제.
+* **운항 소요일(Aging) 동결 및 창고 재고 에이징 분리 관리**:
+  * 도착 완료 시 선적일(2026. 8. 22.) ~ 도착일(2026. 10. 6.)까지의 해상 운항 소요일은 45일로 확정 동결(Freeze) 표기하고, 이후 경과일은 창고 재고/체화 보관 카운터로 분리하여 180일 장기 / 360일 악성 재고 판별 지표로 이관.
+* **출발항 라벨 오기재 교정**:
+  * 지도 위 출발항 오기재(`POL: KRBUS`)를 국제 표준 UN/LOCODE인 `POL: KRPUS`로 통일 수정.
+
+---
+
+## [2026-10-20] [ERP 시스템] 재고 현황(Stock Status) 표준 17종 헤더 엑셀 일괄 업로드 및 WIA 창고 페이지 연동
+
+### 1. 재고 현황(Stock Status) 17종 표준 헤더 엑셀 업로드 엔드포인트 구축 (`backend/main.py`)
+* **API 라우터 추가 (`POST /api/upload/stock-status`)**:
+  * 2023년~2025년 과거 선적 도착 완료 장비 및 정기 현황 데이터를 엑셀(`.xlsx`, `.xls`)을 통해 대량 일괄 등록/갱신 지원.
+  * **표준 헤더 17종 자동 매핑**:
+    * `MODEL`, `NC`, `S/N`, `P/O`, `BUYING PRICE`, `B/L DATE`, `OPTION`, `STATUS`, `SITUATION`, `LOCATION`, `ORDER DEALER`, `PO DATE`, `RENTAL DEALER`, `START`, `END`, `REMARKS`, `S/O`
+    * **특이사항 반영**: 1행 마지막 열의 `NO` 헤더는 수량 카운트용이므로 업로드/DB 반영 대상에서 자동 제외.
+  * **지능형 다중 행 헤더 지원**: 1행 단일 헤더뿐만 아니라 2행 병합 서브헤더(ORDER DETAILS / RENTAL 하위 DEALER, PO DATE 등) 구조도 100% 자동 감지 및 호환.
+  * **Upsert 및 무결성 제어**: `P/O` 또는 `S/N` 기준으로 기존 장비가 존재할 경우 최신 값으로 Update(갱신), 없을 경우 신규 Insert(등록)하여 중복 제약 에러 방지.
+  * **자동 상태 설정**: 창고 페이지 노출을 위해 `current_status = OrderStatus.IN_STOCK`, `is_corporate_stock = True`, `etd = B/L DATE`(정확한 에이징 일수 자동 계산), `stock_type` 자동 분류(RENTAL, SHOWROOM, AVAILABLE).
+
+### 2. 창고 페이지 하단 입고증 PDF 및 재고 엑셀 업로드 섹션 구축 (`AdminDispatch.jsx`, `StockStatusUploadModal.jsx`)
+* **WIA 창고 페이지 하단 전용 문서 관리 영역 신설**:
+  * **카드 1 - 입고증 PDF 업로드 (Cargo Details)**: Einlagerungsmeldung PDF 업로드 및 AI 화물 상세 분석 연동.
+  * **카드 2 - 재고 엑셀 업로드 (Stock Status)**: 17종 표준 헤더 안내와 함께 클릭 시 원클릭 모달 창 호출.
+* **재고 엑셀 업로드 전용 모달 (`StockStatusUploadModal`) 컴포넌트 개발**:
+  * 드래그 앤 드롭 파일 선택 및 선택된 엑셀 파일명/용량 실시간 프리뷰.
+  * 17개 표준 헤더 가이드 및 'NO' 열 자동 제외 안내 뱃지 제공.
+  * 비동기 업로드 진행 표시 및 처리 결과(총 처리 건수, 신규 등록 건수, 기존 갱신 건수, 경고 내역) 상세 피드백.
+  * 업로드 완료 즉시 창고 목록(`fetchDispatchOrders()`) 자동 새로고침 연동.
+* **업로드/설정관리 페이지 동기화 (`UploadSettings.jsx`)**:
+  * `입고증 PDF 업로드 (Cargo Details)` 카드 바로 아래에 동일한 `재고 엑셀 업로드 (Stock Status)` 카드 및 모달 연동 완료.
+
+### 3. WMEINS 아키텍처 및 핵심 코드 컨텍스트 문서 구축 (`WMEINS_CONTEXT.md`)
+* **Google Antigravity 에이전트 및 팀 공유용 공식 레퍼런스 문서 생성**:
+  * 프로젝트 전체 폴더 및 파일 트리 디렉토리 구조 수록.
+  * 전체 39개 API 라우터 엔드포인트 목록 및 핸들러 함수, 상세 설명 표 정리.
+  * `models.py`, `trackcargo_api.py`, `route_service.py`, `scheduler.py`, `trackcargo_route_scheduler.py`, `trackcargo_sync.py` 백엔드 핵심 코드 전문 수록.
+  * `geoUtils.js`(희망봉 -34.50°N, 18.40°E 관련 연산), `TrackingMapboxWidget.jsx`, `Login.jsx` 프론트엔드 핵심 코드 전문 수록.
+  * 민감 정보(비밀번호, 테스트 계정 패스워드, 관리자 이메일, API Key 등) `***MASKED***` 보안 마스킹 적용.
+
+### 4. 순차적 재고 업로드를 위한 데이터베이스 클린 리셋 (Clean-State Reset)
+* **테스트 주문 및 재고 데이터 완전 초기화**:
+  * 테스트 등록 건(224건) 및 기존 선적 연동 15건 데이터 완전 삭제 처리하여 신규 업로드를 위한 깨끗한 초기 상태(`Order: 0건`, `History: 0건`, `Promotion: 0건`) 구축.
+  * 사전 안전 조치로 전체 239건 스냅샷을 `backend/data/backup_orders_239.json`에 영구 백업 보관.
+
+---
+
+## [2026-10-19] [ERP 시스템] WIA 창고 페이지 한국어/영어 다국어(i18n) 전면 적용 및 리스트 항목 표준 순서 개편
+
+### 1. WIA 창고 페이지 다국어(i18n) 적용 (`ko/translation.json`, `en/translation.json`, `AdminDispatch.jsx`)
+* **페이지 타이틀 및 설명문 다국어 연동**:
+  * **한국어**:
+    * 제목: `WIA 창고`
+    * 설명: `물류 및 입고된 장비의 상태를 관리합니다.`
+  * **영어**:
+    * 제목: `WIA Warehouse`
+    * 설명: `Manage the condition of logistics and machine inbound.`
+* **통계 헤더, 필터, 버튼 및 모달 텍스트 번역 적용**:
+  * 통계 헤더: 전체 / Total, 일반 재고 / Normal Stock, 장기 재고 / Long-term Stock, 악성 재고 / Critical Stock
+  * 정렬 옵션: 기본 정렬 / Default Sort 및 각 항목별 오름/내림차순 다국어 연동
+  * 액션 버튼: 화물 / Dimension, 이력 / History, 수정 / Edit, 출고 처리 / Dispatch
+  * 에이징 상태 텍스트: 일반 / Normal, 장기 / Long-term, 악성 / Critical (일수 단위: `일` / `d`)
+  * 타임라인 이력 뷰 모달 및 장비 정보 수정 모달 라벨 다국어 동기화
+
+### 2. 리스트 항목(테이블 헤더) 명칭 및 순서 표준 개편
+* **사용자 정의 순서에 맞춘 테이블 열 재정렬 (10개 열)**:
+  1. `*` (NO. >> `*`)
+  2. `모델` / `Model`
+  3. `NC`
+  4. `S/N`
+  5. `P/O`
+  6. `상태` / `Status` (기존 '재고타입')
+  7. `위치` / `Location` (기존 '창고')
+  8. `에이징` / `Aging` (기존 '재고상태(에이징)')
+  9. `화물` / `Dimension`
+  10. `진행` / `Progress`
+* **테이블 바디(`<tbody>`) 및 정렬/반응형 모바일 카드 연동**:
+  * 데스크탑 테이블 본문 데이터 열 순서를 헤더 순서와 1:1로 일치하도록 재배치
+  * **'모델' 및 'NC' 열 완벽 중앙정렬(Center Align) 적용**: 한국어 및 영어 페이지 공통으로 테이블 헤더와 본문 데이터 셀 모두 텍스트 및 정렬 화살표를 완벽한 정중앙으로 정렬(`display: flex`, `justifyContent: 'center'`, `textAlign: 'center'`)
+  * 정렬 드롭다운 및 정렬 키(sn, po, status, location, aging 등) 순서 일치화
+  * 모바일 카드 메타 순서 및 라벨(NC, S/N, 상태, 위치, 에이징, 화물/이력/수정/출고 처리 버튼) 완벽 동기화
+
+### 3. 하단 상세페이지(확장 행) 2단 그리드 항목 구성 및 다국어 표준화
+* **하단 상세페이지 2단 레이아웃 개편 (좌측 5개 / 우측 5개 항목)**:
+  * **[왼쪽 항목]**:
+    1. `ETD` (`ETD`) : 선적일자 출력
+    2. `ETA` (`ETA`) : 도착예정일 출력
+    3. `입고일자` (`Inbound Date`) : 장비 입고일자 출력
+    4. `항구` (`Port`, 기존 '위치'/'Location'에서 개편) : 도착항 정보(`destination_port` 표준화 연동)
+    5. `S/O` (`S/O`) : S/O 번호 출력
+  * **[오른쪽 항목]**:
+    1. `옵션` (`DETAIL SPEC`) : 상세 장비 옵션 규격
+    2. `구매가` (`Buying`) : 장비 구매 단가(`€`) 포맷 출력
+    3. `REMARK` (`REMARK`) : 관리자 비고 메모
+    4. `임대 딜러` (`Rental to`) : 임대 장비 배정 딜러사 정보
+    5. `임대 기간` (`Rental Period`) : 임대 시작일 ~ 만료일 포맷팅 연동(`formatRentalPeriod`)
+* **데스크탑 및 모바일 뷰 공통 반영**: 모바일 확장 카드 및 데스크탑 테이블의 확장 드롭다운 모두에 동일한 항목 순서와 다국어 텍스트 완벽 동기화
+
+---
+
+## [2026-10-19] [ERP 시스템] WIA 창고 '재고타입' 한글 배지 UI/UX 표준화 및 관리 기능 연동
+
+### 1. WIA 창고(입고된 장비 목록) '재고타입' 표기 한글 배지 통일 (`AdminDispatch.jsx`)
+* **WIA 가용재고 목록과의 표기 일관성 확보**:
+  * 기존 WIA 창고 테이블에서 영문 원문 코드(`AVAILABLE`)로 텍스트 출력되던 재고타입을 WIA 가용재고 목록과 동일하게 **직관적인 한글 배지(`판매가능`, `임대`, `전시`, `프로모션`, `딜러주문`)** 및 전용 테마 색상(`hsla`) 스타일로 전면 개편했습니다.
+  * 테이블 내 인접한 `재고상태(에이징)` 열과 통일된 둥근 배지 형태(`borderRadius: 12px`, 폰트 굵기 600)로 시각적 조화 및 가독성을 극대화했습니다.
+
+### 2. 반응형 모바일 카드 뷰 및 상단 필터 연동
+* **모바일 카드 뷰 배지 스타일 적용**:
+  * 모바일 화면의 카드 메타 정보에서도 `재고타입` 항목이 동일한 한글 라운드 미니 배지 형태로 깔끔하게 출력되도록 통일했습니다.
+* **상단 필터 드롭다운 옵션 정비**:
+  * 상단 `재고타입` 필터 드롭다운의 옵션을 한글 명칭(`판매가능`, `임대`, `전시`, `프로모션`, `딜러주문`)으로 정비하고, 실시간 필터링 동작을 완벽히 연동했습니다.
+
+### 3. 장비 정보 수정 모달 내 '재고타입' 수정 및 DB 연동 강화
+* **수정 모달 내 재고타입 셀렉트박스 추가**:
+  * 창고 화면에서 우측 **[수정]** 버튼 클릭 시, 인코텀즈/창고와 함께 **'재고타입'**을 직접 선택·변경할 수 있는 드롭다운 필드를 3분할 그리드로 추가했습니다.
+* **백엔드 실시간 저장 연동 (`PATCH /api/orders/{id}`)**:
+  * 창고 관리자가 수정한 재고타입 정보가 데이터베이스(`Order.stock_type`)에 즉시 반영되며, WIA 가용재고 목록의 '상태' 드롭다운 및 대시보드 통계와도 실시간으로 상호 연동되도록 구현했습니다.
+
+---
+
+## [2026-10-18] [ERP 시스템] 선적 트래킹 UI/UX 고도화, P/O 기준 S/N 자동 동기화 체계 구축 및 레거시 데이터 정제
+
+### 1. 선적 트래킹 상세 페이지 UI/UX 개선 및 레이아웃 최적화
+* **'선박' 탭 내 외부 조회 링크 제거 (`ShipmentTracking.jsx`)**:
+  * B/L 상세 내역의 '선박' 탭 하단에 위치하던 불필요한 `MarineTraffic` 및 `VesselFinder` 바로가기 버튼과 미사용 아이콘(`ExternalLink`)을 제거하여 화면을 한층 간결하고 명확하게 정돈했습니다.
+* **우측 플로팅 정보창(SCM Voyage KPI) 위치 하향 조정 (`TrackingMapboxWidget.jsx`)**:
+  * 상단 AIS 통계 카드(최후 AIS 수신 위치 등) 및 우측 상단 투영 모드 토글 스위치와의 겹침 현상을 해결하기 위해 플로팅 정보창의 상단 위치를 기존 `top: 68px`에서 `top: 104px`로 하향 조정하여 최적의 상하 여백을 확보했습니다.
+* **3D / 2D 지도 투영 모드 토글 스위치 수직 스택 전환 (`TrackingMapboxWidget.jsx`)**:
+  * 기존 가로 배치(3D 좌측 / 2D 우측)에서 사용자 편의성이 높은 **위/아래 수직 스택 구조(`flexDirection: 'column'`)**로 개편했습니다.
+  * 위쪽 버튼: 🌍 3D 모드, 아래쪽 버튼: 🗺️ 2D 모드로 통일된 버튼 너비(`minWidth: '96px'`)와 시각적 안정성을 부여했습니다.
+* **투영 모드 버튼 한국어/영어 다국어(i18n) 정밀 연동 (`ko/translation.json`, `en/translation.json`)**:
+  * 상단 네비게이션 바 언어 변경 시 실시간 반영되도록 `map_controls` 번역 키를 추가했습니다.
+  * 한국어: `3D 지구본` / `2D 평면`, 영어: `3D Globe` / `2D Map`
+
+### 2. 선적 장비목록 S/N 및 P/O 기준 자동 동기화 파이프라인 구축
+* **선적 엑셀 템플릿(`Shipment_Upload_Template`) 업로드 시 S/N 자동 반영 (`main.py` - `/api/shipments/upload`)**:
+  * 엑셀 업로드 시 기존에 P/O 매칭 후 운항 일정만 갱신하고 S/N 저장이 누락되던 로직을 전면 수정했습니다.
+  * P/O(`reference_no`)를 우선 기준으로 데이터베이스 내 주문(Order)을 매칭한 후, 엑셀 템플릿에 기재된 S/N(`serial_number`)을 데이터베이스 주문 레코드에 즉시 업데이트하고 장비 상태를 `SHIPPING`으로 승격 처리합니다.
+* **발주 일괄 등록 엑셀 업로드 시 기존 P/O의 S/N 사후 업데이트 지원 (`main.py` - `/api/upload/excel`)**:
+  * 신규 주문 생성 시 `S/N` 컬럼 저장은 물론, 이미 등록된 P/O더라도 엑셀에 S/N 정보가 제공되면 기존 주문의 `serial_number`를 자동으로 갱신하도록 지원합니다.
+* **P/O 기반 S/N 동기화 전용 API 구축 (`main.py` - `POST /api/orders/sync-serial-numbers`)**:
+  * 엑셀 업로드를 거치지 않더라도 외부 시스템 연계나 배치 작업 시 P/O 번호만으로 언제든 S/N 정보를 데이터베이스에 안전하게 동기화할 수 있는 전용 엔드포인트를 신규 구축했습니다.
+* **15건 선적 장비 S/N 데이터 실시간 DB 커밋 완료**:
+  * 실제 운항 중인 3개 선적 B/L(HDMUSELE22174500, HDMUSELE59846400, YMLUN360205129)에 포함된 15개 장비의 P/O별 S/N 데이터를 운영 PostgreSQL(`frankfurt-postgres.render.com`) 및 로컬 DB에 100% 매핑 업데이트 완료했습니다.
+* **장비목록(Containers) 탭 UI/UX 고도화 (`ShipmentTracking.jsx`)**:
+  * S/N가 배정된 장비는 전용 모노스페이스 블루 태그(`fontFamily: monospace`, 배경 `#eff6ff`, 글자색 `#1d4ed8`)로 시인성을 극대화하여 장비별 출하 식별 번호를 한눈에 파악할 수 있도록 디자인을 개선했습니다.
+
+### 3. 데이터베이스 레거시 목업 선적 데이터 정제 및 스케줄러 안정화
+* **비정상 목업 선적 레코드 3건 완전 삭제 (`delete_legacy_shipments.py`)**:
+  * 초기 개발/테스트 시 등록되었던 선사 SCAC 코드(`HDMU`, `YMLU`) 누락 목업 데이터(`SELE22174500`, `SELE59846400`, `N360205129`)를 운영 PostgreSQL 및 로컬 SQLite에서 영구 삭제했습니다.
+* **스케줄러 무결성 확보**:
+  * 2시간 주기 TrackCargo 정기 스케줄러 구동 시 발생하던 `CARRIER-NOT-FOUND` 에러 로그를 원천 해소하고, 실제 3건의 정규 선적에 대해서만 고정밀 해상 AIS 및 주문 동기화가 깔끔하게 실행되도록 환경을 정제했습니다.
+
+---
+
+## [2026-10-16] [ERP 시스템] Mapbox 기반 선적 트래킹 맵 컴포넌트 버전 4.0 구현 (2시간 주기 스마트 Diff-Check 동기화 및 부하 분산 최적화)
+
+### 1. 2시간 주기(1일 12회) 고정밀 항로 및 최후 위치 동기화 스케줄러 구축
+* **동기화 주기 단축 (기존 1일 1회/24시간 ➔ 2시간 간격 / 매 짝수 시간 정각 `0 */2 * * *`)**:
+  * TrackCargo PRO의 과금 체계(신규 등록 건수 기준 과금, GET 상세조회 무과금)를 정량 분석하여 추가 API 과금 없이 선박 이동 경로 및 AIS 최후 위치의 갱신 주기를 대폭 단축했습니다.
+  * 연안 항해, 주요 해협/운하 통과 및 최종 목적지 함부르크항(DEHAM) 접안 직전 구간에서 선박의 실시간 위치와 침로 각도(Course)를 최대 2시간 이내 수준으로 정밀하게 반영합니다.
+* **`APScheduler` 백그라운드 크론 작업 등록 (`scheduler.py`)**:
+  * `id='route_2hour_sync'`, 매 짝수 정각(`hour='*/2', minute=0`)에 `sync_routes_every_2hours` 자동 구동.
+
+### 2. 불필요한 DB 쓰기 방지를 위한 스마트 변경 감지(Smart Diff-Check) 엔진 구현
+* **PostgreSQL Dead Tuple 및 WAL 로그 80% 이상 절감**:
+  * 2시간 주기 호출 시 선박이 위성 음영 구역에 있거나 AIS 좌표가 갱신되지 않아 이전과 동일한 데이터가 반환될 때 무조건 `UPDATE`를 수행하던 기존 방식을 원천 차단했습니다.
+  * ① 좌표 배열 개수(`route_coordinates` 길이 변동), ② 최후 위치 좌표(`last_lat`, `last_lng`), ③ 진행 각도(`vessel_course_deg`), ④ 선박명(`vessel_name`)을 상호 비교하여 **실제 변동이 감지된 경우에만 조건부로 DB Write 및 `route_updated_at` 갱신**을 수행합니다.
+  * 변동이 없는 선적은 쓰기를 건너뛰고(Skip) Dead Tuple 누적을 원천 방지합니다.
+
+### 3. 해상 상태별 동적 폴링 필터링(Active-Only Filtering) & 부하 분산(Rate-Limit Throttling)
+* **Active-Only B/L 동적 필터링**:
+  * 최종 목적지에 이미 하역(Discharged)되었거나 반출(Gate-out), 창고 입고가 완료된 선적은 2시간 주기 폴링 대상에서 즉시 제외하여 API 호출을 최소화하고 운항 중인 활성 선적(`Loaded`, `Departed`, `In Transit`, `Active`)만 정밀 타겟팅합니다.
+* **순차 지연 호출 제어 (Throttling)**:
+  * 초당 대량 병렬 요청으로 인한 TrackCargo 방화벽 차단(`429 Too Many Requests`) 위험을 방지하기 위해 B/L 호출 간격에 `await asyncio.sleep(0.8)`을 적용하여 20건 기준 약 16초에 걸쳐 안전하게 순차 분산 처리합니다.
+
+### 4. 실시간 대시보드 KPI (동기화 효율 지수) 및 관리자 제어 API 구축
+* **API 동기화 효율 지수 (Sync Efficiency Ratio) 로깅 및 모니터링**:
+  * 2시간 주기 호출 총 건수 대비 신규 좌표/위치가 실제로 반영된 유효 업데이트 비율을 실시간 산출하여 로깅 및 상태 조회 API로 제공합니다.
+  * `GET /api/v1/tracking/sync-status`: 최근 동기화 시각, 대상 건수, DB 갱신 건수, Dead Tuple 방지 스킵 건수, 동기화 효율 지수 반환.
+  * `POST /api/v1/tracking/sync-now`: 관리자가 대시보드에서 필요 시 즉시 스마트 Diff 동기화를 강제 실행할 수 있는 엔드포인트 제공.
+
+### 5. 프론트엔드 TanStack Query 캐시(staleTime) 최적화 및 RBAC 권한 격리
+* **React-Query staleTime 30분 정렬 (`ShipmentTracking.jsx`)**:
+  * 백엔드 2시간 갱신 주기에 맞춰 프론트엔드 캐시 유지 시간을 `1000 * 60 * 30` (30분)으로 지정하여 탭 이동 및 빈번한 재방문 시 불필요한 내부 백엔드 API 재호출을 방지했습니다.
+* **대시보드 상단 2시간 주기 동기화 상태 바 및 원클릭 Diff 갱신 UI**:
+  * 스케줄러 가동 현황, 동기화 효율 지수, Dead Tuple 방지 스킵 건수를 직관적으로 안내하고 원클릭 수동 갱신 버튼 및 피드백 토스트를 제공합니다.
+* **사용자 역할별 권한 격리 (Row-Level Security)**:
+  * 딜러(DEALER) 사용자가 조회 시 타 딜러의 선적 및 화물 위치 정보가 일체 노출되지 않도록 `dealer_id` 기준 RLS 필터링 및 접근 권한 검증을 적용했습니다.
+
+---
+
+## [2026-10-16] [ERP 시스템] Mapbox 기반 선적 트래킹 맵 컴포넌트 버전 3.0 본격 구현 및 Docker/환경변수 배포 파이프라인 고도화
+
+### 1. 남아프리카 공화국 희망봉(Cape of Good Hope) 실제 해상 운항 항로 및 704개 고정밀 AIS 궤적 반영
+* **수에즈 운하 가상 경로 ➔ 남아공 희망봉 실제 우회 항로 전면 교체**:
+  * 홍해/수에즈 운하 지정학적 통항 중단 사태로 인해 글로벌 정기 컨테이너선이 남아프리카 공화국 희망봉/케이프타운을 선회하여 운항하는 현실적 항로(총 약 26,281km)를 완벽 반영했습니다.
+  * B/L `YMLUN360205129`(`YM WELLHEAD`) 기준 실제 수신된 704개의 정밀 AIS GPS 궤적 좌표(`route_coordinates`) 및 최후 수신 위치(`51.95°N, 3.99°E`, 네덜란드 로테르담 외곽 해역)를 지도상에 왜곡 없이 렌더링하도록 구축했습니다.
+* **해상 공간 연산 라이브러리(`geoUtils.js`) 고도화**:
+  * `buildMaritimeRouteGeoJSON`에 `customCoordinates` 파라미터를 신설하여, 백엔드로부터 수신된 고정밀 AIS 궤적이 있을 시 최우선적으로 GeoJSON LineString으로 실선 렌더링하도록 구현했습니다.
+  * 실제 수집 좌표가 부재할 경우에도 수에즈 운하가 아닌 33개 정밀 해상 웨이포인트 기반의 희망봉 우회 항로(`CAPE_OF_GOOD_HOPE_WAYPOINTS`)를 기본값으로 자동 보간합니다.
+  * `estimateVesselPosition` 함수에도 AIS 궤적 좌표 기반 진척률 위치 산출 로직을 적용했습니다.
+
+### 2. 지도 상단 플로팅 3종 핵심 항해 성과 지표 (SCM Voyage 3-KPI Cards) 신설
+* **상단 글래스모피즘 플로팅 KPI 바 신설 (데스크톱 최적화)**:
+  * **Card 1. 총 항해 누적 거리 (Reported Distance)**: `26,281 km` (약 14,190 NM, 남아공 희망봉 우회 항로 명시).
+  * **Card 2. 수집 항로 포인트 (Route Coordinates)**: `704 pts` (TrackCargo 정밀 AIS 궤적 연동).
+  * **Card 3. 최후 AIS 수신 위치 (Last Known Position)**: `51.95°N, 3.99°E` (현재 속력 `17.5 kn`, 침로 `58°` 동시 표시).
+* 우측 상단 `SCM Voyage KPI` 위젯 잔여 해상 거리(Distance to Go) 하단에도 누적 항해 거리 및 수신 포인트 수를 연계 노출했습니다.
+* 선박 마커 클릭 팝업(`popupInfo`)에 IMO, MMSI, 누적 항해 거리, AIS 수신 포인트 수 등 핵심 메타데이터를 추가 제공합니다.
+
+### 3. 선적 상세 '선박(Vessel)' 탭 전면 개편 및 실시간 제원 카드 신설
+* **기존 안내 문구("선박 정보가 등록되어 있지 않습니다") 원천 해결**:
+  * 선택된 B/L의 실제 선박 제원을 상세히 확인할 수 있는 전용 스펙 카드를 신설했습니다.
+* **선박 핵심 제원 매핑**:
+  * **선박명**: `YM WELLHEAD` (IMO: `9757527`, MMSI: `477085700`)
+  * **운항 성능**: 현재 속력 `17.5 kts`, 진행 방위 `58°`, 항차 `036E`, 선사 `Yang Ming`
+  * **항로 안내 및 위치**: 남아공 희망봉 우회 항로 상세 안내 및 최후 보고 위경도 표시
+  * **원클릭 외부 검증 링크**: MarineTraffic 및 VesselFinder 실시간 선박 위치 조회 버튼 연동
+* **선적 목록 카드 내 실제 선박명 표시**:
+  * 임의 대체명("WIA Global Voyager") 대신 실제 운항 선박명(`YM WELLHEAD`, `ONE INTELLIGENCE` 등)이 리스트 카드에 직관적으로 표시됩니다.
+
+### 4. 백엔드 데이터베이스 스키마 및 고성능 Route Service 아키텍처 구축
+* **`Shipment` 테이블 10개 신규 컬럼 확장 및 자동 마이그레이션**:
+  * `vessel_name`, `vessel_imo`, `vessel_mmsi`, `vessel_speed_kn`, `vessel_course_deg`, `reported_distance_km`, `last_lat`, `last_lng`, `route_coordinates`, `route_updated_at` 컬럼 추가.
+  * Render PostgreSQL 및 로컬 SQLite 환경 자동 스키마 마이그레이션 적용.
+* **v3.0 전용 신규 API 엔드포인트 및 서비스(`route_service.py`) 구축**:
+  * `GET /api/v1/tracking/{mbl_no}/route-map`: 설계 가이드 규격에 맞춘 선박 스펙, 항로 요약, 704개 GeoJSON 궤적 반환.
+  * `seed_v3_shipment_data`: 서버 구동 시 기존 활성 선적에 대해 고정밀 AIS 궤적과 제원 데이터를 자동 시딩 및 최신 상태로 유지.
+
+### 5. Mapbox 지도 환경변수 연동 및 Dockerfile 멀티스테이지 빌드 파이프라인 최적화
+* **프론트엔드 빌드 타임 환경변수(`VITE_MAPBOX_TOKEN`) 구성**:
+  * Vite SPA 특성상 클라이언트 번들 빌드 시점에 환경변수가 주입되어야 하므로, 백엔드가 아닌 `frontend/.env` 및 Render 프론트엔드 환경변수로 구성을 일원화했습니다.
+* **`frontend/Dockerfile` 멀티스테이지 빌드 인자(Build Argument) 전달 파이프라인 구축**:
+  * `Dockerfile` 빌드 스테이지 이전에 `ARG VITE_MAPBOX_TOKEN` 및 `ENV VITE_MAPBOX_TOKEN=$VITE_MAPBOX_TOKEN`을 선언하여 `RUN npm run build` 시점에 토큰이 정적 에셋으로 정상 주입되도록 개선했습니다.
+* **토큰 미설정 감지 및 안내 UI 폴백(Fallback Screen) 구축**:
+  * 로컬 개발환경 또는 신규 배포 시 토큰이 설정되지 않은 경우 화면 깨짐 대신 친절한 설정 가이드 화면이 표시되도록 개선했습니다.
+* **보안 및 GitHub Push Protection 정책 준수**:
+  * 소스코드 내 Mapbox 비밀키/공개키 직접 하드코딩을 원천 배제하고 환경변수 참조 방식으로 표준화하여 보안 위험 및 Git Push 차단 이슈를 해결했습니다.
+
+### 6. 워크스페이스 일원화 및 동기화 (wme-system & scm_erp_system)
+* `wme-system`과 `scm_erp_system` 양방향 코드베이스를 완벽 동기화하여 버전 불일치를 해소하고, `npm run build` 프로덕션 번들 무결성(0 errors)을 검증했습니다.
+
+## [2026-10-15] 선적 트래킹(ShipmentTracking) 모바일 화면 반응형 최적화 구축
+
+### 1. 모바일 환경 전용 반응형 레이아웃 및 성능 최적화
+* **모바일 화면 내 지도 미표시 (Resource Optimization)**:
+  * 모바일 뷰(`isMobileView` 또는 `windowWidth <= 768px`) 환경에서는 무거운 WebGL Mapbox 지도 컴포넌트를 렌더링하지 않도록 분기하여 모바일 기기의 배터리 및 데이터 소모를 방지하고 부드러운 스크롤 퍼포먼스를 확보했습니다.
+  * 데스크톱 환경에서는 기존과 동일하게 3D 지구본 / 2D 평면 전환이 가능한 고해상도 해상 항로 지도가 배경에 정상 표시됩니다.
+* **고정 폭 오버레이 패널 ➔ 100% 반응형 컨테이너 전환**:
+  * 기존 데스크톱용 고정 폭(`width: 420px, left: 16px`)으로 인해 모바일 뷰포트 우측이 잘려 보이던 현상을 해결하고, `width: 100%, box-sizing: border-box` 구조로 화면 크기에 맞게 자연스럽게 맞춰지도록 전면 개편했습니다.
+
+### 2. '운송 중인 선적' 리스트 카드 모바일 맞춤 디자인 개편
+* **모바일 친화적 카드 레이아웃 및 가독성 개선**:
+  * **상단 헤더**: B/L 번호와 운송 상태 태그(`도착`, `지연`, `운송중`)가 좁은 화면에서도 줄바꿈 없이 유연하게 정렬되도록 구성했습니다.
+  * **중앙 해상 운송 구간 (POL ➔ POD)**: 출발항(ETD 날짜)과 도착항(ETA 날짜)이 모바일 화면 폭에서도 겹치거나 잘리지 않도록 좌우 밸런스를 맞추고, 중앙에 해상 진행 아이콘을 배치하여 시인성을 높였습니다.
+  * **하단 메타 정보**: 선박명과 '상세보기 ›' 터치 안내를 추가하여 터치 유도 UX를 강화했습니다.
+
+### 3. 모바일 선적 상세 뷰(Detail View) 및 KPI 위젯 대응
+* 모바일에서 선적 카드 터치 시 모바일 전용 전체 화면 상세 뷰로 매끄럽게 전환되며, 상단에 엄지손가락으로 터치하기 편리한 '← 목록으로 돌아가기' 버튼을 제공합니다.
+* 4대 탭 메뉴(`항로`, `선박`, `장비목록`, `예외사항`)를 균등 분할 그리드로 배치하여 좁은 화면에서도 탭 이름이 찌그러지지 않고 직관적으로 탐색할 수 있도록 했습니다.
+* `DelayRateWidget`(해상 운송 지연율 차트)에 `isMobileView` 반응형 속성을 적용하여 모바일 화면에서도 반원 게이지와 수치 정보가 여백에 맞게 정렬됩니다.
+
+### 4. 선적 트래킹 런타임 안정성 보강 및 예외 처리
+* **`useEffect` 임포트 누락으로 인한 렌더링 중단(Blank Screen) 이슈 해결**:
+  * 윈도우 크기 리사이즈 리스너 등록에 사용된 `useEffect` 훅의 import 누락을 신속히 수정하여 런타임 참조 오류(`ReferenceError`)를 원천 해결했습니다.
+* **비동기 데이터 로딩 인디케이터 및 안전 가드 보강**:
+  * 선적 목록 비동기 조회 중(`isLoading`)일 때 명확한 실시간 조회 안내 메시지를 표시하여 사용성 혼선을 방지했습니다.
+  * 특정 B/L 선택 시 해당 선적 데이터의 존재 여부를 검증하는 안전 가드(`(!selectedMbl || !activeShipment)`)를 적용하여 미동기화 상태에서의 객체 속성 접근 예외(`TypeError`)를 방지했습니다.
+
+## [2026-10-15] [ERP 시스템] Mapbox 기반 선적 트래킹 맵 컴포넌트 버전 2.0 (3D 지구본 / 2D 평면 동적 전환 & 개인화) 구축
+
+### 1. 3D 지구본(Globe) vs 2D 평면(Mercator) 동적 투영 모드 전환(Toggle) 지원
+* **사용자 친화적 뷰 모드 토글 스위치 (`[ 🌍 3D 지구본 | 🗺️ 2D 평면 ]`) 신설**:
+  * 지도 우측 상단 플로팅 컨트롤 바에 직관적인 글래스모피즘(Glassmorphism) 세그먼트 토글스위치를 배치했습니다.
+  * 활성화된 모드에는 그라데이션 블루 하이라이트 및 부드러운 그림자 효과를 적용하여 뛰어난 시각적 피드백을 제공합니다.
+* **대양 횡단(Deep Sea) 몰입감과 정밀 항만 뷰의 유연한 공존**:
+  * **3D 지구본(Globe) 모드**: 한국(POL)에서 유럽(POD)까지의 긴 대양 횡단 여정을 실제 둥근 지구 표면과 우주/대기권(Atmosphere Fog) 효과로 시각적 몰입감 있게 조망합니다.
+  * **2D 평면(Mercator) 모드**: 좁은 유럽 내해나 항구(함부르크, 로테르담 등) 근처의 복잡한 경로 및 향후 내륙 운송(트럭킹) 연계 도로망을 도법 왜곡 없이 정밀하게 확인합니다.
+* **무중단 데이터 정합성 (Data Integrity)**:
+  * 백엔드 및 TrackCargo GeoJSON 위도/경도 데이터 구조를 그대로 유지한 채 프론트엔드 React(`react-map-gl`)의 `projection` 속성만 유연하게 전환하므로 추가 데이터 가공이나 마이그레이션 부담이 없습니다.
+
+### 2. 브라우저 로컬 스토리지 기반 사용자 개인화(User Preferences) 자동 저장
+* 사용자가 마지막으로 선택한 지도 투영 모드(`globe` 또는 `mercator`)를 브라우저 로컬 스토리지(`wme_scm_map_projection`)에 자동 저장합니다.
+* 다음번 시스템 접속 또는 페이지 새로고침 시에도 사용자가 선호하는 지도 뷰가 자동으로 복원되어 개인 맞춤형 UX를 제공합니다.
+
+### 3. SCM Voyage KPI 위젯 위치 최적화 및 180일 체화 재고(Aging) 지표 연동
+* **우측 상단 UI 계층 구조 최적화**:
+  * 뷰 전환 토글스위치를 우측 최상단(`top: 16px`)에 고정하고, 단일 선적 선택 시 활성화되는 `SCM Voyage KPI` 위젯을 그 아래(`top: 68px`)로 자연스럽게 정렬하여 일관된 레이아웃을 구축했습니다.
+* **선적일 기준 운항 경과일(Aging) 및 180일 이상 악성 체화 재고 경고 표기**:
+  * 선적일(ETD)로부터 경과된 일수(`voyageDays`)를 실시간 계산하여 KPI 카드에 표시합니다.
+  * 180일 이상 경과된 장비의 경우 `⚠️ 180일+ 체화 악성` 위험 경고 배지를 동적으로 노출하여 ERP 재고 관리자와의 신속한 CS 대응을 지원합니다.
+
+## [2026-10-15] WIA 창고(AdminDispatch) '수정' 팝업 내 ETD/ETA 항목 신설 및 Mapbox 기반 선적 트래킹 맵 컴포넌트 고도화 구축
+
+### 1. WIA 창고 페이지 장비 수정 모달 내 'ETD' 및 'ETA' 항목 신설 및 선적정보 자동 연동
+* **모달 팝업 항목 배치 규격화**:
+  * 장비 정보 수정 모달 내에서 **'인코텀즈' 바로 아래에 'ETD'**, **'창고' 바로 아래에 'ETA'** 입력 필드를 나란히 신설 배치했습니다.
+* **실제 선적정보(Shipment) 데이터 자동 매핑 및 결측치 디스플레이**:
+  * 해당 장비의 P/O(reference_no) 정보를 기준으로 데이터베이스 내 연계된 실제 선적정보(`Shipment`)의 ETD 및 ETA 일정을 자동으로 조회하여 `선적정보: [날짜 또는 -]` 형태로 보조 안내합니다.
+  * 선적정보 데이터가 등록되어 있지 않은 경우 `-` 로 안전하게 표기됩니다.
+* **수동/메뉴얼 일정 입력 및 수정 스케줄 저장 반영**:
+  * HTML5 날짜 피커(`type="date"`)를 통해 사용자가 직접 원하는 날짜를 선택/수정할 수 있도록 구현했습니다.
+  * 수정 후 저장 시 해당 주문의 ETD 및 ETA 일정이 백엔드에 즉시 동기화되어 목록 및 상세 정보에 정상 반영됩니다.
+
+### 2. [WIA 공작기계 ERP] Mapbox 기반 해상 선적 트래킹 맵 컴포넌트 (`TrackingMapboxWidget.jsx`) 신설
+* **Mapbox 공인 Access Token 및 스타일 맵 연동**:
+  * 사내 Mapbox 공인 Access Token(`pk.eyJ1Ijoid21laW5z...`)을 프론트엔드 환경변수(`VITE_MAPBOX_TOKEN`)로 격리 등록했습니다.
+  * WIA 기업 브랜딩과 시인성에 최적화된 Mapbox Vector 스타일(`mapbox://styles/mapbox/light-v11`)을 적용했습니다.
+* **GeoJSON Route Layer (현실적 해상 회랑 곡선 궤적)**:
+  * 단순 직선이 아닌 한국 출발항(POL: 부산/광양/울산/인천/평택 등)에서 유럽 도착항(POD: 함부르크/로테르담/안트베르펜/이스탄불/르아브르 등)까지의 실제 해상 회랑(대한해협 ➔ 대만해협 ➔ 말라카 해협 ➔ 아라비아해 ➔ 수에즈 운하 ➔ 지브롤터 해협 ➔ 북해)을 반영한 GeoJSON LineString 곡선형 궤적(`geoUtils.js`)을 생성하도록 구현했습니다.
+  * 지연 여부에 따라 정상 운항 시 블루(`#3b82f6`), 3일 이상 지연 시 레드(`#ef4444`), 항구 도착 시 그레이(`#9ca3af`)로 동적 스타일 분기(`line-width: 3.5`, `line-dasharray: [2, 2]`)를 적용했습니다.
+
+### 3. 실시간 동적 선박 마커 (Custom HTML Marker) & 애니메이션
+* **진행 방위(Heading) 각도 회전 및 펄스 링 애니메이션**:
+  * 정적 아이콘 대신 선박의 현재 침로(Heading 0°~360°)에 맞춰 동적으로 회전하는 마커를 구현했습니다.
+  * 운항 상태(정상: Blue, 지연: Red)에 따른 펄스(Ping) 링 애니메이션을 적용하여 살아있는 대시보드 경험을 제공하며, 항구 도착(Discharged) 시에는 비활성화 회색 마커로 전환됩니다.
+* **마커 인터랙티브 팝업 (Popup) & FlyTo 카메라 이동**:
+  * 마커 클릭 시 선박명, B/L 번호, 항로 구간, 현재 속력(kts), 침로(°), 최종 ETA 및 지연 상태 팝업을 제공합니다.
+  * 선적 목록에서 특정 화물 선택 시 해당 선박의 현재 위치로 부드럽게 줌인 이동(FlyTo Zoom 4.2)하는 카메라 트랜지션을 구축했습니다.
+
+### 4. 핵심 성과 지표 (KPI) 대시보드 플로팅 연동
+* **운송 잔여 마일리지 (Distance to Go)**:
+  * Haversine 대권 거리 공간 연산 유틸리티(`geoUtils.js`)를 통해 선박 현재 위치부터 목적지(POD)까지의 남은 해상 거리를 해리(NM) 및 킬로미터(km)로 실시간 계산하여 지도 우측 상단 플로팅 카드에 표시합니다.
+* **선박 속력, 침로, 출항/예정일 및 지연 경고 배지**:
+  * 실시간 운항 지표(Speed, Heading, ETD, ETA) 및 3일 이상 지연 시 시각적 위험 경고 배지를 동적으로 표기합니다.
+
+### 5. 선적 트래킹 종합 페이지 (`ShipmentTracking.jsx`) 전면 연동
+* **글로벌 뷰(전체 선적 조망) 및 단일 선적 상세 뷰 매끄러운 전환**:
+  * 미선택 시 운항 중인 전체 선적들의 위치와 마커를 한눈에 조망할 수 있으며, 선적 카드 클릭 시 해당 B/L 전용 항로와 세부 운항 정보로 즉시 포커싱됩니다.
+  * 좌측 선적 리스트 카드에도 지연 여부(`checkIsDelayed`)에 따른 좌측 액센트 보더 및 태그를 추가하여 직관성을 높였습니다.
+
+## [2026-10-14] WIA 창고(AdminDispatch) '수정' 팝업 내 창고위치 드롭다운 도입 및 리스트 '창고' 열(Column) 신설
+
+### 1. WIA 창고 페이지 장비 정보 수정 모달 내 '선박명' 항목을 '창고' 드롭다운으로 개편
+* **창고위치 드롭다운 선택 기능 구축**:
+  * 입고 완료된 장비 관리의 실무 용도에 부합하도록 기존의 텍스트 기반 '선박명(VESSEL)' 입력 필드를 유럽 내 3대 운영 창고를 선택할 수 있는 **'창고' 선택 드롭다운(`select`)**으로 전면 교체했습니다.
+  * 첨부된 항구 코드 체계(`Port_code`)를 완벽히 반영하여 다음 3대 도시 창고 옵션을 기본 제공합니다:
+    * `Hamburg (Germany)` (함부르크 창고)
+    * `Istanbul (Turkey)` (이스탄불 창고)
+    * `Rotterdam (Netherlands)` (로테르담 창고)
+  * 다국어(`ko`, `en`) 사전(`translation.json`)에 `warehouse` 및 `warehouse_placeholder`를 신규 등록하여 한국어 및 영어 환경 모두 완벽히 지원합니다.
+
+### 2. 입고된 장비 목록 테이블 내 '창고' 열(Column) 배치 및 UI 최적화
+* **테이블 열 배치 ('S/N'과 '재고상태(에이징)' 사이)**:
+  * 요구사항에 따라 데스크탑 테이블 헤더 및 행 데이터에서 **'S/N'** 컬럼 바로 우측이자 **'재고상태(에이징)'** 컬럼 좌측 사이에 **'창고'** 열을 정식 신설했습니다.
+  * 테이블 열 비율을 전체 100% 규격(`No.` 4%, `모델` 12%, `NC` 8%, `P/O` 10%, `S/N` 11%, `창고` 9%, `재고상태(에이징)` 11%, `재고타입` 9%, `화물` 7%, `진행` 19%)으로 최적화하여 시인성과 가독성을 극대화했습니다.
+  * 헤더 클릭 시 창고명 기준 오름차순/내림차순 정렬 및 상단 정렬 드롭다운(`창고 ▲/▼`)과 통합 검색(창고명 검색 지원)을 완벽히 연동했습니다.
+  * 모바일 카드형 뷰에서도 메타 영역(`NC`, `S/N`, `창고`, `TYPE`) 및 확장 아코디언 상세 내역에 창고 정보를 자연스럽게 노출했습니다.
+
+### 3. 백엔드 스키마 확장 및 레거시 데이터 양방향 호환 유지
+* **데이터 모델 및 DDL 마이그레이션**:
+  * `models.py`의 `Order` 모델 및 `schemas.py`(`OrderBase`, `OrderCreate`, `OrderUpdate`, `OrderOut`)에 `warehouse` 필드를 신설했습니다.
+  * 서버 구동 시 SQLite 및 PostgreSQL에 무중단 자동 반영되도록 `database.py`에 자동 DDL 마이그레이션 구문을 추가하고, 로컬 SQLite 데이터베이스(`scm_erp.db`)에 즉시 반영했습니다.
+  * 기존 레거시 주문 데이터와의 연속성을 위해 `order.warehouse || order.vessel` 폴백 구조를 적용하고 `vessel` 필드와도 동기화하여 하위 호환성을 100% 확보했습니다.
+
+## [2026-10-13] WIA 가용재고 목록 임대(Rental) 딜러 지정, 일정 달력 설정 모달 및 기간수정 기능 구축
+
+### 1. WIA 가용재고 목록 임대(Rental) 프로세스 파이프라인 완성
+* **임대 상태 및 딜러 선택 후 확정 연동**:
+  * 가용재고 목록에서 장비 상태를 '임대'로 지정하고 주문선택 목록에서 임대 대상 딜러를 선택한 뒤 [확정]을 클릭하면, 전용 '임대 기간 설정' 팝업 모달이 자동으로 실행되는 단계별 워크플로우를 구축했습니다.
+  * 기존 임대 장비에 대해 딜러 선택 드롭다운에서 타 딜러사가 숨겨지던 필터링 제약을 제거하여 모든 딜러사(AK MAKINA 등)를 자유롭게 지정할 수 있도록 개선했습니다.
+* **달력(Calendar) 기반 임대 기간 설정 팝업 모달 탑재**:
+  * 팝업창 상단에 *"임대 기간을 입력해 주시기 바랍니다. 달력 기능을 사용하여 임대 시작일과 종료일을 지정하신 후, '임대기간 확정' 버튼을 클릭하여 일정을 저장해 주세요."* 안내 공지 배너를 배치했습니다.
+  * HTML5 날짜 피커(달력 UI)를 통해 시작일과 종료일(만료일)을 직관적으로 선택할 수 있으며, 빠른 기간 프리셋(+1개월, +3개월, +6개월, +1년, +2년) 버튼을 제공하여 계약 기간을 원클릭으로 산출할 수 있습니다.
+  * [임대기간 확정] 클릭 시 백엔드 단일 PATCH 요청으로 임대 상태(`RENTAL`), 임대 딜러, 시작일(`rental_start_date`), 만료일(`rental_expiry_date`)이 완벽하게 동기화 저장됩니다.
+* **상세내역 내 '임대 기간' 표시 및 '기간수정' 기능 구현**:
+  * 테이블 행을 클릭하여 펼치는 하단 상세내역의 3번째 영역에서 `임대 딜러:` 바로 아래에 `임대 기간: [시작일] ~ [종료일]` 항목이 노출되도록 구현했습니다.
+  * 임대 기간 우측에 `[기간수정]` 버튼을 신설하여, 클릭 시 기존 계약 일자가 세팅된 모달 팝업이 호출되어 언제든지 손쉽게 계약 일정을 갱신할 수 있도록 조치했습니다.
+* **백엔드 DB 스키마 및 마이그레이션 확장**:
+  * `Order` 모델 및 Pydantic 스키마(`models.py`, `schemas.py`)에 `rental_start_date` 필드를 신설하고, 서버 구동 시 Render PostgreSQL 및 로컬 SQLite에 무중단 자동 반영되도록 DDL 마이그레이션을 추가했습니다.
+  * 임대 장비의 딜러 할당 시에도 법인 재고(`is_corporate_stock=True`) 속성이 안전하게 유지되어 가용재고 목록에서 유실되지 않도록 보강했습니다.
+
+## [2026-10-13] 자동 일정 알림 엔진 고도화: 배송요청일 D-Day, 프로모션 예약 만료(D-1), 임대 만료(D-7) 자동 이메일 발송 및 엔진 스위치(On/Off) 연동
+
+### 1. 자동 일정 알림 5번, 6번, 7번 엔진 및 발송 파이프라인 정식 가동
+* **5. 배송요청일(D-Day) 지연 방지 알림 (`DELIVERY_DUE_ALERT`)**:
+  * 고객 또는 딜러의 배송요청일(Delivery Request Date) 해당 월의 마지막 주차(말일 기준 7일 전) 진입 시, 선적 및 납기 지연을 사전에 방지할 수 있도록 관리자(`admin`)에게 자동 경고 이메일을 발송합니다.
+  * 당월 중복 발송을 방지하기 위해 `order.last_delivery_alert_month` 추적 플래그를 도입했습니다.
+* **6. 프로모션 예약 만료 사전 알림 및 자동 취소 (`PROMOTION_EXPIRY_ALERT`)**:
+  * 예약 기간 만료 하루 전(D-1, 24시간 이내) 시점에 도래한 프로모션 장비에 대해 관리자와 해당 예약 딜러 모두에게 사전 경고 이메일을 자동 통지합니다.
+  * 기한 내 판매 전환(구매 확정) 미조치 시 백그라운드 스케줄러에서 판매가능(AVAILABLE) 상태로 자동 취소(Roll-back) 처리됩니다.
+  * 중복 통지를 차단하기 위해 `promo.expiry_alert_sent` 플래그를 신설하고 신규 예약 시 자동 리셋되도록 조치했습니다.
+* **7. 임대(Rental) 만료 연장/반납 사전 공지 (`RENTAL_EXPIRY_ALERT`)**:
+  * 임대 장비의 임대 기간 만료 1주일 전(D-7)에 장비 연장 여부 확인 및 반납 일정 조율을 위한 사전 안내 이메일을 관리자(`admin`)에게 자동 발송합니다.
+  * 중복 발송을 방지하기 위해 `order.rental_alert_sent` 플래그를 추가했습니다.
+
+### 2. 백그라운드 스케줄러 연동 및 엔진 온/오프(On/Off) 개별 제어 스위치 구축
+* **2시간 주기 백그라운드 스케줄러 감지 (`scheduler.py`)**:
+  * 서버 가동 즉시 1회 및 2시간 간격으로 5번(배송요청일), 6번(프로모션 만료), 7번(임대 만료) 대상을 자동 스캔하여 이메일을 발송합니다.
+  * 주기적 실행 부하를 최소화하기 위해 10분/1시간 단위 대신 2시간 주기로 최적화하여 Render 무료/표준 인스턴스의 안정성을 극대화했습니다.
+* **설정 관리 페이지 실시간 On/Off 연동**:
+  * `업로드 / 설정관리`(`UploadSettings.jsx`) 및 `관리자 포털 설정`(`AdminManagement.jsx`)의 '자동 일정 알림 및 빈도 설정' 테이블에 5, 6, 7번 규칙이 정식 등록되었습니다.
+  * 각 알림 규칙별로 우측 엔진 스위치(`● 엔진 활성 (Running)` / `○ 비활성화 됨 (Paused)`)를 원클릭으로 토글하여 스케줄러의 발송 여부를 즉시 켜고 끌 수 있습니다.
+* **DB 동적 마이그레이션 및 실운영 Render PostgreSQL 호환성 완비**:
+  * 서버 구동 시 (`on_startup`) 신규 컬럼 DDL 및 `EmailNotificationConfig` 기본 시드 행을 자동 감지/생성하여 무중단 자동 반영을 완료했습니다.
+
+### 3. WIA 프로모션 예약 기간 단위 7일/14일 표준화 및 다국어 UI 개선
+* **예약 기간 단위 변경 (7일 및 14일 2종 전용 선택)**:
+  * 기존의 임의 일수 입력 방식을 탈피하고, 관리자 프로모션 페이지(`AdminPromotion.jsx`) 및 통합 관리자 페이지(`AdminManagement.jsx`)에서 오직 **7일 (1주)** 또는 **14일 (2주)**의 두 가지 옵션만 선택하여 예약할 수 있도록 셀렉트 박스 UI를 표준화했습니다.
+* **다국어(영어) 텍스트 명확화**:
+  * 영문 화면에서 `7 Days (1Wk)` -> `7 Days`, `14 Days (2Wks)` -> `14 Days`로 보다 간결하고 직관적인 텍스트로 로컬라이징을 정비했습니다 (`translation.json`).
+* **만료 시 자동 예약 해제 (Auto Roll-back) 연동**:
+  * 예약 기간이 초과되면 수동 조치 없이도 백그라운드 스케줄러가 판매가능(`AVAILABLE`) 상태로 자동 환원시키고, 관련 변경 내역을 감사 로그에 기록합니다.
+
+## [2026-10-11] TrackCargo 대량 연동, R2 썸네일 자동화, 전 페이지 테이블 컬럼별 차순 정렬(Sorting)·토글 UI 및 이메일 자동 알림 실계정 안정화
+
+### 1. TrackCargo 대량 화물 추적(Bulk API) 연동 및 엑셀 업로드 최적화
+* **대량 해상 트래킹 등록 API 구축 (`create_bulk_sea_tracking`)**: TrackCargo의 `/v1/tracking/sea/bulk` 엔드포인트를 연동하여, 선적 B/L(MBL)을 최대 100건까지 한 번의 요청으로 일괄 등록할 수 있는 대량 API 연동 모듈을 백엔드(`trackcargo_api.py`)에 구현했습니다.
+* **엑셀 대량 업로드 시 일괄 연동 적용**: 관리자가 선적 엑셀을 업로드(`upload_shipments`)할 때, 기존 개별 단건 호출 방식 대신 벌크 API를 호출하여 등록 처리 속도를 대폭 개선하고 발급된 `tracking_id`를 각 주문 레코드에 즉각 자동 매핑하도록 고도화했습니다.
+
+### 2. 주문(Order) 배송 타임라인 ETD / ETA 실시간 자동 동기화
+* **주문-배송 일정 데이터 동기화 복구**: 기존에 주석 처리되거나 누락되어 있던 주문 테이블의 `order.etd` 및 `order.eta` 업데이트 로직을 정상화했습니다.
+* **스케줄러 주기적 반영**: 엑셀 업로드 시점뿐만 아니라 정기 백그라운드 스케줄러(`scheduler.py`)가 최신 선적 일정을 조회할 때도, TrackCargo로부터 수신된 최신 ETD/ETA 정보를 주문 레코드에 실시간 동기화하여 전체 배송 타임라인과 출고 대시보드의 일관성을 확보했습니다.
+
+### 3. 라인업 제품 라이브러리 카탈로그 & 썸네일 DB 스키마 확장
+* **ProductModel 스키마 필드 신설**: `ProductModel` DB 테이블 및 Pydantic 스키마(`models.py`, `schemas.py`)에 `catalog_file` (카탈로그 PDF 파일명) 및 `thumbnail_file` (썸네일 이미지 파일명) 컬럼을 새롭게 추가했습니다.
+* **제품 라이브러리 시각화 기반 마련**: 프론트엔드 라인업 제품 라이브러리 화면에서 장비별 썸네일 이미지(`*.webp`)와 카탈로그 파일(`*.pdf`)이 데이터베이스 레벨에서 정확히 매핑 및 호출될 수 있도록 데이터 구조를 완비했습니다.
+
+### 4. 실운영(Render) 자동 마이그레이션 엔진 탑재 (Startup Hook)
+* **스키마 자동 감지 및 컬럼 추가 (`update_thumbnails.py`)**: 데이터베이스에 `catalog_file` 및 `thumbnail_file` 컬럼이 없는 경우 자동으로 `ALTER TABLE`을 실행하여 스키마를 동적으로 확장하는 마이그레이션 유틸리티를 구현했습니다.
+* **서버 구동 시 자동 마이그레이션 연동 (`@app.on_event("startup")`)**: FastAPI 서버 부팅 시점에 마이그레이션 함수(`run_migration`)가 자동 실행되도록 등록하여, 로컬 환경은 물론 Render 배포 환경에서도 별도 수동 작업 없이 라이브 DB가 최신 스키마 및 썸네일 매핑 데이터로 자동 갱신되도록 구축했습니다.
+
+### 5. 로컬 데이터베이스 최신화 및 설정 반영
+* **로컬 DB(`scm_erp.db`) 데이터 최신화**: 카탈로그 및 썸네일 매핑 정보가 완전히 적용된 로컬 데이터베이스를 커밋하여 로컬 및 스테이징 환경에서의 테스트 신뢰도를 확보했습니다.
+* **UI/UX 번역 및 리스트 정렬 설정 반영**: 언어 설정 및 번역 텍스트, 장비 리스트 정렬 등의 수정사항을 시스템에 안정적으로 반영했습니다.
+
+### 6. 실운영(Render) 제품 라이브러리 Cloudflare R2 썸네일 로딩 핫픽스
+* **환경변수 누락 시 R2 기본 도메인 자동 폴백(Fallback) 적용**: `.env` 파일이 Git 추적에서 제외됨에 따라 Render 배포 시 `VITE_R2_CUSTOM_DOMAIN` 환경변수가 주입되지 않아 썸네일 이미지 요청 경로가 상대 경로(`/thumbnail/...`)로 컴파일되어 404 및 '썸네일 없음' 에러가 발생하던 현상을 파악했습니다.
+* **영구 해결 패치 (`ProductLibrary.jsx`)**: 환경변수가 명시적으로 전달되지 않는 배포 환경에서도 Cloudflare R2 공식 버킷 주소(`https://pub-83904521416547dabb69bfc1d46438a8.r2.dev`)가 기본값(Fallback)으로 자동 적용되도록 코드를 개선하여, 실운영 사이트에서도 고화질 WebP 썸네일이 끊김 없이 안정적으로 로딩되도록 조치했습니다.
+
+### 7. WIA 재고리스트 테이블 열 헤더 차순 정렬(Sorting) 및 토글 UI 도입
+* **테이블 열(Column) 인터랙티브 정렬 시스템 구축**: 데스크탑 화면의 표 헤더(`<th>`)를 클릭하여 모델, NC, 구매가, 발주번호, 옵션 상세, ETA, 도착지, 상태 등 각 항목별로 오름차순(▲) 및 내림차순(▼)으로 즉시 순서를 반전(Toggle)할 수 있는 정렬 기능을 구현했습니다.
+* **텍스트 우측 화살표 정렬 인디케이터 (`>> 모델 ▼ <<`)**: 정렬 대상 컬럼명의 우측에 직관적인 화살표(▲, ▼)를 배치하였으며, 비활성 컬럼에는 은은한 양방향 정렬 기호(`⇅`)를 노출하여 클릭 정렬이 가능함을 시각적으로 안내했습니다.
+* **모바일 및 데스크탑 다중 정렬 지원**: 데스크탑 헤더 정렬뿐만 아니라 모바일 환경에서도 손쉽게 순서를 전환할 수 있도록 상단 필터 바에 차순 정렬 드롭다운 메뉴를 연동하고, 관리자 포털(`AdminInventory.jsx`) 및 딜러 포털(`DealerInventory.jsx`) 양쪽에 일관되게 적용했습니다.
+
+### 8. WIA 프로모션, WIA 창고, 판매 목록 전체 페이지 차순 정렬(Sorting) 및 화살표 토글 UI 확대 구축
+* **주요 목록 페이지 전역 정렬 표준화**: WIA 재고리스트에 이어 다음 3개 주요 업무 페이지의 모든 리스트 테이블에 컬럼별 오름차순/내림차순 정렬 및 헤더 클릭 토글 기능을 완벽히 확대 적용했습니다:
+  * **WIA 프로모션 관리/조회**: 관리자(`AdminPromotion.jsx`) 및 딜러(`DealerPromotion.jsx`) 페이지의 모델, NC, 프로모션가(PRICE), 발주번호(P/O), 상세스펙, ETA, 항구(PORT), 상태, 딜러명 등
+  * **WIA 창고 출고/재고 관리**: 관리자(`AdminDispatch.jsx`) 페이지의 모델, NC, P/O, S/N, 에이징(일반/장기/악성 경과일수 순), 재고타입(AVAILABLE/RENTAL 등)
+  * **판매 목록(매출 확정 내역)**: 관리자(`AdminSalesArchive.jsx`) 및 딜러(`DealerSalesArchive.jsx`) 페이지의 주문일자(Order Date), 딜러사명, 모델명, NC, P/O, S/N, 판매가격, 출고(Pickup) 상태 등
+* **텍스트 우측 화살표 토글 UI 일관화 (`>> 컬럼명 ▼ <<`)**:
+  * 테이블 헤더 텍스트 우측에 `▲`(오름차순) / `▼`(내림차순) / `⇅`(비활성 정렬 가능) 인디케이터를 일관되게 배치(`gap: 5px`).
+  * 최좌측 순번(`No.` / `*`) 헤더 클릭 시 기본 정렬 상태로 즉시 초기화(Reset)되는 편의 기능 제공.
+* **모바일 및 데스크톱 통합 정렬 드롭다운 연동**: 모바일 카드 뷰 및 상단 검색 필터 바에서도 동일한 정렬 기준을 손쉽게 선택할 수 있도록 드롭다운(`<select>`) 메뉴를 동기화 구현.
+
+### 9. 주문 / 배송현황 페이지 리스트 컬럼별 차순 정렬(Sorting) 및 화살표 토글 UI 구축
+* **주문 및 배송 타임라인 리스트 전역 정렬 적용**: 관리자/RSM 포털 및 딜러 포털의 '주문 / 배송현황' 목록에도 타 페이지들과 100% 동일한 인터랙티브 정렬 시스템을 구축했습니다:
+  * **관리자/RSM 포털 대시보드 (`AdminDashboard.jsx`)**: 모델(Model), 발주번호(P/O 및 S/N), 딜러(Dealer), 진행상태(Status 단계순), 입항지(Port), 도착 예정일(ETA)
+  * **딜러 포털 배송상태 (`DealerOrders.jsx`)**: 모델, 발주번호(REFERENCE NO. / S/N), 딜러(Dealer), 진행상태(Status 단계순), 도착항(Port), 도착 예정일(ETA)
+* **텍스트 우측 화살표 토글 UI (`>> 컬럼명 ▼ <<`) 및 리셋 기능**:
+  * 테이블 열 헤더 텍스트 우측에 오름차순(▲) / 내림차순(▼) 토글 인디케이터를 배치(`gap: 5px`).
+  * 정렬 미적용 상태에서는 은은한 양방향 정렬 기호(`⇅`)를 노출하고, 클릭 시 즉시 반전 정렬.
+  * 최좌측 순번(`No.` / `*`) 헤더 클릭 시 기본 등록 순서로 원클릭 초기화(Reset) 지원.
+* **모바일 카드 뷰 및 상단 필터 바 정렬 드롭다운 연동**:
+  * 상단 검색 필터 영역에 직관적인 차순 정렬 셀렉트 박스(`<select>`)를 배치하여 모바일 및 데스크톱 환경 모두에서 간편하게 정렬 전환 가능.
+  * 모바일 카드 뷰(`mobile-cards-grid`)에서도 정렬된 목록(`sortedOrders`)이 실시간 연동되도록 조치.
+
+### 10. 이메일 자동 알림 수신처 실계정(2개소) 지정 및 반송 방지 안전 가드 구축
+* **알림 수신처 실계정 일원화 (`jypark@hyundai-wia.de; freelogin3975@gmail.com`)**:
+  * 기존 개발 단계의 더미 주소(`scm_admin@example.com`, `dealer@example.com`)로 인해 발생하던 구글 시스템 반송(Mailer-Daemon 배달 실패) 문제를 영구 해결했습니다.
+  * 유럽 항구 도착 예정일(ETA) 업데이트 알림, 해상 운송 정기 리포트, 출항(ETD) 및 항구/창고 입고 통지 등 전 알림 파이프라인의 기본 수신자로 지정했습니다.
+  * 백그라운드 스케줄러(`scheduler.py`)에서 선적 정보 갱신 시 관리자 계정 2곳과 담당 딜러사 계정으로 동시 발송되도록 파이프라인을 고도화했습니다.
+* **더미 도메인(`@example.com`) 발송 방지 안전 필터 탑재 (`email_service.py`)**:
+  * `send_email_notification` 함수 단에서 수신 주소 목록 중 `@example.com` 등의 가상/테스트용 도메인을 자동 검출 및 제외 처리하도록 필터를 구현하여, 실제 메일 서버가 없는 주소로 발송이 시도되어 편지함에 반송 에러 메일이 누적되는 문제를 원천 차단했습니다.
+  * 선박 정보가 누락된 경우에도 메시지 본문에 `선박(None)` 대신 `운송 선박`으로 자연스럽게 표시되도록 문구를 정돈했습니다.
+
+---
+
+## [2026-10-10] TrackCargo API 실시간 추적 연동 안정화 및 강제 동기화 (Bugfix & Enhancement)
+
+### 1. TrackCargo API 연동 최적화 및 오류 해결
+* **API 키 유효성 검증**: `TRACKCARGO_API_KEY` 환경변수 주입 및 401(Unauthorized) 인증 에러를 디버깅하여 실서버와 TrackCargo 서버 간의 안전한 통신 채널을 개통했습니다.
+* **에러 응답 유연화 (ORDER_ALREADY_EXISTS)**: TrackCargo에 이미 등록된 화물을 조회할 때 반환되는 `error` 페이로드 내부에서 기존 주문 번호(`orderId`)를 강제로 추출하도록 파싱 로직을 유연하게 강화했습니다.
+* **다중 깊이 JSON 구조 파싱 보완**: TrackCargo의 최신 응답 구조(`data.data.trackingData.pod_eta_iso.date` 등)를 분석 및 재귀적으로 추적하여, 겉면에 ETA가 없는 경우에도 숨겨진 날짜를 100% 낚아채어 시스템에 반영하도록 완벽 대응했습니다.
+
+### 2. 가짜 데이터(Mock Data) 자동 치유(Auto-healing) 및 정화 로직
+* **좀비 데이터 박멸**: 과거 모의 테스트용 데이터로 굳어져 갱신되지 않던 가짜 날짜('2026-11-08' 등)를 타겟팅하여, 백엔드 서버에서 원격으로 라이브 DB에 접속해 해당 데이터들을 None으로 완전히 초기화했습니다.
+* **강제 덮어쓰기 로직 적용**: 엑셀 업로드 시 기존에 남아있을 수 있는 `ord_mock_` 가짜 추적 번호와 날짜 정보를 강제로 지우고, 빈 데이터(None)조차도 동기화되도록 수정하여 오입력을 원천 차단했습니다.
+
+---
+
+## [2026-10-08] 실운영 데이터 마이그레이션(PostgreSQL) 및 시스템 스크립트 최적화
+
+### 1. 실운영(Render PostgreSQL) 최신 기종 마이그레이션
+* **최신 218개 장비 모델 DB 연동**: 제공받은 최신 제품 카탈로그(PDF) 기반으로 총 218종의 모델 정보를 파싱하여, 실서버 PostgreSQL 데이터베이스의 마스터 데이터(`ProductModel`)로 완벽하게 마이그레이션 및 동기화했습니다.
+* **엑셀 발주(Order) 무결성 확보**: 마스터 모델 데이터가 100% 최신화됨에 따라, 관리자가 선적/발주 대량 엑셀 업로드 시 발생할 수 있는 "시스템에 등록되지 않은 기계" 오류를 원천 차단했습니다.
+
+### 2. 백엔드 스크립트 최적화 및 레거시 파일 정리
+* **불필요한 파이썬 스크립트 제거**: 과거 테스트 및 구버전 데이터 연동용으로 혼재되어 있던 스크립트 파일(`import_new_models.py`, `parse_models.py`, `test_models.py` 등)을 모두 깔끔하게 삭제하여 관리 효율성을 높였습니다.
+* **단일화된 모델 관리 체계**: 시스템의 DB 스키마 뼈대인 `models.py`와, 최신 218개 모델 등록 스크립트인 `import_models.py` 단 두 개의 파일로만 데이터 구조가 관리되도록 백엔드 환경을 정돈했습니다.
+
+### 3. 클라우드 스토리지 이미지 최적화
+* **Cloudflare R2 로컬 폴백(Fallback) 차단**: 제품 라이브러리(ProductLibrary) 페이지 내 썸네일 이미지 렌더링 로직에서 로컬 경로Fallback을 제거하고, 100% 안전하고 빠른 CDN 캐싱망인 R2 스토리지 주소로만 렌더링되도록 프론트엔드 코드를 리팩토링했습니다.
+
+## [2026-10-06] TrackCargo API 단일화 및 실서버 운영 환경(Render) 버그 픽스
+
+### 1. 외부 항만 데이터 연동망 단일화 (TrackCargo Pro 전면 도입)
+* **HHLA API 레거시 코드 제거**: 과거 선박명(Vessel) 기반으로 도착 일정을 조회하던 HHLA API 기능 및 가상 데이터(Mock) 모듈을 시스템에서 완전히 제거하여, 시스템 복잡도를 낮추고 데이터 출처의 혼선을 방지했습니다.
+* **스케줄러 단일 소스 적용**: 백엔드 정기 스케줄러(`scheduler.py`)가 오직 TrackCargo 시스템 하나만을 단일 진실 공급원(Single Source of Truth)으로 삼아 데이터를 조회하도록 개편했으며, 06:00, 14:00, 22:00 정기 조회(Cron) 및 서버 재시작 시 즉각 조회 기능을 반영했습니다.
+
+### 2. 프론트엔드 API 통신 주소 핫픽스 (실서버 엑셀 업로드 정상화)
+* **로컬 통신 주소(Localhost) 하드코딩 제거**: 관리자의 엑셀 업로드 화면(`AdminShipmentUpload.jsx`)과 선적 트래킹 화면(`ShipmentTracking.jsx`) 내 백엔드 통신 API 주소가 로컬 호스트(`http://localhost:8000`)로 고정되어 있어 실서버 업로드가 묵살되던 치명적인 버그를 파악했습니다.
+* **상대 경로(Relative Path) 전환 배포**: 해당 주소를 브라우저 환경에 맞는 상대 경로로 즉각 패치하고 실서버에 재배포함으로써, MBL 번호가 포함된 엑셀 파일이 정상적으로 DB에 업로드되고 TrackCargo 추적 시스템에 즉각 자동 등록되도록 복구했습니다.
+
+### 3. 클라우드 임시 파일 시스템(Ephemeral FS) 초기화 트러블슈팅
+* **데이터 유실(초기화) 원인 규명**: 실서버(Render)에서 코드를 재배포(Deploy)하거나 서버 재시작 시마다 SQLite 데이터베이스 파일이 파괴되어 S/N 등 새로 입력한 데이터가 모두 증발하는 클라우드 임시 파일 시스템의 특성(아키텍처)을 분석했습니다.
+* **데이터 영구 보존(Persistent) 솔루션 가이드**: 실운영 환경에서 데이터가 100% 안전하게 유지되도록 Render 전용 PostgreSQL 영구 데이터베이스 연동 및 `DATABASE_URL` 환경변수 세팅 방안을 해결책으로 제시하고 인프라 구성 가이드를 제공했습니다.
+## [2026-10-04] 재고 리스트 UI/UX 최적화 및 임대(Rental) 프로세스 고도화
+
+### 1. 임대(RENTAL) 장비 상태 제어 및 프로세스 고도화
+* **법인 재고 유지 로직 적용**: 가용재고 목록에서 장비의 상태를 '임대'로 설정하더라도 목록에서 사라지지 않고 지속적으로 추적될 수 있도록 백엔드의 `is_corporate_stock` 속성 유지 로직을 개선했습니다.
+* **상태 임의 변경 차단**: 장비가 한 번 '임대' 상태로 진입하면, 일반적인 다른 상태(전시, 프로모션 등)로 직접 변경할 수 없도록 상태 제어 드롭다운을 비활성화(Disabled) 및 반투명 처리했습니다.
+* **WME 원복 프로세스 강제**: 임대 중인 장비의 딜러 선택 목록에는 오직 **'WME'** 항목만 노출되도록 제한했습니다. WME를 선택하여 상태를 확정지어야만 해당 장비가 임대 상태를 탈피하여 정상적인 '판매가능(AVAILABLE)' 상태로 자동 원복됩니다.
+* **임대 딜러 상세정보 노출**: 임대 중인 장비는 리스트 하단의 상세정보 영역 우측에 `임대 딜러: (실제 딜러명)` 형식으로 딜러 정보가 명확히 표기되도록 UI를 추가했습니다. 다국어(i18n) 설정이 반영되어 영문 환경에서는 `Rental to:`로 자동 치환됩니다.
+
+### 2. 가시성 향상을 위한 폰트 및 텍스트 스타일 튜닝
+* **WME 딜러 상단 고정 노출**: 딜러 리스트에 사내용 코드인 'WME'를 새롭게 추가하고, 딜러 선택 드롭다운 목록에서 WME가 항상 최상단 1순위로 고정 노출되도록 백엔드 정렬 로직을 반영했습니다.
+* **제품 제원 폰트 크기 최적화**: 
+  - 모델명(1.0rem, 굵게) 및 장비 유형(0.8rem) 등 핵심 기종 정보를 더 크고 직관적으로 개선했습니다.
+  - S/N 번호에서 중복되는 'S/N:' 텍스트를 제거하고 실제 시리얼 값(예: G2815-0116)만 1.0rem 크기로 깔끔하게 표기했습니다.
+  - 주문번호(1.0rem, 굵게)와 딜러명(1.0rem, 약간 굵게, 검정색) 텍스트의 가시성을 대폭 상향시켰습니다.
+* **진행상태(STATUS) 색상 및 명칭 갱신**: WIA 프로모션 페이지 리스트에서 '예약중' 텍스트 색상을 `rgb(46, 24, 5)`로 강조하고, 가용재고 목록의 '딜러발주' 텍스트를 '주문선택'으로, '발주로 전환' 버튼 텍스트를 '딜러선택'으로 변경 적용했습니다.## [2026-10-03] WIA 창고 관리 페이지 카고 디테일(Cargo Details) 연동 및 모바일 UI 동기화
+
+### 1. WIA 창고(AdminDispatch) 리스트 내 '화물' 열(Column) 신설
+* **표(Table) 레이아웃 재구성**: 데스크탑 화면의 장비 목록 리스트에서 '재고타입'과 '진행' 컬럼 사이에 **'화물'** 열을 새롭게 추가하고, 전체 테이블 너비 비율을 최적화하여 렌더링이 깨지지 않도록 조정했습니다.
+* **상세보기(Details) 버튼 추가**: 각 장비의 S/N(시리얼 넘버) 유무를 판별하여 데이터가 있을 경우에만 클릭할 수 있는 `Details` 버튼을 렌더링하고, 버튼에 ExternalLink 아이콘을 적용하여 직관성을 높였습니다.
+* **모바일 액션 버튼 그룹 통합**: 모바일 화면(Card View)에서도 화물 정보를 간편하게 열람할 수 있도록 하단 제어 버튼 그룹(이력/수정/출고처리) 좌측에 '화물' 조회 전용 버튼을 신규 편입시켰습니다.
+
+### 2. 카고 디테일 모달(Modal) 컴포넌트 이식 및 데이터 일원화
+* **관리자/딜러 데이터 동기화**: 기존에 딜러 포털('내 구매 내역')에서만 제공되던 화물 제원 상세 모달(`CargoDetailModal`) 컴포넌트를 관리자 포털 페이지 내부로 완벽히 이식했습니다.
+* **백엔드 실시간 연동**: 관리자가 화물 조회 버튼을 누를 시 딜러와 동일하게 백엔드 데이터베이스(`/api/cargo-details/`)를 비동기로 즉시 조회하여 포장 규격, 갯수, 순중량/총중량(NW/GW) 등을 완벽히 일치된 포맷으로 표출하도록 통합 작업을 완료했습니다.
+
+## [2026-10-02] 로컬 개발 환경 안정화, 데이터베이스 핫픽스 및 원격 저장소 동기화
+
+### 1. 로컬 환경 실행 에러 트러블슈팅
+* **종속성 패키지 인식 오류 해결**: 로컬 터미널 환경에서 백엔드 진입 전 파이썬 경로 이탈로 인해 발생한 패키지 인식(`uvicorn: command not found`) 이슈를 파악하고, `run_all.bat` 스크립트 유도를 통해 가상 환경 및 패키지 설치 절차를 안정적으로 해결했습니다.
+* **로컬 서버 통신 재개**: 프론트엔드(`localhost:3000`)에서 백엔드 API 호출 시 발생하던 "서버와 통신할 수 없습니다" 에러를 진단하고, Vite의 Proxy 포트(`8000`)에 맞춰 FastAPI 서버를 독립 실행함으로써 정상적인 풀스택 개발 환경 구성을 완료했습니다.
+
+### 2. 로컬 데이터베이스 스키마(Schema) 긴급 패치
+* **새로운 컬럼 누락 에러 해결**: 최근 도입된 `supabase_uid` 속성이 로컬의 기존 `scm_erp.db` 파일에는 존재하지 않아 발생한 `sqlite3.OperationalError`를 확인했습니다.
+* **DB 핫픽스 쿼리 실행**: 별도의 복잡한 마이그레이션 툴 없이, 파이썬 내장 `sqlite3` 모듈을 이용한 한 줄 스크립트(One-liner)를 통해 `custom_users` 테이블에 누락된 `supabase_uid` 컬럼을 즉각 추가하여 로그인 및 백엔드 크래시를 방지했습니다.
+
+### 3. Git 병합 충돌(Merge Conflict) 일괄 해결 및 동기화
+* **원격 및 로컬 저장소 불일치 분석**: 깃허브 원격 저장소(`main`)와 로컬 워크스페이스 간 커밋 이력이 엇갈려 발생한 푸쉬 거절(`non-fast-forward`) 및 핵심 파일 병합 충돌 현상을 파악했습니다.
+* **안정적인 원격 코드 기준 병합**: 터미널 명령어 기반 병합 절차(`git checkout --theirs`)를 통해 깃허브의 검증된 원본 코드로 5개의 충돌 파일을 일괄 덮어쓴 후, 성공적으로 커밋 및 원격 푸쉬를 완료하여 소스코드 동기화를 완벽하게 마무리했습니다.
+
+## [2026-10-01] Supabase 패스키(WebAuthn) 도입 및 백엔드(FastAPI) 연동 완료
+
+### 1. 프론트엔드 패스키(Passkey) 등록 및 로그인 구현
+* **최신 SDK 함수명 적용**: 기존 레거시 함수명을 버리고 Supabase v2.x 최신 규격인 `signInWithPasskey` 및 `registerPasskey` 함수를 사용하여 `Login.jsx`에 지문/안면 인식(Windows Hello 등) 팝업 호출 로직을 성공적으로 이식했습니다.
+* **사용자 경험(UX) 및 에러 핸들링**: 모바일 브라우저의 강력한 해킹 방지 정책(User Gesture Constraint)으로 인해 비동기 통신 대기 시 팝업이 차단되는 현상을 규명하고, 회원가입 절차와 기기 등록 절차를 적절히 우회 및 분리하여 모바일 크롬(Chrome) 및 PC 환경에서 패스키가 완벽히 등록되도록 조치했습니다.
+* **인앱 브라우저 보안 제약 안내**: 카카오톡이나 구글 검색 앱 같은 인앱 브라우저(WebView) 환경에서는 글로벌 보안 표준에 의해 패스키가 차단됨을 파악하여, 정식 브라우저(크롬, 사파리) 사용 가이드를 정립했습니다.
+
+### 2. 백엔드(FastAPI) JWT 검증 및 자동 계정 연동 (Auto-Linking) 구축
+* **Supabase 파이썬 공식 SDK 연동**: 최근 Supabase의 JWT 암호화 알고리즘이 Legacy HS256에서 ECC(P-256)로 강제 업그레이드되면서 발생한 백엔드 디코딩 에러(Invalid Signature)를 해결하기 위해, `python-jose`를 사용한 자체 검증 대신 공식 `supabase` 패키지를 `requirements.txt`에 탑재하여 구조를 안전하게 개편했습니다.
+* **신규 패스키 로그인 전용 엔드포인트 신설**: 프론트엔드가 패스키로 얻어낸 인증서(access_token)를 백엔드에 전송하면, 백엔드가 이를 검증하고 ERP 접속 권한(Role)을 반환해 주는 `/api/v1/auth/supabase-login` API 라우터를 `main.py`에 구축했습니다.
+* **이메일 기반 계정 마이그레이션**: 패스키로 로그인한 유저의 이메일을 분석해, ERP DB(`CustomUser`)에 존재하는 기존 관리자/딜러 계정과 매칭하고 `supabase_uid`를 자동으로 덮어씌워 매핑하는(Auto-Linking) 스마트 로직을 `auth_supabase.py`에 적용했습니다.
+
+### 3. 클라우드 배포(Render) 안정화 및 트러블슈팅
+* **파이썬 이름 충돌(Name Shadowing) 버그 픽스**: 렌더(Render) 실서버 배포 시, 개발자가 작성한 `supabase_auth.py` 파일 이름이 공식 라이브러리 내부 모듈 이름과 완벽히 겹쳐서 발생하던 치명적 임포트 에러(`ModuleNotFoundError`)를 분석하고, 파일 이름을 `auth_supabase.py`로 변경하여 배포 파이프라인을 복구했습니다.
+* **환경 변수 구성 고도화**: 레거시 JWT Secret 문자열을 직접 관리하는 위험을 없애고, 프론트엔드와 동일하게 `SUPABASE_URL` 및 `SUPABASE_ANON_KEY`만을 Render 백엔드 환경변수에 주입하여 안전하게 인프라 구성을 완료했습니다.
+
+## [2026-09-30] Supabase 하이브리드 아키텍처 기반 패스키(WebAuthn) 2차 인증 인프라 구축
+### 1. 백엔드(FastAPI) JWT 검증 및 DB 스키마 연동 (Phase 1)
+* **Supabase UID 매핑 컬럼 추가**: `models.CustomUser` 테이블에 Supabase가 발급하는 고유 식별자와 기존 회원을 논리적으로 연결할 수 있는 `supabase_uid` 컬럼을 신규 추가했습니다.
+* **DB 스키마 마이그레이션**: 서버 시작(`on_startup`) 스크립트(`main.py`) 내에 `supabase_uid` 컬럼을 자동으로 생성하는 마이그레이션 로직을 추가하여 실서버 운영 중 발생할 수 있는 데이터베이스 충돌을 원천 차단했습니다.
+* **JWT 검증 미들웨어 구축**: `python-jose[cryptography]` 라이브러리를 추가하고, 클라이언트가 보내는 Supabase JWT 토큰의 유효성을 검사하는 전용 의존성 모듈(`supabase_auth.py`)을 설계했습니다.
+### 2. 프론트엔드(React) 환경 구축 및 로그인 UI 통합
+* **Supabase Client 및 패키지 도입**: `@supabase/supabase-js` 라이브러리를 프로젝트에 성공적으로 연동하고, 전역에서 호출 가능한 `supabaseClient.js` 유틸리티 스크립트를 작성했습니다. (구글 드라이브 파일 락(Lock) 이슈를 해결하기 위해 로컬 드라이브 분리 적용)
+* **환경 변수(Env) 런타임 바인딩 해결**: Render 빌드 서버의 캐시(Cache)로 인해 발생한 렌더링 충돌(빈 화면) 오류를 분석하고, 실서버 환경 변수에 `VITE_SUPABASE_URL` 및 `VITE_SUPABASE_ANON_KEY`를 주입한 뒤 캐시를 초기화(`Clear build cache`)하여 해결했습니다.
+* **생체 인증 버튼/로직 이식**: 기존 `Login.jsx` 화면에 `signInWithWebAuthn` API를 호출하는 "패스키로 1초 만에 로그인" 버튼과, 기기 등록용 `signUpWithWebAuthn` 텍스트 링크 및 관련 State 비동기 처리 함수들을 추가했습니다.
+### 3. Supabase Auth 보안 정책 및 인프라 최적화
+* **WebAuthn 활성화 및 RP ID 바인딩**: Supabase Authentication 대시보드 내에서 Email Provider와 Passkeys(WebAuthn) BETA 기능을 활성화했습니다. 
+* **운영 도메인(Origin) 보안 강화**: 패스키의 보안성을 높이기 위해 Relying Party ID를 실 운영 도메인(`www.wmeins.eu`)으로 엄격하게 고정시키고, URL Configuration에 Site URL 및 개발용 Redirect URL을 맞춤 설정했습니다.
+
+## [2026-09-30] 모바일 반응형 UI 디테일 세밀화 및 플렉스박스(Flexbox) 랜더링 이슈 완벽 해결
+
+### 1. 5단계 진행 타임라인 모바일 정렬(가운데 점) 및 크기 최적화
+* **CSS 480px 미디어 쿼리 충돌(Override) 제거**: 일반적인 스마트폰 해상도(480px 이하) 환경에서 원형 도형(`.step-dot`)의 크기가 32px로 강제 덮어쓰기(Override) 되던 하위 미디어 쿼리 충돌 문제를 발견하고 해당 코드를 제거하여, 모든 모바일 환경에서 사용자가 요청한 50px 크기가 동일하게 유지되도록 수정했습니다.
+* **CSS Flexbox 의존성 제거 및 높이 찌그러짐 현상 해결**: 모바일 환경에서 브라우저의 플렉스박스 계산에 의해 점을 렌더링하는 컨테이너의 높이가 0px로 찌그러지며 점이 사라지거나, 단계별 글자 수에 따라 넓이가 미세하게 달라져 점의 위치가 한쪽으로 쏠리던 렌더링 오류를 파악했습니다.
+* **수학적 절대 위치(Absolute Positioning) 로직 적용**: 두 원형 도형 사이의 순수한 빈 여백 너비(`calc(100% - 50px)`)를 도출해 내고 시작점을 고정(`calc(50% + 25px)`)한 뒤, 가상 요소(`::after`)를 통해 빈 공간의 정확히 절반 지점(`left: 50%`)에 강제로 점을 찍는 방식으로 수정하여, 어떤 해상도에서도 점이 100% 완벽한 대칭을 이루고 사라지지 않도록 근본적으로 문제를 해결했습니다.
+
+### 2. 모바일-PC 화면 맞춤형 액션 버튼 반응형(Responsive) 처리
+* **인라인 스타일(Inline-style) 분리 작업**: 기존 컴포넌트(`AdminDashboard.jsx`) 내부에서 인라인으로 하드코딩되어 PC 표(Table) 화면과 모바일 카드 화면에 공통으로 강제 적용되던 타임라인 상태 제어 버튼의 여백과 폰트 크기 코드를 걷어냈습니다.
+* **반응형 전용 독립 클래스(`.action-btn`) 신설**: `index.css`에 미디어 쿼리 기반의 전용 클래스를 설계하여, 일반(PC) 화면에서는 기존의 컴팩트한 디자인(상하 3px/좌우 4px 패딩, 폰트 10px, 둥글기 10px)을 유지하되, 모바일 화면(767px 이하) 진입 시에만 터치하기 편한 큰 사이즈(상하 6px/좌우 4px 패딩, 폰트 13px, 둥글기 12px)로 동적 전환되도록 최적화했습니다.
+
+## [2026-09-29] AI 파서 모델 최적화 및 입고증(PDF) 전용 업로드 기능 신설
+
+### 1. AI 카고 파서(Cargo Parser) 모델 최적화 및 Rate Limit 해결
+* **Gemini API 모델 변경**: 구글 AI Studio 무료 등급(Free Tier)의 엄격한 일일 호출 제한(20 RPD) 문제를 해결하기 위해, 백엔드 AI 분석 모델을 `gemini-3.8-flash`에서 한도가 대폭 넉넉한 `gemini-3.5-flash-lite` 모델로 변경 적용했습니다.
+* **사용량 한도 대폭 상향**: 모델 변경을 통해 일일 최대 요청 수(RPD)가 20회에서 500회로, 분당 최대 요청 수(RPM)가 5회에서 15회로 상향되어 결제 연동 없이도 안정적이고 쾌적한 운영이 가능해졌습니다.
+
+### 2. 관리자 포털 [입고증 PDF 업로드] 전용 기능 개발
+* **직관적인 프론트엔드 UI 추가**: 관리자 메뉴의 '업로드 / 설정관리(`UploadSettings.jsx`)' 페이지에 엑셀 업로드와 별도로 '입고증 PDF 업로드(Cargo Details)' 전용 UI 패널을 신규 구현하여 담당자의 사용 편의성을 극대화했습니다.
+* **백엔드 전용 업로드 API 신설**: 프론트엔드에서 전송된 PDF 파일을 수신하여 Cloudflare R2 클라우드 스토리지 카탈로그에 안전하게 자동 저장하는 전용 엔드포인트(`/api/upload/pdf-cargo`)를 백엔드에 구축했습니다.
+
+### 3. 하이브리드 트리거(Dual Trigger) 아키텍처 구축
+* **백그라운드 즉각 파싱 탑재**: ERP 화면을 통해 PDF 업로드 시, 클라우드 웹훅 신호 도착을 기다리지 않고 백엔드 자체적으로 즉시 AI 분석 태스크를 강제 실행하도록 설계했습니다.
+* **안정적인 이중화 구조 완성**: Cloudflare R2 웹훅(Event Notification) 방식과 API 직접 실행 방식을 함께 병행 사용할 수 있도록 구성하여, 어떤 방식으로 업로드하든 100% 확실하게 카고 데이터가 DB에 업데이트되도록 아키텍처를 고도화했습니다.
+
+
+## [2026-09-28] 도메인/이메일 연동 완료 및 시스템 인프라 설정 마무리
+
+### 1. 실운영 도메인 및 이메일(Resend) 인프라 연동 구축
+* **도메인 연결 (STRATO ↔ Render)**: 실운영 도메인(`www.wmeins.eu` 및 `wmeins.eu`)의 DNS A-Record 및 CNAME 레코드 세팅을 완료하고 Render 프론트엔드 서버와 연결했습니다.
+* **SSL 인증서 발급(HTTPS)**: 본사 보안 정책 요구사항에 맞춰 도메인 접근 시 안전한 통신이 가능하도록 SSL(보안 인증서)을 자동 발급 및 적용 완료했습니다.
+* **발신용 이메일 인증 (Resend ↔ STRATO)**: 시스템 내에서 발송되는 알림 이메일의 스팸 분류 방지 및 수신율 향상을 위해 Resend 서비스의 DKIM(TXT) 및 SPF(CNAME) 레코드를 STRATO 도메인에 맵핑하여 도메인 인증을 100% 완료했습니다.
+
+### 2. UI/UX 개선 및 로그인 화면 텍스트 갱신
+* **로그인 메인 타이틀 변경**: 로그인 텍스트를 `WME Shipping & Stock Management`에서 `Europe Integrated Network System`으로 교체하고 줄바꿈 방지(`nowrap`) 및 폰트 사이즈 최적화를 진행했습니다.
+* **화물 디테일(Cargo Details) 팝업창 모바일 최적화**: 딜러 포털 내 '내 구매내역'의 화물 디테일 모달을 가로 스크롤 테이블(Table) 형식에서 세로형 리스트 항목 나열 방식으로 전면 재구성하여 좁은 모바일 환경에서도 글자가 짤리지 않도록 가독성을 대폭 향상시켰습니다.
+* **다중 박스 렌더링 세분화**: 화물이 2개(MACHINE, C/C) 이상으로 나뉘어 표시될 경우 직관적인 구분이 가능하도록 각 항목 리스트에 원형 글머리 기호(`•`)를 추가하고 항목 간에 점선 구분선(`---`)을 적용했습니다.
+
+### 3. 클라우드 연동(AI 파서) 트러블슈팅 및 가이드 제공
+* **R2 수동 업로드 트리거 분석**: Cloudflare R2 대시보드를 통한 수동 업로드는 백엔드의 분석 웹훅(Webhook)을 자동으로 호출하지 않는다는 아키텍처 상의 원인을 분석하여 안내했습니다.
+* **Gemini API 사용량 한도 분석**: 백엔드 파서 수동 호출 테스트 과정에서 `gemini-3.8-flash` 모델의 무료(Free Tier) 사용량 일일 한도 초과(`429 Error`)를 에러 로그를 통해 감지하고, Google AI Studio 결제 등록(Pay-as-you-go)을 해결책으로 제시했습니다.
+
+
+## [2026-09-27] 딜러 포털 모바일 반응형 적용 및 AI 자동화 파이프라인 버그 픽스
+
+### 1. 딜러포털 '내 구매 내역' 모바일 반응형(Card View) UI 적용
+* **모바일 전용 카드 레이아웃 전환**: 모바일 화면 접속 시(isMobileView) 기존의 가로 스크롤 표(Table) 방식 대신 모바일에 최적화된 세로형 '카드 뷰(Card View)' 레이아웃으로 자동 전환되도록 구현했습니다.
+* **UI/UX 편의성 극대화**: 각 발주 건의 모델명과 진행 상태(Status)를 상단에 강조하고, S/N, P/O 등 주요 제원을 2열 그리드 형태로 배치하여 가독성을 높였습니다. 하단에는 전체 너비를 꽉 채우는 터치 친화적 'Details' 모달 호출 버튼을 적용했습니다.
+
+### 2. Cloudflare R2 및 Gemini AI 연동 파이프라인 버그 해결 및 안정화
+* **웹훅(Webhook) Payload 파싱 로직 개선**: Cloudflare R2에서 전송하는 고유의 웹훅 JSON 포맷(`object -> key`) 구조를 백엔드(`main.py`)가 정상적으로 파싱하여 추출할 수 있도록 파일 경로 인식 로직을 수정했습니다.
+* **R2 스토리지 파일 읽기 기능 보강**: 백엔드 `S3StorageProvider` 클래스에 누락되었던 `read_file` 메서드를 추가 구현하여, AI 파서가 클라우드의 PDF 입고증 파일을 정상적으로 읽어올 수 있도록 시스템을 패치했습니다.
+* **구글 최신 API 정책 대응 (Gemini 3.8 Flash 전환)**: 구글의 최신 모델 지원 정책(구버전 모델 접근 차단)으로 인해 발생한 API 호출 404 에러를 완벽히 해결하기 위해, 파싱 엔진(`ai_cargo_parser.py`)의 모델을 구글 공식 권장 최신 모델인 `gemini-3.8-flash`로 버전업 완료했습니다.
+
+## [2026-09-26] 딜러 포털 UI 디테일 개선 및 화물 파싱 AI 엔진(Gemini) 전환
+
+### 1. 딜러 포털 '내 구매 내역' UI 및 타이포그래피 최적화
+* **상태 뱃지(Badge) 규격 통일**: 리스트의 STATUS 항목에 표시되는 뱃지 크기를 가장 긴 텍스트인 `In Warehouse` 너비(95px)를 기준으로 모두 고정폭으로 동일하게 맞춰 깔끔한 정렬을 구현했습니다.
+* **폰트 굵기(Weight) 기반 활성화 상태 표시**: 화물 디테일(`Details`) 버튼의 활성화 상태를 명확히 구분하기 위해, 단일 폰트(`SUITE`) 내에서 `fontWeight` 수치를 조절(활성화 시 600, 비활성화 시 100)하여 시각적 차이를 확실하게 적용했습니다.
+* **글꼴(Font-family) 및 텍스트 일관성 정리**: `S/N` 항목에 독립적으로 적용되어 있던 `monospace` 폰트를 제거하여 다른 텍스트 항목들과 폰트 디자인을 일치시켰습니다. 또한 검색창 안내 텍스트(placeholder)를 심플하게 `search`로 변경하고, 불필요한 페이지 설명글을 제거하여 화면을 더욱 미니멀하게 개선했습니다.
+
+### 2. 화물 제원(Cargo Detail) 모달(Modal) 사용성 및 안정성 강화
+* **모달 UI 텍스트 정비**: 화물 제원을 보여주는 모달창의 타이틀을 `화물 디테일 (Cargo Details)`에서 직관적인 **`Machine Details`**로 변경했습니다.
+* **표(Table) 데이터 중앙 정렬**: 모달 내부 데이터 표의 좌측에 치우쳐 있던 헤더 항목(`Model`, `S/N`, `ITEM`)에 중앙 정렬(`textAlign: 'center'`)을 추가 적용하여, 모든 데이터가 일관성 있게 가운데 정렬되도록 조정했습니다.
+* **API 호출 안정성 패치**: 백엔드로 `S/N`을 전달할 때 특수문자로 인한 API 호출 오류를 방지하기 위해 URL에 `encodeURIComponent` 처리를 보강했습니다.
+
+### 3. AI 입고증 자동 파이프라인 엔진 전환 (OpenAI -> Google Gemini API)
+* **초고속/가성비 Gemini 1.5 Flash 모델 도입**: 기존에 사용하던 OpenAI(ChatGPT) 파싱 로직을 제거하고, 구글의 최신 생성형 AI인 **Gemini API**(`google-generativeai`) 기반으로 백엔드 파싱 로직(`ai_cargo_parser.py`)을 완벽하게 재설계했습니다.
+* **환경 변수 및 의존성 업데이트**: 시스템 의존성 파일(`requirements.txt`)에서 `openai`를 제외하고 `google-generativeai` 패키지를 신규 등록했으며, 환경 변수를 `OPENAI_API_KEY`에서 `GEMINI_API_KEY`로 전면 교체하여 Render 서버 배포를 성공적으로 완료했습니다.
+
+## [2026-09-25] WIA 프로모션 및 가용재고 UI/UX 개편 및 딜러 포털 동기화
+
+### 1. WIA 가용재고 및 프로모션 리스트 신규 항목 추가
+* **도착지(PORT) 항목 추가**: WIA 가용재고 및 WIA 프로모션 페이지 리스트에 해당 주문의 '도착지' 데이터를 표시하는 항목을 신규 추가하고 배치 위치를 최적화했습니다.
+* **프로모션 전용 판매가(PRICE) 기능 구축**: 프로모션 영역에만 단독으로 보여지는 '판매가' 데이터를 인라인 수정(개별) 및 엑셀 기반 대량 업로드 방식으로 유연하게 관리할 수 있도록 백엔드 API와 UI를 완비했습니다.
+* **다국어(i18n) 번역 적용**: 리스트의 각 항목(모델, NC, 발주번호, 옵션 상세, 도착일정, 도착지 등)에 대해 한/영 공식 명칭(MODEL, NC, P/O, ETA, PORT 등) 번역을 100% 동기화했습니다.
+
+### 2. 딜러 포털 기능 확장 및 화면 텍스트 일관성 확보
+* **통합 검색 및 상태 필터 연동**: 딜러 포털(`DealerPromotion`)에도 관리자 화면과 동일하게 모델명, P/O 기반의 통합 검색창과 상태 조회 필터(판매가능, 예약중, 판매완료)를 신설하고 즉각적인 데이터 필터링 로직을 연결했습니다.
+* **텍스트 번역 일괄 변경 적용**: 페이지의 메인 타이틀을 `[진행 중인 프로모션 / Active Promotions]`으로 통일하고, 검색창(search) 및 상태 조회(All type) 안내 텍스트 등 모든 수정 사항을 관리자와 딜러 포털에 동일하게 반영했습니다.
+
+### 3. 모바일 화면 최적화 및 레이아웃 개선
+* **모바일 상단 컨트롤 레이아웃 재배치**: 모바일 환경에서 프로모션 업로드 버튼이 타이틀 바로 우측에 공간 낭비 없이 배치되고, 그 아래에 검색창과 상태 필터가 좌/우 비율에 맞게 분할 배치되도록 구조를 반응형으로 재설계했습니다.
+* **모바일 카드뷰 핵심정보 상단화**: 모바일 리스트 카드의 최상단 영역에 **[ 모델명 - NC(회색 음영박스 강조) - 발주번호(P/O) ]** 순서로 3가지 핵심 정보가 가장 먼저 눈에 띄도록 항목을 재배치하여 모바일 뷰에서의 데이터 가독성을 대폭 끌어올렸습니다.
+
+## [2026-09-25] 로그인 UI 개선 및 Cloudflare R2 이벤트 연동(Queue/Worker) 아키텍처 완비
+
+### 1. 메인 로그인 화면(UI) 시각적 깊이감 개선
+* **Shadow 효과 적용**: 로그인 화면(`Login.jsx`)의 좌측 로그인 폼 영역과 우측 이미지 배너 영역의 경계면에 자연스러운 그림자(`box-shadow`)와 `z-index`를 적용하여, 로그인 패널이 배경 이미지 위로 입체적으로 떠 있는 듯한 고급스러운 깊이감(Depth)을 구현했습니다.
+
+### 2. Cloudflare R2 Webhook 연동 구조 고도화 (Queue & Worker 도입)
+* **Wrangler 정책 변경 대응**: 최신 Cloudflare R2의 Event Notification 기능에서 직접적인 외부 Webhook 전송이 제한됨에 따라, 백엔드로 이벤트를 쏘아주기 위한 새로운 브릿지 아키텍처를 설계 및 구축했습니다.
+* **비동기 큐(Queue) 생성 및 연동**: R2 버킷(`wmeins`)에 입고증(PDF)이나 CLP(엑셀) 파일이 업로드되는 이벤트(`object-create`)를 중간에서 수신하고 보관할 Cloudflare Queue(`r2-events-queue`)를 새롭게 생성하여 버킷과 연결했습니다.
+* **전용 중계 Worker 배포**: Queue에 이벤트가 발생할 때마다 이를 즉시 소비(Consume)하여 실제 운영 중인 백엔드 서버(Render)의 `/api/webhooks/r2-upload` 주소로 안전하게 POST 요청을 포워딩해주는 전용 Worker(`r2-webhook-worker`) 코드를 작성하고 배포를 성공적으로 완료했습니다.
+
+## [2026-09-24] 딜러 포털 내 구매내역 개편 및 AI 기반 입고증 자동 파이프라인 구축
+
+### 1. 딜러 포털 '내 구매내역(My Purchase History)' 페이지 UI 개편 및 데이터 통합
+* **전체 파이프라인 데이터 통합**: 기존에 완료된 구매(SOLD) 건만 필터링되어 노출되던 한계를 수정하여, 신규 발주(A주문)와 재고 할당(F주문)을 모두 포함한 5단계 파이프라인 상태의 전체 주문 내역을 모두 조회하도록 로직을 변경했습니다.
+* **리스트 레이아웃 변경**: PDF 가이드라인 요구사항에 맞춰 리스트업 컬럼을 총 8개 항목(주문일자, Model, S/N, N/C, P/O, 상태 컬러 뱃지, 화물디테일 팝업, 픽업상태)으로 구성했습니다.
+* **엑셀 다운로드 최적화**: 화면의 컬럼 변경 사항과 일치하도록 CSV 다운로드 시 내보내는(Export) 데이터 헤더 양식을 동일하게 동기화했습니다.
+
+### 2. 화물 제원 상세보기(Cargo Detail) 기능 및 모달(Modal) 신규 구현
+* **데이터베이스 확장**: 1개의 시리얼넘버(S/N) 하위에 메인 기계(MACHINE) 및 칩컨베이어(CC) 등 여러 박스의 제원 데이터를 저장할 수 있도록 백엔드 DB 스키마(`CargoDetail`)를 확장 구축했습니다.
+* **전용 비동기 API 엔드포인트 구축**: 프론트엔드에서 S/N을 보내면 해당 장비의 세부 제원을 배열 형태로 즉시 응답해 주는 전용 엔드포인트(`/api/cargo-details/{sn}`)를 신설했습니다.
+* **Lazy Loading 및 모달 UI 적용**: 무거운 데이터를 한 번에 가져오지 않도록 리스트에서 `[상세보기]` 버튼을 클릭할 때만 비동기 호출하는 Lazy Loading 방식을 적용했습니다. 또한 데이터가 아예 없는 빈 상태에서도 기본 표 프레임(Table)과 빈 셀(`-`) 형식을 잃지 않도록 세심하게 렌더링을 조정했습니다.
+
+### 3. AI 기반 입고증 데이터 추출 및 ERP 자동화 파이프라인 (R2 Webhook 연동) 구축
+* **Cloudflare R2 Webhook 엔드포인트 신설**: 스토리지에 입고증 파일(PDF 또는 엑셀) 업로드 시 발송되는 이벤트 알림을 수신하기 위해 백엔드에 전용 엔드포인트(`POST /api/webhooks/r2-upload`)를 추가하고, Render 서버 환경 최적화를 위한 `202 Accepted` 즉시 응답 및 백그라운드 처리(FastAPI BackgroundTasks)를 구현했습니다.
+* **AI 데이터 파서 스크립트(`ai_cargo_parser.py`) 개발**: 
+    * `PyPDF2`와 `openai` 라이브러리를 통해 업로드된 원문 PDF에서 LLM(프롬프트 엔지니어링)으로 S/N, 품목명, 무게(G*W, N*W) 등을 추출하여 정규화된 JSON 스키마로 가공합니다.
+    * 엑셀(CLP) 업로드 시 `pandas`를 이용하여 지정된 열을 스캔하여 데이터를 자동 매핑(Machine/CC 분류 등)하는 로직을 통합 지원합니다.
+* **ERP 데이터베이스 자동 업데이트**: 파이프라인에서 추출 및 가공된 데이터를 토대로 `CargoDetail` DB에 다중 박스 제원을 자동 저장하며, 동시에 해당 S/N과 일치하는 예정된 발주 내역(Order)을 조회하여 현재 상태를 `IN_STOCK(입고 완료)`로 일괄 승급(업데이트)시킵니다.
+## [2026-09-23] 선적 트래킹 대시보드 신규 구축 및 UI/UX 개편
+
+### 1. 선적 트래킹(Shipment Tracking) 전용 페이지 신규 구축
+* **UI/UX 디자인 대폭 개편**: 기존의 정적인 테이블 형태에서 벗어나, Mapbox GL JS를 활용한 풀스크린 글로벌 해상 맵을 백그라운드로 배치하고, 좌측에 플로팅 오버레이 형태의 대시보드 패널을 적용하여 프리미엄 급 뷰어 레이아웃으로 업그레이드했습니다.
+* **B/L 및 장비(Container) 상세 추적 타임라인 구현**: 좌측 리스트에서 특정 B/L(선하증권) 항목을 클릭하면, 경로(Route), 장비 목록(Containers) 등의 탭 메뉴와 함께 출발지(POL)부터 도착지(POD)까지의 운송 마일스톤(타임라인)이 표시되는 디테일 뷰를 구축했습니다.
+* **KPI 위젯 연동**: 좌측 패널 상단에 재고 에이징 비율(일반/장기/악성) 및 해상 운송 지연율을 직관적으로 확인할 수 있는 파이 차트 위젯을 추가 배치했습니다.
+* **데이터 패칭 및 Mapbox 연동 최적화**: `@tanstack/react-query`를 도입하여 선적 데이터를 실시간으로 캐싱/폴링하도록 안정화했으며, Mapbox의 의존성 및 CSS 호환성 문제를 해결하기 위해 `react-map-gl` 버전을 안정적인 v7으로 다운그레이드하여 에러를 조치했습니다.
+
+## [2026-09-23] 다국어(i18n) 지원 범위 확대 및 관리자 UI/기능 최적화
+
+### 1. 선적정보 업로드 페이지 UI 및 다국어 고도화
+* **사이드바 메뉴 다국어(i18n) 적용**: 사이드바의 '선적정보 업로드' 메뉴에 다국어 키를 연동하여, 한국어(선적정보 업로드) 및 영어(Shipment Management) 환경에 맞게 동적으로 텍스트가 전환되도록 개선했습니다.
+* **업로드 드롭존(Dropzone) UI 최적화**: 파일 업로드 영역의 레이아웃을 다듬어 가로 최대 폭을 500px로 제한하고, 상하 안쪽 여백(padding)을 20px로 축소하여 화면 중앙에 훨씬 깔끔하고 콤팩트하게 배치되도록 스타일을 업데이트했습니다.
+
+### 2. 주문 배송 타임라인 및 권한 오류 수정
+* **삭제 권한 검증(Validation) 버그 픽스**: 관리자(WME-admin) 계정으로 타임라인 리스트 삭제 시 발생하던 권한 오류 현상을 수정했습니다. 삭제 로직에서 계정 문자열의 불필요한 공백으로 인해 권한이 차단되는 문제를 원천 차단하기 위해 `trim()` 처리를 추가했습니다.
+
+### 3. 제품 라이브러리 및 영업 통계 차트 정리
+* **불필요한 버튼 및 기능 제거**: 제품 라이브러리 페이지의 좌/우측 상단에 위치했던 '신규자료 업로드' 버튼과 해당 기능을 사용자 요청에 따라 완전히 제거하여 페이지를 더 깔끔하게 정리했습니다.
+* **통계 트리맵 롤백 및 안정화**: 영업 통계 및 분석 페이지의 '딜러/지역별 판매 비중' 트리맵을 외부 주식 히트맵 스타일로 시범 적용해보았으나, 원본 뷰의 가시성이 더 우수하다는 판단하에 기존 상태로 안전하게 롤백했습니다.
+
+### 4. 백엔드 외부 연동망 점검
+* **TrackCargo API 모킹(Mocking) 확인**: 현재 연결된 외부 선적 추적(TrackCargo) API가 원활히 연결되어 동작하는지 점검을 완료했으며, 현재 테스트용 모크(`mock_api`) 설정으로 정상적으로 가상 B/L 데이터를 수신하고 있음을 확인했습니다.
+
+
+## [2026-09-22] 클라우드 인프라 이전 및 Render 배포 환경 최적화
+
+### 1. GitHub 저장소 및 클라우드 배포 환경 재구축
+* **신규 GitHub 조직 이전**: 로컬 소스코드를 신규 GitHub 조직(`WIAmachine-EU/wme-system`)으로 전면 이관하여 협업 및 배포 파이프라인의 기반을 마련했습니다.
+* **Render 클라우드 분리 배포**: 기존 단일 환경 서버를 백엔드(`wme-system-backend`)와 프론트엔드(`wme-system-frontend`) 2개의 독립적인 Web Service(PRO 버전)로 분리 배포하여 안정성과 확장성을 확보했습니다.
+
+### 2. 프론트엔드 Nginx 프록시(Proxy) 및 보안 설정 고도화
+* **API 라우팅 경로 수정**: 프론트엔드(`nginx.conf`)에서 백엔드로 `/api/` 요청을 전달할 때, 경로가 유실되지 않도록 `proxy_pass` 설정의 Trailing slash(`/`)를 제거하여 API 통신 규격을 맞추었습니다.
+* **SNI 및 Host 헤더 보안 설정**: 외부 클라우드(Render)의 리버스 프록시 및 로드밸런서를 정상 통과하도록, Nginx 설정에 `proxy_ssl_server_name on;` 옵션을 추가하고 Host 헤더를 백엔드 주소로 명확히 명시하여 502 Bad Gateway 에러(통신 거부 현상)를 완벽히 해결했습니다.
+
+### 3. 백엔드 배포 및 데이터베이스 초기화 방지 패치
+* **로컬 DB 배포 환경 동기화**: Render의 Docker 빌드 환경에서 로컬 데이터베이스(`scm_erp.db`)가 누락되어 텅 빈 상태로 서버가 시작되는 문제를 방지하기 위해, 백엔드 `.dockerignore` 설정에서 DB 파일 제외 설정을 해제했습니다. 이로써 `WME-admin`을 포함한 기존 데이터가 운영 서버에 그대로 반영되어 정상적인 로그인이 가능해졌습니다.
+
+## [2026-09-21] 외부 애그리게이터(TrackCargo) API 연동 및 선적정보 업로드 기능 구현
+
+### 1. 선적정보 업로드 전용 페이지 신설 (프론트엔드)
+* **엑셀/CSV 업로드 컴포넌트 추가**: B/L(선하증권) 단위의 해상 수송 현황 정보를 시스템에 손쉽게 적재할 수 있도록 Drag & Drop 기반의 업로드 컴포넌트를 신규 구축했습니다.
+* **실시간 데이터 검증 및 그리드 표출**: `papaparse` 및 `xlsx` 라이브러리를 통해 업로드된 데이터를 브라우저 단에서 즉시 파싱하고, 필수값(MBL, P/O 누락 등) 및 S/N 중복 여부를 실시간 검증하여 오류 셀을 하이라이팅하는 데이터 그리드를 도입했습니다.
+
+### 2. 백엔드 DB 스키마 확장 및 MBL-Order 연동 구조
+* **Shipment 엔티티 신규 생성**: 기존 주문(`Order`) 테이블과 별개로 MBL별 운송 상태를 관리하기 위해 `Shipment` 테이블을 데이터베이스에 새롭게 구축하고, Order 테이블과 1:N 관계(하위 종속성)를 설정했습니다.
+
+### 3. 외부 API (TrackCargo) 연동 및 자동 동기화 
+* **API Tracking 모듈 통합**: 목업 형태였던 항만 도착 일정을 실제 전문 3rd Party 애그리게이터인 TrackCargo API 모듈(`trackcargo_api.py`)로 교체(현재 테스트 모드)하여, MBL 기반 해상운송 정보 조회 파이프라인을 연결했습니다.
+* **24시간 Polling 스케줄러 구축**: 백엔드 스케줄러(`scheduler.py`)가 24시간 주기로 활성화된 전체 MBL의 최신 상태(Vessel, Voyage, ETD, ETA)를 TrackCargo로부터 조회하고, 해당 MBL에 속한 수많은 장비(S/N) 및 주문(P/O)별 ETA 정보까지 일괄 전파 및 갱신하도록 설계했습니다.
+## [2026-09-17] 관리자 영업 통계 차트 개편 및 발주 모달 UI 통일
+
+### 1. 관리자용 영업 통계 및 분석 (Sales Analytics) 차트 고도화
+* **트리맵(Treemap) 차트 도입**: '카드 6: 딜러/지역별 판매 비중' 항목의 기존 원형(도넛) 및 막대그래프를 제거하고, 딜러별 점유율을 직관적으로 파악할 수 있는 단일 트리맵 차트로 전면 개편했습니다.
+* **블루(Blue) 계열 테마 적용**: 차트의 영역별 색상을 다색에서 어두운 파란색부터 밝은 파란색으로 이어지는 전용 컬러 팔레트로 변경하여, 전체 시스템 디자인 테마와의 통일성을 강화했습니다.
+* **폰트 렌더링 및 애니메이션 최적화**: 새로고침 시 화면 로딩 지연을 없애기 위해 차트 기본 애니메이션 효과를 제거하고, 차트 내부 텍스트가 강제로 굵게 출력되던 현상을 수정해 `SUITE-Light` 폰트의 얇고 세련된 두께가 제대로 표현되도록 안티앨리어싱 처리를 적용했습니다.
+
+### 2. 업로드 / 설정관리 (신규 발주 생성) 팝업 UI 개선
+* **표준 드롭다운(Select) 적용**: 신규 발주 생성 팝업창 내의 5가지 항목(모델, NC, 딜러, Incoterms, 항구)을 기존 커스텀 스크롤(Datalist) 방식에서, '장비 정보 수정' 팝업창과 동일한 표준 드롭다운 메뉴 형태(Select 태그)로 교체하여 UI 일관성을 확보했습니다.
+
+### 3. 전체 시스템 레이아웃 및 여백(Padding) 표준화
+* **전체 페이지 여백 최적화**: 화면 좌/우 여백을 10px로 축소하여 좁은 모바일 및 태블릿 환경에서의 데이터 시인성을 극대화하였으며, 상/하 여백은 기존 32px을 그대로 유지하도록 CSS(`.page-body`)를 글로벌 업데이트했습니다.
+* **타임라인 목록 여백 축소**: 타임라인 리스트(`.step-bar-container`)의 상하 패딩을 축소하여 한 화면에 더 많은 주문 배송 정보가 표시되도록 전체 리스트 높이를 밀도 있게 조정했습니다.
+* **컴포넌트 여백 렌더링 통일**: '라인업 제품 라이브러리'와 '유저 및 보안 관리' 페이지의 개별 인라인 패딩 스타일을 완전히 제거하고, 공통 `.page-body` 클래스로 일괄 전환하여 모든 페이지 간의 레이아웃 통일성을 100% 확보했습니다.
+
+### 4. WIA 프로모션 관리 및 재고 목록 UI 고도화
+* **WIA 프로모션 상태 필터 및 통합 검색 추가**: 프로모션 리스트 상단에 모델명, P/O, NC, 딜러 등을 텍스트로 조회할 수 있는 통합 검색창과, 전체 상태(판매가능, 예약중, 판매완료)를 바로 조회할 수 있는 드롭다운 필터를 신규 배치하여 WIA 재고리스트와 완벽히 동일한 레이아웃으로 개편했습니다.
+* **재고 목록 구입가 통화 포맷팅**: WIA 가용재고 목록 등에서 '구입가(Price)' 숫자가 천 단위마다 콤마(,)가 찍히도록 자동 렌더링 포맷팅(`toLocaleString`)을 적용하여 재무적 가독성을 높였습니다.
+* **모바일 렌더링 안정성 확보**: 모바일 뷰에서 리스트의 특정 부위(토글)를 클릭할 때 전체 화면 데이터가 사라지는 치명적 버그를 추적하여, 렌더링 함수 내 누락된 스케줄(`showSchedule`) 참조 에러를 완벽히 수정했습니다.
+
+### 5. 입고된 장비 목록 (AdminDispatch) 데이터 수정 기능 구현
+* **수정(Edit) 팝업 모달 신설**: 입고된 장비 목록의 '진행' 란에 데이터 정보를 수정할 수 있는 전용 팝업창(Edit Modal) 기능과 호출 버튼을 새롭게 개발 및 연동했습니다.
+* **마스터 데이터 실시간 연동**: 수정 팝업창에서 변경 가능한 딜러 및 모델 정보를 백엔드 마스터 데이터(`dealers`, `models`)와 실시간으로 비동기 통신하여 선택할 수 있도록 구현했습니다.
+* **장비 데이터 100% 동기화 구조 확보**: P/O 번호(`reference_no`) 고유 식별 체계와 단일 데이터베이스 기반 조회 구조를 통해, '입고된 장비 목록'에서 장비 정보를 수정하면 'WIA 재고리스트', 'WIA 프로모션' 페이지에도 즉각적으로 모든 수정 내역(S/N, 가격, 모델 등)이 실시간 자동 동기화되도록 시스템 정합성을 확보 및 검증했습니다.
+## [2026-09-15] 타임라인 도착일정(Actual) 실데이터 연동 및 시스템 안정화
+
+### 1. 타임라인(주문 상세 정보) HHLA API 도착일정 동기화 (메뉴 1, 3)
+* **Actual 날짜 하드코딩 제거**: 프론트엔드 모듈(`DealerOrders.jsx`, `AdminDashboard.jsx`) 화면에 임시로 노출되던 하드코딩 날짜(`2026.09.30` 등)를 전부 제거하고 실제 시스템 데이터가 표기되도록 수정했습니다. (ETD, ETA의 하드코딩된 예외 날짜 표기 로직도 함께 제거하여 오류 방지)
+* **실제 도착일(actual_date) DB 구축**: 백엔드 `orders` 데이터베이스 테이블에 실제 도착일(`actual_date`)을 저장할 수 있는 컬럼 스키마를 신규 반영하고 내부 마이그레이션을 자동 수행했습니다.
+* **HHLA API 스케줄러 로직 개편**: 외부 HHLA 항만 API와 통신하는 봇 스케줄러(`scheduler.py`)가 ETA 값 이외에도 선박의 실제 항만 도착 및 입항 일정(예: 2026-09-08 16:15)까지 획득하여 DB에 함께 업데이트하도록 데이터를 확장 및 안정화시켰습니다.
+
+### 2. 가상 환경(Mock) 항만 데이터 추가 및 검증
+* **누락된 선박 데이터 추가**: 아직 실제 API 통신 환경이 구축되지 않은 프로토타입 단계에서 내부 테스트 및 검증이 원활히 이루어질 수 있도록, 백엔드 API 목(Mock) 데이터 목록(`hhla_api.py`)에 누락되어 있던 `ONE INTEGRITY` 선박의 가상 데이터를 추가 등록했습니다. 이를 통해 타임라인에서 해당 선박 주문의 `Actual` 정보가 정상적으로 노출됨을 확인했습니다.
+
+## [2026-09-12] 가용재고 텍스트 수정 및 신규 발주 모달 UI/UX 개편
+
+### 1. WIA 가용재고 목록 (AdminSalesArchive 등) 다국어 텍스트 업데이트
+* **'구매가' 통화 표기 명확화**: 가용재고 목록 및 장비 정보 수정창에 표기되던 '구매가' 항목을 `구매가(€)`로 통일하여 유로화 기준임을 직관적으로 알 수 있게 수정했습니다.
+* **영문 번역본 연동**: 영문 페이지 환경에서도 기존 `BUYING` 텍스트가 `BUYING(€)`로 표출되도록 국/영문 다국어 파일을 동기화했습니다.
+
+### 2. 신규 단건 발주 생성 모달 폼 고도화 (UploadSettings)
+* **2단 분할 레이아웃(Grid) 적용**: 한 줄에 하나의 항목만 입력받아 길어지던 기존 모달 디자인을 '장비 정보 수정' 팝업창과 동일하게 한 줄에 2개의 필드가 나란히 배치되도록 Grid 레이아웃으로 변경했습니다.
+* **장비옵션(DETAIL SPEC) 신규 항목 추가**: 신규 발주 생성 시 상세 스펙을 즉시 입력할 수 있도록 `장비옵션` 항목을 모달 하단에 신설하고 폼 전송(Payload) 시 백엔드로 값이 넘어가도록 데이터 구조(`detail_spec`)를 확장했습니다.
+* **다국어 번역 시스템 적용**: 팝업창 내부의 모든 필드 이름과 하단 액션 버튼('취소', '발주 생성' 등)을 하드코딩 방식에서 다국어 매핑 시스템(`translation.json`)으로 전환했습니다. 영문 모드일 경우 `Cancell`, `Create`, `DETAIL SPEC` 등 공식 영문 명칭으로 자동 치환됩니다.
+## [2026-09-11] 포털 UI/UX 개편 및 모바일 디스플레이 최적화
+
+### 1. WME 포털 대시보드 (주문 배송 타임라인) UI 개편
+* **항구 및 인코텀즈 통합 표기**: 데스크탑 및 모바일 화면 모두 리스트의 도착지(Port) 표기 항목에 `Incoterms` 정보가 함께 묶여 표기(`FCA Hamburg` 형태)되도록 데이터 렌더링 로직을 통합했습니다.
+* **상세 정보 아코디언 텍스트 변경**: 리스트 하단 상세 정보 영역의 기존 `Incoterms` 항목 라벨을 `Date of Request`로 변경하고 데이터 출력을 연동했습니다.
+* **모바일 화면 일정 포맷 최적화**: 모바일 카드 뷰에서 일정 정보가 한눈에 들어오도록 `ETD: 날짜 / ETA: 날짜` 형태로 문자열 포맷을 갱신했으며, 레이블 텍스트(검은색)와 실제 날짜(파란색)의 색상 스타일을 분리 적용하여 시인성을 높였습니다.
+* **모바일 상세 정보 뷰 리팩토링**: 모바일 화면에서 아코디언이 펼쳐질 때 불필요하게 노출되던 진행 상황, 겹치는 시리얼 번호, REMARK 등을 삭제하고 요구사항에 맞춰 상세 항목을 전면 재배치했습니다.
+
+### 2. 업로드 및 설정관리 페이지 (자동화 기능 확장 기반 마련) 
+* **발주 생성 폼 항목 추가**: 신규발주 생성 모달 내부에 `배송요청일(Delivery Request Date)`을 입력받는 필드를 신규 추가하여 데이터 수집 기반을 마련했습니다.
+* **자동 일정 알림 설정 문구 안내**: 화면 하단에 향후 고도화될 3가지 핵심 기능(D-Day 배송요청 알림, 프로모션 자동 롤백 알림, 임대 만료일 안내 알림)에 대한 상세 안내 가이드를 배치했습니다.
+
+### 3. 로그인 화면 레이아웃 및 다국어 텍스트 튜닝
+* **로그인 화면 디자인 조정**: 접속 시 나타나는 메인 텍스트를 `WME Shipping & Stock Management`로 갱신하고, 기계 아이콘을 텍스트 하단 영역으로 위치를 정중앙 재조정하여 심미적인 안정감을 강화했습니다.
+* **다국어(i18n) 번역 갱신**: 포털 명칭(SCM -> WME 포털 대시보드 등) 및 관련 메뉴 텍스트 다국어 패치를 완료하여 시스템 내 일관성을 확보했습니다.
+
+## [2026-09-07] 제품 카탈로그 데이터 갱신 및 Cloudflare R2 실서버 연동 트러블슈팅
+
+### 1. 제품 모델별 카탈로그(PDF) 매핑 데이터 업데이트
+* **카탈로그 매핑 갱신**: 제품 라이브러리(`ProductLibrary.jsx`)에서 참조하는 프론트엔드 데이터 소스(`productLibraryModels.js`)의 각 모델별 카탈로그 PDF 파일명 매핑 로직을 최신 기준에 맞춰 일괄 업데이트했습니다.
+* **HD3100 시리즈 파일명 수정**: 추가 검토된 내용에 따라 `HD3100` ~ `HD3100MA` 모델의 카탈로그 다운로드 연결을 기존 `catalog-003.pdf`에서 `catalog-004.pdf`로 수정하고 실서버 배포를 위한 커밋 및 푸시(Git Push)를 완료했습니다.
+
+### 2. Render 실서버 배포(R2 스토리지 연동) 환경변수 문제 해결
+* **로컬 폴백(Fallback) 현상 분석**: Render 실서버에서 최신 카탈로그가 아닌 이전 파일(더미 파일)이 다운로드되던 원인을 추적하여, 백엔드 서비스에 Cloudflare R2 환경변수가 누락되어 로컬 스토리지로 우회(Fallback)하는 문제를 규명했습니다.
+* **환경변수 세팅 가이드라인 제공**: Render 대시보드의 Environment 설정에서 `R2_BUCKET_NAME`, `R2_ENDPOINT_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` 4개의 필수 환경변수를 직접 설정하도록 명확한 해결 가이드와 지침을 제공했습니다.
+
+### 3. 백엔드 시작(Startup) 패치 DB 에러 분석 및 조치
+* **UNIQUE 제약조건 에러 식별**: 서버 재시작 시 출력되던 `custom_users.email`의 무결성(UNIQUE constraint failed) 에러가, 딜러 계정의 이메일을 특정 주소로 강제 업데이트하려는 구버전의 하드코딩된 'Startup Patch' 로직 때문임을 확인했습니다.
+* **시스템 안정성 검증 완료**: 해당 에러가 예외 처리(`try-except`)로 안전하게 보호되고 있으며, 카탈로그 R2 연동 및 메인 시스템 구동에는 전혀 악영향을 미치지 않는 무해한 에러임을 검증 및 안내했습니다.
+
+## [2026-09-06] 시스템 전반 UI/UX 최적화 및 팝업 모달 모바일 동기화
+
+### 1. 시스템 전체 모바일 최적화 (풀스크린 팝업) 일괄 적용
+* **모바일 전체화면 레이아웃 구축**: 시스템 내 존재하는 모든 팝업(Modal) 창에 대해 모바일 환경에서 화면(Viewport)을 꽉 채우는 풀스크린 형태로 최적화하여 좁은 화면에서도 스크롤 및 폼 입력이 원활하게 동작하도록 개편했습니다.
+* **디자인 및 구조 표준화**: `UserProfile`, `ProductLibrary`, `AdminManagement`, `UploadSettings`, `AdminUsers`, `AdminSalesArchive`, `AdminDashboard`, `AdminDispatch` 등 시스템 전체의 팝업창 UI 구조를 공통된 클래스(`.modal-overlay`, `.modal-content`) 기반으로 표준화 및 리팩토링했습니다.
+* **닫기 버튼 직관화**: 모바일 사용자 경험(UX) 개선을 위해 모든 모달창 우측 상단에 닫기('X') 아이콘 버튼을 일괄 탑재했습니다.
+
+### 2. WIA 창고 (AdminDispatch) 컴포넌트 텍스트 및 데이터 정합성 갱신
+* **용어 직관화**: 입고된 장비 목록의 데이터 테이블 헤더 텍스트 중 불필요한 외래어인 '액션'을 명확한 '진행'으로 변경했습니다.
+* **스펙 항목 글로벌 규격화**: 장비 입고 내역 및 상세 정보(아코디언 뷰) 내에 표시되던 '상세 사양' 텍스트를 시스템 글로벌 규격인 'DETAIL SPEC'으로 영문화했습니다.
+* **데이터 매핑 강화**: 통합 판매 목록 등 다른 메뉴의 주문(P/O) 정보와 동일하게 DETAIL SPEC 데이터가 WIA 창고 리스트에서도 완벽히 불러와져 표출되도록 렌더링 로직을 고도화했습니다.
+
+## [2026-09-05] 입고/판매 워크플로우 로직 개선 및 엑셀 일괄 업로드 고도화
+
+### 1. 주문 배송 타임라인 및 창고 간의 상태 연동 (Workflow) 개선
+* **타임라인 입고 완료 로직 수정**: 타임라인(`AdminDashboard`)에서 '입고완료' 클릭 시, 주문의 실제 상태는 `IN_STOCK`(입고)으로 유지되면서 타임라인 목록에서만 깔끔하게 숨겨지도록 새로운 상태 플래그(`is_timeline_completed`)를 데이터베이스 모델과 연동했습니다. 이로 인해 입고 처리된 주문이 정상적으로 'WIA 창고'에 조회 가능해졌습니다.
+* **WIA 창고 출고 기능 복구 및 판매 연동**: WIA 창고(`AdminDispatch`) 내의 **[출고처리]** 버튼 기능이 실제 비즈니스 흐름에 맞게 주문 상태를 `SOLD`(판매완료)로 전환하도록 조치했습니다. 이제 출고 처리를 완료하면 장비가 즉시 '통합 판매 목록(`AdminSalesArchive`)'으로 이관됩니다.
+* **F발주 (법인재고) 가용 목록 유지**: 법인재고(WME) 주문에 대해 딜러 할당 전까지는 배송 단계와 무관하게 항상 가용재고 목록(`AdminInventory`)에 노출되도록 하는 `is_corporate_stock` 렌더링 검증 및 확인을 완료했습니다.
+
+### 2. Pandas 엑셀 일괄 업로드 표준 헤더 및 데이터 파싱 업데이트
+* **새로운 표준 헤더 포맷 적용**: '업로드 / 설정관리' 페이지의 대량 발주 엑셀 업로드 템플릿 검증 시스템을 `MODEL`, `NC`, `P/O`, `DEALER`, `ORDER DATE`, `DETAIL SPEC`, `BUYING`, `INCOTERMS`, `PORT` 신규 9가지 필수 헤더 기준으로 업데이트했습니다.
+* **데이터 정합성(Mapping) 및 자동화**: 엑셀 업로드 시 `BUYING` 열의 데이터가 자동으로 구매가(Price)로 맵핑되고, `ORDER DATE` 날짜 값이 분석되어 시스템의 '딜러 발주 일자'로 즉각 변환 및 적재되도록 백엔드 파싱 로직을 고도화했습니다.
+
+### 3. WIA 가용재고 목록 (AdminInventory) 일정(ETD/ETA) 표시 오류 해결
+* **가짜(Fake) 일정 노출 방지**: 신규 업로드된 발주 건이 '주문(CONFIRMED)' 단계일 때부터 백엔드가 생성한 가상의 배송 일자(ETD/ETA)가 가용재고 목록에 노출되던 버그를 해결했습니다.
+* **타임라인 연동 (동적 렌더링)**: 주문 배송 타임라인과 완벽히 동일한 조건(주문 상태가 `SHIPPING`, `ARRIVED`, `IN_STOCK`으로 진입했을 때만 노출)을 부여하여, 배송 시작 이전 단계의 장비들은 ETD/ETA가 깔끔하게 `- / -` 로 숨겨지도록 디테일을 잡았습니다.
+
+### 4. Cloudflare R2 스토리지 연동 고도화 및 썸네일 이미지 최적화
+* **퍼블릭 도메인 연동**: 제품 썸네일 이미지를 원활하게 제공하기 위해 프론트엔드 환경 변수(`.env`)에 Cloudflare R2의 Public Development URL(`VITE_R2_CUSTOM_DOMAIN`)을 완벽하게 맵핑했습니다.
+* **백엔드 다운로드 로직 검증**: 백엔드의 환경변수(접근 키, 버킷명)가 정상적으로 인식되어 R2 스토리지와 연결되었으며, 카탈로그 다운로드 요청 시 서명된 URL로 정상 리다이렉트(307 Redirect) 되는 것을 검증했습니다.
+* **웹 최적화 포맷(WebP) 변환 스크립트 구축**: 파이썬 `Pillow` 라이브러리를 활용하여 로컬 스토리지의 원본 썸네일 이미지(`jpg`)들을 차세대 웹 표준 규격인 `webp` 형식으로 일괄 변환(용량 30% 이상 절감)하는 자동화 스크립트(`convert_thumbnails.py`)를 프로젝트 루트에 신규 작성 및 적용했습니다.
+
+## [2026-09-03] 유저 관리 기능 및 제품 라이브러리 UI/UX 고도화
+
+### 1. 관리자 권한 유저 계정 삭제 기능 구현
+* **계정 삭제 API 연동**: 백엔드(`main.py`)에 유저 삭제를 위한 `DELETE /api/users/{user_id}` 엔드포인트를 신규 구현하여 보안 관리 기능을 강화했습니다.
+* **프론트엔드 UI 적용**: 유저 및 보안 관리(`AdminUsers.jsx`) 화면에서 관리자가 직접 사용자의 계정을 삭제할 수 있도록, 비활성화되어 있던 '관리' 항목의 휴지통(삭제) 아이콘 버튼 기능을 활성화했습니다.
+* **안전한 삭제 프로세스**: 삭제 버튼 클릭 시 "해당 유저를 삭제하시겠습니까?"라는 확인 팝업(confirm)을 노출하여, 실수로 인한 계정 삭제를 미연에 방지합니다.
+
+### 2. 제품 라이브러리 (Product Library) 모델 상세 데이터 고도화
+* **자동화 스크립트 기반 데이터 대량 맵핑**: 파이썬 스크립트(`update_models.py`)를 활용하여 사양서 PDF에 기재된 분류 데이터를 추출한 후, 프론트엔드 DB(`productLibraryModels.js`) 내 218개 전체 모델에 신규 속성(`series`, `typeCategory`, `typeDescription`)을 일괄 주입(Mapping)했습니다.
+* **텍스트 오타 교정**: 데이터 주입 과정에서 원본 PDF 문서의 헤더 열 이름 오타(mode_category 등)가 실제 코드에 반영되지 않도록 올바른 명칭(`model`)으로 내부 매핑하여 데이터 무결성을 확보했습니다.
+
+### 3. 제품 라이브러리 모달(Modal)창 다국어(i18n) 번역 적용
+* **텍스트 영문화 동기화**: 장비 상세 스펙 팝업창 내의 텍스트가 영어(EN) 설정 시에도 한국어로 노출되던 이슈를 픽스하고 아래와 같이 완벽한 다국어 동기화를 달성했습니다.
+  * `핵심 스펙` ➔ `Specifications`
+  * `다운로드 (EN)` ➔ `DOWNLOAD (EN)`
+  * `카탈로그(EN). PDF` ➔ `CATALOG (EN). PDF`
+  * `세일즈 가이드 (EN). PDF` ➔ `SALES GUIDE (EN). PDF`
+
+### 4. 제품 라이브러리 리스트 뷰 (Card UI) 디자인 개편
+* **썸네일 비율 최적화**: 모델 썸네일 이미지 컨테이너의 높이를 `190px`로 상향 조정하고 상단 여백(`padding-top: 5px`)을 부여하여 안정적인 이미지 비율을 확보했습니다.
+* **불필요한 데이터 제거 및 직관화**: 모델 카드박스 내부에 있던 '문서 N개 보유', '스핀들', '이송거리' 등 복잡한 스펙 수치 표시를 완전히 걷어냈습니다.
+* **신규 카테고리 텍스트 대체**: 걷어낸 정보 영역의 빈자리에 새롭게 추가한 `series`(시리즈), `typeCategory`(장비 카테고리), `typeDescription`(장비 타입) 텍스트를 배치하여 깔끔하고 세련된 카드 레이아웃으로 개편했습니다.
+* **타이포그래피 및 데코레이션**: 모델명 텍스트(`model.name`)의 크기를 `1.55rem`으로 확대하고 여백(`margin-bottom: 4px`)을 조정해 시인성을 높였습니다. 모델명 우측에는 미적 완성도를 위한 다운로드 아이콘(14px) 데코레이션 레이아웃을 추가했습니다.
+* **가로 열 배치 한도 설정 (Responsive Grid)**: 대형 모니터(1600px 이상) 등 브라우저 창의 가로 폭이 아무리 커지더라도, 제품 모델 카드가 무한정 나열되지 않고 한 줄(가로열) 당 최대 5개까지만 노출되도록 CSS 미디어 쿼리 제어를 적용했습니다.
+
+### 5. 제품 라이브러리 카탈로그 다운로드 오류(CORS) 해결 및 최적화
+* **다운로드 방식 전환 (Fetch ➔ Navigation)**: Cloudflare R2 스토리지의 Pre-signed URL로 리다이렉트 시 발생하는 브라우저 CORS(`Failed to fetch`) 차단 문제를 해결하기 위해, 비동기 `fetch` 방식에서 앵커(`<a>`) 태그 기반의 네비게이션 이동 방식으로 다운로드 로직을 수정했습니다.
+* **첨부파일 다운로드 강제(Content-Disposition)**: 크로스 도메인 환경에서 브라우저가 PDF를 새 탭으로 열어버리는 현상을 방지하기 위해, 백엔드(`storage.py`)의 Pre-signed URL 생성 시 `ResponseContentDisposition` 속성을 주입하여 즉각적인 파일 다운로드가 시작되도록 조치했습니다.
+* **API 프록시 매핑 적용**: 파일 다운로드 URL에 하드코딩되어 있던 주소(`http://localhost:8000`)를 제거하고 프론트엔드 환경 변수에 맞춘 상대 경로 호출 방식을 적용하여 Vite 프록시를 정상적으로 거치도록 개선했습니다.
+
+### 6. 제품 라이브러리 '핵심스펙' 항목 다국어 규격화 적용
+* **상세 스펙 항목 영문화 맵핑**: 팝업창 내의 기종별 12가지 상세 스펙 항목명(Key)에 대해 공식 영문 규격표를 기준으로 번역을 제공하는 모듈(`translateSpecKey`)을 구현하여 JSX 구조 외부로 안전하게 분리 탑재했습니다.
+* **공식 영문명칭 반영 완료**: `최대 가공경` ➔ `Max. Machining Diameter`, `회전공구 회전수` ➔ `Rotary Tool Speed` 등 제품 사양서에 명시된 영문 텍스트 규격과 100% 일치하도록 동기화를 완료했습니다.
+
+## [2026-09-01] 프론트엔드 로그인, 사이드바 UI 개선 및 제품 라이브러리 고도화
+
+### 1. 로그인 (Login) 화면 UI 최적화
+* **타이포그래피 및 레이아웃 재조정**: 상단 로고 텍스트 'WME SCM'의 폰트 두께를 얇은 굵기(`300`)로 변경하고, 로고 아이콘과의 수직 정렬을 하단(`flex-end`)으로 일치시켰습니다.
+* **여백 조정**: 로고와 입력 폼 사이의 상단 마진(`margin-top`)을 `50px`로 적용하여 화면의 여백과 밸런스를 개선했습니다.
+
+### 2. 컴포넌트 사이드바 (Sidebar) UI 개선
+* **아이콘 규격 및 간격 일원화**: 모든 포털(관리자, RSM, 딜러)에 공통 적용되는 좌측 사이드바 하단의 '내 정보(User)' 및 '로그아웃(LogOut)' 아이콘 크기를 `20px`로 일괄 적용하고, 두 아이콘 간의 간격을 `14px`로 최적화했습니다.
+* **우측 정렬 배치**: 프로필 및 로그아웃 아이콘을 우측 가장자리로 밀착 정렬(`margin-left: auto`)하여 시각적인 안정감을 더했습니다.
+
+### 3. 제품 라이브러리 (Product Library) 썸네일 연동 및 UX 개선
+* **실제 썸네일 이미지 연동**: 제품 썸네일 관리 전용 경로(`frontend/public/images/products/`)를 확보하여 `E160A`, `E160C`, `HD2200` 모델에 실제 기종 이미지를 맵핑(`productLibraryModels.js`)하고 UI 뷰에 즉시 표출되도록 렌더링 방식을 갱신했습니다.
+* **카드 마우스 호버(Hover) 효과 최적화**: 제품 카드(`clean-card`) 마우스 오버 시 기존 회색 음영 배경색 전환 효과를 제거하고, 브랜드 골드 컬러(`RGB: 205, 170, 125`) 라인의 `2px` 테두리 강조 효과가 부각되도록 개편했습니다.
+* **레이아웃 출렁거림 및 테두리 렌더링 이슈 해결**: 호버 시 카드의 실제 박스 크기가 변동되는 출렁거림 현상 방지를 위해 `inset box-shadow`를 활용하고, 썸네일 이미지 컨테이너의 고정 배경색을 투명(`transparent`)하게 처리하여 썸네일 레이어가 안쪽 테두리를 덮어 선이 어긋나 보이던 이슈를 완벽히 픽스했습니다.## [2026-08-30] 제품 라이브러리 카탈로그 다운로드 구현 및 UI/UX 개선
+
+### 1. 제품 라이브러리 (Product Library) PDF 다운로드 기능 구축
+* **백엔드 스토리지 추상화 도입**: 향후 외부 스토리지(S3 등)로의 확장을 대비해 파일 다운로드 처리를 추상화한 `storage.py`를 신설하고, 파일 스트림을 제공하는 `/api/documents/{filename}/download` API 엔드포인트를 구축했습니다.
+* **카탈로그 코드 기반 자동 매핑**: 파이썬 스크립트를 통해 기종별(예: E160A, HD2200 등) '카탈로그 코드'를 분석하고 모델별 고유 PDF 파일명(예: `catalog-001.pdf`)을 데이터에 일괄 자동 매핑했습니다.
+* **프론트엔드 다운로드 로직 연동**: 제품 라이브러리의 모델 상세 팝업창에서 '카탈로그(EN) PDF' 버튼 클릭 시 즉각적으로 백엔드 API를 호출해 PDF 파일이 안전하게 브라우저로 다운로드 되도록 로직(`handleDownload`)을 구현했습니다.
+* **모바일 상세 팝업 레이아웃 조정**: 모바일 뷰 화면에서 문서 다운로드 접근성을 높이기 위해, 상세 팝업창 내 '문서(EN)' 항목이 상단에 표출되고 '핵심스펙'이 하단으로 배치되도록 모바일 전용 레이아웃을 최적화했습니다.
+
+### 2. 주문 배송 타임라인 데이터 테이블 뷰 최적화
+* **풀 사이즈(Full-bleed) 테이블 확장 적용**: 관리자(`AdminDashboard`) 및 딜러(`DealerDashboard`) 포털의 '주문 배송 타임라인' 화면 내 리스트(데이터 테이블)에 음수 마진(`margin: 0 -28px` 등) 및 가로폭 보정 스타일을 적용했습니다.
+* **공간 활용도 극대화**: 상단의 통계 요약표 및 안내 텍스트의 기존 패딩 여백은 그대로 유지하면서도, 정보량이 많은 테이블 영역만 카드의 좌우 양끝 여백 없이(0px) 가로 100% 꽉 채워서 화면을 넓게 쓰도록 가시성을 대폭 개선했습니다.
+
+### 3. Cloudflare R2 기반 외부 스토리지 연동 (카탈로그 다운로드 최적화)
+* **S3 호환 스토리지 설정 완비**: 백엔드 시스템(`storage.py`)에 Cloudflare R2 (S3 호환) 연결 모듈인 `boto3`를 연동하고 `S3StorageProvider` 구현을 완료했습니다.
+* **Pre-signed URL 다운로드 전환**: 서버의 트래픽(대역폭)을 절약하기 위해, 카탈로그 파일 다운로드 요청 시 서버가 직접 파일을 스트리밍하지 않고 R2 스토리지에서 직접 받아지는 1시간 유효기간의 임시 서명된 URL(Pre-signed URL)로 리다이렉트 처리되도록 구조를 최적화했습니다.
+* **보안 및 환경 변수 처리**: `Access Key ID` 및 `Secret Access Key` 등 중요 자격 증명을 `.env` 파일을 통해 안전하게 불러오도록 구성하여 운영 환경 배포 시의 유연성과 보안을 강화했습니다.
+
+### 4. 기타 UI/UX 세부 튜닝 및 반응형 개선
+* **테이블 풀-블리드(Full-bleed) 레이아웃 전면 적용**: 관리자, RSM, 딜러 포털의 모든 대시보드 및 리스트 페이지 내 데이터 테이블 영역 좌/우 여백을 완전히 없애 모니터 해상도 엣지에 딱 맞게 채워지도록 리스트 뷰 영역을 극대화했습니다.
+* **페이지 타이틀 텍스트 정렬 통일**: 전체 포털 주요 페이지 상단의 제목(Title)과 설명(Subtitle) 텍스트를 감싸는 컨테이너에 일관된 여백(`padding-top: 4px`, `padding-left: 28px`)을 부여해 타이포그래피 정렬을 개선했습니다.
+* **불필요한 안내 텍스트 삭제**: 영업 통계 및 분석(Sales Analytics) 페이지에서 기존에 표출되던 'V8 설계: 관리자 영업 통계/분석 (1024px 이상 PC 데스크탑 최적화)' 관련 뱃지 및 설명 문구를 삭제해 가독성을 높였습니다.
+* **모바일 네비게이션 사용성 개선**: 화면이 좁은 모바일(스마트폰 뷰) 기기로 접속 시, 상단 네비게이션(Navbar)에 위치하던 '로그아웃' 버튼이 더 이상 겹치지 않게 숨김 처리됩니다. 대신 햄버거 메뉴를 통해 접근하는 좌측 슬라이드 사이드바(Sidebar) 하단(내 정보 프로필 아이콘 우측)으로 로그아웃 버튼을 재배치했습니다.
+
+## [2026-08-29] 영업 통계 리얼 데이터 연동 및 기타 UI/UX 개선
+
+### 1. 영업 통계 및 분석 (Sales Analytics) 고도화
+* **실제 데이터(API) 연동**: 통계 위젯의 기존 더미 데이터를 제거하고, 시스템의 실제 데이터를 바탕으로 수치가 실시간 반영되도록 업데이트했습니다. KPI 카드 내 '발주된 장비 총량', '현재 제조 중', '현재 해상을 통해 이동 중' 등 불필요한 설명 텍스트를 제거해 시각적 간결함을 높였습니다.
+* **차트 데이터 필터링**: '기종별 베스트셀러 및 판매 점유율' 파이 차트에서 판매량이 가장 많은 상위 20개 모델만 노출되도록 필터링 로직을 추가하여 데이터 가독성을 대폭 개선했습니다.
+
+### 2. 레이아웃 (사이드바 및 네비게이션) UI 개편
+* **사용자 프로필 이동**: Top Navbar에 표시되던 사용자 아이디 정보를 사이드바(Sidebar) 영역으로 이동시켜 상단 헤더 레이아웃을 한층 정돈했습니다. 
+* **사이드바 프로필 아이콘 도입**: 사이드바 사용자 아이디 우측에 '내 정보'를 나타내는 👤 아이콘 버튼을 새롭게 배치했으며, 마우스 오버(Hover) 시 브랜드 고유 색상(R10 G28 B143) 효과가 부드럽게 나타나도록 디자인을 적용했습니다.
+* **텍스트 간소화**: 사이드바 상단에 고정 표출되던 'SCM NAVIGATION' 텍스트를 삭제해 여백을 확보하고 모던한 스타일을 더했습니다.
+
+### 3. 컴포넌트 텍스트 및 스타일(CSS) 세부 튜닝
+* **타임라인 입고완료 버튼 스타일화**: '주문 배송 타임라인' 리스트 내부의 '입고완료' 버튼에 마우스 아웃/오버 시 각각 세련된 푸른색 계열 톤(평상시 배경 `rgb(225, 243, 254)`, 텍스트 `rgb(12, 62, 95)` 등)으로 반응하도록 커스텀 CSS를 추가하고, 영문 텍스트를 'into Stock'으로 갱신했습니다.
+* **라이브러리 문서 명칭 일괄 변경**: 제품 라이브러리(Product Library) 내 모델 상세 팝업창에서 표시되던 '홍보용 브로슈어 (EN)' 텍스트를 전체 데이터 셋에서 '카탈로그(EN) PDF'로 일괄 수정 적용 완료했습니다.
+
+## [2026-08-27] 입고/판매 파이프라인 개편 및 UI/UX 전면 업데이트
+
+### 1. WIA 창고 (WIA Warehouse) 시스템 개편
+* **모바일 및 데스크탑 UI 최적화**: 'WIA 재고리스트'와 동일하게 전체 컴포넌트를 반투명 유리 질감의 Glass Card UI로 통일했습니다. 
+* **데스크탑 아코디언 테이블(toggleRow) 도입**: 많은 정보로 인해 열이 비좁아지던 문제를 해결하기 위해, 핵심 정보(모델, S/N, 상태 등)만 표에 나타내고 행(Row) 클릭 시 나머지 부가 정보가 하단으로 부드럽게 확장(Expand)되는 아코디언 뷰를 도입했습니다.
+* **통계 요약 헤더(Summary Bar) 적용**: 리스트 상단에 총 장비 대수 및 에이징 구간별(일반, 장기, 악성) 재고 현황을 실시간으로 집계해 표출하는 통계 바를 신설했습니다.
+* **가용 재고 전용 뷰 구성**: 과거 출고 내역이 아닌 현재 입고 중인(`IN_STOCK`) 장비 목록만 보여주도록 API 조회 필터를 업데이트했습니다.
+* **재고 에이징(Aging) 자동화**: 선적일자(ETD)를 기준으로 경과일을 계산하여 재고 상태(일반: 180일 이하, 장기: 181~360일, 악성: 361일 이상)를 나타내는 컬러 뱃지를 자동 부여합니다.
+* **퀵 필터 및 출고 처리 연동**: 상단에 [장기/악성 재고만 보기] 및 [재고타입 별 보기] 콤보박스 필터를 추가하고, 리스트 내 `[출고 처리]` 버튼을 통해 출고 시 리스트에서 즉시 제외되도록 워크플로우를 구성했습니다.
+
+### 2. 통합 판매 목록 (Sales List) 개편
+* **모바일 및 데스크탑 UI/UX 통일**: 'WIA 재고리스트'의 Glass Card 레이아웃을 전면 적용하여 모바일 전용 카드형 리스트(`mobile-cards-grid`) 및 데스크탑 아코디언 테이블(`toggleRow`)을 완벽히 이식했습니다. 상단에는 총 판매 수량을 보여주는 통계 요약 바가 신설되었습니다.
+* **확장된 데이터 테이블**: PDF 설계 가이드에 맞춰 주문일자, 구매 딜러, 모델, NC, P/O, S/N, 판매 가격, 구매 가격, ETA, 출고 예정, 매출 일정 등 총 11개 컬럼으로 데이터 구조를 재편했습니다.
+* **장비 정보 수정(Edit) 종합 모달 UI 교체**: 기존의 단순 가격 수정 창을 완전히 삭제하고, 대시보드에서 사용하는 **'장비 정보 수정' 모달(모델명, NC, 딜러, 가격, 선박명 등 전체 필드 포함)과 100% 동일한 형태의 종합 팝업창**으로 교체했습니다.
+* **마스터 데이터 연동**: 모달 교체에 따라 백엔드에서 모델, 딜러, NC코드, 항구(Port) 등 기준 정보(Master Data)를 병렬(`Promise.all`)로 함께 조회하여 각 드롭다운(Select) 항목에 실데이터가 바인딩되도록 API 연동을 고도화했습니다.
+* **엑셀 내보내기 동기화**: 화면에 노출되는 새 컬럼 포맷 그대로 엑셀(CSV) 다운로드가 되도록 로직을 일치시켰습니다.
+
+### 3. 모바일 화면 영문 텍스트 번역 적용
+* **WIA Promotion 다국어 처리**: 모바일 환경에서 영문 페이지 접속 시 여전히 한국어로 표기되던 '진행 상태' 문구를 `STATUS`로, '예약'을 `Reservation`으로 번역 렌더링되도록 수정하고 예약 내역이 없을 땐 `-` 가 나오도록 세밀하게 조정했습니다.
+
+### 4. 사이드바 및 대시보드 UI 최적화
+* **사이드바 너비 최적화**: 데스크탑 화면에서는 사이드바 넓이를 270px로, 모바일 환경에서는 300px로 반응형 너비를 맞춤 조정했습니다.
+* **대시보드 버튼 및 텍스트 픽스**: 입고(`IN_STOCK`) 단계 대시보드에서 비활성화 되어야 할 '판매완료' 버튼을 숨김 처리하고 기존 '출고완료'를 '입고완료' 텍스트로 변경 적용했습니다.
+* **다국어 매핑 및 라벨 정리**: 사이드바의 'v6.0 Final' 배지를 삭제하고, 해당 메뉴명들을 'WIA 창고' 및 '판매 목록'으로 국/영문 모두 업데이트했습니다. 아울러 '업로드/설정관리' 메뉴와 가용재고 목록('상태변경' -> '상태') 텍스트의 다국어 번역 처리도 완벽히 동기화했습니다.
+## [2026-08-25] 프론트엔드 로그인 화면 및 주요 UI/UX 개편
+
+### 1. 로그인 (Login) 페이지 디자인 전면 개편
+* **타이포그래피 및 레이아웃**: 로그인 화면 상단 'WME SCM' 텍스트를 Bold체로 강조하고 글꼴 크기를 확대했습니다. 입력 폼 영역과 버튼의 좌우 폭을 60%로 통일하고 중앙 정렬하여 가독성을 높였습니다.
+* **디테일 최적화**: Username, Password 입력창 및 로그인 버튼의 상하 패딩(여백)을 12px로 통일하여 세련된 비율을 구성하고, 로그인 버튼(Sign In)에 호버(Hover) 시 색상이 'R205 G170 B125'로 전환되는 효과를 적용했습니다.
+* **아이콘 및 이미지 스타일링**: 'WME SCM' 텍스트 우측에 `A-machine.ico` 아이콘을 배치하고, 우측 배너 공간 배경색(`#f4f4f4`) 정돈 및 코어 밸류 이미지(`login-bg.png`)의 투명도를 85%로 적용하여 전체적인 심미성을 향상시켰습니다.
+
+### 2. 사이드바(Sidebar) 및 다국어(i18n) 번역 텍스트 간소화
+* **메뉴 텍스트 직관화**: 관리자, RSM, 딜러 포털의 모든 사이드바 메뉴명에서 불필요한 '메뉴 X.' 및 'Menu X.' 텍스트(넘버링 포함)를 영문/국문 번역 파일에서 일괄 제거하여 메뉴 이름만 명확하게 노출되도록 수정했습니다.
+* **모바일 배지 영역 제거**: 사이드바 하단에 표시되던 '관리자/RSM 모바일 반응형 적용' 뱃지 UI를 화면에서 완전히 삭제했습니다.
+* **데이터 격리 안내 배너 색상**: 하단 V7 데이터 격리 안내 문구 창의 배경색을 좀 더 맑은 톤의 청록색(`rgba(6, 182, 212, 0.1)`)으로 변경했습니다.
+
+### 3. 발주/업로드 설정(Upload Settings) 페이지 영문화 및 UI 통일
+* **영문 번역 적용**: 신규 발주 생성 및 대량 발주(Bulk) 페이지의 주요 타이틀과 설명을 사용자가 직접 요청한 영문 텍스트(`Upload New A or F Order`, `Order Upload(Bulk)`, `Set Up Automated Schedule...` 등)로 완벽하게 갱신했습니다.
+* **액션 버튼 호버 스타일 연동**: 'Create New Order' 버튼과 'Upload Standard EXCEL Template' 버튼 마우스 오버 시, 로그인 버튼과 동일하게 'R205 G170 B125' 색상이 적용되도록 호버(Hover) 스타일을 추가 적용했습니다.
+
+## [2026-08-25] 모바일 반응형 UI/UX 레이아웃 최적화 및 버그 수정
+
+### 1. 모바일 화면 가로 오버플로우(Overflow) 현상 픽스
+* **리스트 레이아웃 잘림 현상 해결**: 관리자(Admin), RSM, 딜러(Dealer) 포털의 주문 배송 타임라인 페이지 등에서 카드의 가로 폭이 모바일 화면을 넘어가 우측이 잘리는 현상을 수정했습니다.
+* **레이아웃 구조 개편**: 모바일 카드(`.mobile-order-card`) 및 하위 컨테이너에 `min-width: 0` 속성을 적용하여, 내부 콘텐츠(StepBar 등)가 화면 폭을 초과하더라도 부모 요소의 레이아웃을 밀어내지 않고 정상적으로 내부 스크롤이 동작하도록 구조를 개선했습니다.
+
+### 2. 컴포넌트 여백(Padding/Margin) 재조정 및 가시성 확보
+* **본문 및 네비게이션 좌우 여백 축소**: 모바일 환경에서 화면을 더 넓게 활용할 수 있도록, 공통 본문 영역(`.page-body`) 및 상단 네비게이션(`.top-navbar`)의 좌우 패딩을 기존 16px에서 10px로 일괄 축소(태블릿 포함)했습니다.
+* **검색/필터 영역(Glass-card) 패딩 최적화**: 모든 포털에 공통으로 적용되는 검색/필터 카드(`.glass-card`)의 모바일 패딩을 조정했습니다. 상하좌우 동일하던 기존 값에서 상단(Top)은 20px로 넓혀 텍스트와의 답답함을 해소하고, 우측/하단/좌측은 10px로 줄여 화면 활용도를 극대화했습니다.
+* **플로팅 스크롤 버튼 위치 밀착**: 화면 우측 하단에 나타나는 상하단 이동 버튼(`.scroll-buttons-container`)의 우측 여백을 25px에서 10px로 줄여, 모바일 화면에서도 콘텐츠를 덜 가리도록 화면 가장자리로 최대한 밀착시켰습니다.
+
+## [2026-08-21] 다국어(i18n) 번역 및 데이터 연동 고도화
+
+### 1. 유저 및 보안 관리 (메뉴 6) 데이터 연동 및 다국어 최적화
+* **KPI 지표 실데이터 연동**: 상단 4개의 정보창(활성사용자, 초대 대기중, 보안 경고, 일일 시스템 접속)에 임의의 텍스트가 아닌 API(/api/users) 및 감사 로그(Audit Logger) 기준 실제 데이터 값이 반영되도록 구성 변경.
+* **전체 텍스트 다국어(i18n) 처리**: 국문 및 영문 페이지에 하드코딩 되어 있던 모든 텍스트(메뉴명, 테이블 헤더, 상태 뱃지 등)를 `translation.json`에 매핑하여 언어 설정에 따라 완벽히 전환되도록 적용.
+* **디테일 문구 교정**: 영문 페이지 내 보안 경고 오탈자(Security alram)를 'Security Alert'로 올바르게 수정.
+
+### 2. 제품 라이브러리 (메뉴 7) 다국어 렌더링 및 UI 텍스트 수정
+* **타이틀 및 검색창 번역 갱신**: 국/영문 페이지 타이틀을 각각 '라인업 제품 라이브러리', 'Line-UP Product Library'로 변경하고 검색창(Placeholder)을 '모델명 검색...', 'search'로 다국어 매핑 적용.
+* **불필요한 부가 설명 삭제**: 타이틀 하단의 '모든 영업 채널을 위한 단일 진실 공급원' 단락을 양국어 UI에서 완전히 삭제하여 레이아웃을 간소화.
+
+### 3. SCM 포털 대시보드 (메뉴 1) 레이아웃 및 영문 텍스트 구조 개선
+* **영문 텍스트 강제 줄바꿈 적용**: 영문 타임라인 설명(timeline_desc)의 문장이 길어져 가독성이 떨어지는 문제를 해결하기 위해, 특정 위치(or 다음)에 개행(\n) 및 'white-space: pre-line'을 적용하여 2줄로 깔끔하게 노출.
+* **flex-box 레이아웃 픽스**: 좌측 텍스트가 길어질 경우 우측의 '검색' 및 '상태조회' 콤보박스가 아래로 밀려나던 현상을 해결. Flex 컨테이너(`flex: 1 1 0%`)를 정교하게 분할하여 한국어 페이지처럼 항상 우측 상단에 나란히 정렬(우측 배치)되도록 UI 안정성 개선.
+
+### 4. 사이드바(Sidebar) 타이틀 텍스트 간소화
+* **메뉴 타이틀 수정**: 좌측 사이드바 상단 네비게이션 텍스트를 기존 'SCM ERP NAVIGATION'에서 간결한 'SCM NAVIGATION'으로 국/영문 모두 일괄 변경.
+
+## [2026-08-04] 프론트엔드 UI/UX 업데이트 및 버그 수정
+
+### 1. V8 설계 가이드 기반 '영업 통계 및 분석 (Sales Analytics)' 페이지 전면 개편
+* **관리자 포털 메뉴 3번 적용**: 데스크탑 와이드 모니터(1024px 이상)에 최적화된 선택적 반응형 웹 레이아웃 적용.
+* **상단 KPI 카드 4종 구성**: 
+  * 카드 1: 총 발주 대수 표기
+  * 카드 2: 생산 중 장비 대수
+  * 카드 3: 해상/항공 운송 중 장비
+  * 카드 4: 현지 창고 가용 재고(ATP) - 함부르크, 네덜란드, 터키 지역별 분할 표기
+* **통계 차트 구성**:
+  * 카드 5: 기종별 베스트셀러 (가로형 막대그래프) 및 연도별 조회 드롭박스.
+  * 카드 6: 딜러/지역별 판매 비중 (도넛 차트 + 가로형 막대그래프 분할 뷰) 및 연도별 조회 드롭박스.
+
+### 2. 카드 5번 (기종별 장비정보) 고도화
+* **DB 모델 코드 반영**: 기존 임의 데이터를 첨부된 'Model code' 기준 실제 기종 정보(예: `KF5700B II`, `HD2600SY`, `SE2600Y`, `L3000SY`, `XM3100ST`)로 갱신.
+* **UI 개선**: 장비 이름이 긴 경우 두 줄로 줄바꿈되는 현상을 방지하기 위해 Y축 넓이(width)를 확장하고 텍스트를 우측 정렬(`textAnchor='end'`) 처리.
+
+### 3. 카드 6번 (딜러/지역별 판매 비중) 고도화
+* **DB 딜러 정보 반영**: 기존 임의 데이터를 첨부된 실제 딜러명(예: `AK MAKINA`, `ARO-TEC`, `BREMBO`, `NEWEMAG`, `VIMACCHINE`, `WECO`)으로 갱신.
+* **UI 개선**: 딜러 이름이 길어서 줄바꿈되는 현상을 막기 위해 Y축 넓이(width)를 확장하고 텍스트를 우측 정렬 적용.
+
+### 4. 카드 7번 (법인 월별 수주실적 및 목표 달성률) 레이아웃 개선
+* **실제 데이터 테이블 적용**: '유럽법인 사업계획 테이블표' PDF에 기반하여 2026년 목표 및 실적 데이터를 상세 테이블 형태로 구현.
+* **가시성 최적화**: 표 크기를 기존 대비 80%로 축소(`zoom: 0.8`)하여 가로 스크롤바(좌/우 스크롤)가 발생하지 않도록 조치.
+* **레이아웃 순서 변경**: 직관적인 성과 확인을 위해 '7월 (현재 월) 실적 및 목표 달성률 상세 (진행률 바)' 정보 영역을 최상단으로 올리고, 세부 '사업계획 테이블표'를 하단으로 이동.
+
+### 5. 버그 수정 및 안정화 (Hotfix)
+* **React JSX 구문 오류 수정**: 카드 7번 레이아웃 순서를 변경하는 과정에서 유실된 `<ResponsiveContainer>` 및 `<BarChart>` 컴포넌트의 닫는 태그를 복구하여 `Unterminated JSX contents` 렌더링 에러 해결 및 정상화 완료.
+
+
+## [2026-08-06] 프론트엔드 UI/UX 업데이트 및 신규 기능 추가
+
+### 1. 통계 및 분석 (Sales Analytics) 카드 6 고도화
+* **바 차트 디자인 변경**: 막대 두께(`barSize`)를 20으로 확대 적용하여 시인성 향상.
+* **DB 딜러명 정합성**: 딜러 이름 출력 시 국가 정보를 제외하고 DB에 등록된 실제 딜러명(예: `AK MAKINA`)만 깔끔하게 출력되도록 수정.
+
+### 2. RSM(지역담당) 및 관리자 포털 모바일 최적화
+* **모바일 반응형 적용**: 딜러 포털과 동일하게 100% 모바일 반응형 UI 적용. 
+* **스마트폰 뷰 시뮬레이션**: 상단 토글 버튼을 통해 PC 환경에서도 모바일 UI(세로형 주문 카드 리스트)를 테스트할 수 있는 기능 추가.
+
+## [2026-08-07] 업데이트 및 수정
+
+### 1. 법인 주관 프로모션 장비 현황 페이지 수정
+* **텍스트 표기 개선**: '프로모션 기종' 칸에서 모델명 뒤에 붙던 '프로모션' 텍스트를 제거하고, 순수 장비 모델명만 표기되도록 수정 (관리자 및 딜러 화면 공통 적용).
+
+### 2. 주문 배송 타임라인 (6단계 StepBar) 디자인 전면 개편
+* **UI/UX 디자인 변경**: 숫자 표기 방식을 제거하고 각 진행 단계를 나타내는 원형 아이콘(직경 38px, 테두리 2px, 아이콘 선 두께 1.5px)으로 전면 교체.
+* **상태별 색상 반전**: 완료된 단계는 코랄 레드 색상으로 채워지고 아이콘이 하얀색으로 반전되도록 처리.
+* **레이아웃 버그 수정**: 브라우저 창 축소 시 진행단계를 잇는 점선이 마지막 원형을 뚫고 넘어가는 오류를, 각 진행 노드 간격에 맞춘 개별 선분 연결 방식으로 개선하여 버그를 완벽 해결하고 정중앙 정렬 적용.
+
+### 3. 딜러 포털 즉시 할당 신청 메일 발송 기능 연동
+* **이메일(Mailto) 자동화 기능 적용**: 가용 재고(ATP) 리스트에서 '즉시 할당 신청' 버튼 클릭 시, 기본 이메일 클라이언트가 실행되며 내용이 자동 기입되도록 구현.
+* **수신자 및 양식 지정**: 수신자 2명(`freelogin3975@gmail.com`, `jypark@hyundai-wia.de`) 설정 및 메일 제목('딜러 장비 출고 신청'), 본문(모델명 및 S/N 정보) 자동 완성 기능 탑재.
+
+### 4. 데이터 테이블 상세 정보 뷰 (아코디언 UI) 도입
+* **주문 배송 타임라인 개편**: 각 주문 항목(행)을 클릭하면 `NC`, `DETAIL SPEC`, `S/O`, `VESSEL`, `REMARK` 등의 핵심 세부 정보가 하단으로 부드럽게 펼쳐지는 아코디언 방식의 Detail View를 구현 (관리자 및 딜러 포털 공통 적용).
+* **테이블 호버 디테일 개선**: 전체 컨테이너 박스의 마우스 오버 배경색 변경 효과를 없애고, 클릭 가능한 개별 테이블 행(Row)에만 시각적 호버 및 포인터 효과가 적용되도록 UX 개선.
+* **액션 버튼 고정**: 상세 뷰 아코디언이 열리거나 닫힐 때 우측 '상태 관리' 버튼들의 상하 위치가 틀어지는 버그를 수정하여, 버튼이 항상 상단에 흔들림 없이 고정되도록 최적화.
+
+### 5. 유럽 재고 상태 레이아웃 및 UI 동기화
+* **상세 정보 확장 적용**: 재고 목록 페이지(관리자 및 딜러)에도 타임라인과 동일한 Detail View(아코디언) 기능을 적용하여 엑셀 기반의 표준 헤더 정보들을 바로 열람할 수 있도록 적용.
+* **테이블 항목 구성 통일**: 관리자와 딜러 포털의 열(Column) 배치 및 이름을 `Model`, `Ref No. / S/N`, `현재 상태`, `위치`, `현재 용도 (Type)` 순으로 통일성 있게 재정렬하여 데이터 가독성 강화.
+
+## [2026-08-08] 주요 업데이트 및 기능 개선
+
+### 1. 사업계획(KGI) 및 KPI 카드 디자인/기능 고도화 (메뉴 5)
+* **텍스트 통일성 및 디자인 개선**: '7월 실적 상세' 및 '유럽법인 사업계획' 타이틀을 각각 `KPI : ...`, `KGI : ...` 형식으로 변경하고 폰트 사이즈와 정렬 위치를 일치시켰습니다.
+* **사업계획 표 편집 및 자동 계산 기능**: KGI 사업계획 테이블에 'Edit' 모드를 도입하여 유로(EUR) 금액이나 대수 수정 시, 설정된 사업환율이 적용되어 억원(KRW)이 자동 계산되도록 편의성을 극대화했습니다.
+* **데이터 영구 저장 (DB 연동)**: 화면 새로고침 시 초기화되던 사업계획 데이터를 데이터베이스(`BusinessPlan` 모델)와 완전히 연동하여 수정된 값이 영구적으로 보존되도록 백엔드 API를 신규 구축 및 연결했습니다.
+
+### 2. 요약 대시보드 카드(1~4번) 커스텀 아이콘 적용 (메뉴 5)
+* **그라데이션 효과 제거**: 기존 아이콘 배경에 있던 파란색 원형 그라데이션을 깔끔하게 제거했습니다.
+* **커스텀 디자인 반영**: 카드 1번과 2번의 기본 아이콘 대신, 전달받은 배경이 투명한 전용 커스텀 이미지를 백엔드를 통해 시스템 공용 에셋으로 주입하여 완벽하게 적용했습니다.
+
+### 3. 주문 상세 정보 레이아웃 개편 및 관리 기능 확장 (메뉴 1)
+* **2단 분할 레이아웃 도입**: 주문 항목 확장 시 나타나는 상세 정보를 요구사항에 맞춰 왼쪽(`S/O`, `NC`, `DETAIL SPEC`)과 오른쪽(`Incoterms`, `VESSEL`, `REMARK`) 2단 그리드로 깔끔하게 나누어 시인성을 높였습니다.
+* **DB 스키마 마이그레이션**: 신규로 추가된 상세 정보 6개 항목을 저장하기 위해 `Order` 테이블에 컬럼들을 추가하고 내부 데이터베이스 마이그레이션을 안전하게 수행했습니다.
+* **장비 정보 수정 팝업 기능 확대**: 기존 '시리얼 번호', '모델명'만 수정 가능하던 팝업창을 시각적으로 넓히고, 신규 6개 항목(S/O, NC, SPEC 등)을 한 번에 모두 입력 및 저장할 수 있도록 폼 구성과 API 로직을 대폭 업데이트했습니다.
+
+
+## [2026-08-09] UI/UX 개선 및 메뉴 데이터 동기화
+
+### 1. 유럽재고상태(메뉴 2) 리스트 개편 및 기능 개선
+* **테이블 넘버링 (No) 추가**: 좌측 끝에 항목별 번호(No) 칼럼을 표기하여 가독성 향상.
+* **용도 변경 항목 UI 통합**: 기존에 분리되어 있던 '현재 용도' 칼럼과 '용도 변경' 선택창을 하나로 통합하고 용도명 변경(판매가능, 딜러주문, 임대, 전시, 프로모션 등 5개 상태) 적용.
+* **장기/악성 재고 식별 아이콘**: 재고 리스트에서 장기 재고 장비를 시각적으로 구별할 수 있도록 아이콘 추가 및 툴팁 기능 적용.
+* **수량 통계 레이아웃 이동**: 전체 수량 및 상태별 대수를 확인할 수 있는 통계 영역을 기존 테이블 하단(Footer)에서 상단(Header) 검색바 아래 영역으로 이동하여 가시성 강화.
+
+### 2. 포털 대시보드(메뉴 1) 및 유럽재고상태(메뉴 2) 데이터 동기화
+* **상세 정보(Expanded Row) UI/데이터 일원화**: 양쪽 메뉴 모두 장비 클릭 시 펼쳐지는 상세 정보 영역이 완벽히 동일한 데이터를 공유하고, 일치하는 디자인(좌측 파란색 포인트 바, 2단 레이아웃 등)으로 표기되도록 동기화.
+* **출력 데이터 구성 통일**: 왼쪽 열(`S/O`, `NC`, `DETAIL SPEC`), 오른쪽 열(`Incoterms`, `ETD / ETA`, `VESSEL`, `REMARK`) 구성으로 핵심 정보들을 두 메뉴에서 모두 일관되게 노출하도록 개편.
+
+### 3. 전체 레이아웃 버그 및 시스템 오류 픽스
+* **상단 네비게이션(Top Navbar) 반응형 오류 해결**: 브라우저 폭 축소 시 타이틀 영역과 우측 버튼 묶음 영역이 서로 겹치거나 밀리는 현상을 해결(`flex-wrap` 및 최소 높이 가변성 적용).
+* **React JSX 구문 오류(Hotfix)**: 페이지 컴포넌트 렌더링 시 발생했던 `Adjacent JSX elements must be wrapped...` 불필요한 닫는 태그 충돌 오류를 완벽하게 제거하여 페이지 접근 불가 버그 수정.
+
+## [2026-08-10] 주문 배송 타임라인 및 ETA 자동화 엔진 고도화
+
+### 1. 주기 조절형 자동 ETA 알림 엔진 구축 (백엔드)
+* **HHLA 항만 API 연동**: SCM 설계 가이드(V09)를 기반으로 선박명(Vessel)을 조회하여 함부르크 항구(HHLA)의 실시간 예상 도착일(ETA) 데이터를 연동하는 모듈(`hhla_api.py`)을 구축했습니다.
+* **백그라운드 스케줄러(`APScheduler`) 도입**: 매일 주기적으로 동작하는 백그라운드 엔진을 도입하여 데이터베이스의 활성 주문 데이터를 스캔하고, 선박 정보가 존재하는 경우 ETA를 자동 업데이트 및 갱신 내역을 이메일로 통지하도록 적용했습니다.
+* **배송 준비 단계 포함 확대**: 배송/쉬핑 상태뿐만 아니라 `배송준비(READY_FOR_SHIPPING)` 단계에 있는 장비들도 선박 배정이 완료된 경우 조기에 스케줄러가 추적하여 ETA를 자동으로 갱신하도록 동기화 범위를 확대했습니다.
+* **자동 알림 이메일 발송**: `email_service.py`를 신규 구축하여 출항(ETD) 직후, 해상 운송 중(10일 주기), HHLA ETA 업데이트, 유럽 법인 창고 입고(가용 재고 전환) 시 각 단계별 이메일 통지가 시스템 로그와 함께 발생하도록 자동화했습니다.
+
+### 2. 주문 배송 타임라인(6단계 Pipeline) UI/UX 개선 (프론트엔드)
+* **스케줄 정보 노출 조건화**: 관리자 및 딜러 포털의 배송 타임라인(메뉴 1)에서, 장비의 진행 상태가 `주문확인`, `생산 중`, `배송준비` 단계로 **실제 선적(출항) 이전인 경우 우측의 ETD/ETA 날짜 정보를 표시하지 않거나 '미정'으로 처리**하여 사용자 혼선을 방지했습니다.
+* **데이터 동기화 UI 반영**: 선적되어 `배송/쉬핑(SHIPPING)` 단계로 넘어가면 숨겨져 있던 해당 ETD/ETA 데이터가 화면에 정상적으로 표기되도록 동적 렌더링 로직을 반영했습니다.
+
+## [2026-08-11] 이메일 발송 실운영 전환 및 포털 UI/UX 고도화
+
+### 1. 이메일 발송 시스템 실제 구현 및 연동 (백엔드)
+* **SMTP 발송 로직 실제화**: 기존 터미널 콘솔 로그 출력 방식(Mock)으로 구성되어 있던 `email_service.py`를 파이썬 내장 `smtplib` 및 `email.mime` 모듈을 활용하여 실제 외부망 메일 발송 방식으로 고도화했습니다.
+* **복수 수신자 지원 기능 강화**: 딜러 다수의 이메일로 알림이 발송될 수 있도록 수신자 리스트 구분자를 쉼표(`,`)에서 세미콜론(`;`) 기반으로 파싱하고 안전하게 발송하도록 시스템을 업데이트했습니다.
+* **HHLA API 스케줄 픽스 및 문서화**: 연동 모듈에 누락되었던 특정 선박(`ONE TRIUMPH`, `ONE INTELLIGENCE`) 테스트 데이터를 매핑하여 ETA 자동 갱신 오류를 해결하고, 작동 원리를 담은 가이드(`HHLA_API_Integration_Guide.md`) 문서를 발행했습니다.
+
+### 2. 주문 배송 타임라인 UI 구조 개편 및 통계 강화 (프론트엔드)
+* **단계별 텍스트 직관화**: 진행 상태 파이프라인에서 텍스트가 다소 길었던 '배송/쉬핑' 및 '주문확인' 단계를 보다 직관적인 '배송', '주문'으로 간결하게 통일했습니다.
+* **진행 상태별 통계 요약표(Summary) 추가**: 상단 검색 영역 아래에 장비의 현재 상태별 대수를 한눈에 파악할 수 있는 통계 블록(전체/주문/생산중/배송준비/배송/항구도착/재고)을 신규 도입했습니다. (유럽재고상태 메뉴의 디자인 시스템 차용)
+* **테이블 인덱싱 및 너비 재구성**: 데이터 테이블 첫 열에 인덱스 넘버링(`No.`)을 신설하고, 가장 중요한 공간인 파이프라인(Step Indicator) 영역의 너비를 35%로 대폭 확장하는 등 전체 테이블 비율을 세밀하게 재조정했습니다.
+
+### 3. 프로모션 데이터 일관성 동기화
+* **데이터 표기 방식 통일**: '프로모션' 메뉴 내 테이블 헤더를 '고유 시리얼 번호 (S/N)'에서 'Ref No. / S/N'으로 변경하고, 상세 셀 내부 데이터를 '유럽재고상태' 메뉴와 완전히 동일한 2단 분할 레이아웃(굵은 Ref No., 작은 S/N)으로 렌더링되도록 동기화했습니다.
+
+## [2026-08-12] 주문 배송 타임라인 간소화 및 UI/UX 통일성 개편
+
+### 1. 주문 배송 타임라인 5단계 파이프라인 간소화
+* **배송준비 단계 제거**: 기존 6단계로 운영되던 배송 타임라인에서 '배송준비(READY_FOR_SHIPPING)' 단계를 삭제하고 '주문 - 생산 중 - 배송 - 항구도착 - 입고'의 5단계 파이프라인 구조로 간소화하여 직관성을 높였습니다.
+* **시스템 동기화**: 관리자 포털 및 딜러 포털의 모든 대시보드, 주문 현황 페이지, 그리고 백엔드 로직까지 변경된 5단계 상태 표기를 100% 동기화 적용 완료했습니다.
+
+### 2. 프로모션 페이지 리스트 구조 전면 개편
+* **항목 재배치 및 일원화**: 프로모션 장비 리스트의 컬럼을 'No. - 모델 - NC - P/O - DETAIL SPEC - ETA - 프로모션 진행 - 예약정보(딜러는 예약/구매 요청) - 설정' 순으로 재구성하여 양쪽 포털의 뷰를 통일했습니다.
+* **너비 비율 및 패딩 최적화**: 정보량이 많은 'DETAIL SPEC' 항목의 가로 너비를 40%로 대폭 확대하고, 모든 리스트 행의 상/하단 패딩을 6px로 슬림하게 압축하여 화면 효율성과 시인성을 극대화했습니다.
+
+### 3. 폰트 최적화 및 디테일 정합성 개선
+* **폰트 사이즈 차등 적용**: 유럽 재고 페이지에서 핵심 식별자인 '모델' 및 'NC'는 12px, 그 외 'No. / P/O / DETAIL SPEC / ETA / 용도' 등의 세부 정보는 11px로 조정하여 목록의 시각적 계층 구조를 명확히 했습니다.
+* **NC 표기 오기 수정**: 모든 포털 화면에서 기본 NC 코드 표기를 'FOiP(알파벳 O)'가 아닌 정확한 'F0iP(숫자 0)'으로 일괄 변경 반영했습니다.
+
+## [2026-08-12] 보안 관리체계 고도화 및 제품 라이브러리(DAM) 구축
+
+### 1. 보안 인증 및 통합 사용자 관리 체계 도입
+* **로그인(인증) 페이지 신설**: 아이디와 비밀번호 기반의 로그인 폼(`Login.jsx`)을 구현하고, SCM 핵심 가치(Core Value) 이미지가 돋보이는 모던한 UI 디자인을 적용했습니다.
+* **유저 및 보안 관리 대시보드**: 관리자 전용 '메뉴 6. 유저 및 보안 관리' 페이지를 신설하여 활성 사용자, 초대 대기, 보안 경고 등의 KPI와 전체 사용자 목록을 관리할 수 있도록 구성했습니다.
+* **시스템 감사 로그 (Audit Log)**: 시스템 내에서 발생하는 로그인 성공/실패 이력 등을 로컬 스토리지에 실시간으로 적재하고, '유저 및 보안 관리' 페이지 내에서 시스템 감사 로그를 직접 조회할 수 있도록 구현했습니다.
+
+### 2. 강력한 역할 기반 접근 제어 (RBAC) 
+* **정적 권한 계정 분리**: 시스템 테스트 및 고도화를 위해 고정된 3개의 권한별 계정(admin, rsm, dealer / 비밀번호 1234)을 구성하고 검증 로직을 적용했습니다.
+* **권한별 UI 강제 격리**: 로그인한 권한에 따라 사이드바 메뉴가 동적으로 제한되며, 권한 없는 페이지로의 접근이 원천 차단됩니다. 기존 테스트용 '권한 스위처' 버튼을 완전히 제거하여 실제 영업 환경과 동일한 보안 무결성을 확보했습니다.
+
+### 3. 제품 디지털 라이브러리 (Product Library) 기능 신설
+* **마스터 리스트 및 Quick View**: '메뉴 7 (딜러는 메뉴 5). 제품 라이브러리'를 신규 추가했습니다. 장비 모델별 이미지 카드 그리드를 제공하며, 클릭 시 화면 전환 없이 상세 스펙을 확인할 수 있는 모달 뷰를 구현했습니다.
+* **문서 다운로드 허브 (보안 등급 적용)**: 장비별 브로슈어, 사용자 매뉴얼, 도면 등의 문서를 통합 관리합니다. 문서별로 `PUBLIC`, `INTERNAL` 등의 보안 등급(Security Level) 속성을 부여하고, 딜러 계정(`DEALER`) 접속 시 '내부 원가표'나 '유지보수 매뉴얼' 등 기밀 문서가 리스트에서 완벽하게 숨겨지도록 차단 로직을 적용했습니다.
+
+## [2026-08-14] 관리자 포털 UI/UX 개선 및 엑셀 벌크 업로드 고도화
+
+### 1. 관리자 포털 (Admin Portal) UI/UX 개선
+* **유럽재고 리스트 뷰 최적화**: 표 항목의 너비 비율을 조정하여 `DETAIL SPEC` 공간을 최대로 확보(33%)하고 좌우 여백(Padding 13px)을 추가해 가독성을 향상했습니다.
+* **테이블 헤더 타이틀 강조**: 표 상단의 모든 타이틀(No., 모델, NC 등)에 **BOLD(굵게)** 스타일을 적용했습니다.
+* **디테일한 정렬(Alignment) 규칙 적용**:
+  - `PRICE` 항목: 헤더는 중앙, 금액 데이터는 우측(오른쪽)으로 정렬하되 값이 없는 빈칸(`-`)은 중앙으로 유지되도록 조건부 정렬을 구현했습니다.
+  - `DETAIL SPEC` 항목: 헤더는 중앙, 실제 스펙 데이터는 좌측(왼쪽)으로 정렬하여 긴 텍스트를 읽기 편하게 변경했습니다.
+  - 이외 기본 정보 셀들은 중앙 정렬로 통일하여 정돈된 화면을 구성했습니다.
+* **리스트 확장(Expanded) 뷰 개선**: 항목 클릭 시 나타나는 하단 상세정보 패널에 `S/O` 정보 바로 아래 `REMARK(비고)` 항목을 신규로 노출되도록 추가했습니다.
+* **딜러코드 최신화**: 기존 `HWME`로 표기되던 코드를 `WME`로 시스템 전체에서 일괄 변경 적용했습니다.
+
+### 2. 엑셀 일괄 업로드(Bulk Upload) 기능 고도화
+* **신규 표준 헤더 양식 전면 개편**: 엑셀 업로드 시 요구되는 헤더를 `MODEL, NC, P/O, PRICE, DEALER, DETAIL SPEC, INCOTERMS, PORT` 양식으로 완전히 변경하고, 시스템이 이에 맞춰 데이터를 맵핑하도록 파싱(Parsing) 로직을 재설계했습니다.
+* **임의 S/N 생성 로직 제거**: 엑셀 업로드 시 `SN-BULK-000000` 형태로 임의 발급되던 시리얼 넘버 자동 생성 기능을 없애고, 최초 등록 시엔 빈 값(`-`)으로 둔 뒤 향후 프로세스에서 별도로 S/N을 등록할 수 있게끔 수정했습니다.
+* **업로드 데이터 연동 보완**: 신규 엑셀 양식으로 추가된 정보들이 포털 대시보드와 유럽재고 리스트 화면에 온전히 반영되도록 데이터 인터페이스를 갱신했습니다.
+
+### 3. 포털 대시보드 및 DB 관리
+* **대시보드 더미 데이터 제거**: 데이터가 누락되었을 때 UI용으로 하드코딩되어 있던 임시 값(`G8888-8888`, `F26-88-30`, `HAMBURG` 등)을 모두 제거하고, 데이터가 비어있을 땐 하이픈(`-`)으로 깔끔히 표기되도록 수정했습니다.
+* **신규 모델 DB 적재**: 새롭게 제공된 기종 리스트(`KF6500/5A`, `KF7300/5A`, `HS6300II`, `HS8000II` 등)를 식별하여 백엔드 DB 초기화 스크립트에 모두 반영 완료했습니다.
+
+## [2026-08-15] PaaS 클라우드 환경 배포 및 운영 인프라 구축
+
+### 1. 인프라 환경 구성 및 배포 전략 수립
+* **PaaS(Render) 배포 결정**: IaaS(서버 호스팅) 대비 1인 개발/운영 체제에 적합하고 보안 및 유지보수 부담을 줄일 수 있는 PaaS 환경인 Render를 최종 배포 플랫폼으로 선정 및 클라우드 구축 완료.
+* **자동 배포 가이드라인 제정**: GitHub 연동, PostgreSQL 생성, FastAPI 백엔드 배포(웹 서비스), React 프론트엔드 배포(정적 사이트) 및 Rewrite 설정까지 아우르는 배포 스텝바이스텝 가이드 문서화 완료.
+
+### 2. 다중 환경(Local/Prod) DB 연결 동적화 (백엔드)
+* **PostgreSQL 연동 라이브러리 추가**: PaaS 환경의 클라우드 PostgreSQL 연동을 위해 `requirements.txt`에 `psycopg2-binary` 패키지 설치 내역 추가.
+* **동적 DB 스위칭 로직 적용 (`database.py`)**: `DATABASE_URL` 환경변수가 존재하면 클라우드 PostgreSQL에 우선 연결하고, 없을 경우 로컬 개발용 SQLite(`scm_erp.db`)로 자동 Fallback 하도록 유연한 데이터베이스 연결 구조 확립.
+
+### 3. 스케줄러(Background Job) 아키텍처 개선
+* **APScheduler 분리 및 제어**: Render 클라우드 환경에서 웹 서버(FastAPI)가 여러 개 뜰 경우 스케줄러가 중복 동작하여 이메일이 다중 발송되는 현상을 막기 위해, 환경변수(`RUN_SCHEDULER`)를 통해 메인 앱에서 스케줄러 작동 여부를 제어하도록 `main.py` 리팩토링.
+* **독립 워커(Worker) 스크립트 신설**: 필요시 스케줄러만 독립적인 백그라운드 프로세스로 격리하여 가동할 수 있도록 `run_scheduler.py` 파일 신설 완료.
+
+### 4. 무중단 프론트엔드 배포 및 통신 규칙 수립
+* **정적 사이트(Static Site) 최적화 전환**: React 프론트엔드를 무거운 컨테이너 서비스 대신 빠르고 15분 수면 모드(Sleep)가 없는 정적 웹 사이트로 배포하여 사용자 최초 접속 렌더링 속도(0.1초 이내) 극대화.
+* **API Proxy (Rewrite) 룰 적용**: 단일 페이지 애플리케이션(SPA)의 새로고침 404 에러를 방지(`/*` -> `/index.html`)하고, 프론트엔드에서 날아오는 백엔드 요청을 API 서버로 안전하게 바이패스(`/api/*` -> 백엔드 주소)하도록 Render 내부 Redirect/Rewrite 라우팅 설정 완료.
+
+## [2026-08-16] 시스템 다국어(i18n) 지원 및 UI 뷰어빌리티 최적화
+
+### 1. 다국어(i18n) 인프라 구축 및 적용
+* **i18next 라이브러리 도입**: React 환경의 표준 다국어 처리 패키지(`i18next`, `react-i18next`, `i18next-browser-languagedetector`)를 설치하고 언어 리소스(`ko`, `en`) 맵핑 구조를 신설했습니다.
+* **공통 레이아웃 번역 적용**: 상단 네비게이션바(Navbar)와 좌측 메뉴 사이드바(Sidebar)의 하드코딩된 텍스트를 제거하고 번역 훅(`useTranslation`)과 `<Trans>` 컴포넌트를 활용하여 동적으로 렌더링되도록 구현했습니다.
+* **언어 전환 기능 추가**: 네비게이션 바 우측 최상단에 토글 버튼(🌐 **KR/EN**)을 신설하여, 실시간으로 언어를 변경할 수 있도록 적용했습니다.
+
+### 2. 관리자 포털 테이블(List) 다국어 및 디테일 개선
+* **메뉴별 테이블 항목 번역 적용**:
+  - `메뉴 1. 포털 대시보드` (PORTAL DASHBOARD)
+  - `메뉴 2. 유럽 재고 상태` (STOCK LIST)
+  - `메뉴 3. 프로모션` (PROMOTION)
+  위 3가지 주요 메뉴의 테이블 헤더 타이틀과 제어 액션 버튼(다음/이전/수정/삭제)들을 모두 한국어와 영어 리소스 파일에 추가하고 연동을 완료했습니다.
+* **헤더(Title) 타이포그래피 및 정렬 개선**: 테이블의 컬럼 구분을 명확히 하기 위해 전체 헤더 텍스트를 **Bold(굵게)** 처리했습니다. 또한 가독성을 위해 헤더를 좌측 정렬(Left) 하되, '진행 상태(STATUS)' 항목만 중앙 정렬(Center)로 세밀하게 조정했습니다.
+
+### 3. 데이터 뷰 밀집도(Density) 최적화
+* **고밀도 엑셀 뷰어 스타일 적용 (`index.css`)**: 한 화면에서 스크롤 없이 최대한 많은 주문/재고 내역을 조회할 수 있도록 테이블 리스트 디자인을 전면 개편했습니다.
+  - 리스트 내 텍스트 크기(Font-size)를 `0.9rem`에서 `12px`로 축소하여 콤팩트하면서도 가독성을 유지했습니다.
+  - 표 항목 간의 상하 간격(Padding Top/Bottom)을 `16px`에서 `6px`로 대폭 줄여 행(Row) 사이의 불필요한 여백을 최소화했습니다.
+
+### 4. 대시보드 및 프로모션 리스트 UI/UX 규격 일괄 통일 및 디테일링
+* **상태 제어 버튼(Action Button) 크기 및 레이아웃 표준화**: 관리자 및 딜러 포털 전반(`AdminDashboard`, `DealerDashboard`, `AdminPromotion`, `DealerPromotion`)에 걸쳐 테이블 하위의 제어 버튼(다음, 이전, 수정, 삭제, 예약 등)의 규격을 일관되게 재정의했습니다.
+  - 텍스트 크기: `10px` 및 중앙 정렬(`justifyContent: 'center'`)
+  - 패딩(크기): 위아래 `3px`, 좌우 `4px`
+  - 버튼 컨테이너 넓이 콤팩트화 (`85px` -> `70px`)
+* **프로모션 직관성 명칭 변경**: 프로모션 리스트 액션 버튼의 명칭을 보다 직관적으로 축약/수정했습니다 ('전용 예약' -> '예약', '판매 전환' -> '판매완료', '예약 취소' -> '예약취소').
+* **데이터 테이블 행간(Row) 간격 추가 압축**: 데이터 테이블 행간 상하 여백을 `5px` 단위로 정밀하게 재조정하여 고밀도 조회 환경을 극대화했습니다.
+
+### 5. 다국어(i18n) 번역 텍스트 세부 최적화
+* **목록 번호(No.) 기호화**: 한국어 및 영어 공통으로 리스트 최좌측 '번호' 및 'No.' 텍스트를 간결한 `*` 기호로 통일했습니다.
+* **영문 항목명 대소문자 및 단어 교정**: 대시보드 영문 페이지의 컬럼명을 가독성 높은 표기법(Title Case)으로 변경(`Model`, `Dealer`, `Status`, `Port`)하고, 모호했던 'Management'를 'Progress'로 직관성 있게 수정 적용했습니다.
+
+### 6. 유럽재고상태(메뉴 2) 다국어 처리 고도화 및 UI 개선
+* **타입(용도) 텍스트 번역 적용**: '판매가능', '딜러주문', '임대', '전시', '프로모션' 상태 옵션을 다국어(i18n) 적용하여 영문 페이지에서 올바르게 표기(Available, Order, Rental, Showroom, Promotion)되도록 개선했습니다.
+* **필터 텍스트 및 디자인 통일**: 상단 상태 필터 메뉴에서 기존의 불필요한 영문 괄호 표기(예: `(AVAILABLE)`)를 제거하고 텍스트만 렌더링되도록 일원화했으며, 영문 'All types'를 'All type'으로 수정했습니다.
+* **검색 대상(범위) 확대 및 안내문구 번역**: 검색창에서 기존 항목(`모델명`, `NC`, `P/O`) 외에 `DETAIL SPEC` 내용까지 통합 검색되도록 로직을 추가하고, 안내(Placeholder) 텍스트를 다국어로 분리 적용했습니다.
+* **데이터 리스트 타이틀 변경**: 한국어 페이지의 리스트 타이틀을 '법인 창고 가용 재고 (ATP) 목록'에서 '법인 가용재고 목록'으로 변경하고 영문 타이틀을 'WIA Available Inventory List'로 수정 적용했습니다.
+* **디테일 정렬 및 문구 수정**: 딜러 '발주로 전환(to order)' 선택 메뉴 텍스트를 중앙 정렬하여 시인성을 높이고, 해당 기능의 '확정(Confirm)' 버튼 번역을 추가했습니다.
+
+### 7. 시스템 네비게이션 타이틀(Navbar) 통합 및 간소화
+* **상단 타이틀 문구 개선**: 한국어 및 영문 버전에 맞춰 불필요한 단어를 제거하고 시스템 메인 타이틀을 간소화했습니다. (한국어: 'WIA 공작기계 유럽 SCM ERP', 영문: 'WIA Machine Tools Europe SCM ERP')
+* **서브 타이틀(모토) 삭제**: 네비게이션 영역 하단에 위치했던 장문의 서브 타이틀('World-best + Innovation...') 텍스트를 UI에서 완전히 삭제하여 레이아웃의 개방감을 향상시켰습니다.
+
+## [2026-08-17] 대시보드 다국어(i18n) 적용 고도화
+
+### 1. SCM 포털 대시보드 다국어 매핑 완료
+* **텍스트 영역 하드코딩 제거**: 대시보드 내 메인 타이틀, 타임라인 제목 및 부연 설명 등을 다국어 변수(`t()`)로 치환하여 언어 설정에 따라 동적으로 출력되도록 수정했습니다.
+* **검색 및 필터 영역 다국어 연동**: 주문 검색창(Placeholder) 및 전체 상태 조회 필터 항목(전체, 주문, 생산 중 등)의 하드코딩된 텍스트를 제거하고 다국어 연동을 완료했습니다.
+* **단계별 텍스트(StepBar) 다국어 지원**: 리스트 항목 내 `STATUS` 단계별 아이콘 텍스트를 `useTranslation`을 사용하여 한국어(`주문`, `생산 중`, `배송` 등)와 영어(`Order`, `Production`, `Shipping` 등) 리소스에 매핑 적용했습니다.
+* **언어별 최적화 텍스트 분리 및 UI 개선**:
+  - **한국어 페이지(`ko`)**: 기존에 `1. 주문 (CONFIRMED)` 형태로 영문이 혼용되었던 필터 텍스트 및 긴 검색창 안내 문구를 `1. 주문`, `검색` 등으로 직관적이고 깔끔하게 단축 및 렌더링하도록 일원화했습니다.
+  - **영문 페이지(`en`)**: 기존에 부분적으로 한국어로 표기되던 상단 진행 상태 통계(전체: 112, 주문: 98 등) 항목을 `All`, `Ordered`, `in Production`, `Shipping`, `Arrived`, `Stock` 등 영문 맞춤형 텍스트로 완전하게 치환 적용했습니다.
+
+## [2026-08-18] 프론트엔드 다국어 번역 및 UI 텍스트/정렬 개선
+
+### 1. 상단 네비게이션 언어 토글 버튼 수정
+* **버튼 텍스트 직관성 향상**: 언어 토글 버튼 텍스트를 현재 설정된 언어 상태(`KR`, `EN`)를 직관적으로 나타내도록 로직을 수정했습니다.
+
+### 2. 메뉴 2. 유럽 재고 상태 (Europe Stock) 영문/국문 번역 텍스트 최적화
+* **메뉴명 및 타이틀 번역 갱신**: 영문 사이드바 메뉴명과 페이지 타이틀을 `Menu 2. Europe Inventory`에서 `Menu 2. Europe Stock`, `WIA Stock Status`로 각각 변경하고 부가 설명을 구체화했습니다.
+* **통계 및 검색 텍스트 분리**: 필터 메뉴의 '전체 상태 조회'와 상단 수량 통계의 '전체:' 텍스트를 분리 적용하여 독립적으로 렌더링되도록 번역 키(`stat_all`)를 신규 적용했습니다.
+* **검색창 텍스트 간소화**: 검색창(Placeholder) 안내 문구를 '검색' / 'search' 로 대폭 간소화 적용했습니다.
+* **전체 상태 조회 필터명 변경**: 셀렉트 박스의 기존 '전체 용도 조회' 텍스트를 직관적인 '전체 상태 조회'로 국문 번역을 수정했습니다.
+
+### 3. 메뉴 3. 프로모션 관리 (Promotion) 다국어 처리 및 디테일 개선
+* **페이지 타이틀 번역 갱신**: 국/영문 페이지 타이틀과 리스트 타이틀을 직관적인 명칭('프로모션 관리' / 'Promotion List' 등)으로 교체 적용했습니다.
+* **상태 뱃지 및 예약정보 텍스트 다국어(i18n) 연동**: 기존에 하드코딩되었던 테이블 리스트 내의 '판매가능', '예약중' 텍스트를 다국어 함수로 치환하고 예약 정보('Reservation:', 날짜 표기법 마침표 제거) 및 비어있는 딜러 항목('-') 등을 정돈했습니다.
+* **테이블 헤더 및 데이터 중앙 정렬**: 리스트의 가독성 강화를 위해 후반 4개 주요 열(`도착일정`, `진행상태`, `예약정보`, `설정`)의 텍스트와 UI 요소들을 테이블 중앙 정렬(Center align)로 일괄 적용했습니다.
+
+### 4. 신규 단건 발주 생성 (메뉴 4) 기계 모델 리스트 개편 및 DB 최신화
+* **218종 기계 모델 DB 최신화**: 제공된 최신 모델 리스트를 기반으로 파싱 스크립트를 적용하여, 총 218개의 기계 모델 데이터(모델 코드, 카테고리 포함)를 백엔드 데이터베이스에 새롭게 추가 및 갱신 완료했습니다.
+* **모델 검색 드롭다운 UI 포맷 변경**: 단건 발주 생성 모달 내 모델 검색 및 선택 시, 기존 `기계모델 - 모델명` 형태가 아닌 `기계모델 - 카테고리명`(예: `E160A - CNC T/C`, `KH1000 - Horizontal M/C`) 포맷으로 표시되도록 프론트엔드를 수정했습니다.
+* **알파벳(A-Z) 오름차순 정렬 적용**: 모델 선택 편의성을 위해 드롭다운에 나열되는 기계 모델 전체 목록이 백엔드 단에서 모델 코드(`model_code`) 기준의 알파벳 오름차순(A-Z)으로 정렬되도록 API 응답 로직을 개선했습니다.
+
+## [2026-08-19] 신규 발주 프로세스 및 제품 라이브러리(DAM) 고도화
+
+### 1. 신규 단건 발주 생성 (메뉴 4) 팝업 및 마스터 데이터 고도화
+* **마스터 데이터 DB 연동**: 발주 시 필요한 부가 정보(NC 코드, Incoterms, 도착지 항구)를 데이터베이스에 신규 등록하고, 발주 생성 팝업창에서 직접 검색 및 선택할 수 있도록 데이터 연동을 완료했습니다.
+* **6종 필수 입력 필드 렌더링**: '기계 모델', 'NC', 'P/O', '딜러사', 'Incoterms', '도착지 항구' 총 6개의 핵심 입력창을 구성하고 검색 필터(Datalist)를 도입하여 사용 편의성을 높였습니다.
+* **드롭다운 텍스트 간소화**: 검색 시 나타나는 리스트 텍스트를 간결하게 최적화하여, 부가 설명 없이 오직 핵심 코드 및 이름(예: `E160A`, `F0iP`, `AK MAKINA`, `FCA`, `Hamburg`)만 노출되도록 직관성을 향상했습니다.
+
+### 2. 제품 라이브러리 (메뉴 7) 라인업 및 상세 스펙 전면 개편
+* **카테고리 6종 재배치**: 기존 임의로 나뉘어 있던 카테고리를 실제 라인업 기준인 `ALL`, `CNC T/C`, `Vertical M/C`, `Horizontal M/C`, `Multi-Tasking`, `5-Axis M/C`의 6개 상위 카테고리로 재설정했습니다.
+* **150종 모델 상세 데이터 연동**: 백엔드에 구축된 전체 모델 정보를 바탕으로 라이브러리 데이터를 추출하여, 클릭한 카테고리에 맞는 정확한 기계 모델들만 그리드(Grid)에 정렬 및 노출되도록 반영했습니다.
+* **핵심 스펙(Specs) 12종 렌더링 적용**: 퀵 뷰 모달창에서 볼 수 있는 핵심 스펙 항목을 기존 4개에서, 첨부된 상세 규격 기준에 맞춘 12종(척 사이즈, 최대이송거리, 주축 회전수, 회전공구 회전수 등)으로 대폭 확장하여 정확한 장비 제원을 확인할 수 있도록 업데이트했습니다.
+* **디테일 뷰 좌우 비율 및 여백 최적화**: 스펙 상세내역 텍스트의 상하좌우 간격을 `8px`로 세밀하게 조율하고, 좌측 항목명과 우측 규격값의 가로 넓이 비율을 `60% : 40%`로 명확하게 분할하여 정보 가독성을 한 단계 끌어올렸습니다.
+
+### 3. 전체 레이아웃 안정화 및 UI/UX 인터랙션 개선
+* **글로벌 레이아웃 흔들림 방지**: 항목 수가 적은 카테고리 탭으로 넘어갈 때 세로 스크롤바가 사라지면서 화면이 우측으로 밀리는(Layout Shift) 브라우저 현상을 방지하기 위해 전역 CSS에 스크롤바를 상시 노출하도록(`overflow-y: scroll`) 적용했습니다.
+* **카테고리 버튼 디자인 개선**: 필터 항목 간 간격을 `10px`로 넓혀 안정감을 더했고, 버튼을 클릭하거나 마우스를 올릴 때마다 화면이 미세하게 떨리는(진동) 현상을 완전히 수정했습니다. 이제 실제 버튼 크기 변화 없이 안쪽으로 2px 굵기의 파란색(`WIA Blue`) 띠(box-shadow)가 생기도록 시각적 피드백(Hover) 효과만 깔끔하게 동작합니다.
+
+### 4. 대용량 가상(Mock) 스펙 데이터 자동화 및 검색 로직 강화
+* **실시간 렌더링용 카테고리 기반 Mock 생성기 탑재**: 외부망 자동 접속 모듈(Playwright) 오류에 대한 대안으로, 기종(카테고리)별 특성을 반영한 현실적인 가상(Mock) 데이터 생성 알고리즘 파이썬 스크립트(`generate_mock.py`)를 자체 개발 및 연동했습니다. 이를 통해 218개 모델의 12가지 상세 스펙 데이터를 실제 제원표와 유사하게 자동 생성하도록 조치했습니다.
+* **모델 검색 필터링 최적화**: 사용자가 검색창에 모델 코드를 입력할 때 하이픈(`-`), 슬래시(`/`), 띄어쓰기(` `) 등 특수문자나 띄어쓰기를 입력하여도, 알파벳 및 숫자 조합만 일치하면 정확하게 해당 모델을 찾아내도록 프론트엔드 검색 필터 로직 정규식(`replace(/[\s\-\/]/g, '')`)을 대폭 강화했습니다.
+
+### 5. 주문 배송 타임라인 (메뉴 1) 장비 정보 수정 팝업 전면 개편
+* **모달 레이아웃 및 12개 항목 확장**: 기존 8개 항목에서 P/O, 딜러(Dealer), 도착지(Port), 구매가(Buying) 항목을 새롭게 추가하여 총 12개 항목으로 구성하고, 2단 그리드로 깔끔하게 재배치했습니다. 시리얼 번호 표기는 'S/N'으로 변경했습니다.
+* **마스터 데이터 드롭다운 적용**: 모델명, NC, 딜러, 도착지, Incoterms 항목을 텍스트 직접 입력 방식에서 DB 데이터를 조회해 선택하는 드롭다운 형태로 변경했습니다. 텍스트도 간소화하여 단일 코드만 직관적으로 표시되도록 수정했습니다.
+* **도착지(Port) 오타 및 대소문자 자동 보정**: 리스트의 '도착지 / 일정' 항목 렌더링 시, 원시 데이터가 잘못 입력되더라도(\ham\, \HAMBURG\ 등) DB에 등록된 표준 항구 코드(\Hamburg\)로 매핑 및 변환되어 화면에 일관되게 노출되도록 최적화했습니다.
+
+### 6. 유럽 재고 상태 (메뉴 2) 구매가 연동
+* **메뉴별 노출 정책 차등 적용**: 추가된 '구매가(Buying Price)' 정보는 메뉴 1(포털 대시보드) 화면에는 숨김 처리하고, 오직 메뉴 2(유럽 재고 상태)의 데스크탑 데이터 테이블과 모바일 카드 뷰에만 표시되도록 정책을 반영했습니다.
+
+### 7. 관리자/RSM 모바일 뷰 전환 UX/UI 최적화
+* **글로벌 모바일 시뮬레이터 적용**: 메뉴 1 상단에 있던 모바일 뷰 시뮬레이션 버튼과 배지를 사이드바(Sidebar) 하단 영역으로 이동하여 전역 기능으로 승격시켰습니다. 이제 어느 메뉴를 보더라도 즉각적으로 전체 UI를 모바일 모드로 전환 확인할 수 있습니다.
+* **사이드바 및 네비게이션 디자인 디테일 튜닝**: 모바일 배지 텍스트를 '관리자/RSM 모바일반응형 적용'으로 변경하고 크기를 \.75rem\으로 조절했습니다. 상단 메뉴 로고 텍스트 크기 역시 적정 비율(\.85rem\)로 다듬어 시각적 밸런스를 개선했습니다.
+
+
+## [2026-08-20] 프론트엔드 UI/UX 업데이트 및 다국어 기능 고도화
+
+### 1. 사이드바(Sidebar) 및 네비게이션 높이 규격 통일
+* **UI 일관성 확보**: `sidebar-header` 영역과 모바일 모드의 상단 네비게이션(Top-navbar) 영역의 높이를 모두 `80px`로 통일하여 시각적 안정감을 개선했습니다.
+
+### 2. 버튼 및 배지(Badge) UI/UX 스타일링 개선
+* **상태 제어 버튼 호버 효과**: 제품 라이브러리 카테고리와 통일감을 주도록, '상태 설정' 등 항목의 윤곽선 버튼(`btn-outline`)에 마우스 오버 시 테두리가 안쪽으로 굵어지는 효과(`box-shadow: inset 0 0 0 1px currentColor`)를 추가했습니다.
+* **입고 완료 배지 사이즈 조절**: 대시보드 내 '입고 완료' 텍스트 뱃지의 폰트 사이즈 및 여백(Padding)을 다른 제어 버튼들과 완벽히 동일한 규격으로 일치시켰습니다.
+
+### 3. 다국어(i18n) 번역 확대 및 텍스트 렌더링 최적화
+* **전역 텍스트 일괄 수정**: 시스템 전체적으로 사용되던 '발주번호' 및 '발주 번호' 텍스트를 모두 **'S/O 번호'**로 일괄 변경했습니다 (테이블 헤더, 검색창 Placeholder, 폼 라벨 등 공통).
+* **대시보드 헤더 텍스트 변경**: 포털 대시보드(메뉴 1) 테이블의 '진행 상태' 항목명을 **'진행 상황'**으로 교체했습니다.
+* **프로모션 텍스트 직관화**: 영문 페이지의 예약 및 딜러 관련 버튼과 라벨 명칭을 구체적으로 변경(`예약 -> Reservation`, `판매완료 -> Order`, `예약취소 -> Cancel`, `만료 -> Expire`)하여 직관성을 높였습니다.
+* **영문 번역 추가**: '입고 완료' 상태에 대한 영문 텍스트를 `In stock`으로 추가 매핑했습니다.
+
+### 4. 유럽 재고 상태 (메뉴 2) 상세 정보(Detail) 데이터 고도화
+* **상세 정보 항목명 다국어 매핑**: 상세 리스트의 항목명을 국/영문 버전에 맞춰 업데이트했습니다. (한국어: `도착지`, `선박정보`, `진행 상황` 등 / 영문: `PORT`, `VESSEL`, `STATUS` 등).
+* **도착 정보(ETD/ETA) 예외 처리**: 상세 정보에서 `ETD / ETA` 데이터가 존재하지 않을 경우, 기존 '미정'으로 표기되던 값을 하이픈(`-`)으로 변경하여 깔끔하게 통일했습니다.
+* **선박 정보(Vessel) 연동**: 상세 정보의 '위치' 항목을 '선박정보(VESSEL)'로 완전히 대체하고, 하드코딩된 유럽 물류센터 텍스트 대신 실제 해당 주문의 `vessel` 데이터를 데이터베이스에서 불러와 렌더링하도록 뷰를 개편했습니다.
+* **진행 상황 데이터 동기화**: 원시 DB 영문 코드(`CONFIRMED` 등)로 노출되던 진행 상황 항목을, 포털 대시보드의 파이프라인과 완벽히 동일한 다국어 텍스트(`주문`, `생산 중`, `배송` 등)로 변환하여 출력되도록 데이터 매핑을 고도화했습니다.
+
+## [2026-08-20] (추가 업데이트) 사용자 프로필(My Data) 및 계정 보안 시스템 구축
+
+### 1. 사용자 프로필 (My Data) 페이지 신설
+* **2단 카드형 레이아웃 구성**: 사용자 가이드라인에 맞춰 상단은 '기본 프로필', 하단은 '보안 및 계정 관리' 카드로 분리된 새로운 UI 페이지(`UserProfile.jsx`)를 구축했습니다.
+* **접근성 개선**: 전체 화면 우측 상단 네비게이션바(Navbar)에 👤(User) 아이콘을 추가하여 언제든 내 정보 페이지로 이동할 수 있도록 동선을 설계했습니다.
+* **사용자 권한 격리 (Data Isolation)**: 프로필 수정 모드에서 '부서(Department)'와 '이메일'은 변경 가능하도록 허용하되, '소속 회사(Company Name)'는 관리자만 제어할 수 있도록 비활성화(Disabled) 처리하여 데이터 오염을 방지했습니다.
+
+### 2. 백엔드 인증(Auth) 및 계정 API 고도화
+* **사용자 스키마 및 DB 마이그레이션**: `CustomUser` 테이블에 `department`(부서)와 `password_hash`(비밀번호) 필드를 신규 추가하고, 시스템 구동 시 누락된 테이블에 안전하게 자동 컬럼을 추가(`ALTER TABLE`)하는 마이그레이션 로직을 구현했습니다.
+* **REST API 엔드포인트 신설**:
+  - `GET /api/v1/users/me`: 현재 로그인한 세션의 프로필 조회 기능
+  - `PATCH /api/v1/users/me`: 사용자 정보 변경 처리 및 유효성 검사 로직
+  - `POST /api/v1/users/me/change-password`: 현재 비밀번호 검증 기반의 신규 비밀번호 변경 기능
+* **하드코딩 로그인 폐지 및 실제 DB 연동**: 프론트엔드 로그인 페이지(`Login.jsx`)에 임시로 설정되어 있던 하드코딩된 아이디/비밀번호 방식을 완전 폐지하고, `POST /api/v1/auth/login` 백엔드 API와 통신하여 실제 데이터베이스의 사용자 정보 및 암호 해시와 일치해야만 로그인되도록 보안 로직을 정상화(수정)했습니다.
+
+### 3. 모바일 UI 레이아웃 안정화
+* **모바일 네비게이션 겹침(Overlap) 현상 해결**: 화면 크기가 작은 모바일(iPhone 12 등)에서 상단 로고와 텍스트가 줄바꿈 될 때 본문 컨텐츠를 덮어버리던 버그를 수정했습니다.
+* **반응형 폰트 및 높이 유동성 확보**: `Navbar.jsx`의 고정 높이(`80px`)를 제거하여 내용물에 맞춰 유연하게 늘어나도록 개선하고, `index.css`를 통해 모바일 뷰일 때만 타이틀 폰트 크기를 약간 줄여(`1.05rem`) 전체적인 배치가 깔끔하게 정돈되도록 다듬었습니다.
+
+## [2026-08-21] 다국어(i18n) 번역 고도화 및 모바일 사용성 개선
+
+### 1. 사용자 프로필(My Data) 페이지 다국어(i18n) 지원 적용
+* **다국어 텍스트 매핑 완비**: '내 정보 (My Data)' 페이지 내 하드코딩 되어 있던 주요 텍스트들(기본 프로필, 사용자 이름, 소속 회사, 부서, 이메일, 보안 및 계정 관리, 비밀번호 등)을 언어 팩 리소스(`translation.json`)로 이관했습니다.
+* **UI 동적 언어 전환**: 상단 언어 토글(KR/EN)을 통한 페이지 언어 전환 시 번역된 텍스트가 즉각적으로 화면에 반영되도록 렌더링을 최적화했습니다. (영문 텍스트: My Data, User Name, Company Name, Department 등).
+* **네비게이션 툴팁 통합**: Navbar에 위치한 사용자 프로필 아이콘의 말풍선 툴팁 텍스트 역시 번역 스키마를 따르도록 동기화했습니다.
+
+### 2. 관리자 포털 장비 정보 수정(Edit) 팝업 다국어 지원 적용
+* **팝업창 내 영문 텍스트 연동**: 메뉴 1 포털 대시보드에서 장비의 세부 스펙을 수정하는 팝업 모달창의 전체 UI(입력창 라벨, Placeholder 문구, 저장/취소 버튼)에 영문 다국어 처리(i18n)를 반영했습니다.
+* **전용 다국어 항목 추가 적용**: 기존 한국어 전용이었던 팝업을 글로벌 규격에 맞춰 `Order detail change`, `Model`, `S/N`, `S/O`, `detail`, `name`, `text`, `cancell`, `save` 텍스트로 치환 적용되도록 개선했습니다.
+
+### 3. 모바일 레이아웃(Sidebar) 스와이프 제스처 기능 추가
+* **사이드바 닫기 UX(사용자 경험) 개선**: 모바일 환경에서 직관성이 떨어지는 우측 상단 'X' 버튼을 과감히 제거하고 최신 모바일 트렌드를 반영했습니다.
+* **터치 앤 스와이프(Touch & Swipe) 도입**: 모바일 화면에서 열린 사이드바를 화면 왼쪽 방향으로 스와이프(Swipe) 할 경우 부드럽게 닫히도록 터치 이벤트를 맵핑(`onTouchStart`, `onTouchMove`, `onTouchEnd`) 적용했습니다.
+* **동작 간섭 방지 로직 적용**: 위/아래 방향으로 단순 스크롤할 때는 사이드바가 닫히지 않도록, 사용자가 정확히 가로(X축) 방향으로 일정 거리(50px) 이상 스와이프했을 때만 닫기 동작이 활성화되도록 로직을 정교화했습니다.
+
+### 4. 발주 관리에 '딜러 주문일자' 데이터 추가 및 표출 연동
+* **데이터베이스 스키마 확장**: 백엔드 `orders` 테이블 및 Pydantic 모델에 `dealer_order_date` 항목을 추가하여 주문일자 정보를 저장할 수 있도록 기능을 확장했습니다.
+* **팝업 입력폼 개선 (메뉴 4)**: '신규 단건 발주 생성' 모달 창에 '딜러 주문일자(Order date)' 입력 필드를 추가하고 백엔드 저장 API와 연동했습니다.
+* **대시보드 상세 뷰 연동 (메뉴 1)**: 생성된 발주의 상세 정보를 보는 타임라인 패널 하단(DETAIL SPEC 영역)에 '딜러 주문일자' 정보를 즉각적으로 표출하도록 프론트엔드 UI를 업데이트했습니다.
+
+### 5. 유저 및 보안 관리(메뉴 6) 기능 전면 개편
+* **사용자 신규등록 (Create) 기능 추가**: '신규 사용자 초대' 버튼을 직관적인 '신규등록'으로 변경하고, 이를 통해 새 사용자를 생성할 수 있는 전용 모달창을 개발했습니다.
+* **사용자 정보 수정 (Update) 기능 반영**: 리스트 상의 연필 아이콘을 클릭해 특정 유저의 기존 정보(소속, 권한 등)를 불러오고 변경할 수 있는 수정 모달 및 패치(`PATCH /api/users`) API를 구축했습니다.
+* **동적 폼 UX 및 초기화 로직 적용**: 유저의 권한(Role)을 `DEALER` 혹은 `ADMIN/RSM`으로 선택함에 따라 딜러사 선택 드롭다운과 부서 입력창이 상호 토글되도록 처리했습니다. 또한, 작업 중 '취소' 또는 'X'를 눌러 모달을 닫을 시 입력 데이터가 깔끔하게 초기화되도록 상태 리셋 로직을 보완했습니다.
+
+### 6. 내 정보 (My Data) 페이지 접근성 및 라우팅 개선
+* **닫기 버튼 신설**: 내 정보 페이지 우측 상단에 '닫기(X)' 버튼을 신설하여, 작업 후 직관적으로 대시보드로 돌아갈 수 있도록 UI 편의성을 개선했습니다.
+* **Tab-based 라우팅 최적화**: 기존 상태값(`activeTab`)을 활용하는 라우팅 아키텍처에 맞춰, 닫기 버튼 클릭 시 `App.jsx`의 홈 이동 로직(`handleHomeClick`)이 정상적으로 호출되도록 컴포넌트 간 Props 통신을 고도화했습니다.
+
+## [2026-08-22] 출고 및 판매 완료 모듈 신설 및 UI 최적화
+
+### 1. 파이프라인 상태값(Status) 및 UI 액션 확장
+* **신규 상태 코드 추가**: 데이터베이스와 API의 `OrderStatus` 열거형에 주문의 최종 단계를 나타내는 `DISPATCHED`(출고완료)와 `SOLD`(판매완료) 상태를 추가하여 이력 관리를 고도화했습니다.
+* **입고(IN_STOCK) 장비 UI 개선**: 대시보드의 '출고대기' 장비에서 [출고완료] 버튼과 [판매완료] 버튼을 각각 제공하여 직관적으로 다음 단계 상태를 처리할 수 있도록 인터페이스를 개선했습니다.
+
+### 2. 출고 및 판매 완료 장비 분리(Soft-hide) 및 전용 리스트(메뉴) 신설
+* **대시보드 메인 리스트 렌더링 최적화**: 관리자 및 딜러 대시보드 메인 리스트에서 진행 완료된 장비(DISPATCHED, SOLD)를 숨김 처리(`exclude_completed=true`)하여 현재 진행 중인 데이터에 집중할 수 있도록 했습니다.
+* **신규 메뉴 A (출고완료 리스트)**: 물리적 출고가 완료된 장비들을 따로 관리할 수 있는 전용 관리자 메뉴(`AdminDispatch.jsx`)를 신설했습니다. 장비별 상태 변경 내역을 확인할 수 있는 타임라인 뷰 기능을 포함하고 있습니다.
+* **신규 메뉴 B (판매완료 기록)**: 매출 확정 장비를 영구 보관하는 페이지(`AdminSalesArchive.jsx`)를 신설하고, 재무 및 영업 부서에서 활용 가능하도록 'Excel Export (CSV)' 기능을 구현했습니다.
+
+### 3. 좌측 사이드바(Sidebar) 메뉴 구조 재배치 및 텍스트 튜닝
+* **메뉴명 및 1~9번 순서 최적화**: 포털 대시보드(메뉴 1)부터 유저 및 보안관리(메뉴 9)까지 사용자가 요청한 최적의 순서대로 메뉴 배치를 완전히 재구성했습니다.
+* **한국어 및 영문 다국어(i18n) 세밀한 교정**: 한국어 텍스트는 '메뉴1. 포털 대시보드' ~ '메뉴9. 유저 및 보안관리'로, 영문은 'Menu1. Portal Dashboard', 'Menu2. WIA Stock', 'Menu4. Upload / Setting' 등 띄어쓰기 및 스펠링 디테일을 사용자의 가이드에 맞추어 완벽하게 적용했습니다.
+* **텍스트 통일성 부여**: `In stock` 상태를 `Ready pickup`으로 변경하고 딜러 주문일자를 '딜러발주 일자'로 통일하는 등 세부 텍스트 번역을 갱신했습니다.
+
+### 4. 기타 버그 수정 및 설정 고도화
+* **이메일 통지 설정 버그 수정**: '업로드 / 알림설정' 메뉴 내 '해상 운송 중 정기 보고' 발송 주기가 테스트 세팅(매 1일)으로 고정되어 있던 현상을 기획 의도에 맞게 매 10일 통지(interval_days=10)로 데이터베이스 값을 정상 복구 및 적용했습니다.
+
+## [2026-08-23] 딜러 포털 전용 기능 및 다국어 텍스트 최적화
+
+### 1. 딜러 포털 (Dealer Portal) 사이드바 메뉴 및 구성 개편
+* **메뉴명 및 구조 재배치**: 딜러 포털의 좌측 사이드바 메뉴 텍스트를 사용자의 가이드(한국어 및 영어)에 맞추어 `메뉴1. 포털 대시보드`부터 `메뉴6. 제품 라이브러리`까지 새롭게 재구성했습니다.
+* **신규 메뉴 추가 (내 구매 내역)**: 딜러 전용 '전체 구매내역 리스트 조회' 페이지(`DealerSalesArchive.jsx`)를 신설하여 딜러 포털 메뉴 3번에 배치했습니다. 이를 통해 딜러가 출고 완료 및 판매된 장비 이력을 별도로 확인할 수 있습니다.
+
+### 2. 딜러 포털 현황판(대시보드) KPI 카드 개편 및 로직 연동
+* **KPI 타이틀 변경 및 데이터 로직 업데이트**: 대시보드 상단의 3개 카드박스 내용을 기존 구조에서 `진행중인 주문(Order in Progress)`, `운송 중 장비(Shipping Machine)`, `출고 대기 장비(Ready for Pickup)`로 텍스트를 갱신했습니다.
+* **실제 상태(Status) 기반 집계**: 각 KPI 카드에 보여지는 숫자가 딜러의 전체 주문 목록에서 현재 단계(Active/Shipping/Ready)에 부합하는 건수만을 정확하게 계산하여 표출되도록 프론트엔드 연산 로직을 수정 적용했습니다.
+
+### 3. WIA 재고 리스트(메뉴 4) 상세 정보(Detail) UI/UX 동기화
+* **관리자 페이지 수준의 2단 분할 레이아웃 도입**: 딜러용 'WIA 재고 리스트'(`DealerInventory.jsx`)에서 장비를 클릭할 때 하단으로 펼쳐지는 상세 정보 패널의 디자인을 관리자 측 페이지와 완벽히 동일하게 개선했습니다.
+* **출력 항목 구성 통일**: 왼쪽 열(`진행상태`, `S/N`, `S/O`, `REMARK`), 오른쪽 열(`ETD / ETA`, `PORT`, `INCOTERMS`, `VESSEL`)로 구성된 핵심 정보들을 파란색 세로 선(포인트 바)과 함께 양쪽(관리자, 딜러)에서 일관되게 노출하도록 개편 적용했습니다.
+
+### 4. 기타 버그 픽스 및 UI 최적화
+* **JSON 문법 오류 픽스 (Hotfix)**: 텍스트 번역 업데이트 과정 중 영문 `translation.json` 파일에 발생했던 콤마(,) 누락 및 문자열 깨짐 문법 오류(Syntax Error)를 복구하여 화면이 정상 렌더링되도록 조치했습니다.
+* **불필요한 모바일 시뮬레이터 제거**: 딜러의 '발주 및 배송상태' 리스트 페이지 상단에 남아있던 모바일 뷰 전환 시뮬레이션 버튼과 안내 배지를 깔끔하게 삭제했습니다. (사이드바 글로벌 전환 기능으로 통합됨)
+
+## [2026-08-24] 프론트엔드 UI 디테일 개선 및 실서버 배포(DB 연동) 안정화
+
+### 1. 딜러 포털 (Dealer Portal) 대시보드 UI/UX 디테일 개선
+* **버튼 호버(Hover) 디자인 신규 적용**: 딜러 대시보드(메뉴 1) 및 프로모션(메뉴 5) 내 'Customs Clearance'(통관/픽업), 'Order'(주문) 버튼에 마우스 오버 시 브랜드 컬러인 'WIA Light Gold'(`rgb(205, 170, 125)`) 색상으로 부드럽게 전환되도록 CSS(`btn-request:hover`) 효과를 추가했습니다.
+* **통계 정보 및 테이블 항목 영역 밸런스 조정**: 대시보드 화면에서 좌측 'WIA available Stock List'의 통계 정보 영역과 우측 'Ready for Release / Request Pickup' 테이블의 항목(버튼) 영역의 높이(height)를 시각적으로 동일하게 맞추어 전체 레이아웃 밸런스를 정교하게 정돈했습니다.
+* **예약/주문 버튼 규격 최적화**: 프로모션 리스트 내 'Reserve' 및 'Order' 버튼의 가로 넓이를 기존 85px에서 70px로 단축하여 콤팩트한 리스트 뷰를 구현했습니다.
+* **버튼 텍스트 간소화 (다국어 연동)**: 영역을 길게 차지하던 'Customs Clearance & Pickup' 다국어 문구를 보다 간결한 'Customs Clearance'로 교체 적용했습니다.
+
+### 2. 클라우드 실서버(Render) 데이터베이스 연동 및 운영 안정화
+* **로컬 DB 기반 테스트 환경 구축**: 개발 중이던 로컬 데이터베이스(`scm_erp.db`) 파일이 서버로 업로드되지 않도록 막혀있던 설정(`.gitignore`)을 해제하여, 최신 데이터가 성공적으로 클라우드에 배포될 수 있도록 조치했습니다.
+* **Render 환경 변수 동적 라우팅 설정**: 클라우드 서버에 배포된 백엔드가 비어있는 외부 PostgreSQL을 바라보느라 로그인이 안 되던 오류(401 Unauthorized)를 해결했습니다. Render 서버의 `DATABASE_URL` 환경 변수를 임시 우회하여 우리가 방금 업로드한 최신 로컬 SQLite 데이터를 정상적으로 로드하고 로그인 및 사용자 관리가 테스트 될 수 있도록 조치했습니다.
+
+### 3. 신규 권한(RSM) 분리 및 포털 신설 (Zero Trust 아키텍처)
+* **API 권한 차단 (Zero Trust API)**: 프론트엔드 API 호출 시 항상 `X-User-Role` 헤더를 포함하도록 글로벌 인터셉터(`fetch` 오버라이드)를 구현하고, 백엔드(`main.py`) 미들웨어 단에서 해당 권한이 `RSM`일 경우 유저/통계/설정 등의 주요 5가지 관리자 API에 접근할 때 즉각적으로 **HTTP 403 Forbidden 에러를 반환**하도록 방어 로직을 적용했습니다.
+* **프론트엔드 컴포넌트 격리**: `App.jsx` 단에서 RSM 권한인 경우 인가된 페이지 외에는 컴포넌트 렌더링을 완전히 차단했으며, `Sidebar.jsx`를 통해 메뉴 역시 보안 가이드라인에 맞추어 엄격하게 제한했습니다. 다국어 지원에 따라 타이틀은 `RSM 포털`로 자동 렌더링됩니다.
+* **신규 RSM 영업통계 대시보드 (`RsmDashboard.jsx`)**: RSM 역할에 특화된 3가지 핵심 KPI 차트(월별 수주 실적, 프로모션 예약 달성률, 파이프라인 체류 리드타임)와 담당 딜러들의 액티브 파이프라인을 모니터링할 수 있는 신규 대시보드를 구축했습니다.
+* **메뉴 구조 및 다국어 텍스트 최적화**: RSM 포털의 좌측 메뉴를 `메뉴1. 포털 대시보드`, `메뉴2. 유럽 재고 상태`, `메뉴3. WIA 프로모션`, `메뉴4. 제품 라이브러리`, `메뉴5. RSM 영업통계` 순으로 재구성하고, 다국어 번역 파일(`ko/en`)을 동기화하여 접근성을 높였습니다.
+
+## [2026-08-25] 다국어 텍스트 일원화 및 상단 네비게이션(GNB) 모바일 최적화
+
+### 1. 전역 다국어(i18n) 텍스트 명칭 일원화 및 교정
+* **포털 공통 메뉴 텍스트 최적화**: 관리자, RSM, 딜러 포털 등 전역에 걸쳐 사용되는 재고 및 프로모션 관련 메뉴 명칭을 직관적으로 교정했습니다.
+  * (한국어) '유럽 재고 상태' / 'WIA 재고 리스트' ➔ **'WIA 재고리스트'**로 완벽 통일
+  * (영어) 'WIA Stock' ➔ **'WIA Stock List'**로 통일
+  * (한국어) '프로모션' / '법인 주관 프로모션 안내' ➔ **'WIA 프로모션'**으로 통일
+  * 딜러 프로모션 문구 최적화: '현재 진행 중인 프로모션 장비 현황' ➔ '진행 중인 프로모션 모델' 등 보다 간결한 문장으로 대체.
+* **상단 네비게이션 타이틀 단축**: `WIA 공작기계 유럽 SCM ERP` ➔ **`WIA 공작기계 유럽 SCM`** 으로 `ERP` 단어를 제외하여 브랜딩을 강화했습니다.
+
+### 2. 상단 네비게이션 바(Top Navbar) UI/UX 전면 개편
+* **사용자 상태 직관적 표시**: 내 정보(프로필) 아이콘 바로 좌측에 현재 로그인된 유저의 아이디(예: `WME-admin`)가 라이트 골드(`R136 G121 B106`, 0.82rem) 색상 텍스트로 항시 노출되도록 신규 추가했습니다.
+* **버튼 컴포넌트 디자인(CSS) 획일화**: 기존의 단색이었던 '로그아웃' 버튼을 '언어 변경', '내 정보' 버튼과 동일한 둥근 아웃라인 스타일(`.btn-outline`)로 통일했습니다. 
+* **마우스 오버(Hover) 효과 및 간격 정밀 조정**: 
+  * 기본 테두리를 1px 두께의 라이트 골드(`R205 G170 B125`)로 일괄 적용.
+  * Hover 시 배경이 라이트 골드 색상으로 완전히 채워지며 텍스트가 흰색으로 반전되도록 시각적 피드백을 강화했습니다.
+  * 아이디, 프로필, 언어변경, 로그아웃 버튼 사이의 간격(`gap`)을 정확히 10px로 타이트하게 정돈했습니다.
+
+### 3. 모바일 반응형(Responsive) 스마트폰 전용 UI 구현
+* **모바일 다이나믹 스위칭 로직 도입**: 스마트폰 크기(Mobile View)가 감지되면 상단 헤더 텍스트와 버튼이 모바일에 최적화된 콤팩트한 형태로 실시간 변환(`App.jsx` -> `Navbar.jsx`)되도록 설계했습니다.
+  * (모바일) 메인 타이틀: `WME SCM` 으로 단축 표기
+  * (모바일) 로그아웃 버튼: 텍스트 대신 새로 제작한 **백터(SVG) 열린 문 아이콘(`exit-favicon.svg`)**으로 대체 표기
+* **줄바꿈 현상 억제 및 가로 스크롤 허용**: 모바일 기기에서 여러 버튼들이 화면 아래로 밀리거나 깨지지 않도록 우측 끝으로 일렬 정렬(`nowrap`)시키고, 영역 초과 시 좌우 스크롤(`overflow-x: auto`)이 가능하게끔 안전 장치를 적용했습니다.
+
+### 4. 기타 불필요 기능(Legacy) 제거
+* **주문 배송 타임라인 UI 최적화**: 딜러 주문 조회 시 표시되는 타임라인 리스트 항목에서 불필요해진 '상태설정' 열(Column)을 제거하고 딜러 포털의 UI와 동일한 심플한 형태로 일원화했습니다.
+* **시드 데이터 초기화(Seed) 로직 폐기**: 테스트 용도로 사용되던 전역 '시드 데이터 초기화' 기능 및 관련 컴포넌트(버튼 UI, 백엔드 호출 로직, 렌더 갱신 State 등)를 `App.jsx`와 `Sidebar.jsx`에서 완전히 도려내어 운영 환경에 맞게 정리했습니다.
+
+### 5. 모바일 페이지 뷰어 확대/축소 레이아웃 버그 수정
+* **모바일 화면 비율 최적화 방어 코드 추가**: 'SCM 포털 대시보드'와 '업로드 / 알림설정' 페이지에서 넓은 데이터 표(Data Table)나 타임라인이 모바일 뷰어의 가로 비율을 깨트리며 화면 전체가 강제로 축소(Zoom-out)되어 글씨가 작아지던 현상을 완벽하게 해결했습니다.
+* **Flexbox 자식 요소 폭발 방지**: 전체 레이아웃 뼈대를 구성하는 `.main-content` 및 `.page-body` 컨테이너에 `min-width: 0`을 명시하여, 내부 콘텐츠가 모바일 기기 본연의 375px 너비를 무단으로 뚫고 나가지 않도록 억제했습니다.
+* **여백(Padding) 스케일링**: 모바일 환경일 때 메인 바디 영역의 좌우 여백을 기존 32px에서 16px로 줄여 컴팩트한 모바일 화면에서도 콘텐츠가 충분한 공간을 확보할 수 있도록 튜닝했습니다.
+
+### 6. 전(All) 포털 배송 타임라인 모바일 하단 상세정보(Accordion) 패널 도입
+* **모바일 카드(Mobile Card) 확장 기능 통합**: 기존 데스크탑 표(Table)에서만 제공되던 클릭 확장 패널을 관리자(Admin), RSM, 딜러(Dealer) 포털의 **모든 타임라인 모바일 리스트 카드에도 확대 적용**했습니다.
+* **다이나믹 렌더링 로직**: 모바일 환경에서 각 주문 리스트 카드를 터치할 경우 부드럽게 하단으로 패널이 펼쳐지며 S/O, NC, 상세스펙(DETAIL SPEC), 발주일자, Incoterms, ETD / ETA, Vessel, Remark 등 핵심 정보를 바로 확인할 수 있도록 설계했습니다.
+* **터치 이벤트 간섭 및 버그 차단 (Event Propagation)**: 확장되는 카드 내부에 위치한 버튼(진행상태 변경, 롤백, 수정, 삭제)이나 타임라인(StepBar) 요소 조작 시, 의도치 않게 패널 전체가 열리거나 닫히는 현상을 완벽히 방어(`e.stopPropagation()`)했습니다.

@@ -123,7 +123,7 @@ const getStatusColor = (status) => {
   }
 };
 
-export default function DealerSalesArchive({ isMobileView }) {
+export default function DealerSalesArchive({ isMobileView, dealerCompanyId, dealerCompanyName }) {
   const { t } = useTranslation();
   const [orders, setOrders] = useState([]);
   const [portCodes, setPortCodes] = useState([]);
@@ -137,32 +137,40 @@ export default function DealerSalesArchive({ isMobileView }) {
   const fetchSoldOrders = async () => {
     setLoading(true);
     try {
-      const [dealersRes, portsRes] = await Promise.all([
-        fetch('/api/dealers'),
+      const ordersUrl = dealerCompanyId
+        ? `/api/orders?dealer_id=${encodeURIComponent(dealerCompanyId)}`
+        : '/api/orders';
+      const [ordersRes, portsRes] = await Promise.all([
+        fetch(ordersUrl),
         fetch('/api/master-data/port-codes')
       ]);
-      const dealers = await dealersRes.json();
       if (portsRes.ok) {
         const portsData = await portsRes.json();
         setPortCodes(Array.isArray(portsData) ? portsData : []);
       }
-      const akMakina = dealers.find(d => d.name === 'AK MAKINA');
-      const dealerId = akMakina ? akMakina.id : '';
 
-      // API 호출: SOLD 필터 제거하여 모든 이력(5단계 파이프라인 포함) 조회
-      const res = await fetch(`/api/orders?dealer_id=${dealerId}`);
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        // Sort by order date descending
-        const sortedData = data.sort((a, b) => {
-          const dateA = a.dealer_order_date || a.created_at;
-          const dateB = b.dealer_order_date || b.created_at;
-          return new Date(dateB) - new Date(dateA);
-        });
-        setOrders(sortedData);
+      if (ordersRes.ok) {
+        const data = await ordersRes.json();
+        if (Array.isArray(data)) {
+          const scopedData = dealerCompanyId
+            ? data.filter(o => Number(o.dealer_company_id) === Number(dealerCompanyId))
+            : data;
+          // Sort by order date descending
+          const sortedData = scopedData.sort((a, b) => {
+            const dateA = a.dealer_order_date || a.created_at;
+            const dateB = b.dealer_order_date || b.created_at;
+            return new Date(dateB) - new Date(dateA);
+          });
+          setOrders(sortedData);
+        } else {
+          setOrders([]);
+        }
+      } else {
+        setOrders([]);
       }
     } catch (err) {
       console.error("Failed to fetch orders:", err);
+      setOrders([]);
     } finally {
       setLoading(false);
     }
@@ -170,7 +178,7 @@ export default function DealerSalesArchive({ isMobileView }) {
 
   useEffect(() => {
     fetchSoldOrders();
-  }, []);
+  }, [dealerCompanyId]);
 
   // 도착지 항구 표준화 함수
   const getStandardPort = (rawPort) => {

@@ -293,7 +293,9 @@ export default function Login({ onLogin }) {
         finalData.role,
         finalData.username || finalData.email,
         finalData.needs_profile_setup,
-        finalData.email
+        finalData.email,
+        finalData.dealer_company_id ?? null,
+        finalData.dealer_company_name || ''
       );
     } catch (err) {
       const errMsg = String(err?.message || err || '');
@@ -364,7 +366,9 @@ export default function Login({ onLogin }) {
         finalData.role,
         finalData.username || finalData.email,
         finalData.needs_profile_setup,
-        finalData.email
+        finalData.email,
+        finalData.dealer_company_id ?? null,
+        finalData.dealer_company_name || ''
       );
     } catch (err) {
       setError(translateError(err.message) || `Step 2 PIN verification failed: ${err.message}`);

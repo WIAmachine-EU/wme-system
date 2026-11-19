@@ -57,6 +57,8 @@ export default function App() {
   const [currentRole, setCurrentRole] = useState(authState?.currentRole || 'SCM_ADMIN');
   const [currentUserId, setCurrentUserId] = useState(authState?.currentUserId || '');
   const [currentUserEmail, setCurrentUserEmail] = useState(authState?.currentUserEmail || '');
+  const [dealerCompanyId, setDealerCompanyId] = useState(authState?.dealerCompanyId ?? null);
+  const [dealerCompanyName, setDealerCompanyName] = useState(authState?.dealerCompanyName || '');
   const [needsProfileSetup, setNeedsProfileSetup] = useState(authState?.needsProfileSetup || false);
   // Default tabs based on role
   const [activeTab, setActiveTab] = useState(authState?.activeTab || 'admin-dashboard');
@@ -70,6 +72,8 @@ export default function App() {
         currentRole,
         currentUserId,
         currentUserEmail,
+        dealerCompanyId,
+        dealerCompanyName,
         needsProfileSetup,
         activeTab,
         lastActivity: Date.now()
@@ -77,7 +81,48 @@ export default function App() {
     } else {
       localStorage.removeItem('erp_auth');
     }
-  }, [isAuthenticated, currentRole, currentUserId, currentUserEmail, needsProfileSetup, activeTab]);
+  }, [isAuthenticated, currentRole, currentUserId, currentUserEmail, dealerCompanyId, dealerCompanyName, needsProfileSetup, activeTab]);
+
+  // 토큰 만료(401) 감지 시 즉시 세션 초기화 및 로그인 화면 전환
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      setDealerCompanyId(null);
+      setDealerCompanyName('');
+      setIsAuthenticated(false);
+    };
+    window.addEventListener('wme-auth-expired', handleAuthExpired);
+    return () => window.removeEventListener('wme-auth-expired', handleAuthExpired);
+  }, []);
+
+  // 로그인 유지 중(새로고침 포함) 백엔드 DB의 최신 역할 및 소속 딜러사 정보 자동 동기화
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const token = localStorage.getItem('wme_access_token');
+    if (!token) {
+      localStorage.removeItem('erp_auth');
+      setDealerCompanyId(null);
+      setDealerCompanyName('');
+      setIsAuthenticated(false);
+      return;
+    }
+
+    let cancelled = false;
+    fetch('/api/v1/users/me')
+      .then(res => (res.ok ? res.json() : null))
+      .then(me => {
+        if (cancelled || !me) return;
+        if (me.role) setCurrentRole(me.role);
+        if (me.username) setCurrentUserId(me.username);
+        if (me.email) setCurrentUserEmail(me.email);
+        setDealerCompanyId(me.dealer_company_id ?? null);
+        setDealerCompanyName(me.dealer_company?.name || '');
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
 
   // Handle inactivity auto-logout
   useEffect(() => {
@@ -168,10 +213,12 @@ export default function App() {
   const isMobileView = windowWidth <= 768;
   const isDesktopOptimized = windowWidth >= 1024;
 
-  const handleLogin = (role, userId, profileSetupNeeded = false, email = '') => {
+  const handleLogin = (role, userId, profileSetupNeeded = false, email = '', companyId = null, companyName = '') => {
     setCurrentRole(role);
     setCurrentUserId(userId);
     setCurrentUserEmail(email || userId);
+    setDealerCompanyId(companyId ?? null);
+    setDealerCompanyName(companyName || '');
     setNeedsProfileSetup(Boolean(profileSetupNeeded));
     setIsAuthenticated(true);
 
@@ -186,6 +233,8 @@ export default function App() {
   const handleLogout = () => {
     localStorage.removeItem('wme_access_token');
     localStorage.removeItem('erp_auth');
+    setDealerCompanyId(null);
+    setDealerCompanyName('');
     setIsAuthenticated(false);
   };
 
@@ -301,9 +350,28 @@ export default function App() {
           {activeTab === 'admin-library' && (currentRole === 'SCM_ADMIN' || currentRole === 'RSM') && <ProductLibrary currentRole={currentRole} isMobileView={isMobileView} />}
 
           {/* Dealer Routing */}
-          {activeTab === 'dealer-dashboard' && <DealerDashboard isMobileView={isMobileView} setActiveTab={setActiveTab} />}
-          {activeTab === 'dealer-orders' && <DealerOrders isMobileView={isMobileView} />}
-          {activeTab === 'dealer-sales-archive' && <DealerSalesArchive isMobileView={isMobileView} />}
+          {activeTab === 'dealer-dashboard' && (
+            <DealerDashboard
+              isMobileView={isMobileView}
+              setActiveTab={setActiveTab}
+              dealerCompanyId={dealerCompanyId}
+              dealerCompanyName={dealerCompanyName}
+            />
+          )}
+          {activeTab === 'dealer-orders' && (
+            <DealerOrders
+              isMobileView={isMobileView}
+              dealerCompanyId={dealerCompanyId}
+              dealerCompanyName={dealerCompanyName}
+            />
+          )}
+          {activeTab === 'dealer-sales-archive' && (
+            <DealerSalesArchive
+              isMobileView={isMobileView}
+              dealerCompanyId={dealerCompanyId}
+              dealerCompanyName={dealerCompanyName}
+            />
+          )}
           {activeTab === 'dealer-inventory' && <DealerInventory isMobileView={isMobileView} />}
           {activeTab === 'dealer-promotion' && <DealerPromotion isMobileView={isMobileView} />}
           {activeTab === 'dealer-library' && <ProductLibrary currentRole={currentRole} isMobileView={isMobileView} />}
