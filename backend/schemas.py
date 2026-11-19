@@ -286,6 +286,7 @@ class OrderOut(OrderBase):
     id: int
     current_status_changed_at: datetime
     created_at: datetime
+    has_cargo_detail: bool = False
     product_model: Optional[ProductModelOut] = None
     dealer_company: Optional[DealerCompanyOut] = None
     reserved_dealer: Optional[DealerCompanyOut] = None

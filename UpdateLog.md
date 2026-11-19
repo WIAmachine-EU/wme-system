@@ -1,6 +1,6 @@
-# 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
+﻿# 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
-## [2026-11-20] 딜러 포털 [내 구매 내역] 화물 상세 팝업 오류 수정 및 CARGO 버튼 UI 통일
+## [2026-11-20] 딜러 포털 화물 상세 팝업 오류 수정, CARGO 버튼 UI 통일 및 데이터 유무별 조건부 활성화 (R10 G28 B143)
 
 ### 1. [딜러 포털 - 내 구매 내역] `CargoDetailModal` 빈 페이지 오류 해결 및 `CARGO` 컬럼 UI 통일 (`DealerSalesArchive.jsx`)
 * **`◎ Machine Details` 팝업창 렌더링 오류 수정**:
@@ -8,6 +8,16 @@
 * **컬럼명 및 버튼 아이콘·텍스트 관리자 포털과 동일화**:
   * 테이블 헤더명을 기존 `Cargo detail`에서 관리자 포털과 동일한 **`CARGO`**로 변경.
   * 데스크탑 테이블 및 모바일 카드의 상세 버튼 아이콘과 텍스트를 관리자 포털(`AdminDispatch.jsx`)과 동일한 정육면체 SVG 아이콘(`CubeIcon`) 및 **`cm / kg`**(`t('dispatch.btn_dimension', 'cm / kg')`)로 통일 적용.
+
+### 2. [출고 관리 & 내 구매 내역] 화물(CARGO) 데이터 보유 장비 조건부 버튼 활성화 및 R10 G28 B143 스타일 적용 (`backend/main.py`, `backend/schemas.py`, `AdminDispatch.jsx`, `DealerSalesArchive.jsx`)
+* **화물 데이터 유무(`has_cargo_detail`) 백엔드 스키마 및 일괄 조회 최적화**:
+  * `OrderOut` Pydantic 스키마에 `has_cargo_detail: bool = False` 필드 추가.
+  * `GET /api/orders` 호출 시 N+1 쿼리 부하를 방지하기 위해 `models.CargoDetail.serial_number` 목록을 1회 일괄 조회(`distinct()`)하여 주문 목록에 플래그를 부착하는 `_attach_cargo_detail_flags` 최적화 함수 구현.
+  * `GET /api/cargo-details/{serial_number}` 호출 시 S/N의 공백 및 대소문자 정규화(`strip()`, `casefold()`)를 적용하여 조회 누락 방지.
+* **화물 데이터 존재 S/N 조건부 버튼 활성화 및 WIA Blue 스타일 적용**:
+  * 딜러 포털 [내 구매 내역](`DealerSalesArchive.jsx`) 및 관리자 포털 [출고 관리](`AdminDispatch.jsx`)의 데스크탑 테이블 및 모바일 카드 뷰에서 `order.serial_number && order.has_cargo_detail` 조건을 평가.
+  * 화물 치수/중량 데이터가 존재하는 장비의 CARGO(`cm / kg`) 버튼은 메인 브랜드 컬러인 WIA Blue **`rgb(10, 28, 143)`** (`#0A1C8F`) 텍스트 및 테두리 스타일로 선명하게 활성화.
+  * 화물 데이터가 존재하지 않는 장비는 버튼을 `disabled` 처리하고 반투명(`opacity: 0.45`, `cursor: not-allowed`) 및 클릭 이벤트 차단(`e.stopPropagation()`)을 적용하여 불필요한 빈 팝업 호출 방지 및 직관적인 데이터 식별성 제공.
 
 
 ## [2026-11-19] 딜러 포털 RBAC 권한 격리 전면 보강, 사용자 접속일(last_login_at) 실시간 추적 및 선적내역 리스트 UI/UX 정비

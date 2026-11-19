@@ -209,6 +209,34 @@ def _mask_corporate_stock_order_for_dealer(
     return dto.model_copy(update=updates) if updates else dto
 
 
+def _attach_cargo_detail_flags(
+    order_dtos: List[schemas.OrderOut],
+    db: Session
+) -> List[schemas.OrderOut]:
+    """
+    주문 목록의 S/N과 cargo_details 테이블을 1회 일괄 대조하여 has_cargo_detail 플래그를 설정합니다.
+    """
+    if not order_dtos:
+        return order_dtos
+    cargo_sns = {
+        str(row[0]).strip().upper()
+        for row in db.query(models.CargoDetail.serial_number).distinct().all()
+        if row[0] and str(row[0]).strip()
+    }
+    if not cargo_sns:
+        return order_dtos
+    return [
+        dto.model_copy(
+            update={
+                "has_cargo_detail": bool(
+                    dto.serial_number and str(dto.serial_number).strip().upper() in cargo_sns
+                )
+            }
+        )
+        for dto in order_dtos
+    ]
+
+
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
@@ -1080,11 +1108,13 @@ def get_orders(
             )
     orders_result = query.order_by(models.Order.id.desc()).all()
     if is_dealer_corp_stock_view:
-        return [
+        order_dtos = [
             _mask_corporate_stock_order_for_dealer(o, current_user.dealer_company_id)
             for o in orders_result
         ]
-    return orders_result
+    else:
+        order_dtos = [schemas.OrderOut.model_validate(o) for o in orders_result]
+    return _attach_cargo_detail_flags(order_dtos, db)
 
 @app.post("/api/orders", response_model=schemas.OrderOut, status_code=status.HTTP_201_CREATED)
 def create_order(
@@ -2889,18 +2919,24 @@ def get_cargo_detail(
     db: Session = Depends(get_db),
     current_user: models.CustomUser = Depends(get_current_aal2_user)
 ):
+    clean_sn = (serial_number or "").strip().upper()
+    if not clean_sn:
+        raise HTTPException(status_code=404, detail="Cargo detail not found for this S/N")
+
     # [RBAC 강제 격리] DEALER 역할은 본인 딜러사 소유 장비(Order)의 CargoDetail만 조회 허용
     if _is_dealer_user(current_user):
         if not current_user.dealer_company_id:
             raise HTTPException(status_code=403, detail="해당 장비의 화물 상세 정보에 대한 열람 권한이 없습니다.")
         owns_order = db.query(models.Order.id).filter(
-            models.Order.serial_number == serial_number,
+            func.upper(func.trim(models.Order.serial_number)) == clean_sn,
             models.Order.dealer_company_id == current_user.dealer_company_id
         ).first()
         if not owns_order:
             raise HTTPException(status_code=403, detail="본인 딜러사 소속 장비의 화물 상세 정보만 조회할 수 있습니다.")
 
-    cargo_details = db.query(models.CargoDetail).filter(models.CargoDetail.serial_number == serial_number).all()
+    cargo_details = db.query(models.CargoDetail).filter(
+        func.upper(func.trim(models.CargoDetail.serial_number)) == clean_sn
+    ).all()
     if not cargo_details:
         raise HTTPException(status_code=404, detail="Cargo detail not found for this S/N")
     return cargo_details

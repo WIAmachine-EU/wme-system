@@ -460,6 +460,7 @@ export default function DealerSalesArchive({ isMobileView, dealerCompanyId, deal
                 sortedOrders.map((order, index) => {
                   const statusColor = getStatusColor(order.current_status);
                   const isPickedUp = order.current_status === 'SOLD';
+                  const hasCargo = Boolean(order.serial_number && order.has_cargo_detail);
                   return (
                     <div key={order.id} style={{ 
                       background: 'var(--bg-card, #ffffff)', 
@@ -498,20 +499,21 @@ export default function DealerSalesArchive({ isMobileView, dealerCompanyId, deal
                       
                       <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
                         <button
-                          onClick={() => openCargoModal(order.serial_number, order.product_model ? order.product_model.model_name : '')}
-                          disabled={!order.serial_number}
+                          onClick={() => hasCargo && openCargoModal(order.serial_number, order.product_model ? order.product_model.model_name : '')}
+                          disabled={!hasCargo}
                           style={{
-                            background: 'transparent', border: '1px solid var(--border-color)',
-                            color: order.serial_number ? 'var(--text-primary)' : 'var(--text-muted)',
+                            background: hasCargo ? 'rgb(10, 28, 143)' : 'transparent',
+                            border: `1px solid ${hasCargo ? 'rgb(10, 28, 143)' : 'var(--border-color)'}`,
+                            color: hasCargo ? '#ffffff' : 'var(--text-muted)',
                             fontFamily: 'SUITE, sans-serif',
-                            fontWeight: order.serial_number ? 600 : 100,
+                            fontWeight: hasCargo ? 600 : 400,
+                            opacity: hasCargo ? 1 : 0.45,
                             padding: '10px', borderRadius: '8px', fontSize: '14px',
-                            cursor: order.serial_number ? 'pointer' : 'not-allowed',
+                            cursor: hasCargo ? 'pointer' : 'not-allowed',
                             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
                             width: '100%',
                             transition: 'all 0.2s'
                           }}
-                          className={order.serial_number ? "hover-bg-subtle" : ""}
                         >
                           <CubeIcon size={14} /> {t('dispatch.btn_dimension', 'cm / kg')}
                         </button>
@@ -552,6 +554,7 @@ export default function DealerSalesArchive({ isMobileView, dealerCompanyId, deal
                   sortedOrders.map((order, index) => {
                     const statusColor = getStatusColor(order.current_status);
                     const isPickedUp = order.current_status === 'SOLD';
+                    const hasCargo = Boolean(order.serial_number && order.has_cargo_detail);
 
                     return (
                       <tr key={order.id}>
@@ -589,19 +592,20 @@ export default function DealerSalesArchive({ isMobileView, dealerCompanyId, deal
                         </td>
                         <td style={{ padding: '13px 12px', textAlign: 'center', fontSize: '11px' }}>
                           <button
-                            onClick={() => openCargoModal(order.serial_number, order.product_model ? order.product_model.model_name : '')}
-                            disabled={!order.serial_number}
+                            onClick={() => hasCargo && openCargoModal(order.serial_number, order.product_model ? order.product_model.model_name : '')}
+                            disabled={!hasCargo}
                             style={{
-                              background: 'transparent', border: '1px solid var(--border-color)',
-                              color: order.serial_number ? 'var(--text-primary)' : 'var(--text-muted)',
+                              background: hasCargo ? 'rgb(10, 28, 143)' : 'transparent',
+                              border: `1px solid ${hasCargo ? 'rgb(10, 28, 143)' : 'var(--border-color)'}`,
+                              color: hasCargo ? '#ffffff' : 'var(--text-muted)',
                               fontFamily: 'SUITE, sans-serif',
-                              fontWeight: order.serial_number ? 600 : 100,
+                              fontWeight: hasCargo ? 600 : 400,
+                              opacity: hasCargo ? 1 : 0.45,
                               padding: '4px 8px', borderRadius: '6px', fontSize: '11px',
-                              cursor: order.serial_number ? 'pointer' : 'not-allowed',
+                              cursor: hasCargo ? 'pointer' : 'not-allowed',
                               display: 'inline-flex', alignItems: 'center', gap: '4px',
                               transition: 'all 0.2s'
                             }}
-                            className={order.serial_number ? "hover-bg-subtle" : ""}
                           >
                             <CubeIcon size={13} /> {t('dispatch.btn_dimension', 'cm / kg')}
                           </button>
