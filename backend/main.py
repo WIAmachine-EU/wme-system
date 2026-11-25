@@ -3098,3 +3098,22 @@ async def trackcargo_webhook(request: Request, db: Session = Depends(get_db)):
         db.rollback()
         return {"status": "error", "message": str(e)}
 
+
+# ==========================================
+# AI 에이전트 기반 본사 Sales List 엑셀 추출 및 PostgreSQL 동기화 라우터
+# ==========================================
+from erp_upload_router import create_erp_sync_router
+
+app.include_router(
+    create_erp_sync_router(auth_dependency=_require_non_dealer)
+)
+
+
+@app.get("/erp-sync-ui", include_in_schema=False)
+async def serve_erp_sync_ui():
+    template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates", "erp_sync_ui.html")
+    if not os.path.exists(template_path):
+        raise HTTPException(status_code=404, detail="ERP Sync UI template not found")
+    return FileResponse(template_path)
+
+

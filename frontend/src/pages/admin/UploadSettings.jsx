@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileSpreadsheet, Upload, Mail, Plus, X, ShoppingCart } from 'lucide-react';
+import { FileSpreadsheet, Upload, Mail, Plus, X, ShoppingCart, Sparkles, ArrowRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import StockStatusUploadModal from '../../components/StockStatusUploadModal';
 
@@ -65,7 +65,7 @@ const STAGE_INFO = {
   }
 };
 
-export default function UploadSettings() {
+export default function UploadSettings({ onOpenErpSync }) {
   const [emailConfigs, setEmailConfigs] = useState([]);
   const [productModels, setProductModels] = useState([]);
   const [dealers, setDealers] = useState([]);
@@ -230,7 +230,8 @@ export default function UploadSettings() {
     }
   };
 
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isKo = i18n.language?.startsWith('ko');
 
   return (
     <div className="page-body">
@@ -240,6 +241,43 @@ export default function UploadSettings() {
           {t('management.page_desc', 'On this page, you can upload a new order and set an alert for the schedule.')}
         </p>
       </div>
+
+      {/* AI 에이전트 기반 본사 Sales List 엑셀 동기화 */}
+      {onOpenErpSync && (
+        <div
+          className="glass-card"
+          style={{
+            padding: '28px',
+            marginBottom: '32px',
+            border: '1px solid rgba(10, 28, 143, 0.22)',
+            background: 'linear-gradient(135deg, rgba(10, 28, 143, 0.03), #ffffff)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+            <Sparkles color="var(--wia-blue)" size={24} />
+            <h2 style={{ fontSize: '1.3rem' }}>
+              {isKo
+                ? 'AI 에이전트 기반 본사 Sales List 엑셀 추출 및 DB 동기화'
+                : 'AI Agent HQ Sales List Extraction & PostgreSQL Sync'}
+            </h2>
+          </div>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '18px', lineHeight: 1.55 }}>
+            {isKo
+              ? '비정형 주간 본사 Sales List 엑셀을 업로드하면 시트명·열 변동 자동 보정 및 Gemini AI 헤더 추론으로 필수 주문·선적 데이터만 추출하여 PostgreSQL 현재 상태와 대조(Dry-Run) 후 안전하게 일괄 Upsert합니다.'
+              : 'Upload unstructured weekly HQ Sales List Excel files with auto schema detection, Gemini AI header inference, live PostgreSQL dry-run diff, inline conflict editing, and atomic bulk upsert.'}
+          </p>
+          <button
+            type="button"
+            onClick={onOpenErpSync}
+            className="btn btn-primary upload-hover-btn"
+            style={{ padding: '10px 22px', fontSize: '0.92rem' }}
+          >
+            <Sparkles size={17} />
+            <span>{isKo ? 'AI 엑셀 동기화 워크스페이스 열기' : 'Open AI Excel Sync Workspace'}</span>
+            <ArrowRight size={16} />
+          </button>
+        </div>
+      )}
 
       {/* 신규 단건 발주 생성 */}
       <div className="glass-card" style={{ padding: '28px', marginBottom: '32px' }}>

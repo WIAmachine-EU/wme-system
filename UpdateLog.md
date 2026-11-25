@@ -1,5 +1,36 @@
 ﻿# 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
+## [2026-11-25] AI 에이전트 기반 본사 Sales List 엑셀 지능형 추출 및 PostgreSQL 원자적 동기화 파이프라인 구축
+
+### 1. 백엔드 지능형 엑셀 파싱 · Gemini AI 스키마 추론 · PostgreSQL 원자적 Upsert API (`backend/erp_upload_router.py`, `backend/main.py`)
+* **제로 디스크(메모리 `io.BytesIO`) 4단계 구조 변동 방어 파서**:
+  * Render 임시 파일시스템 환경에 맞춰 모든 엑셀 파일을 메모리 상에서 직접 파싱하고, 시트 위치·명칭 변경 시 전체 시트 상단 15행을 스캔해 핵심 헤더 점수가 가장 높은 시트와 헤더 행을 자동 탐색.
+  * 절대 열 번호가 아닌 헤더명 동적 매핑(정규화 + 별칭 사전)을 적용해 열 삽입·삭제·이동에도 오프셋 없이 4개 핵심 섹션(`SHIPPED`, `SHIPMENT PLAN`, `BACK LOG`, `HWME STOCK ORDER`)의 유효 P/O 행을 안정적으로 추출.
+  * `canonical_packing()` 정규화(`27년 1월` ↔ `2027.01`, `포장완료` ↔ `PACKED`) 및 S/N 비정상 값(`"0"`, `"0.0"`, 3자 미만, 공백·기호) → `NULL` 일괄 정제 적용.
+* **Gemini AI 보조 스키마 추론 호환 엔진**:
+  * 별칭 사전에 없는 신규 헤더가 등장하고 AI 추론 옵션이 활성화된 경우 헤더 목록과 샘플 3행만 Gemini API로 전달해 컬럼 매핑을 추론.
+  * 신규 `google-genai` SDK와 기존 `google-generativeai` SDK 모두 자동 폴백 지원 및 추론 결과(`ai_inferred_fields`)를 `parse_meta`로 반환.
+* **6종 마스터 1회 프리패치 및 도메인·유럽 현지 데이터 보호 규칙**:
+  * `product_models`, `dealer_companies`, `nc_codes`, `incoterm_codes`, `port_codes` 및 기존 `orders`/`shipments`를 1회 프리패치해 N+1 쿼리 제거(`HWME` → `WME` 자동 매핑).
+  * `A` 발주(딜러 주문, `is_corporate_stock=False`) vs `F` 발주(법인 재고, `sales_price=NULL`, 기존 `RENTAL`/`SHOWROOM`/`RESERVED`/`PROMOTION` 보존) 도메인 규칙 강제.
+  * `OrderStatus` 비역행 보호(`ARRIVED`/`IN_STOCK`/`DISPATCHED`/`SOLD` 유지) 및 유럽 법인 전용 컬럼(`warehouse`, `pickup_date`, `rental_*`, `reservation_*`, `rsm_user_id`, `remark`, TrackCargo AIS 좌표) 100% 보존.
+* **2단계 승인형 엔드포인트 및 FastAPI 마운트**:
+  * `POST /api/erp-sync/preview`: DB 직접 대조(Dry-Run), 파일 내 P/O·S/N 중복 및 타 P/O S/N 점유·FK 누락 탐지, 검수용 `.xlsx` 리포트 다운로드 지원.
+  * `POST /api/erp-sync/apply`: 커밋 직전 실시간 충돌 재검증(TOCTOU 방어, 충돌 시 HTTP 409 전체 롤백), `shipments` 선행 Upsert 후 `orders` Bulk Upsert(`INSERT ... ON CONFLICT DO UPDATE`) 단일 트랜잭션 커밋.
+  * `backend/main.py`에 AAL2 인증 가드(`_require_non_dealer`)를 주입한 라우터 마운트 및 단독 HTML 검수 UI(`GET /erp-sync-ui`, `backend/templates/erp_sync_ui.html`) 등록.
+
+### 2. 1단계 주차 비교 및 14개 표준 컬럼 / 5개 탭 검수 리포트 CLI 유틸리티 (`backend/erp_sales_sync.py`)
+* **이전·최신 주차 본사 엑셀 대조(Diff) 도구 구축**:
+  * 두 주차 본사 Sales List 파일을 대조해 포장 표기 통일 노이즈를 자동 스크리닝하고, ERP 업로드용 14개 표준 컬럼 엑셀과 5개 탭 검수 리포트(`1_Summary`, `2_ERP_Upload_14Cols`, `3_Changes_Detail`, `4_Noise_Filtered`, `5_Exceptions_Audit`) 생성 기능 구현.
+
+### 3. 프론트엔드 AI 엑셀 동기화 검수·수정·승인 워크스페이스 및 메뉴 통합 (`ErpSyncPanel.jsx`, `ErpSyncPanel.css`, `Sidebar.jsx`, `App.jsx`, `UploadSettings.jsx`, `translation.json`, `nginx.conf`)
+* **검수·수정·승인 React 컴포넌트 및 WIA CI 전용 스타일 구축**:
+  * Tailwind 미설치 환경을 고려해 WIA 공식 CI(`SUITE` 서체, `--wia-blue`) 규격의 전용 스코프 스타일시트(`ErpSyncPanel.css`)와 EN/KR 다국어 자동 전환 적용.
+  * 7종 KPI 필터 카드(전체/충돌·차단/P·O·S/N 중복/경고/신규/수정/수정·제외), 4단계 S/N 상태 표시, DB→Excel Diff 배지, 행별 인라인 수정 드로어(`NULL로 비우기`, 기종/딜러 FK 드롭다운, 중복 행 제외/복원) 및 클라이언트 실시간 재검증, 연결 선적(MBL) 미리보기, 최종 확인 모달 구현.
+* **관리자 포털 네비게이션 및 인프라 보강**:
+  * 관리자 사이드바에 **`AI 엑셀 동기화` (`AI Excel Sync`)** 메뉴(`admin-erp-sync`) 신설 및 [업로드 / 설정관리](`UploadSettings.jsx`) 상단에 원클릭 진입 카드 배치.
+  * `frontend/nginx.conf`에 `client_max_body_size 25M;`을 추가해 대용량 본사 엑셀 업로드 시 HTTP 413 오류 방지.
+
 ## [2026-11-20] 딜러 포털 화물 상세 팝업 오류 수정, CARGO 버튼 UI 통일 및 데이터 유무별 조건부 활성화 (R10 G28 B143)
 
 ### 1. [딜러 포털 - 내 구매 내역] `CargoDetailModal` 빈 페이지 오류 해결 및 `CARGO` 컬럼 UI 통일 (`DealerSalesArchive.jsx`)

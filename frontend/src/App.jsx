@@ -19,6 +19,7 @@ import AdminUsers from './pages/admin/AdminUsers';
 import AdminShipmentUpload from './pages/admin/AdminShipmentUpload';
 import ShipmentTracking from './pages/admin/ShipmentTracking';
 import ProductLibrary from './pages/ProductLibrary';
+import ErpSyncPanel from './components/ErpSyncPanel';
 
 // Dealer Pages
 import DealerDashboard from './pages/dealer/DealerDashboard';
@@ -346,7 +347,12 @@ export default function App() {
               onNavigateUpload={() => setActiveTab('admin-shipment-upload')} 
             />
           )}
-          {activeTab === 'management' && currentRole !== 'RSM' && <UploadSettings />}
+          {activeTab === 'management' && currentRole !== 'RSM' && (
+            <UploadSettings onOpenErpSync={() => setActiveTab('admin-erp-sync')} />
+          )}
+          {activeTab === 'admin-erp-sync' && currentRole !== 'RSM' && (
+            <ErpSyncPanel baseUrl="/api/erp-sync" />
+          )}
           {activeTab === 'admin-library' && (currentRole === 'SCM_ADMIN' || currentRole === 'RSM') && <ProductLibrary currentRole={currentRole} isMobileView={isMobileView} />}
 
           {/* Dealer Routing */}
@@ -376,7 +382,7 @@ export default function App() {
           {activeTab === 'dealer-promotion' && <DealerPromotion isMobileView={isMobileView} />}
           {activeTab === 'dealer-library' && <ProductLibrary currentRole={currentRole} isMobileView={isMobileView} />}
           
-          {['admin-dashboard', 'admin-inventory', 'admin-dispatch', 'admin-promotion', 'admin-users', 'dealer-inventory', 'admin-library', 'dealer-library'].includes(activeTab) && (
+          {['admin-dashboard', 'admin-inventory', 'admin-dispatch', 'admin-promotion', 'admin-users', 'admin-erp-sync', 'dealer-inventory', 'admin-library', 'dealer-library'].includes(activeTab) && (
             <ScrollButtons />
           )}
         </main>

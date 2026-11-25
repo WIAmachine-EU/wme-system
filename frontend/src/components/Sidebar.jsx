@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
-import { LayoutDashboard, BarChart3, FileSpreadsheet, Tag, Package, Truck, ShieldAlert, X, FolderOpen, RefreshCw, User, LogOut, UploadCloud, Ship } from 'lucide-react';
+import { LayoutDashboard, BarChart3, FileSpreadsheet, Tag, Package, Truck, ShieldAlert, X, FolderOpen, RefreshCw, User, LogOut, UploadCloud, Ship, Sparkles } from 'lucide-react';
 import WiaLogo from './WiaLogo';
 
 export default function Sidebar({ activeTab, setActiveTab, currentRole, currentUserId, isMobileOpen, onClose, onProfileClick, onLogout }) {
@@ -76,6 +76,11 @@ export default function Sidebar({ activeTab, setActiveTab, currentRole, currentU
       id: 'management',
       label: t('sidebar.admin_menu.management'),
       icon: <FileSpreadsheet size={20} />
+    },
+    {
+      id: 'admin-erp-sync',
+      label: t('sidebar.admin_menu.erp_sync', 'AI 엑셀 동기화'),
+      icon: <Sparkles size={20} />
     },
     {
       id: 'admin-shipment-upload',

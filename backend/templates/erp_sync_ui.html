@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ERP 주간 Sales List 동기화 — DB 대조 · 보완 · 승인</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "Segoe UI", sans-serif; }
+    .wavy-err { text-decoration: underline wavy #e11d48; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased">
+  <div class="mx-auto max-w-[1440px] space-y-4 p-4">
+    <!-- 업로드 헤더 -->
+    <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 pb-3">
+        <div>
+          <h1 class="text-lg font-bold text-slate-900">본사 Sales List 주간 동기화 (Render PostgreSQL 직접 대조)</h1>
+          <p class="mt-0.5 text-xs text-slate-500">
+            최신 본사 엑셀 1개를 업로드해 DB와 대조하고, 중복·충돌 번호를 시각적으로 수정/보완한 뒤 승인 건만 단일 트랜잭션으로 반영합니다.
+          </p>
+        </div>
+        <div id="parseMetaBadge" class="hidden rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-600"></div>
+      </div>
+
+      <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-12">
+        <div class="md:col-span-4">
+          <label class="mb-1 block text-xs font-semibold text-slate-700">1. 최신 본사 Sales List 엑셀 (.xlsx) *</label>
+          <input id="excelFile" type="file" accept=".xlsx,.xls"
+            class="block w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs file:mr-2 file:rounded file:border-0 file:bg-slate-800 file:px-2.5 file:py-1 file:text-xs file:text-white" />
+        </div>
+        <div class="md:col-span-3">
+          <label class="mb-1 block text-xs font-semibold text-slate-700">2. (선택) 기준 P/O 목록 파일</label>
+          <input id="poFilterFile" type="file" accept=".xlsx,.xls,.csv,.txt"
+            class="block w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs file:mr-2 file:rounded file:border-0 file:bg-slate-200 file:px-2.5 file:py-1 file:text-xs file:text-slate-700" />
+        </div>
+        <div class="md:col-span-2">
+          <label class="mb-1 block text-xs font-semibold text-slate-700">3. (선택) P/O 접두어</label>
+          <input id="poPrefixes" type="text" placeholder="예: A26-,F26-"
+            class="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none" />
+        </div>
+        <div class="flex flex-col justify-end gap-1.5 md:col-span-3">
+          <label class="flex items-center gap-1.5 text-xs text-slate-600">
+            <input id="useAi" type="checkbox" class="h-3.5 w-3.5 rounded" />
+            미매칭 신규 헤더 Gemini AI 추론
+          </label>
+          <div class="flex gap-2">
+            <button id="btnPreview" type="button"
+              class="flex-1 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800 disabled:bg-slate-300">
+              DB 대조 미리보기
+            </button>
+            <button id="btnDownloadXlsx" type="button"
+              class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+              검수 .xlsx
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 알림 배너 -->
+    <div id="errorBanner" class="hidden rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800"></div>
+    <div id="successBanner" class="hidden rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs text-emerald-900"></div>
+
+    <!-- Preview 결과 섹션 -->
+    <div id="workspace" class="hidden space-y-4">
+      <!-- KPI 카드 -->
+      <div id="kpiGrid" class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7"></div>
+
+      <!-- P/O 공란 행 경고 -->
+      <div id="missingPoAlert" class="hidden rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900"></div>
+
+      <!-- 툴바 -->
+      <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+        <div class="flex flex-wrap items-center gap-2">
+          <select id="sectionFilter" class="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs">
+            <option value="ALL">전체 섹션</option>
+            <option value="SHIPPED">SHIPPED</option>
+            <option value="SHIPMENT PLAN">SHIPMENT PLAN</option>
+            <option value="BACK LOG">BACK LOG</option>
+            <option value="HWME STOCK ORDER">HWME STOCK ORDER</option>
+          </select>
+          <input id="searchInput" type="text" placeholder="P/O, S/O, S/N, 기종, 딜러, MBL 검색..."
+            class="w-64 rounded-lg border border-slate-300 px-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none" />
+          <span id="visibleCountLabel" class="text-xs text-slate-500"></span>
+        </div>
+        <div class="flex gap-2">
+          <button id="btnSelectAll" type="button" class="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium hover:bg-slate-50">표시 정상 건 전체 선택</button>
+          <button id="btnDeselectAll" type="button" class="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium hover:bg-slate-50">선택 해제</button>
+        </div>
+      </div>
+
+      <!-- 검수 테이블 -->
+      <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div class="overflow-x-auto">
+          <table class="w-full border-collapse text-left text-xs">
+            <thead class="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-600">
+              <tr>
+                <th class="w-10 px-3 py-2.5 text-center">선택</th>
+                <th class="px-3 py-2.5">상태 / 섹션</th>
+                <th class="px-3 py-2.5">P/O &amp; S/O 상태</th>
+                <th class="px-3 py-2.5">S/N (호기) 상태</th>
+                <th class="px-3 py-2.5">기종 / 딜러 (FK)</th>
+                <th class="px-3 py-2.5">선적 (MBL / ETD)</th>
+                <th class="px-3 py-2.5">변경 내역 (DB → Excel) &amp; 충돌 경보</th>
+                <th class="w-28 px-3 py-2.5 text-center">수정 / 보완</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 하단 고정 승인 바 -->
+      <div class="sticky bottom-3 z-10 flex flex-wrap items-center justify-between gap-4 rounded-xl bg-slate-900 px-5 py-3.5 text-white shadow-lg">
+        <div class="flex flex-wrap items-center gap-4 text-xs">
+          <span id="selectedSummaryText"></span>
+          <label class="flex items-center gap-1.5 text-slate-300">
+            <input id="skipOnConflict" type="checkbox" class="h-3.5 w-3.5 rounded" />
+            충돌 건 제외하고 정상 건만 커밋 (skip_on_conflict)
+          </label>
+        </div>
+        <button id="btnApply" type="button"
+          class="rounded-lg bg-emerald-500 px-5 py-2 text-xs font-bold text-slate-950 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300">
+          선택 항목 PostgreSQL 반영 (/apply)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = ""; // 같은 도메인(FastAPI 서빙)이면 빈 문자열 유지
+    const EMPTY_TOKENS = new Set(["", "-", "--", "//", "/", "nan", "none", "nat", "null", "n/a", "tbd"]);
+    const PO_REGEX = /^[A-Z0-9][A-Z0-9\-/_]{3,}$/;
+
+    function getAuthHeaders(extra = {}) {
+      const headers = { ...extra };
+      try {
+        const token = localStorage.getItem("wme_access_token");
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        const auth = localStorage.getItem("erp_auth");
+        if (auth) {
+          const parsed = JSON.parse(auth);
+          if (parsed.currentRole) headers["X-User-Role"] = parsed.currentRole;
+        }
+      } catch (e) {}
+      return headers;
+    }
+
+    const state = {
+      previewData: null,
+      editedPayloads: {},
+      excludedUids: {},
+      selectedUids: {},
+      expandedUid: null,
+      filterTab: "ALL",
+      sectionFilter: "ALL",
+      searchText: "",
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    function esc(str) {
+      return String(str ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function normKey(v) {
+      return v == null ? "" : String(v).trim().replace(/\s+/g, " ").toUpperCase();
+    }
+    function cleanNullable(v) {
+      if (v == null) return null;
+      const s = String(v).trim();
+      return EMPTY_TOKENS.has(s.toLowerCase()) ? null : s;
+    }
+    function cleanSN(v) {
+      const s = cleanNullable(v);
+      return (!s || s === "0" || s === "0.0" || s.length < 3) ? null : s.toUpperCase();
+    }
+    function cleanPO(v) {
+      const s = cleanNullable(v);
+      if (!s) return null;
+      const u = s.toUpperCase();
+      return (!/^\d+$/.test(u) && PO_REGEX.test(u)) ? u : null;
+    }
+    function toDateInput(iso) { return iso ? String(iso).slice(0, 10) : ""; }
+    function fromDateInput(d) { return /^\d{4}-\d{2}-\d{2}$/.test(d || "") ? `${d}T00:00:00` : null; }
+
+    function showError(msg, conflicts = []) {
+      const el = $("errorBanner");
+      let html = `<div class="font-bold">오류 / 충돌 알림</div><p class="mt-1">${esc(msg)}</p>`;
+      if (conflicts.length) {
+        html += `<ul class="mt-2 list-disc space-y-1 pl-5">${conflicts.map((c) => `<li><strong>${esc(c.reference_no)}</strong> [${esc(c.code)}]: ${esc(c.message)}</li>`).join("")}</ul>`;
+      }
+      el.innerHTML = html;
+      el.classList.remove("hidden");
+    }
+    function hideError() { $("errorBanner").classList.add("hidden"); }
+
+    function evaluateAllRows() {
+      const rows = state.previewData?.preview_rows || [];
+      const mo = state.previewData?.master_options || {};
+      const snOwners = mo.existing_sn_owners || {};
+      const existingRefs = new Set((mo.existing_order_refs || []).map(normKey));
+      const ncSet = new Set((mo.nc_codes || []).map(normKey));
+
+      const poCounts = {};
+      const snCounts = {};
+      const entries = rows.map((row) => {
+        const uid = row.row_uid || `r${row.excel_row}_${row.reference_no}`;
+        const isExcluded = Boolean(state.excludedUids[uid]);
+        const base = row.apply_payload || {};
+        const payload = state.editedPayloads[uid] ? { ...base, ...state.editedPayloads[uid] } : { ...base };
+        const refClean = cleanPO(payload.reference_no);
+        const snClean = cleanSN(payload.serial_number);
+        if (!isExcluded) {
+          if (refClean) poCounts[refClean] = (poCounts[refClean] || 0) + 1;
+          if (snClean) snCounts[snClean] = (snCounts[snClean] || 0) + 1;
+        }
+        return { row, uid, isExcluded, payload, refClean, snClean };
+      });
+
+      return entries.map(({ row, uid, isExcluded, payload, refClean, snClean }) => {
+        const isEdited = Boolean(state.editedPayloads[uid]);
+        const errors = [];
+        const warnings = [];
+        if (!isExcluded) {
+          if (!refClean) errors.push({ code: "INVALID_PO", field: "reference_no", message: "유효한 P/O 번호를 입력하세요." });
+          else if (poCounts[refClean] > 1) errors.push({ code: "CONFLICT_DUPLICATE_PO_IN_FILE", field: "reference_no", message: `동일 P/O(${refClean})가 ${poCounts[refClean]}건 중복됩니다.` });
+          if (snClean && snCounts[snClean] > 1) errors.push({ code: "CONFLICT_DUPLICATE_SN_IN_FILE", field: "serial_number", message: `동일 S/N(${snClean})이 ${snCounts[snClean]}건 중복됩니다.` });
+          if (snClean && snOwners[snClean] && normKey(snOwners[snClean]) !== normKey(refClean)) {
+            errors.push({ code: "CONFLICT_SN_OWNED_BY_OTHER_PO", field: "serial_number", message: `S/N '${snClean}'은 DB의 타 P/O '${snOwners[snClean]}'에 등록되어 있습니다.` });
+          }
+          if (!payload.product_model_id) errors.push({ code: "MISSING_FK_PRODUCT_MODEL", field: "product_model_id", message: `기종('${row.model_raw || "공란"}') 마스터 미매칭` });
+          if (!payload.dealer_company_id) errors.push({ code: "MISSING_FK_DEALER_COMPANY", field: "dealer_company_id", message: `딜러('${row.dealer_raw || "공란"}') 마스터 미매칭` });
+
+          if (!cleanNullable(payload.so_no)) warnings.push({ field: "so_no", message: "S/O 번호 미기입" });
+          const ncVal = cleanNullable(payload.nc);
+          if (ncVal && ncSet.size > 0 && !ncSet.has(normKey(ncVal))) warnings.push({ field: "nc", message: `NC '${ncVal}' 마스터 미등록` });
+        }
+
+        const intendedAction = (refClean && existingRefs.has(normKey(refClean))) ? "UPDATE" : (row.intended_action || "CREATE");
+        const effectiveAction = isExcluded ? "EXCLUDED" : (errors.length ? "BLOCKED" : intendedAction);
+        const isCorp = refClean ? refClean.startsWith("F") : Boolean(payload.is_corporate_stock);
+        const isDuplicateIssue = errors.some((e) => e.code.startsWith("CONFLICT_"));
+
+        return {
+          uid,
+          raw: row,
+          effectiveAction,
+          isExcluded,
+          isEdited,
+          isResolved: row.action === "BLOCKED" && !isExcluded && errors.length === 0,
+          isDuplicateIssue,
+          errors,
+          warnings,
+          canSelect: !isExcluded && errors.length === 0,
+          payload: {
+            ...payload,
+            action: intendedAction,
+            reference_no: refClean || payload.reference_no || "",
+            serial_number: snClean,
+            so_no: cleanNullable(payload.so_no),
+            is_corporate_stock: isCorp,
+            stock_type: isCorp ? (payload.stock_type && payload.stock_type !== "DEALER_ORDER" ? payload.stock_type : "AVAILABLE") : "DEALER_ORDER",
+            sales_price: isCorp ? null : cleanNullable(payload.sales_price),
+          },
+        };
+      });
+    }
+
+    function render() {
+      if (!state.previewData) return;
+      $("workspace").classList.remove("hidden");
+
+      const evaluated = evaluateAllRows();
+      const mo = state.previewData.master_options || {};
+      const modelMap = Object.fromEntries((mo.product_models || []).map((m) => [m.id, m]));
+      const dealerMap = Object.fromEntries((mo.dealer_companies || []).map((d) => [d.id, d]));
+
+      const stats = { total: evaluated.length, blocked: 0, dup: 0, warn: 0, create: 0, update: 0, edited: 0, sel: 0, selC: 0, selU: 0 };
+      for (const r of evaluated) {
+        if (r.effectiveAction === "BLOCKED") stats.blocked++;
+        else if (r.effectiveAction === "CREATE") stats.create++;
+        else if (r.effectiveAction === "UPDATE") stats.update++;
+        if (r.isDuplicateIssue) stats.dup++;
+        if (r.warnings.length && !r.isExcluded) stats.warn++;
+        if (r.isEdited || r.isExcluded) stats.edited++;
+        if (r.canSelect && state.selectedUids[r.uid]) {
+          stats.sel++;
+          if (r.effectiveAction === "CREATE") stats.selC++;
+          else if (r.effectiveAction === "UPDATE") stats.selU++;
+        }
+      }
+
+      const cards = [
+        ["ALL", "검수 전체", stats.total, "border-slate-200 bg-white text-slate-900"],
+        ["BLOCKED", "충돌/차단", stats.blocked, stats.blocked ? "border-rose-300 bg-rose-50 text-rose-800" : "border-slate-200 bg-white text-slate-500"],
+        ["DUPLICATES", "P/O·S/N 중복", stats.dup, stats.dup ? "border-orange-300 bg-orange-50 text-orange-800" : "border-slate-200 bg-white text-slate-500"],
+        ["WARNING", "경고/미기입", stats.warn, "border-amber-200 bg-amber-50 text-amber-800"],
+        ["CREATE", "신규 등록", stats.create, "border-emerald-200 bg-emerald-50 text-emerald-800"],
+        ["UPDATE", "기존 수정", stats.update, "border-blue-200 bg-blue-50 text-blue-800"],
+        ["EDITED", "수정/제외됨", stats.edited, "border-indigo-200 bg-indigo-50 text-indigo-800"],
+      ];
+      $("kpiGrid").innerHTML = cards.map(([id, label, cnt, cls]) => `
+        <button type="button" data-tab="${id}" class="kpi-btn rounded-xl border p-3 text-left ${cls} ${state.filterTab === id ? "ring-2 ring-slate-900" : ""}">
+          <div class="text-[11px] opacity-80">${label}</div>
+          <div class="mt-1 text-xl font-bold">${cnt}건</div>
+        </button>`).join("");
+      document.querySelectorAll(".kpi-btn").forEach((b) => b.onclick = () => { state.filterTab = b.dataset.tab; render(); });
+
+      const q = state.searchText.trim().toLowerCase();
+      const visible = evaluated.filter((r) => {
+        if (state.sectionFilter !== "ALL" && r.raw.section !== state.sectionFilter) return false;
+        if (state.filterTab === "BLOCKED" && r.effectiveAction !== "BLOCKED") return false;
+        if (state.filterTab === "DUPLICATES" && !r.isDuplicateIssue) return false;
+        if (state.filterTab === "WARNING" && (!r.warnings.length || r.isExcluded)) return false;
+        if (state.filterTab === "CREATE" && r.effectiveAction !== "CREATE") return false;
+        if (state.filterTab === "UPDATE" && r.effectiveAction !== "UPDATE") return false;
+        if (state.filterTab === "EDITED" && !r.isEdited && !r.isExcluded) return false;
+        if (q) {
+          const hay = [r.payload.reference_no, r.payload.so_no, r.payload.serial_number, r.raw.model_raw, r.raw.dealer_raw, r.payload.mbl_no].filter(Boolean).join(" ").toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+
+      $("visibleCountLabel").textContent = `표시: ${visible.length}건 (DB 변동 없음 ${state.previewData.summary?.no_change_count || 0}건 생략)`;
+
+      const badgeMap = {
+        CREATE: ["bg-emerald-50 text-emerald-700 border-emerald-200", "신규 등록"],
+        UPDATE: ["bg-blue-50 text-blue-700 border-blue-200", "기존 수정"],
+        BLOCKED: ["bg-rose-50 text-rose-700 border-rose-200", "충돌/차단"],
+        EXCLUDED: ["bg-slate-100 text-slate-500 border-slate-200", "중복 제외됨"],
+      };
+
+      const tbodyHtml = visible.map((item) => {
+        const { uid, raw, payload, effectiveAction, errors, warnings, canSelect, isExcluded } = item;
+        const checked = canSelect && Boolean(state.selectedUids[uid]);
+        const expanded = state.expandedUid === uid;
+        const [bCls, bLbl] = badgeMap[effectiveAction];
+        const poErr = errors.find((e) => e.field === "reference_no");
+        const snErr = errors.find((e) => e.field === "serial_number");
+
+        const diffsHtml = Object.entries(raw.diffs || {}).map(([k, v]) =>
+          `<span class="inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px]"><strong>${esc(k)}:</strong><span class="text-slate-400 line-through">${esc(v.db ?? "∅")}</span>→<span class="font-semibold text-blue-700">${esc(v.excel ?? "∅")}</span></span>`
+        ).join(" ");
+
+        const errsHtml = errors.map((e) => `<div class="rounded border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] text-rose-800"><strong>[차단]</strong> ${esc(e.message)}</div>`).join("");
+        const warnsHtml = warnings.map((w) => `<span class="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-800">△ ${esc(w.message)}</span>`).join(" ");
+
+        let rowHtml = `
+        <tr class="${isExcluded ? "bg-slate-50 opacity-60" : effectiveAction === "BLOCKED" ? "bg-rose-50/40" : "bg-white"} hover:bg-slate-50">
+          <td class="px-3 py-2.5 text-center align-top">
+            <input type="checkbox" class="row-chk h-4 w-4 rounded" data-uid="${esc(uid)}" ${checked ? "checked" : ""} ${canSelect ? "" : "disabled"} />
+            <div class="mt-1 text-[10px] text-slate-400">#${raw.excel_row}</div>
+          </td>
+          <td class="px-3 py-2.5 align-top">
+            <span class="inline-block rounded border px-2 py-0.5 text-[11px] font-bold ${bCls}">${bLbl}</span>
+            ${item.isResolved ? '<div class="mt-0.5 text-[10px] font-bold text-emerald-700">✓ 충돌 해결됨</div>' : ""}
+            <div class="mt-1 text-[10px] text-slate-500">${esc(raw.section)}</div>
+          </td>
+          <td class="px-3 py-2.5 align-top">
+            <div class="flex items-center gap-1">
+              <span class="font-mono font-bold ${poErr ? "text-rose-700 wavy-err" : "text-slate-900"}">${esc(payload.reference_no || "(공란)")}</span>
+              <span class="rounded px-1.5 py-0.5 text-[10px] font-semibold ${payload.is_corporate_stock ? "bg-purple-100 text-purple-800" : "bg-sky-100 text-sky-800"}">${payload.is_corporate_stock ? "F 법인" : "A 딜러"}</span>
+            </div>
+            <div class="mt-1 text-[11px] text-slate-600">S/O: ${payload.so_no ? `<span class="font-mono">${esc(payload.so_no)}</span>` : '<span class="rounded bg-amber-100 px-1 text-[10px] text-amber-800">미기입</span>'}</div>
+          </td>
+          <td class="px-3 py-2.5 align-top">
+            ${payload.serial_number
+              ? `<div class="font-mono font-semibold ${snErr ? "text-rose-700 wavy-err" : ""}">${esc(payload.serial_number)}</div>${snErr ? '<span class="mt-0.5 inline-block rounded bg-rose-100 px-1 text-[10px] font-semibold text-rose-800">⚠ S/N 충돌</span>' : '<span class="text-[10px] text-emerald-600">● 정상</span>'}`
+              : '<span class="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-500">NULL (미배정)</span>'}
+          </td>
+          <td class="px-3 py-2.5 align-top">
+            <div class="font-medium">${esc(modelMap[payload.product_model_id]?.model_code || raw.model_raw || "(없음)")}</div>
+            <div class="text-[11px] text-slate-500">${esc(dealerMap[payload.dealer_company_id]?.name || raw.dealer_raw || "(없음)")}</div>
+          </td>
+          <td class="px-3 py-2.5 align-top">
+            <div class="font-mono text-[11px] font-semibold">${esc(payload.mbl_no || "-")}</div>
+            <div class="text-[10px] text-slate-500">${esc(payload.destination_port || "-")} · ${esc(toDateInput(payload.etd) || "-")}</div>
+          </td>
+          <td class="max-w-[340px] space-y-1 px-3 py-2.5 align-top">${errsHtml}<div class="flex flex-wrap gap-1">${diffsHtml}</div><div class="flex flex-wrap gap-1">${warnsHtml}</div></td>
+          <td class="px-3 py-2.5 text-center align-top">
+            <div class="flex flex-col gap-1">
+              <button type="button" class="btn-edit rounded px-2 py-1 text-[11px] font-semibold ${effectiveAction === "BLOCKED" ? "bg-rose-600 text-white" : "border border-slate-300 bg-white text-slate-700"}" data-uid="${esc(uid)}">${expanded ? "닫기" : "수정/보완"}</button>
+              ${(item.isDuplicateIssue || isExcluded) ? `<button type="button" class="btn-excl rounded px-2 py-1 text-[10px] font-semibold ${isExcluded ? "bg-slate-700 text-white" : "border border-orange-300 bg-orange-50 text-orange-800"}" data-uid="${esc(uid)}">${isExcluded ? "제외 해제" : "중복 행 제외"}</button>` : ""}
+            </div>
+          </td>
+        </tr>`;
+
+        if (expanded) {
+          const pmOpts = (mo.product_models || []).map((m) => `<option value="${m.id}" ${payload.product_model_id === m.id ? "selected" : ""}>${esc(m.model_code)}</option>`).join("");
+          const dcOpts = (mo.dealer_companies || []).map((d) => `<option value="${d.id}" ${payload.dealer_company_id === d.id ? "selected" : ""}>${esc(d.name)}</option>`).join("");
+          rowHtml += `
+          <tr class="bg-slate-50">
+            <td colspan="8" class="border-t border-slate-200 px-5 py-4">
+              <div class="mb-2 flex items-center justify-between">
+                <strong class="text-xs">행 #${raw.excel_row} 인라인 수정 / 보완</strong>
+                <button type="button" class="btn-reset rounded border border-slate-300 bg-white px-2.5 py-1 text-[11px]" data-uid="${esc(uid)}">원본 복원</button>
+              </div>
+              <div class="grid grid-cols-2 gap-3 md:grid-cols-6">
+                <div><label class="block text-[11px] font-semibold">P/O *</label><input class="ed-inp mt-1 w-full rounded border px-2 py-1 font-mono text-xs" data-uid="${esc(uid)}" data-field="reference_no" value="${esc(payload.reference_no || "")}" /></div>
+                <div>
+                  <div class="flex justify-between"><label class="text-[11px] font-semibold">S/N</label><button type="button" class="btn-null-sn text-[10px] font-semibold text-blue-600" data-uid="${esc(uid)}">NULL 비우기</button></div>
+                  <input class="ed-inp mt-1 w-full rounded border px-2 py-1 font-mono text-xs" data-uid="${esc(uid)}" data-field="serial_number" value="${esc(payload.serial_number || "")}" placeholder="공란=NULL" />
+                </div>
+                <div><label class="block text-[11px] font-semibold">S/O</label><input class="ed-inp mt-1 w-full rounded border px-2 py-1 font-mono text-xs" data-uid="${esc(uid)}" data-field="so_no" value="${esc(payload.so_no || "")}" /></div>
+                <div><label class="block text-[11px] font-semibold">기종 FK *</label><select class="ed-sel mt-1 w-full rounded border px-2 py-1 text-xs" data-uid="${esc(uid)}" data-field="product_model_id"><option value="">-- 선택 --</option>${pmOpts}</select></div>
+                <div><label class="block text-[11px] font-semibold">딜러 FK *</label><select class="ed-sel mt-1 w-full rounded border px-2 py-1 text-xs" data-uid="${esc(uid)}" data-field="dealer_company_id"><option value="">-- 선택 --</option>${dcOpts}</select></div>
+                <div><label class="block text-[11px] font-semibold">MBL NO</label><input class="ed-inp mt-1 w-full rounded border px-2 py-1 font-mono text-xs" data-uid="${esc(uid)}" data-field="mbl_no" value="${esc(payload.mbl_no || "")}" /></div>
+                <div><label class="block text-[11px] font-semibold">선박명</label><input class="ed-inp mt-1 w-full rounded border px-2 py-1 text-xs" data-uid="${esc(uid)}" data-field="vessel" value="${esc(payload.vessel || "")}" /></div>
+                <div><label class="block text-[11px] font-semibold">도착항</label><input class="ed-inp mt-1 w-full rounded border px-2 py-1 text-xs" data-uid="${esc(uid)}" data-field="destination_port" value="${esc(payload.destination_port || "")}" /></div>
+                <div><label class="block text-[11px] font-semibold">ETD</label><input type="date" class="ed-date mt-1 w-full rounded border px-2 py-1 text-xs" data-uid="${esc(uid)}" data-field="etd" value="${esc(toDateInput(payload.etd))}" /></div>
+                <div><label class="block text-[11px] font-semibold">NC</label><input class="ed-inp mt-1 w-full rounded border px-2 py-1 font-mono text-xs" data-uid="${esc(uid)}" data-field="nc" value="${esc(payload.nc || "")}" /></div>
+                <div><label class="block text-[11px] font-semibold">구매가(EUR)</label><input class="ed-inp mt-1 w-full rounded border px-2 py-1 font-mono text-xs" data-uid="${esc(uid)}" data-field="price" value="${esc(payload.price || "")}" /></div>
+              </div>
+            </td>
+          </tr>`;
+        }
+        return rowHtml;
+      }).join("");
+
+      $("tableBody").innerHTML = tbodyHtml || '<tr><td colspan="8" class="py-10 text-center text-slate-400">해당 조건의 항목이 없습니다.</td></tr>';
+      $("selectedSummaryText").innerHTML = `승인 선택: <strong class="text-base text-emerald-400">${stats.sel}건</strong> (신규 ${stats.selC} / 수정 ${stats.selU}) ${stats.blocked ? `<span class="ml-2 rounded bg-rose-500/20 px-2 py-0.5 text-rose-200">미해결 차단 ${stats.blocked}건 제외</span>` : ""}`;
+      $("btnApply").disabled = stats.sel === 0;
+
+      // 이벤트 바인딩
+      document.querySelectorAll(".row-chk").forEach((el) => el.onchange = () => { state.selectedUids[el.dataset.uid] = el.checked; render(); });
+      document.querySelectorAll(".btn-edit").forEach((el) => el.onclick = () => { state.expandedUid = state.expandedUid === el.dataset.uid ? null : el.dataset.uid; render(); });
+      document.querySelectorAll(".btn-excl").forEach((el) => el.onclick = () => {
+        const u = el.dataset.uid;
+        state.excludedUids[u] = !state.excludedUids[u];
+        if (state.excludedUids[u]) state.selectedUids[u] = false;
+        render();
+      });
+      document.querySelectorAll(".btn-reset").forEach((el) => el.onclick = () => { delete state.editedPayloads[el.dataset.uid]; delete state.excludedUids[el.dataset.uid]; render(); });
+      document.querySelectorAll(".btn-null-sn").forEach((el) => el.onclick = () => {
+        const u = el.dataset.uid;
+        state.editedPayloads[u] = { ...(state.editedPayloads[u] || {}), serial_number: null };
+        render();
+      });
+      document.querySelectorAll(".ed-inp").forEach((el) => el.onchange = () => {
+        const u = el.dataset.uid;
+        state.editedPayloads[u] = { ...(state.editedPayloads[u] || {}), [el.dataset.field]: el.value };
+        render();
+      });
+      document.querySelectorAll(".ed-sel").forEach((el) => el.onchange = () => {
+        const u = el.dataset.uid;
+        state.editedPayloads[u] = { ...(state.editedPayloads[u] || {}), [el.dataset.field]: el.value ? Number(el.value) : null };
+        render();
+      });
+      document.querySelectorAll(".ed-date").forEach((el) => el.onchange = () => {
+        const u = el.dataset.uid;
+        state.editedPayloads[u] = { ...(state.editedPayloads[u] || {}), [el.dataset.field]: fromDateInput(el.value) };
+        render();
+      });
+    }
+
+    function buildFormData(downloadExcel) {
+      const fd = new FormData();
+      fd.append("file", $("excelFile").files[0]);
+      if ($("poFilterFile").files[0]) fd.append("po_filter_file", $("poFilterFile").files[0]);
+      if ($("poPrefixes").value.trim()) fd.append("po_prefixes", $("poPrefixes").value.trim());
+      fd.append("use_ai", String($("useAi").checked));
+      fd.append("download_excel", String(downloadExcel));
+      return fd;
+    }
+
+    $("btnPreview").onclick = async () => {
+      if (!$("excelFile").files[0]) return showError("본사 Sales List 엑셀 파일(.xlsx)을 먼저 선택해 주세요.");
+      hideError();
+      $("successBanner").classList.add("hidden");
+      $("btnPreview").disabled = true;
+      $("btnPreview").textContent = "DB 대조 중...";
+      try {
+        const res = await fetch(`${API_BASE}/api/erp-sync/preview`, {
+          method: "POST",
+          headers: getAuthHeaders(),
+          credentials: "include",
+          body: buildFormData(false),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.detail || `HTTP ${res.status}`);
+        state.previewData = data;
+        state.editedPayloads = {};
+        state.excludedUids = {};
+        state.expandedUid = null;
+        state.selectedUids = {};
+        for (const r of data.preview_rows || []) {
+          const uid = r.row_uid || `r${r.excel_row}_${r.reference_no}`;
+          state.selectedUids[uid] = (r.action === "CREATE" || r.action === "UPDATE");
+        }
+        $("parseMetaBadge").textContent = `감지 시트: ${data.parse_meta.sheet_name} (${data.parse_meta.header_row}행 / ${data.parse_meta.total_cols}열 / P/O ${data.parse_meta.total_po_rows}건)`;
+        $("parseMetaBadge").classList.remove("hidden");
+        const skipped = data.parse_meta?.skipped_missing_po_rows || [];
+        if (skipped.length) {
+          $("missingPoAlert").innerHTML = `<strong>P/O 공란 행 제외(${skipped.length}건):</strong> ` + skipped.map((x) => `${x.excel_row}행(S/O ${esc(x.so_no)}, ${esc(x.model || "-")})`).join(" / ");
+          $("missingPoAlert").classList.remove("hidden");
+        } else {
+          $("missingPoAlert").classList.add("hidden");
+        }
+        render();
+      } catch (err) {
+        showError(err.message);
+      } finally {
+        $("btnPreview").disabled = false;
+        $("btnPreview").textContent = "DB 대조 미리보기";
+      }
+    };
+
+    $("btnDownloadXlsx").onclick = async () => {
+      if (!$("excelFile").files[0]) return showError("엑셀 파일을 먼저 선택해 주세요.");
+      const res = await fetch(`${API_BASE}/api/erp-sync/preview`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        credentials: "include",
+        body: buildFormData(true),
+      });
+      if (!res.ok) return showError("검수 엑셀 다운로드 실패");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `ERP_DB_Preview_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    $("btnApply").onclick = async () => {
+      const evaluated = evaluateAllRows();
+      const orders = evaluated.filter((r) => r.canSelect && state.selectedUids[r.uid]).map((r) => r.payload);
+      if (!orders.length) return showError("승인된 항목이 없습니다.");
+      if (!confirm(`승인된 ${orders.length}건을 Render PostgreSQL에 일괄 반영하시겠습니까?`)) return;
+
+      const selectedMbls = new Set(orders.map((o) => normKey(o.mbl_no)).filter(Boolean));
+      const shipments = (state.previewData?.apply_request_template?.shipments || []).filter((s) => selectedMbls.has(normKey(s.mbl_no)));
+
+      hideError();
+      $("btnApply").disabled = true;
+      $("btnApply").textContent = "DB 반영 중...";
+      try {
+        const res = await fetch(`${API_BASE}/api/erp-sync/apply`, {
+          method: "POST",
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
+          credentials: "include",
+          body: JSON.stringify({ orders, shipments, skip_on_conflict: $("skipOnConflict").checked }),
+        });
+        const data = await res.json();
+        if (res.status === 409) {
+          showError(data?.detail?.message || "충돌로 인해 롤백되었습니다.", data?.detail?.conflicts || []);
+          return;
+        }
+        if (!res.ok) throw new Error(data?.detail || `HTTP ${res.status}`);
+        $("successBanner").innerHTML = `<strong>PostgreSQL 반영 완료</strong> (${esc(data.committed_at)}) — 신규: <strong>${data.orders_created}건</strong>, 수정: <strong>${data.orders_updated}건</strong>, 선적(MBL): <strong>${data.shipments_upserted}건</strong>`;
+        $("successBanner").classList.remove("hidden");
+      } catch (err) {
+        showError(err.message);
+      } finally {
+        $("btnApply").disabled = false;
+        $("btnApply").textContent = "선택 항목 PostgreSQL 반영 (/apply)";
+      }
+    };
+
+    $("sectionFilter").onchange = (e) => { state.sectionFilter = e.target.value; render(); };
+    $("searchInput").oninput = (e) => { state.searchText = e.target.value; render(); };
+    $("btnSelectAll").onclick = () => { evaluateAllRows().forEach((r) => { if (r.canSelect) state.selectedUids[r.uid] = true; }); render(); };
+    $("btnDeselectAll").onclick = () => { Object.keys(state.selectedUids).forEach((k) => state.selectedUids[k] = false); render(); };
+  </script>
+</body>
+</html>
