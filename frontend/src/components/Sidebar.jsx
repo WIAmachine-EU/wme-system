@@ -151,6 +151,11 @@ export default function Sidebar({ activeTab, setActiveTab, currentRole, currentU
       icon: <Tag size={20} />
     },
     {
+      id: 'admin-dispatch',
+      label: t('sidebar.rsm_menu.dispatch', 'WIA 창고'),
+      icon: <Truck size={20} />
+    },
+    {
       id: 'admin-sales-archive',
       label: t('sidebar.rsm_menu.sales_archive'),
       icon: <FileSpreadsheet size={20} />

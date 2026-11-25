@@ -1,5 +1,20 @@
 ﻿# 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
+## [2026-11-25] RSM 포털 [WIA 창고] 메뉴 활성화 및 출고 처리 관리자(SCM_ADMIN) 전용 권한 제어
+
+### 1. RSM 포털 [WIA 창고] 메뉴 및 라우팅 활성화 (`Sidebar.jsx`, `App.jsx`, `translation.json`)
+* **RSM 사이드바 메뉴 추가 및 다국어 적용**:
+  * `Sidebar.jsx`의 `rsmMenuItems`에 `admin-dispatch`(`WIA 창고` / `WIA Warehouse`) 메뉴 항목을 추가하고, `ko/en` `translation.json`에 `sidebar.rsm_menu.dispatch` 키를 등록.
+* **RSM 라우팅 허용 및 권한 전달**:
+  * `App.jsx`의 `RSM` 허용 탭 목록에 `admin-dispatch`를 추가하고, `<AdminDispatch>` 컴포넌트 렌더링 시 `SCM_ADMIN`과 `RSM` 모두 접근 가능하도록 허용하면서 `currentRole` prop을 전달.
+
+### 2. 출고 처리 관리자(`SCM_ADMIN`) 전용 권한 제어 (`AdminDispatch.jsx`, `backend/main.py`)
+* **프론트엔드 UI 및 액션 가드**:
+  * `AdminDispatch.jsx`에 `isAdmin = currentRole === 'SCM_ADMIN'` 판별을 도입하여, 데스크톱 테이블 및 모바일 카드 뷰의 `진행` 항목에서 `수정` 버튼은 유지하고 **`출고 처리` 버튼은 `SCM_ADMIN` 권한에서만 렌더링**되도록 제한.
+  * `handleDispatchOrder` 내부에 `if (!isAdmin) return;` 가드 및 서버 오류 메시지(`detail`) 알림 처리를 추가.
+* **백엔드 API RBAC 강제 검증**:
+  * `PATCH /api/orders/{order_id}/status`(`backend/main.py`)에서 `DISPATCHED` 또는 `SOLD` 상태(출고 처리)로 전환 요청 시 `SCM_ADMIN` 권한이 아니면 `HTTP 403`으로 차단하도록 서버단 권한 검증을 적용.
+
 ## [2026-11-25] AI 에이전트 기반 본사 Sales List 엑셀 지능형 추출 및 PostgreSQL 원자적 동기화 파이프라인 구축
 
 ### 1. 백엔드 지능형 엑셀 파싱 · Gemini AI 스키마 추론 · PostgreSQL 원자적 Upsert API (`backend/erp_upload_router.py`, `backend/main.py`)

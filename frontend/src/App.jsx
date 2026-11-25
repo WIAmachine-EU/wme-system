@@ -201,7 +201,7 @@ export default function App() {
     if (currentRole === 'DEALER') {
       if (!activeTab.startsWith('dealer-')) setActiveTab('dealer-dashboard');
     } else if (currentRole === 'RSM') {
-      if (!['admin-inventory', 'admin-promotion', 'admin-sales-archive', 'admin-tracking', 'admin-library', 'admin-dashboard'].includes(activeTab)) {
+      if (!['admin-inventory', 'admin-promotion', 'admin-dispatch', 'admin-sales-archive', 'admin-tracking', 'admin-library', 'admin-dashboard'].includes(activeTab)) {
         setActiveTab('admin-dashboard');
       }
     } else {
@@ -335,7 +335,7 @@ export default function App() {
           {/* Admin Routing */}
           {activeTab === 'admin-dashboard' && (currentRole === 'SCM_ADMIN' || currentRole === 'RSM') && <AdminDashboard isMobileView={isMobileView} currentRole={currentRole} />}
           {activeTab === 'admin-inventory' && (currentRole === 'SCM_ADMIN' || currentRole === 'RSM') && <AdminInventory isMobileView={isMobileView} />}
-          {activeTab === 'admin-dispatch' && currentRole !== 'RSM' && <AdminDispatch isMobileView={isMobileView} />}
+          {activeTab === 'admin-dispatch' && (currentRole === 'SCM_ADMIN' || currentRole === 'RSM') && <AdminDispatch isMobileView={isMobileView} currentRole={currentRole} />}
           {activeTab === 'admin-sales-archive' && (currentRole === 'SCM_ADMIN' || currentRole === 'RSM') && <AdminSalesArchive isMobileView={isMobileView} />}
           {activeTab === 'admin-users' && currentRole !== 'RSM' && <AdminUsers isMobileView={isMobileView} />}
           {activeTab === 'analytics' && currentRole !== 'RSM' && <SalesAnalytics isMobileView={isMobileView} isDesktopOptimized={isDesktopOptimized} />}

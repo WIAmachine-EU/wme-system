@@ -129,8 +129,9 @@ const calculateAging = (etd) => {
   return { type: 'CRITICAL', status: '악성', days: diffDays, ...AGING_COLORS.CRITICAL };
 };
 
-export default function AdminDispatch({ isMobileView }) {
+export default function AdminDispatch({ isMobileView, currentRole = 'SCM_ADMIN' }) {
   const { t } = useTranslation();
+  const isAdmin = currentRole === 'SCM_ADMIN';
 
   const getStandardPort = (rawPort) => {
     if (!rawPort) return '';
@@ -369,6 +370,7 @@ export default function AdminDispatch({ isMobileView }) {
   };
 
   const handleDispatchOrder = async (orderId) => {
+    if (!isAdmin) return;
     if (!window.confirm("이 장비를 출고 처리하시겠습니까? (출고 처리 시 창고 리스트에서 제외됩니다)")) return;
     try {
       const res = await fetch(`/api/orders/${orderId}/status`, {
@@ -383,7 +385,8 @@ export default function AdminDispatch({ isMobileView }) {
       if (res.ok) {
         fetchDispatchOrders();
       } else {
-        alert("출고 처리 중 오류가 발생했습니다.");
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.detail || "출고 처리 중 오류가 발생했습니다.");
       }
     } catch (e) {
       console.error(e);
@@ -739,13 +742,15 @@ export default function AdminDispatch({ isMobileView }) {
                       >
                         {t('dispatch.btn_edit', '수정')}
                       </button>
-                      <button
-                        onClick={() => handleDispatchOrder(order.id)}
-                        className="btn btn-primary"
-                        style={{ flex: 2, padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                      >
-                        <CheckCircle size={14} /> {t('dispatch.btn_dispatch', '출고 처리')}
-                      </button>
+                      {isAdmin && (
+                        <button
+                          onClick={() => handleDispatchOrder(order.id)}
+                          className="btn btn-primary"
+                          style={{ flex: 2, padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                        >
+                          <CheckCircle size={14} /> {t('dispatch.btn_dispatch', '출고 처리')}
+                        </button>
+                      )}
                     </div>
 
                     {expandedRows.has(order.id) && (
@@ -903,13 +908,15 @@ export default function AdminDispatch({ isMobileView }) {
                               >
                                 {t('dispatch.btn_edit', '수정')}
                               </button>
-                              <button
-                                onClick={() => handleDispatchOrder(order.id)}
-                                className="btn btn-primary"
-                                style={{ padding: '4px 12px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                              >
-                                <CheckCircle size={13} /> {t('dispatch.btn_dispatch', '출고 처리')}
-                              </button>
+                              {isAdmin && (
+                                <button
+                                  onClick={() => handleDispatchOrder(order.id)}
+                                  className="btn btn-primary"
+                                  style={{ padding: '4px 12px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                >
+                                  <CheckCircle size={13} /> {t('dispatch.btn_dispatch', '출고 처리')}
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>

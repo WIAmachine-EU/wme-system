@@ -1319,6 +1319,10 @@ def update_order_status(
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="해당 발주 건을 찾을 수 없습니다.")
+
+    # 출고 처리(DISPATCHED / SOLD 전환)는 관리자(SCM_ADMIN) 권한만 허용
+    if payload.to_status in (models.OrderStatus.DISPATCHED, models.OrderStatus.SOLD) and _get_user_role_str(current_user) != "SCM_ADMIN":
+        raise HTTPException(status_code=403, detail="출고 처리는 관리자(SCM_ADMIN) 권한만 사용할 수 있습니다.")
     
     # 역방향 제어 시 사유(reason) 필수
     if payload.direction == models.OrderDirection.BACKWARD and not payload.reason:
