@@ -1,5 +1,27 @@
 ﻿# 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
+## [2026-11-26] 딜러 포털 [내 구매 내역] ORDER NO 컬럼 신규 추가 및 리스트 헤더·순서 개편, 관리자 [판매 목록] 영문 텍스트 간소화
+
+### 1. 딜러 포털 [내 구매 내역] `ORDER NO` 컬럼 추가 및 리스트 헤더·순서 개편 (`DealerSalesArchive.jsx`)
+* **`ORDER NO` (`dealer_order_no`) 신규 컬럼 반영**:
+  * 딜러가 발주 등록 시 입력한 딜러 주문번호(`order.dealer_order_no`)를 리스트 2번째 열로 신규 추가하여 시스템 전반(`orders.dealer_order_no`)과 1:1로 일치하는 주문 식별 정보 제공 (미등록 시 `-` 표기).
+* **리스트 헤더 명칭 및 컬럼 순서 표준화**:
+  * 테이블 열 순서를 요청 사양에 맞춰 전면 재정렬:
+    * `*` → **`DATE`** → **`ORDER NO`** → **`MODEL`** → **`NC`** → **`S/N`** → **`P/O`** → **`STATUS`** → **`PORT`** → **`CARGO`** → **`PICKUP`** (총 11개 컬럼, 빈 데이터 안내 `colSpan="11"` 보정).
+* **검색, 정렬, CSV Export 및 모바일 카드 뷰 동기화**:
+  * **실시간 검색**: 검색 필터링 대상에 `dealer_order_no`를 포함하여 딜러 주문번호로 즉시 검색 가능하도록 개선.
+  * **정렬(Sorting)**: `ORDER NO` 오름차순/내림차순 정렬 기능을 추가하고, 드롭다운 정렬 키 판별 시 언더스코어 파싱(`lastIndexOf('_')`)을 정밀화하여 정렬 동작의 신뢰성 확보.
+  * **CSV 내보내기 & 모바일 뷰**: Excel/CSV Export 헤더/데이터와 모바일 반응형 카드 뷰 메타데이터에도 동일한 항목명과 순서를 일관되게 반영.
+
+### 2. 관리자 [판매 목록] 영문 헤더 텍스트 간소화 (`frontend/src/locales/en/translation.json`, `AdminSalesArchive.jsx`)
+* **영문 리스트 헤더 직관성 개선**:
+  * 관리자 [판매 목록] (`Sales List`) 페이지의 영문 헤더 텍스트를 간결하고 직관적인 단어로 변경:
+    * `SALES PRICE` → **`SELLING`**
+    * `BUYING PRICE` → **`BUYING`**
+    * `SALES MONTH` → **`MONTH`**
+    * `DISPATCH / PICKUP` → **`PICKUP`**
+  * 데스크톱 테이블 헤더, 정렬 드롭다운, 모바일 카드 뷰 라벨에 전면 동기화 적용.
+
 ## [2026-11-25] RSM 포털 [WIA 창고] 메뉴 활성화 및 출고 처리 관리자(SCM_ADMIN) 전용 권한 제어
 
 ### 1. RSM 포털 [WIA 창고] 메뉴 및 라우팅 활성화 (`Sidebar.jsx`, `App.jsx`, `translation.json`)

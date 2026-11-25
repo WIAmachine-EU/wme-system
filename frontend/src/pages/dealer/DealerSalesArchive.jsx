@@ -234,19 +234,21 @@ export default function DealerSalesArchive({ isMobileView, dealerCompanyId, deal
   };
 
   const handleExportCSV = () => {
-    if (orders.length === 0) return;
+    if (sortedOrders.length === 0) return;
 
-    const headers = ['Order Date', 'Model', 'NC', 'S/N', 'P/O', 'Status', 'PORT', 'Cargo Detail', 'Pick-up'];
-    const rows = orders.map(order => [
-      new Date(order.dealer_order_date || order.created_at).toLocaleDateString(),
-      order.product_model ? order.product_model.model_name : '-',
-      order.nc || '-',
-      order.serial_number || '-',
-      order.reference_no || '-',
-      getStatusLabel(order.current_status),
-      getOrderPort(order),
-      order.serial_number ? 'Details' : '-',
-      order.current_status === 'SOLD' ? '완료' : '-'
+    const headers = ['DATE', 'ORDER NO', 'MODEL', 'NC', 'S/N', 'P/O', 'STATUS', 'PORT', 'CARGO', 'PICKUP'];
+    const escapeCsv = (val) => `"${String(val ?? '-').replace(/"/g, '""')}"`;
+    const rows = sortedOrders.map(order => [
+      escapeCsv(order.dealer_order_date || order.created_at ? new Date(order.dealer_order_date || order.created_at).toLocaleDateString() : '-'),
+      escapeCsv(order.dealer_order_no || '-'),
+      escapeCsv(order.product_model ? order.product_model.model_name : '-'),
+      escapeCsv(order.nc || '-'),
+      escapeCsv(order.serial_number || '-'),
+      escapeCsv(order.reference_no || '-'),
+      escapeCsv(getStatusLabel(order.current_status)),
+      escapeCsv(getOrderPort(order)),
+      escapeCsv(order.serial_number && order.has_cargo_detail ? 'cm / kg' : '-'),
+      escapeCsv(order.current_status === 'SOLD' ? 'Picked Up' : '-')
     ]);
 
     let csvContent = "data:text/csv;charset=utf-8,\uFEFF"
@@ -265,12 +267,13 @@ export default function DealerSalesArchive({ isMobileView, dealerCompanyId, deal
   const filteredOrders = orders.filter(o => {
     const s = searchQuery.toLowerCase().trim();
     if (!s) return true;
+    const orderNo = (o.dealer_order_no || '').toLowerCase();
     const sn = (o.serial_number || '').toLowerCase();
     const mn = (o.product_model?.model_name || '').toLowerCase();
     const po = (o.reference_no || '').toLowerCase();
     const nc = (o.nc || '').toLowerCase();
     const port = getOrderPort(o).toLowerCase();
-    return sn.includes(s) || mn.includes(s) || po.includes(s) || nc.includes(s) || port.includes(s);
+    return orderNo.includes(s) || sn.includes(s) || mn.includes(s) || po.includes(s) || nc.includes(s) || port.includes(s);
   });
 
   // 정렬 (Sorting) 상태 및 핸들러
@@ -296,6 +299,10 @@ export default function DealerSalesArchive({ isMobileView, dealerCompanyId, deal
         const timeB = new Date(b.dealer_order_date || b.created_at || 0).getTime();
         return sortConfig.direction === 'asc' ? timeA - timeB : timeB - timeA;
       }
+      case 'order_no':
+        valA = a.dealer_order_no || '';
+        valB = b.dealer_order_no || '';
+        break;
       case 'model':
         valA = a.product_model?.model_name || '';
         valB = b.product_model?.model_name || '';
@@ -417,7 +424,9 @@ export default function DealerSalesArchive({ isMobileView, dealerCompanyId, deal
                 if (!e.target.value) {
                   setSortConfig({ key: null, direction: 'asc' });
                 } else {
-                  const [key, direction] = e.target.value.split('_');
+                  const lastUnderscore = e.target.value.lastIndexOf('_');
+                  const key = e.target.value.slice(0, lastUnderscore);
+                  const direction = e.target.value.slice(lastUnderscore + 1);
                   setSortConfig({ key, direction });
                 }
               }}
@@ -428,22 +437,24 @@ export default function DealerSalesArchive({ isMobileView, dealerCompanyId, deal
               title={t('common.sort_by', '정렬 기준')}
             >
               <option value="">{t('common.sort_default', '기본 정렬')}</option>
-              <option value="order_date_asc">{t('menu4.header_order_date', '주문일자')} ▲ {t('common.sort_oldest', '(과거순)')}</option>
-              <option value="order_date_desc">{t('menu4.header_order_date', '주문일자')} ▼ {t('common.sort_newest', '(최신순)')}</option>
-              <option value="model_asc">{t('menu4.header_model', '모델')} ▲ {t('common.sort_asc', '(오름차순)')}</option>
-              <option value="model_desc">{t('menu4.header_model', '모델')} ▼ {t('common.sort_desc', '(내림차순)')}</option>
-              <option value="nc_asc">{t('menu4.header_nc', 'NC')} ▲</option>
-              <option value="nc_desc">{t('menu4.header_nc', 'NC')} ▼</option>
-              <option value="sn_asc">{t('menu4.header_sn', 'S/N')} ▲</option>
-              <option value="sn_desc">{t('menu4.header_sn', 'S/N')} ▼</option>
-              <option value="po_asc">{t('menu4.header_po', 'P/O')} ▲</option>
-              <option value="po_desc">{t('menu4.header_po', 'P/O')} ▼</option>
-              <option value="status_asc">{t('menu4.header_status', '상태')} ▲</option>
-              <option value="status_desc">{t('menu4.header_status', '상태')} ▼</option>
-              <option value="port_asc">{t('menu2.header_port', '도착지')} ▲</option>
-              <option value="port_desc">{t('menu2.header_port', '도착지')} ▼</option>
-              <option value="pickup_asc">{t('menu4.header_pickup', '출고/픽업')} ▲</option>
-              <option value="pickup_desc">{t('menu4.header_pickup', '출고/픽업')} ▼</option>
+              <option value="order_date_asc">DATE ▲ {t('common.sort_oldest', '(과거순)')}</option>
+              <option value="order_date_desc">DATE ▼ {t('common.sort_newest', '(최신순)')}</option>
+              <option value="order_no_asc">ORDER NO ▲</option>
+              <option value="order_no_desc">ORDER NO ▼</option>
+              <option value="model_asc">MODEL ▲ {t('common.sort_asc', '(오름차순)')}</option>
+              <option value="model_desc">MODEL ▼ {t('common.sort_desc', '(내림차순)')}</option>
+              <option value="nc_asc">NC ▲</option>
+              <option value="nc_desc">NC ▼</option>
+              <option value="sn_asc">S/N ▲</option>
+              <option value="sn_desc">S/N ▼</option>
+              <option value="po_asc">P/O ▲</option>
+              <option value="po_desc">P/O ▼</option>
+              <option value="status_asc">STATUS ▲</option>
+              <option value="status_desc">STATUS ▼</option>
+              <option value="port_asc">PORT ▲</option>
+              <option value="port_desc">PORT ▼</option>
+              <option value="pickup_asc">PICKUP ▲</option>
+              <option value="pickup_desc">PICKUP ▼</option>
             </select>
             <button onClick={handleExportCSV} className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', fontSize: '0.85rem' }}>
               <Download size={16} /> Export
@@ -486,13 +497,14 @@ export default function DealerSalesArchive({ isMobileView, dealerCompanyId, deal
                       </div>
                       
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                        <div><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Order Date</span>{new Date(order.dealer_order_date || order.created_at).toLocaleDateString()}</div>
-                        <div><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>P/O</span><span style={{ fontWeight: 500 }}>{order.reference_no || '-'}</span></div>
+                        <div><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>DATE</span>{order.dealer_order_date || order.created_at ? new Date(order.dealer_order_date || order.created_at).toLocaleDateString() : '-'}</div>
+                        <div><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>ORDER NO</span><span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{order.dealer_order_no || '-'}</span></div>
                         <div><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>NC</span>{order.nc || '-'}</div>
                         <div><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>S/N</span><span style={{ fontWeight: 600 }}>{order.serial_number || '-'}</span></div>
+                        <div><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>P/O</span><span style={{ fontWeight: 500 }}>{order.reference_no || '-'}</span></div>
                         <div><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>PORT</span><span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{getOrderPort(order)}</span></div>
                         <div>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Pick up</span>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>PICKUP</span>
                           {isPickedUp ? <span style={{ color: 'var(--success-color)', fontWeight: 600 }}>Picked Up</span> : <span>-</span>}
                         </div>
                       </div>
@@ -538,15 +550,16 @@ export default function DealerSalesArchive({ isMobileView, dealerCompanyId, deal
                   >
                     *
                   </th>
-                  {renderSortHeader('order_date', 'Order Date', '11%', 'center')}
-                  {renderSortHeader('model', 'Model', '13%', 'center')}
-                  {renderSortHeader('nc', 'NC', '9%', 'center')}
-                  {renderSortHeader('sn', 'S/N', '11%', 'center')}
-                  {renderSortHeader('po', 'P/O', '11%', 'center')}
-                  {renderSortHeader('status', 'Status', '10%', 'center')}
-                  {renderSortHeader('port', 'PORT', '11%', 'center')}
+                  {renderSortHeader('order_date', 'DATE', '9%', 'center')}
+                  {renderSortHeader('order_no', 'ORDER NO', '10%', 'center')}
+                  {renderSortHeader('model', 'MODEL', '11%', 'center')}
+                  {renderSortHeader('nc', 'NC', '7%', 'center')}
+                  {renderSortHeader('sn', 'S/N', '10%', 'center')}
+                  {renderSortHeader('po', 'P/O', '10%', 'center')}
+                  {renderSortHeader('status', 'STATUS', '10%', 'center')}
+                  {renderSortHeader('port', 'PORT', '10%', 'center')}
                   <th style={{ width: '10%', textAlign: 'center' }}>CARGO</th>
-                  {renderSortHeader('pickup', 'Pick up', '10%', 'center')}
+                  {renderSortHeader('pickup', 'PICKUP', '9%', 'center')}
                 </tr>
               </thead>
               <tbody>
@@ -562,7 +575,10 @@ export default function DealerSalesArchive({ isMobileView, dealerCompanyId, deal
                           <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>{index + 1}</span>
                         </td>
                         <td style={{ padding: '13px 12px', textAlign: 'center', fontSize: '11px' }}>
-                          {new Date(order.dealer_order_date || order.created_at).toLocaleDateString()}
+                          {order.dealer_order_date || order.created_at ? new Date(order.dealer_order_date || order.created_at).toLocaleDateString() : '-'}
+                        </td>
+                        <td style={{ padding: '13px 12px', textAlign: 'center', fontWeight: 500, fontSize: '11px', color: 'var(--text-primary)' }}>
+                          {order.dealer_order_no || '-'}
                         </td>
                         <td style={{ padding: '13px 12px', textAlign: 'center', fontWeight: 600, fontSize: '11px' }}>
                           {order.product_model ? order.product_model.model_name : '-'}
@@ -622,7 +638,7 @@ export default function DealerSalesArchive({ isMobileView, dealerCompanyId, deal
                   })
                 ) : (
                   <tr>
-                    <td colSpan="10" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                    <td colSpan="11" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
                       내역이 존재하지 않습니다.
                     </td>
                   </tr>
