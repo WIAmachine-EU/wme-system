@@ -469,11 +469,11 @@ export default function DealerInventory({ isMobileView }) {
                   >
                     {t('menu2.header_no')}
                   </th>
-                  {renderSortHeader('model', t('menu2.header_model'), '12%', 'center')}
+                  {renderSortHeader('model', t('menu2.header_model'), '13%', 'center')}
                   {renderSortHeader('nc', t('menu2.header_nc'), '6%', 'center')}
-                  {renderSortHeader('sn', t('menu2.header_sn', 'S/N'), '10%', 'center')}
+                  {renderSortHeader('sn', t('menu2.header_sn', 'S/N'), '11%', 'center')}
                   {renderSortHeader('po', t('menu2.header_po'), '12%', 'center')}
-                  {renderSortHeader('detail_spec', t('menu2.header_detailspec'), '15%', 'left')}
+                  {renderSortHeader('detail_spec', t('menu2.header_detailspec'), '13%', 'left')}
                   {renderSortHeader('eta', t('menu2.header_eta'), '9%', 'center')}
                   {renderSortHeader('port', t('menu2.header_port'), '8%', 'center')}
                   {renderSortHeader('stock_type', t('menu2.header_status', '상태'), '11%', 'center')}
