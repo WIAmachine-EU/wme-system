@@ -459,25 +459,25 @@ export default function DealerInventory({ isMobileView }) {
           </div>
         ) : (
           <div className="data-table-container full-bleed">
-            <table className="data-table">
+            <table className="data-table" style={{ tableLayout: 'fixed', width: '100%' }}>
               <thead>
                 <tr>
                   <th
-                    style={{ width: '3%', textAlign: 'center', fontWeight: 'bold', cursor: 'pointer', userSelect: 'none' }}
+                    style={{ width: '4%', textAlign: 'center', fontWeight: 'bold', cursor: 'pointer', userSelect: 'none' }}
                     onClick={() => setSortConfig({ key: null, direction: 'asc' })}
                     title="기본 순서로 리셋"
                   >
                     {t('menu2.header_no')}
                   </th>
-                  {renderSortHeader('model', t('menu2.header_model'), '12%', 'center')}
-                  {renderSortHeader('nc', t('menu2.header_nc'), '6%', 'center')}
-                  {renderSortHeader('sn', t('menu2.header_sn', 'S/N'), '10%', 'center')}
+                  {renderSortHeader('model', t('menu2.header_model'), '13%', 'center')}
+                  {renderSortHeader('nc', t('menu2.header_nc'), '7%', 'center')}
+                  {renderSortHeader('sn', t('menu2.header_sn', 'S/N'), '11%', 'center')}
                   {renderSortHeader('po', t('menu2.header_po'), '12%', 'center')}
-                  {renderSortHeader('detail_spec', t('menu2.header_detailspec'), '16%', 'left')}
-                  {renderSortHeader('eta', t('menu2.header_eta'), '8%', 'center')}
-                  {renderSortHeader('port', t('menu2.header_port'), '8%', 'center')}
-                  {renderSortHeader('stock_type', t('menu2.header_status', '상태'), '11%', 'center')}
-                  <th style={{ width: '14%', textAlign: 'center', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                  {renderSortHeader('detail_spec', t('menu2.header_detailspec'), '10%', 'left')}
+                  {renderSortHeader('eta', t('menu2.header_eta'), '9%', 'center')}
+                  {renderSortHeader('port', t('menu2.header_port'), '9%', 'center')}
+                  {renderSortHeader('stock_type', t('menu2.header_status', '상태'), '10%', 'center')}
+                  <th style={{ width: '15%', textAlign: 'center', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
                     {t('menu2.header_request', '요청')}
                   </th>
                 </tr>
@@ -514,8 +514,8 @@ export default function DealerInventory({ isMobileView }) {
                           <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
                             <div style={{ fontWeight: 700, color: 'var(--accent-cyan)', fontSize: '12px' }}>{order.reference_no}</div>
                           </td>
-                          <td style={{ textAlign: 'left', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
-                            <div style={{ fontSize: '10px' }}>{order.detail_spec || 'T/F, CC(S-H)+B, 20BAR, B/I, P/C, Q(A)'}</div>
+                          <td style={{ width: '10%', maxWidth: '10%', textAlign: 'left', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px', overflowWrap: 'anywhere', wordBreak: 'break-word', whiteSpace: 'normal' }}>
+                            <div style={{ fontSize: '10px', lineHeight: 1.35 }}>{order.detail_spec || 'T/F, CC(S-H)+B, 20BAR, B/I, P/C, Q(A)'}</div>
                           </td>
                           <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
                             <div style={{ fontSize: '10px' }}>{order.eta ? new Date(order.eta).toLocaleDateString() : '-'}</div>
@@ -526,7 +526,7 @@ export default function DealerInventory({ isMobileView }) {
                           <td style={{ textAlign: 'center', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
                             {renderStatusBadge(order, '72px', 'center')}
                           </td>
-                          <td style={{ fontSize: '11px', textAlign: 'center', verticalAlign: 'middle', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '4px', paddingTop: '4px' }}>
+                          <td style={{ fontSize: '11px', textAlign: 'center', verticalAlign: 'middle', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', padding: '4px 6px' }}>
                             {canRequest ? (
                               <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center' }}>
                                 <button

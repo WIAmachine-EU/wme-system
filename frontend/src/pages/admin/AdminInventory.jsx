@@ -1073,11 +1073,11 @@ export default function AdminInventory({ isMobileView }) {
           </div>
         ) : (
           <div className="data-table-container full-bleed">
-            <table className="data-table">
+            <table className="data-table" style={{ tableLayout: 'fixed', width: '100%' }}>
               <thead>
                 <tr>
                   <th
-                    style={{ width: '3%', textAlign: 'center', fontWeight: 'bold', cursor: 'pointer', userSelect: 'none' }}
+                    style={{ width: '4%', textAlign: 'center', fontWeight: 'bold', cursor: 'pointer', userSelect: 'none' }}
                     onClick={() => setSortConfig({ key: null, direction: 'asc' })}
                     title="기본 순서로 리셋"
                   >
@@ -1085,14 +1085,14 @@ export default function AdminInventory({ isMobileView }) {
                   </th>
                   {renderSortHeader('model', t('menu2.header_model'), '11%')}
                   {renderSortHeader('nc', t('menu2.header_nc'), '6%')}
-                  {renderSortHeader('sn', t('menu2.header_sn', 'S/N'), '9%')}
-                  {renderSortHeader('price', t('menu2.header_buying'), '8%', 'right')}
+                  {renderSortHeader('sn', t('menu2.header_sn', 'S/N'), '10%')}
+                  {renderSortHeader('price', t('menu2.header_buying'), '9%', 'right')}
                   {renderSortHeader('po', t('menu2.header_po'), '9%')}
-                  {renderSortHeader('detail_spec', t('menu2.header_detailspec'), '18%', 'left')}
-                  {renderSortHeader('eta', t('menu2.header_eta'), '8%')}
-                  {renderSortHeader('port', t('menu2.header_port'), '7%')}
-                  {renderSortHeader('stock_type', t('menu2.header_status_change'), '8%')}
-                  {renderSortHeader('dealer', t('menu2.header_dealer_order'), '13%')}
+                  {renderSortHeader('detail_spec', t('menu2.header_detailspec'), '10%', 'left')}
+                  {renderSortHeader('eta', t('menu2.header_eta'), '9%')}
+                  {renderSortHeader('port', t('menu2.header_port'), '8%')}
+                  {renderSortHeader('stock_type', t('menu2.header_status_change'), '9%')}
+                  {renderSortHeader('dealer', t('menu2.header_dealer_order'), '15%')}
                 </tr>
               </thead>
               <tbody>
@@ -1133,8 +1133,8 @@ export default function AdminInventory({ isMobileView }) {
                           <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '6px', paddingTop: '6px', textAlign: 'center' }}>
                             <div style={{ fontWeight: 700, color: 'var(--accent-cyan)', fontSize: '11px' }}>{order.reference_no}</div>
                           </td>
-                          <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '6px', paddingTop: '6px', textAlign: 'left' }}>
-                            <div style={{ fontSize: '11px' }}>{order.detail_spec || 'T/F, CC(S-H)+B, 20BAR, B/I, P/C, Q(A)'}</div>
+                          <td style={{ width: '10%', maxWidth: '10%', borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '6px', paddingTop: '6px', textAlign: 'left', overflowWrap: 'anywhere', wordBreak: 'break-word', whiteSpace: 'normal' }}>
+                            <div style={{ fontSize: '11px', lineHeight: 1.35 }}>{order.detail_spec || 'T/F, CC(S-H)+B, 20BAR, B/I, P/C, Q(A)'}</div>
                           </td>
                           <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '6px', paddingTop: '6px', textAlign: 'center' }}>
                             <div style={{ fontSize: '11px' }}>{showSchedule && order.eta ? new Date(order.eta).toLocaleDateString() : '-'}</div>
@@ -1142,20 +1142,20 @@ export default function AdminInventory({ isMobileView }) {
                           <td style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '6px', paddingTop: '6px', textAlign: 'center' }}>
                             <div style={{ fontSize: '11px' }}>{getStandardPort(order.destination_port)}</div>
                           </td>
-                          <td onClick={e => e.stopPropagation()} style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '6px', paddingTop: '6px', textAlign: 'center' }}>
+                          <td onClick={e => e.stopPropagation()} style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', padding: '6px 6px', textAlign: 'center' }}>
                             <select
                               value={sType}
                               onChange={(e) => handlePendingChange(order.id, 'stockType', e.target.value)}
                               style={{
                                 background: typeBgColor, border: `1px solid ${typeBgColor}`, color: typeColor,
-                                padding: '4px 8px', borderRadius: '6px', fontSize: '10px', cursor: 'pointer', width: '90px',
+                                padding: '4px 6px', borderRadius: '6px', fontSize: '10px', cursor: 'pointer', width: '100%', maxWidth: '92px',
                                 fontWeight: 600, textAlign: 'center'
                               }}
                             >
                               {renderStockTypeOptions()}
                             </select>
                           </td>
-                          <td onClick={e => e.stopPropagation()} style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', paddingBottom: '6px', paddingTop: '6px', textAlign: 'center' }}>
+                          <td onClick={e => e.stopPropagation()} style={{ borderBottom: expandedRows.has(order.id) ? 'none' : '1px solid var(--border-color)', padding: '6px 8px', textAlign: 'center' }}>
                             {isConfirmedReserved ? (
                               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', lineHeight: 1.3 }}>
                                 <div style={{ fontWeight: 700, fontSize: '11.5px', color: 'var(--accent-cyan)', whiteSpace: 'nowrap' }}>
