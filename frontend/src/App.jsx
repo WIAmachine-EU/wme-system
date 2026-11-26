@@ -63,6 +63,7 @@ export default function App() {
   const [needsProfileSetup, setNeedsProfileSetup] = useState(authState?.needsProfileSetup || false);
   // Default tabs based on role
   const [activeTab, setActiveTab] = useState(authState?.activeTab || 'admin-dashboard');
+  const [erpSyncMode, setErpSyncMode] = useState('hq_sync');
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
 
@@ -348,10 +349,15 @@ export default function App() {
             />
           )}
           {activeTab === 'management' && currentRole !== 'RSM' && (
-            <UploadSettings onOpenErpSync={() => setActiveTab('admin-erp-sync')} />
+            <UploadSettings
+              onOpenErpSync={(mode = 'hq_sync') => {
+                setErpSyncMode(mode);
+                setActiveTab('admin-erp-sync');
+              }}
+            />
           )}
           {activeTab === 'admin-erp-sync' && currentRole !== 'RSM' && (
-            <ErpSyncPanel baseUrl="/api/erp-sync" />
+            <ErpSyncPanel baseUrl="/api/erp-sync" initialMode={erpSyncMode} />
           )}
           {activeTab === 'admin-library' && (currentRole === 'SCM_ADMIN' || currentRole === 'RSM') && <ProductLibrary currentRole={currentRole} isMobileView={isMobileView} />}
 

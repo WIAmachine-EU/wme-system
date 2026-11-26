@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileSpreadsheet, Upload, Mail, Plus, X, ShoppingCart, Sparkles, ArrowRight } from 'lucide-react';
+import { FileSpreadsheet, Upload, Mail, Plus, X, ShoppingCart, Sparkles, ArrowRight, Database } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import StockStatusUploadModal from '../../components/StockStatusUploadModal';
 
@@ -263,19 +263,40 @@ export default function UploadSettings({ onOpenErpSync }) {
           </div>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '18px', lineHeight: 1.55 }}>
             {isKo
-              ? '비정형 주간 본사 Sales List 엑셀을 업로드하면 시트명·열 변동 자동 보정 및 Gemini AI 헤더 추론으로 필수 주문·선적 데이터만 추출하여 PostgreSQL 현재 상태와 대조(Dry-Run) 후 안전하게 일괄 Upsert합니다.'
-              : 'Upload unstructured weekly HQ Sales List Excel files with auto schema detection, Gemini AI header inference, live PostgreSQL dry-run diff, inline conflict editing, and atomic bulk upsert.'}
+              ? '주간 본사 Sales List 엑셀 동기화(Upsert) 및 딜러 주문 내역 엑셀 기준 기등록 P/O(A·F 발주) 빈 칸("-") 일괄 보충(ORDER NO, SELLING, MONTH 등)을 DB 대조 미리보기 후 안전하게 반영합니다.'
+              : 'Run weekly HQ Sales List sync (Upsert) or bulk-enrich blank ("-") fields of existing A & F orders (ORDER NO, SELLING, MONTH, etc.) by P/O with dry-run PostgreSQL preview.'}
           </p>
-          <button
-            type="button"
-            onClick={onOpenErpSync}
-            className="btn btn-primary upload-hover-btn"
-            style={{ padding: '10px 22px', fontSize: '0.92rem' }}
-          >
-            <Sparkles size={17} />
-            <span>{isKo ? 'AI 엑셀 동기화 워크스페이스 열기' : 'Open AI Excel Sync Workspace'}</span>
-            <ArrowRight size={16} />
-          </button>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+            <button
+              type="button"
+              onClick={() => onOpenErpSync('hq_sync')}
+              className="btn btn-primary upload-hover-btn"
+              style={{ padding: '10px 22px', fontSize: '0.92rem' }}
+            >
+              <Sparkles size={17} />
+              <span>{isKo ? '본사 Sales List 동기화 열기' : 'Open HQ Sales List Sync'}</span>
+              <ArrowRight size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => onOpenErpSync('order_enrich')}
+              className="btn btn-outline upload-hover-btn"
+              style={{
+                padding: '10px 22px',
+                fontSize: '0.92rem',
+                borderColor: 'var(--wia-blue, #0A1C8F)',
+                color: 'var(--wia-blue, #0A1C8F)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontWeight: 700
+              }}
+            >
+              <Database size={17} />
+              <span>{isKo ? "주문 정보 일괄 보충 (빈 칸 '-' 채우기)" : "Order Data Enrichment (Fill Blanks '-')"}</span>
+              <ArrowRight size={16} />
+            </button>
+          </div>
         </div>
       )}
 

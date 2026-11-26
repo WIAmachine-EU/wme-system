@@ -1,5 +1,25 @@
 ﻿# 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
+## [2026-11-26] P/O 기준 주문 정보 일괄 보충 (DB 빈 칸 '-' 채우기 전용) 파이프라인 및 검수 UI 구축
+
+### 1. 백엔드 P/O 기준 빈 칸 보충 엔진 & 트랜잭션 API (`backend/erp_upload_router.py`)
+* **2단계 안전 보충 엔드포인트 신설 (`/api/erp-sync/enrich/preview`, `/api/erp-sync/enrich/apply`)**:
+  * **원본 엑셀(`.xlsx`/`.xls`) 메모리 파싱 (`parse_order_enrichment_excel_bytes`)**: 딜러 주문 리스트 엑셀(`Order 20261126` 규격 15개 헤더)을 상단 15행 자동 스캔으로 인식하고 `P/O` 기준으로 11개 보충 대상 필드(`dealer_order_date`, `dealer_order_no`, `serial_number`, `nc`, `incoterms`, `destination_port`, `etd`, `eta`, `sales_price`, `sales_month`, `so_no`)를 정제.
+  * **중복 P/O 및 비정상 값 빈 값 제외 규칙 적용**:
+    * 파일 내 중복 P/O 행은 보충 대상에서 전량 제외하고 별도 목록(`excluded_duplicate_rows`)으로 분리.
+    * `SerialNo`의 `0`/`x`/`?`/파일내 중복/DB 타 P/O 점유 충돌, `selling`의 음수·괄호 반품 표기 `(121,470)`·`0`, `S/O`의 `x`, `G1747-0232\t` 같은 제어문자는 정제하거나 해당 필드만 빈 값(`None`)으로 제외.
+  * **`Sales month` 정규화 (월 미정 값 보충 제외)**:
+    * 연도만 단독 표기된 값(`2026`, `2027`) 및 미확정 표기(`12 ???`, `11 ?`)는 보충에서 제외하고, 확정 월은 `YYYY.MM` 형식으로 통일(`1`~`12` → `2026.01`~`2026.12`, `27.01`/`27.3` → `2027.01`/`2027.03`).
+  * **기등록 A·F 발주 전체 보충 및 기존 DB 값 100% 보존**:
+    * 시스템 DB에 이미 등록된 `A` 발주 및 `F` 발주 모두에 대해 `selling`(`sales_price`), `DEALER Order no`, `Sales month`를 포함한 DB 빈 칸(`NULL` / `'-'`)에만 채움(기존 non-empty 값 덮어쓰기 원천 차단, 미등록 P/O는 신규 `INSERT` 미수행).
+  * **검수용 2시트 `.xlsx` 리포트 다운로드 (`_build_enrich_preview_excel`)**: `1_빈칸보충_미리보기` 및 `2_제외_및_DB미등록` 시트 생성 지원.
+
+### 2. 프론트엔드 일괄 보충 검수 워크스페이스 및 진입 연동 (`OrderEnrichPanel.jsx`, `ErpSyncPanel.jsx`, `ErpSyncPanel.css`, `App.jsx`, `UploadSettings.jsx`)
+* **`OrderEnrichPanel.jsx` 신규 구현 및 CSS 확장**:
+  * 원본 엑셀 업로드, 기준 연도(`sales_month_year`) 지정, `DB 빈 칸 보충 미리보기`, `검수 .xlsx` 다운로드, 6종 KPI 카드(`보충 대상 주문`/`A 발주`/`F 발주`/`비정상·월미정 제외 셀`/`중복 P/O 제외`/`DB 미등록`), 컬럼별 보충 건수 요약 스트립, 행별 선택 체크박스, `- → 신규값` Diff 미리보기 및 최종 승인 모달 구현.
+* **워크스페이스 모드 전환 탭 및 원클릭 진입 버튼 추가**:
+  * `ErpSyncPanel.jsx` 상단에 `1. 본사 Sales List 동기화` / `2. 주문 정보 일괄 보충 (DB 빈 칸 '-' 채우기)` 모드 전환 탭을 추가하고, `UploadSettings.jsx` 카드 및 `App.jsx` 라우팅 상태에서 즉시 전환 진입 가능하도록 연동.
+
 ## [2026-11-26] [AI 엑셀 동기화] ERP 표준 추출 17개 컬럼 개편 (DEALER, ETA, DETAIL SPEC 추가 및 순서·명칭 정비)
 
 ### 1. 백엔드 지능형 파서 · AI 스키마 추론 · 검수 엑셀 17개 표준 컬럼 개편 (`backend/erp_upload_router.py`)

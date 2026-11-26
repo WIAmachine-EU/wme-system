@@ -1700,6 +1700,824 @@ def _build_preview_excel(preview_data: Dict[str, Any]) -> bytes:
 
 
 # =============================================================================
+# 7-B. 딜러 주문 정보 일괄 보충 (P/O 기준 DB 빈 칸 '-' Fill-Blanks-Only)
+# =============================================================================
+
+ENRICH_TARGET_FIELDS: List[Dict[str, str]] = [
+    {"field": "dealer_order_date", "label": "ORDER DATE", "type": "datetime"},
+    {"field": "dealer_order_no", "label": "ORDER NO", "type": "str"},
+    {"field": "serial_number", "label": "S/N", "type": "str"},
+    {"field": "nc", "label": "NC", "type": "str"},
+    {"field": "incoterms", "label": "INCOTERMS", "type": "str"},
+    {"field": "destination_port", "label": "PORT", "type": "str"},
+    {"field": "etd", "label": "ETD", "type": "datetime"},
+    {"field": "eta", "label": "ETA", "type": "datetime"},
+    {"field": "sales_price", "label": "SELLING", "type": "str"},
+    {"field": "sales_month", "label": "MONTH", "type": "str"},
+    {"field": "so_no", "label": "S/O", "type": "str"},
+]
+
+ENRICH_FIELD_MAP: Dict[str, Dict[str, str]] = {f["field"]: f for f in ENRICH_TARGET_FIELDS}
+
+ENRICH_HEADER_DISPLAY_COLUMNS: List[Dict[str, Optional[str]]] = [
+    {"header": "P/O", "field": "reference_no"},
+    {"header": "DEALER Order Date", "field": "dealer_order_date"},
+    {"header": "DEALER Order no", "field": "dealer_order_no"},
+    {"header": "SerialNo", "field": "serial_number"},
+    {"header": "NC", "field": "nc"},
+    {"header": "Shipment Type", "field": "incoterms"},
+    {"header": "ArrivalPort", "field": "destination_port"},
+    {"header": "ETD", "field": "etd"},
+    {"header": "ETA", "field": "eta"},
+    {"header": "selling", "field": "sales_price"},
+    {"header": "Sales month", "field": "sales_month"},
+    {"header": "S/O", "field": "so_no"},
+]
+
+ENRICH_COLUMN_ALIASES: Dict[str, List[str]] = {
+    "reference_no": ["p/o", "pono", "ponumber", "p/ono", "p/onumber", "po#", "po", "referenceno"],
+    "order_month": ["ordermonth", "주문월"],
+    "dealer": ["dealer", "dealername", "orderdealer", "customer", "buyer", "딜러", "딜러사"],
+    "dealer_order_date": ["dealerorderdate", "orderdate", "podate", "주문일자", "딜러주문일", "발주일"],
+    "dealer_order_no": ["dealerorderno", "orderno", "dealerpo", "딜러주문번호", "주문번호"],
+    "model": ["model", "modelname", "modelcode", "기종"],
+    "serial_number": ["serialno", "s/n", "sn", "serialnumber", "serial", "호기"],
+    "nc": ["nc", "nccode", "cnc", "controller"],
+    "incoterms": ["shipmenttype", "incoterms", "incoterm", "선적조건", "인코텀즈"],
+    "destination_port": ["arrivalport", "port", "pod", "destport", "destinationport", "도착항"],
+    "etd": ["etd", "etdpol", "b/ldate", "bldate", "출항예정일"],
+    "eta": ["eta", "etapod", "etadate", "arrivaldate", "도착예정일"],
+    "sales_price": ["selling", "salesprice", "sellingprice", "판매가"],
+    "sales_month": ["salesmonth", "invoicemonth", "month", "매출월"],
+    "so_no": ["s/o", "so", "sono", "s/ono", "salesorder"],
+}
+
+ENRICH_EMPTY_TOKENS: Set[str] = EMPTY_TOKENS | {"none", "nat", "nil"}
+
+
+class OrderEnrichApplyItem(BaseModel):
+    reference_no: str = Field(..., description="매칭 대상 기존 발주번호 P/O (orders.reference_no)")
+    fill_fields: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="DB에서 비어 있는('-'/NULL) 컬럼에만 채울 값 맵",
+    )
+
+
+class ApplyEnrichRequest(BaseModel):
+    items: List[OrderEnrichApplyItem] = Field(default_factory=list)
+    sales_month_year: int = Field(2026, ge=2000, le=2100)
+
+
+def _strip_control_chars(val: Any) -> str:
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return ""
+    # 탭(\t), 개행, 비표준 공백(\u00a0), 대체문자(\ufffd) 제거
+    cleaned = re.sub(r"[\x00-\x1f\x7f\u00a0\ufffd]+", "", str(val))
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def _is_db_value_empty(val: Any) -> bool:
+    """DB 컬럼이 실제로 비어 있어 UI에 '-'로 표기되는 상태인지 판별."""
+    if val is None:
+        return True
+    if isinstance(val, str):
+        return _strip_control_chars(val).lower() in ENRICH_EMPTY_TOKENS
+    return False
+
+
+def clean_enrich_serial_number(val: Any) -> Tuple[Optional[str], Optional[str]]:
+    """보충용 S/N 정제: 제어문자 제거, '0'/'x'/'?'/3자미만/순수숫자 등 비정상 값은 None 제외."""
+    raw = _strip_control_chars(val)
+    if not raw or raw.lower() in ENRICH_EMPTY_TOKENS:
+        return None, None
+    if raw in ("0", "0.0") or raw.lower() == "x" or "?" in raw or len(raw) < 3 or raw.isdigit():
+        return None, f"비정상 S/N 값 '{raw}' 제외"
+    if not re.search(r"[A-Za-z]", raw) or not re.search(r"\d", raw):
+        return None, f"유효하지 않은 S/N 형식 '{raw}' 제외"
+    return raw.upper(), None
+
+
+def clean_enrich_sales_price(val: Any) -> Tuple[Optional[str], Optional[str]]:
+    """보충용 판매가(selling) 정제: 괄호 음수 '(121,470)', 음수, 0, 비숫자는 None 제외."""
+    raw = _strip_control_chars(val)
+    if not raw or raw.lower() in ENRICH_EMPTY_TOKENS:
+        return None, None
+    if "?" in raw or raw.lower() == "x":
+        return None, f"비정상 판매가 '{raw}' 제외"
+    # 회계 음수 표기 '(121,470)' 또는 음수 '-121470' 차단
+    if (raw.startswith("(") and raw.endswith(")")) or raw.startswith("-"):
+        return None, f"음수/반품 판매가 '{raw}' 제외"
+    num_str = re.sub(r"[€$£₩,\s]", "", raw)
+    num_str = re.sub(r"(?i)eur$", "", num_str).strip()
+    try:
+        fv = float(num_str)
+    except ValueError:
+        return None, f"숫자 형식 오류 판매가 '{raw}' 제외"
+    if fv <= 0:
+        return None, f"0 이하 판매가 '{raw}' 제외"
+    return (str(int(fv)) if fv.is_integer() else f"{fv:.2f}"), None
+
+
+def clean_enrich_sales_month(val: Any, default_year: int = 2026) -> Tuple[Optional[str], Optional[str]]:
+    """
+    보충용 Sales month 정규화 (표준 출력: 'YYYY.MM'):
+    - '?' 포함 ('12 ???', '11 ?') -> 월 미확정 -> None 제외
+    - 연도만 단독 표기 ('2026', '2027') -> 월 미정 -> None 제외
+    - 단일 월 (1~12) -> '{default_year}.{MM:02d}'
+    - '27.01', '27.3', '2026.11', '2026-11' -> 'YYYY.MM'
+    """
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return None, None
+
+    if isinstance(val, (pd.Timestamp, datetime.datetime, datetime.date)):
+        dt = parse_excel_datetime(val)
+        if dt and 2000 <= dt.year <= 2100:
+            return f"{dt.year:04d}.{dt.month:02d}", None
+        return None, f"비정상 매출월 날짜 '{val}' 제외"
+
+    raw = _strip_control_chars(val)
+    if not raw or raw.lower() in ENRICH_EMPTY_TOKENS:
+        return None, None
+
+    if "?" in raw:
+        return None, f"월 미확정 '{raw}' 제외"
+    if raw.lower() == "x":
+        return None, f"비정상 매출월 '{raw}' 제외"
+
+    # 연도 단독 표기 ('2026', '2027', '2026.0', '2027.0') -> 월 미정 제외
+    if re.match(r"^(20\d{2})(?:\.0+)?$", raw):
+        return None, f"월 미정 연도 표기 '{raw}' 제외"
+
+    # YYYY.MM / YYYY-MM / YYYY/MM
+    m_full = re.match(r"^(20\d{2})[-./](\d{1,2})$", raw)
+    if m_full:
+        yy, mm = int(m_full.group(1)), int(m_full.group(2))
+        if 1 <= mm <= 12:
+            return f"{yy:04d}.{mm:02d}", None
+        return None, f"범위 초과 매출월 '{raw}' 제외"
+
+    # YY.MM / YY.M / YY-MM (예: '27.01', '27.03', '27.3', '26.11')
+    m_short = re.match(r"^(\d{2})[-./](\d{1,2})$", raw)
+    if m_short:
+        yy_short, mm = int(m_short.group(1)), int(m_short.group(2))
+        if 20 <= yy_short <= 49 and 1 <= mm <= 12:
+            return f"{2000 + yy_short:04d}.{mm:02d}", None
+        return None, f"비정상 매출월 '{raw}' 제외"
+
+    # 단일 월 숫자 (1~12, '1.0'~'12.0', '11월')
+    m_mon = re.match(r"^(\d{1,2})(?:\.0+)?월?$", raw)
+    if m_mon:
+        mm = int(m_mon.group(1))
+        if 1 <= mm <= 12:
+            return f"{default_year:04d}.{mm:02d}", None
+        return None, f"범위 초과 월 숫자 '{raw}' 제외"
+
+    return None, f"해석 불가 매출월 '{raw}' 제외"
+
+
+def clean_enrich_so_no(val: Any) -> Tuple[Optional[str], Optional[str]]:
+    raw = _strip_control_chars(val)
+    if not raw or raw.lower() in ENRICH_EMPTY_TOKENS:
+        return None, None
+    if "?" in raw or raw.lower() == "x" or raw in ("0", "0.0"):
+        return None, f"비정상 S/O 값 '{raw}' 제외"
+    cleaned = clean_so_number(raw)
+    if not cleaned:
+        return None, f"유효하지 않은 S/O 형식 '{raw}' 제외"
+    return cleaned, None
+
+
+def clean_enrich_dealer_order_no(val: Any) -> Tuple[Optional[str], Optional[str]]:
+    raw = _strip_control_chars(val)
+    if not raw or raw.lower() in ENRICH_EMPTY_TOKENS:
+        return None, None
+    if raw in ("0", "0.0") or raw.lower() == "x" or raw.replace("?", "").strip() == "":
+        return None, f"비정상 ORDER NO '{raw}' 제외"
+    return raw, None
+
+
+def clean_enrich_date(val: Any, label: str) -> Tuple[Optional[datetime.datetime], Optional[str]]:
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return None, None
+    if isinstance(val, str):
+        raw = _strip_control_chars(val)
+        if not raw or raw.lower() in ENRICH_EMPTY_TOKENS:
+            return None, None
+        if "?" in raw or raw.lower() == "x":
+            return None, f"비정상 {label} '{raw}' 제외"
+    dt = parse_excel_datetime(val)
+    if dt is None:
+        raw_s = _strip_control_chars(val)
+        if raw_s and raw_s.lower() not in ENRICH_EMPTY_TOKENS:
+            return None, f"날짜 형식 오류 {label} '{raw_s}' 제외"
+        return None, None
+    return dt, None
+
+
+def clean_enrich_code_str(
+    val: Any,
+    label: str,
+    uppercase: bool = False,
+) -> Tuple[Optional[str], Optional[str]]:
+    raw = _strip_control_chars(val)
+    if not raw or raw.lower() in ENRICH_EMPTY_TOKENS:
+        return None, None
+    if raw in ("0", "0.0") or raw.lower() == "x" or "?" in raw:
+        return None, f"비정상 {label} '{raw}' 제외"
+    return (raw.upper() if uppercase else raw), None
+
+
+def parse_order_enrichment_excel_bytes(
+    excel_bytes: bytes,
+    sales_month_year: int = 2026,
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """
+    딜러 주문 내역 엑셀(.xlsx/.xls, 예: Order 20261126.xlsx)을 메모리에서 파싱합니다.
+    - 상단 15행을 스캔하여 P/O 및 주문 보충 헤더 행을 자동 탐지
+    - 모든 비정상 값(0, x, ?, 음수 괄호, 월 미정 Sales month 등)은 빈 값(None)으로 제외하고 사유를 기록
+    """
+    xls = pd.ExcelFile(io.BytesIO(excel_bytes))
+    all_alias_tokens = {tok for aliases in ENRICH_COLUMN_ALIASES.values() for tok in aliases}
+
+    best_score = -1
+    best_sheet = None
+    best_header_row = 0
+    best_raw = None
+
+    for sheet in xls.sheet_names:
+        raw = pd.read_excel(xls, sheet_name=sheet, header=None)
+        for r in range(min(15, len(raw))):
+            norms = [_norm_header(v) for v in raw.iloc[r].tolist()]
+            score = sum(1 for v in norms if v in all_alias_tokens)
+            if any(v in ENRICH_COLUMN_ALIASES["reference_no"] for v in norms):
+                score += 6
+            if any(v in ENRICH_COLUMN_ALIASES["dealer_order_no"] for v in norms):
+                score += 4
+            if any(v in ENRICH_COLUMN_ALIASES["sales_price"] for v in norms):
+                score += 3
+            if score > best_score:
+                best_score = score
+                best_sheet = sheet
+                best_header_row = r
+                best_raw = raw
+
+    if best_raw is None or best_score < 6:
+        raise ValueError("엑셀에서 유효한 주문 보충 헤더(P/O, DEALER Order no, selling 등)를 찾을 수 없습니다.")
+
+    raw_headers = [_strip_control_chars(v) for v in best_raw.iloc[best_header_row].tolist()]
+    norm_headers = [_norm_header(v) for v in raw_headers]
+
+    col_map: Dict[str, Tuple[int, str, str]] = {}
+    used_idx: Set[int] = set()
+
+    for field_name, aliases in ENRICH_COLUMN_ALIASES.items():
+        found_idx = None
+        method = ""
+        for idx, nh in enumerate(norm_headers):
+            if idx in used_idx or not nh:
+                continue
+            if nh == aliases[0]:
+                found_idx, method = idx, "exact"
+                break
+        if found_idx is None:
+            for idx, nh in enumerate(norm_headers):
+                if idx in used_idx or not nh:
+                    continue
+                if nh in aliases:
+                    found_idx, method = idx, "alias"
+                    break
+        if found_idx is not None:
+            col_map[field_name] = (found_idx, raw_headers[found_idx], method)
+            used_idx.add(found_idx)
+
+    if "reference_no" not in col_map:
+        raise ValueError("필수 기준 컬럼 'P/O'를 찾을 수 없습니다.")
+
+    po_idx = col_map["reference_no"][0]
+
+    def _get(r_idx: int, key: str) -> Any:
+        if key not in col_map:
+            return None
+        c_idx = col_map[key][0]
+        return best_raw.iloc[r_idx, c_idx] if c_idx < best_raw.shape[1] else None
+
+    parsed_rows: List[Dict[str, Any]] = []
+    skipped_invalid_po_rows: List[Dict[str, Any]] = []
+
+    for r in range(best_header_row + 1, len(best_raw)):
+        raw_po_val = _get(r, "reference_no")
+        raw_po_str = _strip_control_chars(raw_po_val)
+        po_val = clean_po_number(raw_po_str)
+
+        if not po_val:
+            # 완전히 비어 있는 행은 무시, 다른 데이터(딜러/모델 등)가 있는데 P/O만 이상한 행은 기록
+            dealer_hint = _strip_control_chars(_get(r, "dealer"))
+            model_hint = _strip_control_chars(_get(r, "model"))
+            if raw_po_str or dealer_hint or model_hint:
+                if raw_po_str.upper() not in ("P/O", "PO", "PO NUMBER"):
+                    skipped_invalid_po_rows.append({
+                        "excel_row": r + 1,
+                        "raw_po": raw_po_str,
+                        "dealer": dealer_hint,
+                        "model": model_hint,
+                    })
+            continue
+
+        anomalies: List[Dict[str, str]] = []
+
+        def _track(field_name: str, cleaned_tuple: Tuple[Any, Optional[str]]) -> Any:
+            val_out, reason = cleaned_tuple
+            if reason:
+                anomalies.append({
+                    "field": field_name,
+                    "label": ENRICH_FIELD_MAP[field_name]["label"],
+                    "reason": reason,
+                })
+            return val_out
+
+        values = {
+            "dealer_order_date": _track("dealer_order_date", clean_enrich_date(_get(r, "dealer_order_date"), "ORDER DATE")),
+            "dealer_order_no": _track("dealer_order_no", clean_enrich_dealer_order_no(_get(r, "dealer_order_no"))),
+            "serial_number": _track("serial_number", clean_enrich_serial_number(_get(r, "serial_number"))),
+            "nc": _track("nc", clean_enrich_code_str(_get(r, "nc"), "NC", uppercase=False)),
+            "incoterms": _track("incoterms", clean_enrich_code_str(_get(r, "incoterms"), "INCOTERMS", uppercase=True)),
+            "destination_port": _track("destination_port", clean_enrich_code_str(_get(r, "destination_port"), "PORT", uppercase=False)),
+            "etd": _track("etd", clean_enrich_date(_get(r, "etd"), "ETD")),
+            "eta": _track("eta", clean_enrich_date(_get(r, "eta"), "ETA")),
+            "sales_price": _track("sales_price", clean_enrich_sales_price(_get(r, "sales_price"))),
+            "sales_month": _track("sales_month", clean_enrich_sales_month(_get(r, "sales_month"), default_year=sales_month_year)),
+            "so_no": _track("so_no", clean_enrich_so_no(_get(r, "so_no"))),
+        }
+
+        parsed_rows.append({
+            "excel_row": r + 1,
+            "reference_no": po_val,
+            "dealer_raw": _strip_control_chars(_get(r, "dealer")) or None,
+            "model_raw": _strip_control_chars(_get(r, "model")) or None,
+            "values": values,
+            "anomalies": anomalies,
+        })
+
+    parse_meta = {
+        "sheet_name": best_sheet,
+        "header_row": best_header_row + 1,
+        "total_cols": int(best_raw.shape[1]),
+        "total_po_rows": len(parsed_rows),
+        "sales_month_year": sales_month_year,
+        "column_mapping": {
+            k: {"col_idx": v[0], "raw_header": v[1], "method": v[2]}
+            for k, v in col_map.items()
+        },
+        "target_columns": ENRICH_HEADER_DISPLAY_COLUMNS,
+        "skipped_invalid_po_rows": skipped_invalid_po_rows,
+    }
+    return parsed_rows, parse_meta
+
+
+def _compute_enrichment_preview(
+    parsed_rows: List[Dict[str, Any]],
+    parse_meta: Dict[str, Any],
+    db: Session,
+) -> Dict[str, Any]:
+    """
+    P/O 기준 DB 빈 칸('-') 보충 Dry-Run 미리보기 계산:
+    - 규칙 2: 파일 내 중복 P/O 행은 전체 보충 제외, 중복/타 P/O 점유 S/N 및 비정상 값은 빈 값(None) 제외
+    - 규칙 3: 월 미정 Sales month는 빈 값(None) 제외
+    - 규칙 4: 시스템에 기등록된 A 발주 및 F 발주 모두 빈 칸(selling, DEALER Order no, Sales month 포함) 보충
+    - 기존 DB에 이미 값이 있는 컬럼은 절대 덮어쓰지 않고 보존
+    """
+    cache = prefetch_master_and_state(db)
+    # NC 마스터 원본 대소문자 보존 맵
+    nc_canonical_map: Dict[str, str] = {
+        _norm_key(nc.nc_code): nc.nc_code
+        for nc in db.execute(select(models.NCCode)).scalars().all()
+        if nc.nc_code
+    }
+    models_by_id: Dict[int, models.ProductModel] = {
+        pm.id: pm for pm in list(cache.models_by_code.values()) + list(cache.models_by_name.values())
+    }
+    dealers_by_id: Dict[int, models.DealerCompany] = {
+        dc.id: dc for dc in cache.dealers_by_name.values()
+    }
+
+    # 1) 파일 내 중복 P/O 검출 -> 전부 제외 대상
+    po_counter = Counter(r["reference_no"] for r in parsed_rows)
+    dup_po_set = {po for po, cnt in po_counter.items() if cnt > 1}
+
+    # 2) 비중복 P/O 행 기준 파일 내 중복 S/N 검출 -> 해당 S/N 값만 빈 값으로 제외
+    non_dup_rows = [r for r in parsed_rows if r["reference_no"] not in dup_po_set]
+    sn_counter = Counter(
+        r["values"]["serial_number"]
+        for r in non_dup_rows
+        if r["values"].get("serial_number")
+    )
+    dup_sn_set = {sn for sn, cnt in sn_counter.items() if cnt > 1}
+
+    enrich_rows: List[Dict[str, Any]] = []
+    excluded_duplicate_rows: List[Dict[str, Any]] = []
+    unmatched_rows: List[Dict[str, Any]] = []
+    apply_items: List[Dict[str, Any]] = []
+
+    no_change_count = 0
+    total_fields_to_fill = 0
+    total_anomalies_excluded = 0
+    field_fill_counts: Counter = Counter()
+    po_type_counts: Counter = Counter()
+
+    for row in parsed_rows:
+        ref_no = row["reference_no"]
+        ref_key = _norm_key(ref_no)
+        anomalies = list(row["anomalies"])
+
+        # [규칙 2] 파일 내 중복 P/O는 보충 대상에서 완전 제외
+        if ref_no in dup_po_set:
+            excluded_duplicate_rows.append({
+                "excel_row": row["excel_row"],
+                "reference_no": ref_no,
+                "dealer_raw": row["dealer_raw"],
+                "model_raw": row["model_raw"],
+                "duplicate_count": po_counter[ref_no],
+                "reason": f"파일 내 동일 P/O({ref_no})가 {po_counter[ref_no]}건 중복되어 보충 제외 처리됨",
+            })
+            continue
+
+        # DB 매칭 확인 (미등록 P/O는 신규 생성하지 않고 건너뜀)
+        existing_order = cache.orders_by_ref.get(ref_key)
+        if existing_order is None:
+            unmatched_rows.append({
+                "excel_row": row["excel_row"],
+                "reference_no": ref_no,
+                "po_type": "F" if ref_no.startswith("F") else ("A" if ref_no.startswith("A") else "OTHER"),
+                "dealer_raw": row["dealer_raw"],
+                "model_raw": row["model_raw"],
+                "dealer_order_no": row["values"].get("dealer_order_no"),
+                "sales_price": row["values"].get("sales_price"),
+                "sales_month": row["values"].get("sales_month"),
+            })
+            continue
+
+        # [규칙 2] S/N 중복 및 타 P/O DB 점유 검사 -> 해당 S/N만 빈 값(None)으로 제외
+        cand_values = dict(row["values"])
+        sn_val = cand_values.get("serial_number")
+        if sn_val:
+            sn_key = _norm_key(sn_val)
+            if sn_val in dup_sn_set:
+                cand_values["serial_number"] = None
+                anomalies.append({
+                    "field": "serial_number",
+                    "label": "S/N",
+                    "reason": f"파일 내 중복 S/N '{sn_val}'({sn_counter[sn_val]}건) 제외",
+                })
+            elif sn_key in cache.orders_by_sn and _norm_key(cache.orders_by_sn[sn_key].reference_no) != ref_key:
+                owner = cache.orders_by_sn[sn_key]
+                cand_values["serial_number"] = None
+                anomalies.append({
+                    "field": "serial_number",
+                    "label": "S/N",
+                    "reason": f"DB 타 P/O('{owner.reference_no}') 점유 S/N '{sn_val}' 제외",
+                })
+
+        # NC 표기가 마스터에 존재하면 마스터 표기 사용
+        if cand_values.get("nc"):
+            nc_k = _norm_key(cand_values["nc"])
+            if nc_k in nc_canonical_map:
+                cand_values["nc"] = nc_canonical_map[nc_k]
+
+        total_anomalies_excluded += len(anomalies)
+
+        # 빈 칸('-')인 DB 컬럼만 추출 (기존 DB 값이 있으면 절대 덮어쓰지 않음)
+        fill_fields: Dict[str, Any] = {}
+        fill_display: Dict[str, Dict[str, Any]] = {}
+        preserved_fields: List[str] = []
+
+        for meta in ENRICH_TARGET_FIELDS:
+            f_name = meta["field"]
+            new_val = cand_values.get(f_name)
+            db_val = getattr(existing_order, f_name, None)
+
+            if not _is_db_value_empty(db_val):
+                if new_val is not None:
+                    preserved_fields.append(meta["label"])
+                continue
+
+            if new_val is None:
+                continue
+
+            serialized_val = new_val.isoformat() if isinstance(new_val, datetime.datetime) else new_val
+            display_val = _fmt_diff_val(new_val)
+            fill_fields[f_name] = serialized_val
+            fill_display[f_name] = {
+                "label": meta["label"],
+                "db": "-",
+                "new": display_val,
+            }
+            field_fill_counts[f_name] += 1
+            total_fields_to_fill += 1
+
+        if not fill_fields:
+            no_change_count += 1
+            continue
+
+        po_type = "F" if ref_no.startswith("F") else ("A" if ref_no.startswith("A") else "OTHER")
+        po_type_counts[po_type] += 1
+
+        db_dealer = dealers_by_id.get(existing_order.dealer_company_id)
+        db_model = models_by_id.get(existing_order.product_model_id)
+
+        enrich_rows.append({
+            "row_uid": f"e{row['excel_row']}_{ref_no}",
+            "excel_row": row["excel_row"],
+            "reference_no": ref_no,
+            "po_type": po_type,
+            "order_id": existing_order.id,
+            "current_status": existing_order.current_status.value if existing_order.current_status else None,
+            "db_dealer": db_dealer.name if db_dealer else "-",
+            "excel_dealer": row["dealer_raw"],
+            "db_model": db_model.model_name if db_model else (db_model.model_code if db_model else "-"),
+            "fill_count": len(fill_fields),
+            "fill_fields": fill_fields,
+            "fill_display": fill_display,
+            "preserved_fields": preserved_fields,
+            "anomalies": anomalies,
+        })
+        apply_items.append({
+            "reference_no": ref_no,
+            "fill_fields": fill_fields,
+        })
+
+    enrich_rows.sort(key=lambda x: (-x["fill_count"], x["reference_no"]))
+
+    return {
+        "mode": "FILL_BLANKS_ONLY",
+        "parse_meta": parse_meta,
+        "summary": {
+            "total_excel_po_rows": len(parsed_rows),
+            "matched_db_orders": len(enrich_rows) + no_change_count,
+            "enrich_order_count": len(enrich_rows),
+            "enrich_a_order_count": po_type_counts["A"],
+            "enrich_f_order_count": po_type_counts["F"],
+            "total_fields_to_fill": total_fields_to_fill,
+            "no_change_count": no_change_count,
+            "unmatched_po_count": len(unmatched_rows),
+            "excluded_duplicate_po_count": len(excluded_duplicate_rows),
+            "excluded_anomaly_values_count": total_anomalies_excluded,
+            "field_fill_counts": dict(field_fill_counts),
+        },
+        "enrich_rows": enrich_rows,
+        "excluded_duplicate_rows": excluded_duplicate_rows,
+        "unmatched_rows": unmatched_rows,
+        "apply_request_template": {
+            "items": apply_items,
+            "sales_month_year": parse_meta.get("sales_month_year", 2026),
+        },
+    }
+
+
+def _execute_atomic_enrichment(req: ApplyEnrichRequest, db: Session) -> Dict[str, Any]:
+    """
+    [트랜잭션 빈 칸 보충 커밋]
+    - 커밋 직전 DB를 재조회하여 실제로 비어 있는(NULL/'-') 컬럼에만 안전하게 기록
+    - 기등록 A/F 발주 모두 selling(sales_price), DEALER Order no, Sales month 포함 보충
+    - 기존에 값이 존재하는 컬럼은 100% 보존 (절대 덮어쓰지 않음)
+    - DB에 없는 P/O는 신규 생성(INSERT)하지 않음
+    """
+    cache = prefetch_master_and_state(db)
+    now = datetime.datetime.utcnow()
+
+    nc_canonical_map: Dict[str, str] = {
+        _norm_key(nc.nc_code): nc.nc_code
+        for nc in db.execute(select(models.NCCode)).scalars().all()
+        if nc.nc_code
+    }
+
+    # 요청 내 중복 P/O가 있다면 규칙 2에 따라 전부 제외
+    norm_refs = [clean_po_number(it.reference_no) for it in req.items]
+    ref_counter = Counter(r for r in norm_refs if r)
+    dup_req_refs = {r for r, c in ref_counter.items() if c > 1}
+
+    # 요청 내 중복 S/N 사전 감지 -> 해당 S/N 값만 제외
+    req_sn_counter: Counter = Counter()
+    for it in req.items:
+        raw_sn = (it.fill_fields or {}).get("serial_number")
+        sn_clean, _ = clean_enrich_serial_number(raw_sn)
+        if sn_clean:
+            req_sn_counter[sn_clean] += 1
+    dup_req_sns = {sn for sn, c in req_sn_counter.items() if c > 1}
+
+    orders_enriched = 0
+    fields_filled_total = 0
+    field_fill_counts: Counter = Counter()
+    skipped_details: List[Dict[str, str]] = []
+    claimed_sns: Set[str] = set()
+
+    try:
+        for item in req.items:
+            ref_no = clean_po_number(item.reference_no)
+            if not ref_no:
+                skipped_details.append({"reference_no": str(item.reference_no), "reason": "유효하지 않은 P/O"})
+                continue
+            if ref_no in dup_req_refs:
+                skipped_details.append({"reference_no": ref_no, "reason": "요청 내 중복 P/O 제외"})
+                continue
+
+            ref_key = _norm_key(ref_no)
+            existing_order = cache.orders_by_ref.get(ref_key)
+            if existing_order is None:
+                skipped_details.append({"reference_no": ref_no, "reason": "DB 미등록 P/O (신규 생성 안 함)"})
+                continue
+
+            filled_this_order = 0
+            for f_name, raw_val in (item.fill_fields or {}).items():
+                if f_name not in ENRICH_FIELD_MAP:
+                    continue
+
+                # 실시간 빈 칸 재검증: DB에 이미 값이 있으면 절대 덮어쓰지 않음
+                current_db_val = getattr(existing_order, f_name, None)
+                if not _is_db_value_empty(current_db_val):
+                    continue
+
+                # 서버단 2차 정제 방어
+                cleaned_val: Any = None
+                anomaly_msg: Optional[str] = None
+                if f_name in ("dealer_order_date", "etd", "eta"):
+                    cleaned_val, anomaly_msg = clean_enrich_date(raw_val, ENRICH_FIELD_MAP[f_name]["label"])
+                elif f_name == "dealer_order_no":
+                    cleaned_val, anomaly_msg = clean_enrich_dealer_order_no(raw_val)
+                elif f_name == "serial_number":
+                    cleaned_val, anomaly_msg = clean_enrich_serial_number(raw_val)
+                    if cleaned_val:
+                        sn_key = _norm_key(cleaned_val)
+                        if cleaned_val in dup_req_sns or sn_key in claimed_sns:
+                            skipped_details.append({"reference_no": ref_no, "reason": f"중복 S/N '{cleaned_val}' 제외"})
+                            cleaned_val = None
+                        elif sn_key in cache.orders_by_sn and _norm_key(cache.orders_by_sn[sn_key].reference_no) != ref_key:
+                            owner = cache.orders_by_sn[sn_key]
+                            skipped_details.append({
+                                "reference_no": ref_no,
+                                "reason": f"타 P/O('{owner.reference_no}') 점유 S/N '{cleaned_val}' 제외",
+                            })
+                            cleaned_val = None
+                        else:
+                            claimed_sns.add(sn_key)
+                elif f_name == "sales_price":
+                    cleaned_val, anomaly_msg = clean_enrich_sales_price(raw_val)
+                elif f_name == "sales_month":
+                    cleaned_val, anomaly_msg = clean_enrich_sales_month(raw_val, default_year=req.sales_month_year)
+                elif f_name == "so_no":
+                    cleaned_val, anomaly_msg = clean_enrich_so_no(raw_val)
+                elif f_name == "incoterms":
+                    cleaned_val, anomaly_msg = clean_enrich_code_str(raw_val, "INCOTERMS", uppercase=True)
+                elif f_name == "nc":
+                    cleaned_val, anomaly_msg = clean_enrich_code_str(raw_val, "NC", uppercase=False)
+                    if cleaned_val and _norm_key(cleaned_val) in nc_canonical_map:
+                        cleaned_val = nc_canonical_map[_norm_key(cleaned_val)]
+                elif f_name == "destination_port":
+                    cleaned_val, anomaly_msg = clean_enrich_code_str(raw_val, "PORT", uppercase=False)
+
+                if anomaly_msg:
+                    skipped_details.append({"reference_no": ref_no, "reason": anomaly_msg})
+                    continue
+                if cleaned_val is None:
+                    continue
+
+                setattr(existing_order, f_name, cleaned_val)
+                filled_this_order += 1
+                fields_filled_total += 1
+                field_fill_counts[f_name] += 1
+
+            if filled_this_order > 0:
+                orders_enriched += 1
+
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"빈 칸 보충 트랜잭션 커밋 실패(전체 롤백 완료): {exc}",
+        )
+
+    return {
+        "status": "committed",
+        "orders_enriched": orders_enriched,
+        "fields_filled_total": fields_filled_total,
+        "field_fill_counts": dict(field_fill_counts),
+        "skipped_details": skipped_details,
+        "committed_at": now.isoformat(),
+    }
+
+
+def _build_enrich_preview_excel(preview_data: Dict[str, Any]) -> bytes:
+    """빈 칸 보충 미리보기 결과를 2개 시트(.xlsx) 검수 리포트로 생성합니다."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "1_빈칸보충_미리보기"
+
+    navy_fill = PatternFill("solid", fgColor="0A1C8F")
+    green_fill = PatternFill("solid", fgColor="E2EFDA")
+    yellow_fill = PatternFill("solid", fgColor="FFF2CC")
+    red_fill = PatternFill("solid", fgColor="FCE4D6")
+    hdr_font = Font(name="Malgun Gothic", size=10, bold=True, color="FFFFFF")
+    data_font = Font(name="Malgun Gothic", size=9.5, color="222222")
+    thin = Side(border_style="thin", color="D9D9D9")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    headers = [
+        "엑셀행", "P/O", "구분", "DB 딜러", "DB 모델", "보충 셀 수",
+        "ORDER DATE", "ORDER NO", "S/N", "NC", "INCOTERMS", "PORT",
+        "ETD", "ETA", "SELLING", "MONTH", "S/O", "제외된 비정상/미정 값",
+    ]
+    ws.row_dimensions[1].height = 24
+    for idx, h in enumerate(headers, 1):
+        c = ws.cell(1, idx, h)
+        c.font, c.fill, c.border = hdr_font, navy_fill, border
+        c.alignment = Alignment(horizontal="center", vertical="center")
+
+    field_keys = [
+        "dealer_order_date", "dealer_order_no", "serial_number", "nc",
+        "incoterms", "destination_port", "etd", "eta",
+        "sales_price", "sales_month", "so_no",
+    ]
+    for r_i, row in enumerate(preview_data.get("enrich_rows", []), 2):
+        fd = row.get("fill_display") or {}
+        anom_txt = " / ".join(a["reason"] for a in (row.get("anomalies") or []))
+        vals = [
+            row["excel_row"],
+            row["reference_no"],
+            row["po_type"],
+            row["db_dealer"],
+            row["db_model"],
+            row["fill_count"],
+            *[fd[k]["new"] if k in fd else "" for k in field_keys],
+            anom_txt,
+        ]
+        for c_i, v in enumerate(vals, 1):
+            cell = ws.cell(r_i, c_i, v)
+            cell.font, cell.border = data_font, border
+            if 7 <= c_i <= 17 and v != "":
+                cell.fill = green_fill
+            elif c_i == 18 and v != "":
+                cell.fill = yellow_fill
+            cell.alignment = Alignment(
+                horizontal="center" if c_i in (1, 2, 3, 6, 7, 10, 11, 13, 14, 16, 17) else "left",
+                vertical="center",
+                wrap_text=True,
+            )
+
+    for idx, w in enumerate([8, 14, 6, 16, 16, 10, 13, 20, 15, 10, 11, 14, 13, 13, 13, 11, 12, 34], 1):
+        ws.column_dimensions[get_column_letter(idx)].width = w
+    ws.freeze_panes = "A2"
+
+    # Sheet 2: 중복 P/O 제외 및 DB 미등록(추후 업로드 예정) 목록
+    ws2 = wb.create_sheet("2_제외_및_DB미등록")
+    headers2 = ["구분", "엑셀행", "P/O", "발주유형", "엑셀 딜러", "엑셀 모델", "상세 사유"]
+    ws2.row_dimensions[1].height = 24
+    for idx, h in enumerate(headers2, 1):
+        c = ws2.cell(1, idx, h)
+        c.font, c.fill, c.border = hdr_font, navy_fill, border
+        c.alignment = Alignment(horizontal="center", vertical="center")
+
+    r_idx = 2
+    for d in preview_data.get("excluded_duplicate_rows", []):
+        vals2 = ["중복 P/O 제외", d["excel_row"], d["reference_no"], "-", d.get("dealer_raw") or "", d.get("model_raw") or "", d["reason"]]
+        for c_i, v in enumerate(vals2, 1):
+            cell = ws2.cell(r_idx, c_i, v)
+            cell.font, cell.border = data_font, border
+            if c_i == 1:
+                cell.fill = red_fill
+            cell.alignment = Alignment(horizontal="center" if c_i in (1, 2, 3, 4) else "left", vertical="center")
+        r_idx += 1
+
+    for u in preview_data.get("unmatched_rows", []):
+        vals2 = [
+            "DB 미등록 (건너뜀)",
+            u["excel_row"],
+            u["reference_no"],
+            u.get("po_type") or "",
+            u.get("dealer_raw") or "",
+            u.get("model_raw") or "",
+            "시스템 미등록 P/O — 신규 생성하지 않음 (추후 발주 업로드 후 재실행 시 자동 보충)",
+        ]
+        for c_i, v in enumerate(vals2, 1):
+            cell = ws2.cell(r_idx, c_i, v)
+            cell.font, cell.border = data_font, border
+            if c_i == 1:
+                cell.fill = yellow_fill
+            cell.alignment = Alignment(horizontal="center" if c_i in (1, 2, 3, 4) else "left", vertical="center")
+        r_idx += 1
+
+    for idx, w in enumerate([18, 8, 15, 10, 18, 18, 48], 1):
+        ws2.column_dimensions[get_column_letter(idx)].width = w
+    ws2.freeze_panes = "A2"
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+# =============================================================================
 # 8. FastAPI Router 팩토리 및 기본 Router (순환 임포트 방지)
 # =============================================================================
 
@@ -1774,6 +2592,62 @@ def create_erp_sync_router(auth_dependency: Optional[Callable[..., Any]] = None)
         if not payload.orders and not payload.shipments:
             raise HTTPException(status_code=400, detail="반영할 주문 또는 선적 항목이 없습니다.")
         result = _execute_atomic_upsert(payload, db)
+        return JSONResponse(result)
+
+    @api_router.post("/enrich/preview")
+    async def preview_order_enrichment(
+        file: UploadFile = File(..., description="딜러 주문 내역 원본 엑셀 (.xlsx/.xls)"),
+        sales_month_year: int = Form(2026, description="단일 월 숫자(1~12)에 적용할 기준 연도 (기본 2026)"),
+        download_excel: bool = Form(False, description="True 시 빈 칸 보충 검수 리포트를 .xlsx로 다운로드"),
+        db: Session = Depends(get_db),
+    ):
+        """
+        [보충 1단계: Dry-Run] 딜러 주문 내역 엑셀을 P/O 기준으로 기존 DB와 대조하여
+        DB에 비어 있는('-'/NULL) 항목에만 채워질 보충 미리보기를 생성합니다.
+        - 기존 DB 값은 절대 덮어쓰지 않음
+        - 중복 P/O 및 비정상 값, 월 미정 Sales month는 자동 제외
+        - 시스템에 기등록된 A/F 발주 모두 selling, DEALER Order no, Sales month 포함 보충
+        """
+        fname_lower = (file.filename or "").lower()
+        if fname_lower and not fname_lower.endswith((".xlsx", ".xls")):
+            raise HTTPException(status_code=400, detail="원본 엑셀 파일(.xlsx, .xls)만 업로드할 수 있습니다.")
+
+        try:
+            excel_bytes = await file.read()
+            parsed_rows, parse_meta = parse_order_enrichment_excel_bytes(
+                excel_bytes=excel_bytes,
+                sales_month_year=sales_month_year,
+            )
+            preview_data = _compute_enrichment_preview(parsed_rows, parse_meta, db)
+        except ValueError as ve:
+            raise HTTPException(status_code=400, detail=str(ve))
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"엑셀 파싱 또는 보충 대조 중 오류: {exc}")
+
+        if download_excel:
+            xls_bytes = _build_enrich_preview_excel(preview_data)
+            ts = datetime.datetime.now().strftime("%Y%m%d_%H%M")
+            fname = quote(f"ERP_Order_Enrich_Preview_{ts}.xlsx")
+            return StreamingResponse(
+                io.BytesIO(xls_bytes),
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={"Content-Disposition": f"attachment; filename*=UTF-8''{fname}"},
+            )
+
+        return JSONResponse(preview_data)
+
+    @api_router.post("/enrich/apply")
+    async def apply_order_enrichment(
+        payload: ApplyEnrichRequest,
+        db: Session = Depends(get_db),
+    ):
+        """
+        [보충 2단계: Atomic Fill-Blanks Commit] /enrich/preview에서 승인된 항목들을
+        단일 트랜잭션으로 기존 DB 레코드의 빈 칸('-'/NULL)에만 안전하게 보충합니다.
+        """
+        if not payload.items:
+            raise HTTPException(status_code=400, detail="보충 반영할 항목이 없습니다.")
+        result = _execute_atomic_enrichment(payload, db)
         return JSONResponse(result)
 
     return api_router

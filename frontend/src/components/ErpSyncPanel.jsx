@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Sparkles,
@@ -10,7 +10,9 @@ import {
   Search,
   RotateCcw,
   ShieldCheck,
+  Database,
 } from "lucide-react";
+import OrderEnrichPanel from "./OrderEnrichPanel";
 import "./ErpSyncPanel.css";
 
 /**
@@ -126,10 +128,18 @@ export default function ErpSyncPanel({
   apiBaseUrl = "",
   baseUrl = "",
   authHeaders = {},
+  initialMode = "hq_sync",
   onSyncCommitted = null,
 }) {
   const { i18n } = useTranslation();
   const isKo = i18n.language?.startsWith("ko");
+  const [workspaceMode, setWorkspaceMode] = useState(initialMode || "hq_sync");
+
+  useEffect(() => {
+    if (initialMode) {
+      setWorkspaceMode(initialMode);
+    }
+  }, [initialMode]);
 
   const endpointBase = useMemo(() => {
     if (baseUrl) return baseUrl.replace(/\/+$/, "");
@@ -780,6 +790,53 @@ export default function ErpSyncPanel({
   // ---------------------------------------------------------------------------
   return (
     <div className="erp-sync-panel">
+      {/* 워크스페이스 모드 전환 탭 */}
+      <div className="erp-sync-mode-tabs">
+        <button
+          type="button"
+          onClick={() => setWorkspaceMode("hq_sync")}
+          className={`erp-sync-mode-tab ${workspaceMode === "hq_sync" ? "active" : ""}`}
+        >
+          <Sparkles size={18} style={{ flexShrink: 0 }} />
+          <div>
+            <div className="erp-sync-mode-tab-title">
+              {isKo ? "1. 본사 Sales List 동기화 (17컬럼 Upsert)" : "1. HQ Sales List Sync (17-Col Upsert)"}
+            </div>
+            <div className="erp-sync-mode-tab-desc">
+              {isKo
+                ? "주간 본사 엑셀 기준 신규 발주 생성 · 기존 일정/S/N/B/L 갱신"
+                : "Create new orders & update schedules/S/N/B/L from weekly HQ Excel"}
+            </div>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setWorkspaceMode("order_enrich")}
+          className={`erp-sync-mode-tab ${workspaceMode === "order_enrich" ? "active" : ""}`}
+        >
+          <Database size={18} style={{ flexShrink: 0 }} />
+          <div>
+            <div className="erp-sync-mode-tab-title">
+              {isKo ? "2. 주문 정보 일괄 보충 (DB 빈 칸 '-' 채우기)" : "2. Order Data Enrichment (Fill Blanks '-')"}
+            </div>
+            <div className="erp-sync-mode-tab-desc">
+              {isKo
+                ? "딜러 주문 리스트 엑셀(P/O 기준)으로 기등록 A·F 발주의 빈 칸(ORDER NO·SELLING·MONTH 등)만 안전 보충"
+                : "Fill empty ('-') fields of existing A & F orders by P/O without overwriting existing values"}
+            </div>
+          </div>
+        </button>
+      </div>
+
+      {workspaceMode === "order_enrich" ? (
+        <OrderEnrichPanel
+          endpointBase={endpointBase}
+          authHeaders={authHeaders}
+          onEnrichCommitted={onSyncCommitted}
+        />
+      ) : (
+        <>
       {/* 헤더 & 업로드 카드 */}
       <div className="erp-sync-card">
         <div className="erp-sync-header">
@@ -2169,6 +2226,8 @@ export default function ErpSyncPanel({
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );
