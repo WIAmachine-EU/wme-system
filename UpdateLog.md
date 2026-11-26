@@ -1,5 +1,31 @@
 ﻿# 공작기계 글로벌 SCM 재고 관리 ERP 시스템 - Update Log
 
+## [2026-11-26] [AI 엑셀 동기화] ERP 표준 추출 17개 컬럼 개편 (DEALER, ETA, DETAIL SPEC 추가 및 순서·명칭 정비)
+
+### 1. 백엔드 지능형 파서 · AI 스키마 추론 · 검수 엑셀 17개 표준 컬럼 개편 (`backend/erp_upload_router.py`)
+* **ERP 표준 추출 17개 컬럼 정의 및 별칭 사전 전면 보강**:
+  * 표준 추출 컬럼 체계를 17개로 확정 및 순서 재배치:
+    * **`NO`** → **`S/O`** → **`MODEL`** → **`DUAL ITEM`** → **`DEALER`** → **`S/N`** → **`P/O`** → **`Port`** → **`PACKING`** → **`ETD`** → **`ETA`** → **`BUYING`** → **`NC`** → **`DETAIL SPEC`** → **`INVOICE(E/C)`** → **`VESSEL`** → **`B/L`**
+  * 신규 추가 3개 컬럼(`DEALER`, `ETA`, `DETAIL SPEC`)과 명칭 정비 컬럼(`P/O`, `BUYING`, `B/L`)에 대한 정규화 별칭(`COLUMN_ALIASES`) 매핑을 보강하여 본사 엑셀의 기존 표기(`PO NUMBER`, `FINAL`, `B/L NO`) 및 변형 헤더에 대한 100% 하위 호환성 유지.
+* **Gemini AI 보조 추론 엔진 확장**:
+  * AI 추론 대상 `core_fields`에 `eta`, `detail_spec`, `dual_item`, `dealer`, `packing`, `invoice_ec` 등 16개 전체 데이터 필드를 포함하고, 필드별 의미 힌트(`field_hints`)를 프롬프트에 주입하여 신규 미매칭 헤더 자동 추론 정확도를 극대화.
+* **검수 리포트 (.xlsx) 다운로드 기능 2개 시트로 확장**:
+  * `1_DB_대조_검수리포트`: 17개 표준 데이터와 함께 DB 대조 Diff, 경고, 차단오류를 한눈에 확인할 수 있는 통합 검수 시트 제공.
+  * **`2_ERP_표준추출_17Cols`**: 업로드된 행 전체를 표준 17개 컬럼 포맷 순서 그대로 가공/정렬한 전용 엑셀 시트 동시 생성.
+
+### 2. 1단계 주차 비교 CLI 유틸리티 17개 컬럼 동기화 (`backend/erp_sales_sync.py`)
+* **14Cols $\rightarrow$ 17Cols 전면 전환**:
+  * 기존 `STANDARD_14_HEADERS` 및 `ERP_Upload_14Cols` 생성 로직을 17개 표준 컬럼(`STANDARD_17_HEADERS`, `ERP_Upload_17Cols`)으로 전환.
+  * 주차 간 변동 대조 항목(`COMPARE_FIELDS`)에 `DEALER`, `ETA`, `DETAIL SPEC` 및 정비된 라벨(`BUYING`, `B/L`)을 반영하여 변경 내역 추적 커버리지 강화.
+
+### 3. 프론트엔드 [AI 엑셀 동기화] 워크스페이스 & 단독 HTML UI 개편 (`ErpSyncPanel.jsx`, `ErpSyncPanel.css`, `erp_sync_ui.html`)
+* **표준 추출 컬럼 (17) 실시간 매핑 현황 스트립 탑재**:
+  * 업로드 영역 하단에 17개 표준 추출 컬럼의 매핑 상태(자동 매핑 / AI 추론 / 미감지)를 칩 형태로 시각화하여 사용자가 파일의 정합성을 즉시 확인할 수 있도록 지원.
+* **검수 테이블 및 인라인 수정 드로어 확장**:
+  * 메인 테이블에서 `DEALER`, `ETA`, `BUYING`, `DETAIL SPEC`, `B/L`을 직관적으로 확인 가능하도록 열 구성 및 배지 라벨을 정비하고, 실시간 통합 검색 범위에 `detail_spec`과 `dealer`를 포함.
+  * 인라인 수정 드로어에 **`ETA` 날짜 입력** 및 **`DETAIL SPEC` 사양 입력 필드**를 추가하고, `ETA`/`ETD`/`VESSEL` 수정 시 연결 선적(Master B/L) 데이터에도 실시간 자동 연동되도록 기능 고도화.
+  * 단독 검수 페이지(`backend/templates/erp_sync_ui.html`)에도 동일한 17개 컬럼 스트립 및 수정/표시 UI 동기화 반영.
+
 ## [2026-11-26] 딜러 포털 [내 구매 내역] ORDER NO 컬럼 신규 추가 및 리스트 헤더·순서 개편, 관리자 [판매 목록] 영문 텍스트 간소화
 
 ### 1. 딜러 포털 [내 구매 내역] `ORDER NO` 컬럼 추가 및 리스트 헤더·순서 개편 (`DealerSalesArchive.jsx`)

@@ -57,6 +57,11 @@
           </div>
         </div>
       </div>
+
+      <!-- 표준 추출 17개 컬럼 현황 -->
+      <div id="schemaStrip" class="mt-3 flex flex-wrap items-center gap-1.5 border-t border-dashed border-slate-200 pt-3 text-[11px]">
+        <span class="mr-1 font-bold text-slate-700">표준 추출 컬럼 (17):</span>
+      </div>
     </div>
 
     <!-- 알림 배너 -->
@@ -81,7 +86,7 @@
             <option value="BACK LOG">BACK LOG</option>
             <option value="HWME STOCK ORDER">HWME STOCK ORDER</option>
           </select>
-          <input id="searchInput" type="text" placeholder="P/O, S/O, S/N, 기종, 딜러, MBL 검색..."
+          <input id="searchInput" type="text" placeholder="P/O, S/O, S/N, 기종, 딜러, 스펙, B/L 검색..."
             class="w-64 rounded-lg border border-slate-300 px-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none" />
           <span id="visibleCountLabel" class="text-xs text-slate-500"></span>
         </div>
@@ -101,8 +106,8 @@
                 <th class="px-3 py-2.5">상태 / 섹션</th>
                 <th class="px-3 py-2.5">P/O &amp; S/O 상태</th>
                 <th class="px-3 py-2.5">S/N (호기) 상태</th>
-                <th class="px-3 py-2.5">기종 / 딜러 (FK)</th>
-                <th class="px-3 py-2.5">선적 (MBL / ETD)</th>
+                <th class="px-3 py-2.5">기종 / 딜러 / 사양</th>
+                <th class="px-3 py-2.5">선적 (B/L / ETD · ETA)</th>
                 <th class="px-3 py-2.5">변경 내역 (DB → Excel) &amp; 충돌 경보</th>
                 <th class="w-28 px-3 py-2.5 text-center">수정 / 보완</th>
               </tr>
@@ -133,6 +138,49 @@
     const API_BASE = ""; // 같은 도메인(FastAPI 서빙)이면 빈 문자열 유지
     const EMPTY_TOKENS = new Set(["", "-", "--", "//", "/", "nan", "none", "nat", "null", "n/a", "tbd"]);
     const PO_REGEX = /^[A-Z0-9][A-Z0-9\-/_]{3,}$/;
+    const STANDARD_17_COLUMNS = [
+      { header: "NO", field: null },
+      { header: "S/O", field: "so_no" },
+      { header: "MODEL", field: "model" },
+      { header: "DUAL ITEM", field: "dual_item" },
+      { header: "DEALER", field: "dealer" },
+      { header: "S/N", field: "serial_number" },
+      { header: "P/O", field: "reference_no" },
+      { header: "Port", field: "destination_port" },
+      { header: "PACKING", field: "packing" },
+      { header: "ETD", field: "etd" },
+      { header: "ETA", field: "eta" },
+      { header: "BUYING", field: "price" },
+      { header: "NC", field: "nc" },
+      { header: "DETAIL SPEC", field: "detail_spec" },
+      { header: "INVOICE(E/C)", field: "invoice_ec" },
+      { header: "VESSEL", field: "vessel" },
+      { header: "B/L", field: "mbl_no" },
+    ];
+
+    function renderSchemaStrip(colMap = null) {
+      const chips = STANDARD_17_COLUMNS.map((c, idx) => {
+        let cls = "border-slate-200 bg-slate-50 text-slate-600";
+        let title = c.header;
+        if (colMap) {
+          if (!c.field) {
+            cls = "border-emerald-200 bg-emerald-50 text-emerald-700";
+            title = "자동 순번 (NO)";
+          } else if (colMap[c.field]) {
+            const m = colMap[c.field];
+            cls = m.method === "ai_inferred"
+              ? "border-violet-200 bg-violet-50 text-violet-700"
+              : "border-emerald-200 bg-emerald-50 text-emerald-700";
+            title = `매핑됨: '${m.raw_header}' (${m.method})`;
+          } else {
+            cls = "border-amber-200 bg-amber-50 text-amber-800";
+            title = "업로드 파일에서 미감지 (인라인 보완 가능)";
+          }
+        }
+        return `<span title="${esc(title)}" class="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 font-semibold ${cls}"><span class="text-[10px] opacity-60">${idx + 1}</span>${esc(c.header)}</span>`;
+      }).join("");
+      $("schemaStrip").innerHTML = `<span class="mr-1 font-bold text-slate-700">표준 추출 컬럼 (17):</span>${chips}`;
+    }
 
     function getAuthHeaders(extra = {}) {
       const headers = { ...extra };
@@ -323,7 +371,7 @@
         if (state.filterTab === "UPDATE" && r.effectiveAction !== "UPDATE") return false;
         if (state.filterTab === "EDITED" && !r.isEdited && !r.isExcluded) return false;
         if (q) {
-          const hay = [r.payload.reference_no, r.payload.so_no, r.payload.serial_number, r.raw.model_raw, r.raw.dealer_raw, r.payload.mbl_no].filter(Boolean).join(" ").toLowerCase();
+          const hay = [r.payload.reference_no, r.payload.so_no, r.payload.serial_number, r.raw.model_raw, r.raw.dealer_raw, r.payload.mbl_no, r.payload.detail_spec, r.payload.nc].filter(Boolean).join(" ").toLowerCase();
           if (!hay.includes(q)) return false;
         }
         return true;
@@ -379,10 +427,13 @@
           <td class="px-3 py-2.5 align-top">
             <div class="font-medium">${esc(modelMap[payload.product_model_id]?.model_code || raw.model_raw || "(없음)")}</div>
             <div class="text-[11px] text-slate-500">${esc(dealerMap[payload.dealer_company_id]?.name || raw.dealer_raw || "(없음)")}</div>
+            ${(payload.nc || payload.price) ? `<div class="mt-0.5 text-[10px] text-slate-400">NC: ${esc(payload.nc || "-")} / BUYING: ${payload.price ? esc(payload.price) : "-"}</div>` : ""}
+            ${payload.detail_spec ? `<div class="mt-0.5 max-w-[200px] truncate text-[10px] text-slate-600" title="${esc(payload.detail_spec)}">SPEC: ${esc(payload.detail_spec)}</div>` : ""}
           </td>
           <td class="px-3 py-2.5 align-top">
             <div class="font-mono text-[11px] font-semibold">${esc(payload.mbl_no || "-")}</div>
-            <div class="text-[10px] text-slate-500">${esc(payload.destination_port || "-")} · ${esc(toDateInput(payload.etd) || "-")}</div>
+            <div class="text-[10px] text-slate-500">${esc(payload.destination_port || "-")} · ETD ${esc(toDateInput(payload.etd) || "-")} / ETA ${esc(toDateInput(payload.eta) || "-")}</div>
+            ${payload.vessel ? `<div class="max-w-[170px] truncate text-[10px] text-slate-400" title="${esc(payload.vessel)}">${esc(payload.vessel)}</div>` : ""}
           </td>
           <td class="max-w-[340px] space-y-1 px-3 py-2.5 align-top">${errsHtml}<div class="flex flex-wrap gap-1">${diffsHtml}</div><div class="flex flex-wrap gap-1">${warnsHtml}</div></td>
           <td class="px-3 py-2.5 text-center align-top">
@@ -412,12 +463,14 @@
                 <div><label class="block text-[11px] font-semibold">S/O</label><input class="ed-inp mt-1 w-full rounded border px-2 py-1 font-mono text-xs" data-uid="${esc(uid)}" data-field="so_no" value="${esc(payload.so_no || "")}" /></div>
                 <div><label class="block text-[11px] font-semibold">기종 FK *</label><select class="ed-sel mt-1 w-full rounded border px-2 py-1 text-xs" data-uid="${esc(uid)}" data-field="product_model_id"><option value="">-- 선택 --</option>${pmOpts}</select></div>
                 <div><label class="block text-[11px] font-semibold">딜러 FK *</label><select class="ed-sel mt-1 w-full rounded border px-2 py-1 text-xs" data-uid="${esc(uid)}" data-field="dealer_company_id"><option value="">-- 선택 --</option>${dcOpts}</select></div>
-                <div><label class="block text-[11px] font-semibold">MBL NO</label><input class="ed-inp mt-1 w-full rounded border px-2 py-1 font-mono text-xs" data-uid="${esc(uid)}" data-field="mbl_no" value="${esc(payload.mbl_no || "")}" /></div>
-                <div><label class="block text-[11px] font-semibold">선박명</label><input class="ed-inp mt-1 w-full rounded border px-2 py-1 text-xs" data-uid="${esc(uid)}" data-field="vessel" value="${esc(payload.vessel || "")}" /></div>
-                <div><label class="block text-[11px] font-semibold">도착항</label><input class="ed-inp mt-1 w-full rounded border px-2 py-1 text-xs" data-uid="${esc(uid)}" data-field="destination_port" value="${esc(payload.destination_port || "")}" /></div>
+                <div><label class="block text-[11px] font-semibold">B/L (MBL)</label><input class="ed-inp mt-1 w-full rounded border px-2 py-1 font-mono text-xs" data-uid="${esc(uid)}" data-field="mbl_no" value="${esc(payload.mbl_no || "")}" /></div>
+                <div><label class="block text-[11px] font-semibold">VESSEL</label><input class="ed-inp mt-1 w-full rounded border px-2 py-1 text-xs" data-uid="${esc(uid)}" data-field="vessel" value="${esc(payload.vessel || "")}" /></div>
+                <div><label class="block text-[11px] font-semibold">Port</label><input class="ed-inp mt-1 w-full rounded border px-2 py-1 text-xs" data-uid="${esc(uid)}" data-field="destination_port" value="${esc(payload.destination_port || "")}" /></div>
                 <div><label class="block text-[11px] font-semibold">ETD</label><input type="date" class="ed-date mt-1 w-full rounded border px-2 py-1 text-xs" data-uid="${esc(uid)}" data-field="etd" value="${esc(toDateInput(payload.etd))}" /></div>
+                <div><label class="block text-[11px] font-semibold">ETA</label><input type="date" class="ed-date mt-1 w-full rounded border px-2 py-1 text-xs" data-uid="${esc(uid)}" data-field="eta" value="${esc(toDateInput(payload.eta))}" /></div>
                 <div><label class="block text-[11px] font-semibold">NC</label><input class="ed-inp mt-1 w-full rounded border px-2 py-1 font-mono text-xs" data-uid="${esc(uid)}" data-field="nc" value="${esc(payload.nc || "")}" /></div>
-                <div><label class="block text-[11px] font-semibold">구매가(EUR)</label><input class="ed-inp mt-1 w-full rounded border px-2 py-1 font-mono text-xs" data-uid="${esc(uid)}" data-field="price" value="${esc(payload.price || "")}" /></div>
+                <div><label class="block text-[11px] font-semibold">BUYING (EUR)</label><input class="ed-inp mt-1 w-full rounded border px-2 py-1 font-mono text-xs" data-uid="${esc(uid)}" data-field="price" value="${esc(payload.price || "")}" /></div>
+                <div class="col-span-2 md:col-span-5"><label class="block text-[11px] font-semibold">DETAIL SPEC</label><input class="ed-inp mt-1 w-full rounded border px-2 py-1 text-xs" data-uid="${esc(uid)}" data-field="detail_spec" value="${esc(payload.detail_spec || "")}" /></div>
               </div>
             </td>
           </tr>`;
@@ -497,6 +550,7 @@
         }
         $("parseMetaBadge").textContent = `감지 시트: ${data.parse_meta.sheet_name} (${data.parse_meta.header_row}행 / ${data.parse_meta.total_cols}열 / P/O ${data.parse_meta.total_po_rows}건)`;
         $("parseMetaBadge").classList.remove("hidden");
+        renderSchemaStrip(data.parse_meta?.column_mapping || null);
         const skipped = data.parse_meta?.skipped_missing_po_rows || [];
         if (skipped.length) {
           $("missingPoAlert").innerHTML = `<strong>P/O 공란 행 제외(${skipped.length}건):</strong> ` + skipped.map((x) => `${x.excel_row}행(S/O ${esc(x.so_no)}, ${esc(x.model || "-")})`).join(" / ");
@@ -570,6 +624,7 @@
     $("searchInput").oninput = (e) => { state.searchText = e.target.value; render(); };
     $("btnSelectAll").onclick = () => { evaluateAllRows().forEach((r) => { if (r.canSelect) state.selectedUids[r.uid] = true; }); render(); };
     $("btnDeselectAll").onclick = () => { Object.keys(state.selectedUids).forEach((k) => state.selectedUids[k] = false); render(); };
+    renderSchemaStrip(null);
   </script>
 </body>
 </html>

@@ -195,6 +195,63 @@
   margin-top: 6px;
 }
 
+/* Standard 17 Extraction Columns Strip */
+.erp-sync-schema-bar {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed #e2e8f0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.erp-sync-schema-title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #334155;
+  margin-right: 4px;
+  white-space: nowrap;
+}
+
+.erp-sync-schema-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 0.69rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.erp-sync-schema-chip.mapped {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #047857;
+}
+
+.erp-sync-schema-chip.ai {
+  background: #f5f3ff;
+  border-color: #c4b5fd;
+  color: #6d28d9;
+}
+
+.erp-sync-schema-chip.missing {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.erp-sync-schema-chip .erp-sync-schema-idx {
+  font-size: 0.63rem;
+  opacity: 0.6;
+  font-weight: 600;
+}
+
 .erp-sync-btn {
   display: inline-flex;
   align-items: center;
@@ -566,15 +623,25 @@
   gap: 10px;
 }
 
+.erp-sync-drawer-span-5 {
+  grid-column: span 5;
+}
+
 @media (max-width: 1180px) {
   .erp-sync-drawer-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .erp-sync-drawer-span-5 {
+    grid-column: span 2;
   }
 }
 
 @media (max-width: 640px) {
   .erp-sync-drawer-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .erp-sync-drawer-span-5 {
+    grid-column: span 2;
   }
 }
 

@@ -1,12 +1,12 @@
 """
-ERP Weekly Sales List Diff & Standard 14-Column Excel Generator (Stage 1 CLI Utility)
+ERP Weekly Sales List Diff & Standard 17-Column Excel Generator (Stage 1 CLI Utility)
 =====================================================================================
 이전 주차와 최신 주차 본사 Sales List 엑셀 파일 2개를 대조(Diff)하여:
-1. ERP 업로드용 14개 표준 컬럼 엑셀 파일 생성:
-   NO, S/O, MODEL, S/N, PO NUMBER, Port, PACKING, ETD, DUAL ITEM, FINAL, NC, INVOICE(E/C), VESSEL, B/L NO
+1. ERP 업로드용 17개 표준 컬럼 엑셀 파일 생성:
+   NO, S/O, MODEL, DUAL ITEM, DEALER, S/N, P/O, Port, PACKING, ETD, ETA, BUYING, NC, DETAIL SPEC, INVOICE(E/C), VESSEL, B/L
 2. 5개 탭으로 구성된 검수 리포트 생성:
    - Summary (요약)
-   - ERP_Upload_14Cols (신규/변동 반영 대상)
+   - ERP_Upload_17Cols (신규/변동 반영 대상)
    - Changes_Detail (필드별 변경 상세: Old -> New)
    - Noise_Filtered (포장 표기 통일 노이즈 제외 목록)
    - Exceptions_Audit (P/O·S/N 중복, S/O 미기입, P/O 공란 행 감사)
@@ -29,43 +29,30 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 from erp_upload_router import (
+    STANDARD_17_HEADERS,
     _norm_key,
     canonical_packing,
     load_po_filter_bytes,
     parse_hq_excel_bytes,
 )
 
-STANDARD_14_HEADERS: List[str] = [
-    "NO",
-    "S/O",
-    "MODEL",
-    "S/N",
-    "PO NUMBER",
-    "Port",
-    "PACKING",
-    "ETD",
-    "DUAL ITEM",
-    "FINAL",
-    "NC",
-    "INVOICE(E/C)",
-    "VESSEL",
-    "B/L NO",
-]
-
 COMPARE_FIELDS: List[Tuple[str, str]] = [
     ("section", "SECTION"),
     ("so_no", "S/O"),
     ("model", "MODEL"),
+    ("dual_item", "DUAL ITEM"),
+    ("dealer", "DEALER"),
     ("serial_number", "S/N"),
     ("destination_port", "Port"),
     ("packing", "PACKING"),
     ("etd", "ETD"),
-    ("dual_item", "DUAL ITEM"),
-    ("price", "FINAL"),
+    ("eta", "ETA"),
+    ("price", "BUYING"),
     ("nc", "NC"),
+    ("detail_spec", "DETAIL SPEC"),
     ("invoice_ec", "INVOICE(E/C)"),
     ("vessel", "VESSEL"),
-    ("mbl_no", "B/L NO"),
+    ("mbl_no", "B/L"),
 ]
 
 
@@ -250,36 +237,44 @@ def _style_sheet(ws: openpyxl.worksheet.worksheet.Worksheet, col_widths: List[in
     ws.freeze_panes = "A2"
 
 
+def _to_standard_17_row(seq: int, r: Dict[str, Any]) -> List[Any]:
+    return [
+        seq,
+        r["so_no"] or "",
+        r["model"] or "",
+        r["dual_item"] or "",
+        r["dealer"] or "",
+        r["serial_number"] or "",
+        r["reference_no"] or "",
+        r["destination_port"] or "",
+        r["packing"] or "",
+        _fmt_val(r["etd"]),
+        _fmt_val(r["eta"]),
+        r["price"] or "",
+        r["nc"] or "",
+        r["detail_spec"] or "",
+        r["invoice_ec"] or "",
+        r["vessel"] or "",
+        r["mbl_no"] or "",
+    ]
+
+
 def write_stage1_outputs(diff_result: Dict[str, Any], out_dir: str) -> Tuple[str, str]:
     os.makedirs(out_dir, exist_ok=True)
     ts = datetime.datetime.now().strftime("%Y%m%d_%H%M")
-    upload_path = os.path.join(out_dir, f"ERP_Upload_14Cols_{ts}.xlsx")
+    upload_path = os.path.join(out_dir, f"ERP_Upload_17Cols_{ts}.xlsx")
     report_path = os.path.join(out_dir, f"ERP_Diff_Review_Report_{ts}.xlsx")
 
-    # 1) ERP 업로드용 14개 표준 컬럼 엑셀
+    std_17_widths = [7, 12, 16, 12, 18, 16, 15, 14, 14, 13, 13, 12, 10, 30, 18, 22, 20]
+
+    # 1) ERP 업로드용 17개 표준 컬럼 엑셀
     wb_up = openpyxl.Workbook()
     ws_up = wb_up.active
     ws_up.title = "ERP_Upload"
-    ws_up.append(STANDARD_14_HEADERS)
+    ws_up.append(STANDARD_17_HEADERS)
     for idx, item in enumerate(diff_result["actionable_rows"], 1):
-        r = item["row"]
-        ws_up.append([
-            idx,
-            r["so_no"] or "",
-            r["model"] or "",
-            r["serial_number"] or "",
-            r["reference_no"] or "",
-            r["destination_port"] or "",
-            r["packing"] or "",
-            _fmt_val(r["etd"]),
-            r["dual_item"] or "",
-            r["price"] or "",
-            r["nc"] or "",
-            r["invoice_ec"] or "",
-            r["vessel"] or "",
-            r["mbl_no"] or "",
-        ])
-    _style_sheet(ws_up, [7, 12, 16, 16, 15, 14, 14, 13, 12, 12, 10, 18, 22, 20])
+        ws_up.append(_to_standard_17_row(idx, item["row"]))
+    _style_sheet(ws_up, std_17_widths)
     wb_up.save(upload_path)
 
     # 2) 5개 탭 검수 리포트
@@ -297,17 +292,11 @@ def write_stage1_outputs(diff_result: Dict[str, Any], out_dir: str) -> Tuple[str
         ws1.append([f"분류: {k}", v])
     _style_sheet(ws1, [28, 42])
 
-    ws2 = wb_rep.create_sheet("2_ERP_Upload_14Cols")
-    ws2.append(["CHANGE_TYPE"] + STANDARD_14_HEADERS)
+    ws2 = wb_rep.create_sheet("2_ERP_Upload_17Cols")
+    ws2.append(["CHANGE_TYPE"] + STANDARD_17_HEADERS)
     for idx, item in enumerate(diff_result["actionable_rows"], 1):
-        r = item["row"]
-        ws2.append([
-            item["change_type"], idx, r["so_no"] or "", r["model"] or "", r["serial_number"] or "",
-            r["reference_no"] or "", r["destination_port"] or "", r["packing"] or "", _fmt_val(r["etd"]),
-            r["dual_item"] or "", r["price"] or "", r["nc"] or "", r["invoice_ec"] or "", r["vessel"] or "",
-            r["mbl_no"] or "",
-        ])
-    _style_sheet(ws2, [20, 7, 12, 16, 16, 15, 14, 14, 13, 12, 12, 10, 18, 22, 20])
+        ws2.append([item["change_type"]] + _to_standard_17_row(idx, item["row"]))
+    _style_sheet(ws2, [20] + std_17_widths)
 
     ws3 = wb_rep.create_sheet("3_Changes_Detail")
     ws3.append(["변동유형", "엑셀행", "P/O", "S/O", "MODEL", "변경 상세 (Old -> New)"])
@@ -332,7 +321,7 @@ def write_stage1_outputs(diff_result: Dict[str, Any], out_dir: str) -> Tuple[str
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="HQ Weekly Sales List Diff & 14-Column ERP Generator")
+    parser = argparse.ArgumentParser(description="HQ Weekly Sales List Diff & 17-Column ERP Generator")
     parser.add_argument("--old", required=True, help="이전 주차 본사 Sales List 엑셀 (.xlsx)")
     parser.add_argument("--new", required=True, help="최신 주차 본사 Sales List 엑셀 (.xlsx)")
     parser.add_argument("--po-filter", default=None, help="(선택) 기준 P/O 목록 파일 (.xlsx/.csv/.txt)")

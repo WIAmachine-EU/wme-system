@@ -45,6 +45,48 @@ const EMPTY_TOKENS = new Set([
 
 const PO_REGEX = /^[A-Z0-9][A-Z0-9\-/_]{3,}$/;
 
+// ERP 표준 추출 17개 컬럼 정의 (순서 및 백엔드 필드 매핑)
+const STANDARD_17_COLUMNS = [
+  { header: "NO", field: null },
+  { header: "S/O", field: "so_no" },
+  { header: "MODEL", field: "model" },
+  { header: "DUAL ITEM", field: "dual_item" },
+  { header: "DEALER", field: "dealer" },
+  { header: "S/N", field: "serial_number" },
+  { header: "P/O", field: "reference_no" },
+  { header: "Port", field: "destination_port" },
+  { header: "PACKING", field: "packing" },
+  { header: "ETD", field: "etd" },
+  { header: "ETA", field: "eta" },
+  { header: "BUYING", field: "price" },
+  { header: "NC", field: "nc" },
+  { header: "DETAIL SPEC", field: "detail_spec" },
+  { header: "INVOICE(E/C)", field: "invoice_ec" },
+  { header: "VESSEL", field: "vessel" },
+  { header: "B/L", field: "mbl_no" },
+];
+
+const DIFF_FIELD_LABELS = {
+  reference_no: "P/O",
+  so_no: "S/O",
+  serial_number: "S/N",
+  product_model_id: "MODEL",
+  dealer_company_id: "DEALER",
+  current_status: "STATUS",
+  destination_port: "Port",
+  etd: "ETD",
+  eta: "ETA",
+  price: "BUYING",
+  sales_price: "SALES PRICE",
+  nc: "NC",
+  detail_spec: "DETAIL SPEC",
+  vessel: "VESSEL",
+  mbl_no: "B/L",
+  incoterms: "INCOTERMS",
+  stock_type: "STOCK TYPE",
+  is_corporate_stock: "CORP STOCK",
+};
+
 function normKey(v) {
   if (v === null || v === undefined) return "";
   return String(v).trim().replace(/\s+/g, " ").toUpperCase();
@@ -404,7 +446,13 @@ export default function ErpSyncPanel({
     const result = [];
     for (const [mblKey, orderPayload] of selectedByMbl.entries()) {
       if (templateMap.has(mblKey)) {
-        result.push(templateMap.get(mblKey));
+        const baseSh = templateMap.get(mblKey);
+        result.push({
+          ...baseSh,
+          vessel: orderPayload.vessel || baseSh.vessel,
+          etd: orderPayload.etd || baseSh.etd,
+          eta: orderPayload.eta || baseSh.eta,
+        });
       } else {
         result.push({
           mbl_no: orderPayload.mbl_no,
@@ -440,10 +488,16 @@ export default function ErpSyncPanel({
           r.payload.so_no,
           r.payload.serial_number,
           r.raw.model_raw,
+          r.payload.product_model_id && modelById[r.payload.product_model_id]?.model_code,
           r.raw.dealer_raw,
+          r.payload.dealer_company_id && dealerById[r.payload.dealer_company_id]?.name,
           r.payload.mbl_no,
           r.payload.vessel,
           r.payload.destination_port,
+          r.payload.nc,
+          r.payload.detail_spec,
+          r.raw.hq_extra?.dual_item,
+          r.raw.hq_extra?.invoice_ec,
         ]
           .filter(Boolean)
           .join(" ")
@@ -452,7 +506,7 @@ export default function ErpSyncPanel({
       }
       return true;
     });
-  }, [evaluatedRows, filterTab, sectionFilter, searchText]);
+  }, [evaluatedRows, filterTab, sectionFilter, searchText, modelById, dealerById]);
 
   // ---------------------------------------------------------------------------
   // API 호출 핸들러
@@ -854,6 +908,45 @@ export default function ErpSyncPanel({
             </div>
           </div>
         </div>
+
+        {/* ERP 표준 추출 17개 컬럼 현황 스트립 */}
+        <div className="erp-sync-schema-bar">
+          <span className="erp-sync-schema-title">
+            {isKo ? "표준 추출 컬럼 (17):" : "Standard Extraction Columns (17):"}
+          </span>
+          {STANDARD_17_COLUMNS.map((col, idx) => {
+            const colMap = previewData?.parse_meta?.column_mapping;
+            const mapped = col.field && colMap ? colMap[col.field] : null;
+            let statusCls = "";
+            let titleTxt = col.header;
+            if (colMap) {
+              if (!col.field) {
+                statusCls = "mapped";
+                titleTxt = isKo ? "자동 순번 (NO)" : "Auto sequence number";
+              } else if (mapped) {
+                statusCls = mapped.method === "ai_inferred" ? "ai" : "mapped";
+                titleTxt = isKo
+                  ? `매핑됨: '${mapped.raw_header}' (${mapped.method})`
+                  : `Mapped: '${mapped.raw_header}' (${mapped.method})`;
+              } else {
+                statusCls = "missing";
+                titleTxt = isKo
+                  ? "업로드 파일에서 미감지 (인라인 보완 가능)"
+                  : "Not detected in uploaded file (can edit inline)";
+              }
+            }
+            return (
+              <span
+                key={col.header}
+                className={`erp-sync-schema-chip ${statusCls}`}
+                title={titleTxt}
+              >
+                <span className="erp-sync-schema-idx">{idx + 1}</span>
+                <span>{col.header}</span>
+              </span>
+            );
+          })}
+        </div>
       </div>
 
       {/* 오류 / 서버 409 충돌 배너 */}
@@ -1001,8 +1094,8 @@ export default function ErpSyncPanel({
                   onChange={(e) => setSearchText(e.target.value)}
                   placeholder={
                     isKo
-                      ? "P/O, S/O, S/N, 기종, 딜러, MBL 검색..."
-                      : "Search P/O, S/O, S/N, Model, Dealer, MBL..."
+                      ? "P/O, S/O, S/N, 기종, 딜러, 스펙, B/L 검색..."
+                      : "Search P/O, S/O, S/N, Model, Dealer, Spec, B/L..."
                   }
                   className="erp-sync-text-input"
                   style={{ width: "260px", paddingLeft: "30px" }}
@@ -1131,8 +1224,8 @@ export default function ErpSyncPanel({
                     <th>{isKo ? "상태 / 섹션" : "Status / Section"}</th>
                     <th>{isKo ? "P/O (reference_no) & S/O" : "P/O & S/O"}</th>
                     <th>{isKo ? "S/N (호기) 상태" : "S/N Status"}</th>
-                    <th>{isKo ? "기종 / 딜러 (FK)" : "Model / Dealer (FK)"}</th>
-                    <th>{isKo ? "선적 (MBL / 선박 / ETD)" : "Shipment (MBL / ETD)"}</th>
+                    <th>{isKo ? "기종 / 딜러 / 사양" : "Model / Dealer / Spec"}</th>
+                    <th>{isKo ? "선적 (B/L / ETD · ETA)" : "Shipment (B/L / ETD · ETA)"}</th>
                     <th>
                       {isKo
                         ? "변경 내역 (DB → Excel) & 이상 경보"
@@ -1405,10 +1498,26 @@ export default function ErpSyncPanel({
                                     color: "#94a3b8",
                                   }}
                                 >
-                                  NC: {payload.nc || "-"} /{" "}
+                                  NC: {payload.nc || "-"} / BUYING:{" "}
                                   {payload.price
                                     ? `€${Number(payload.price).toLocaleString()}`
                                     : "-"}
+                                </div>
+                              )}
+                              {payload.detail_spec && (
+                                <div
+                                  style={{
+                                    marginTop: "2px",
+                                    maxWidth: "210px",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                    fontSize: "0.68rem",
+                                    color: "#475569",
+                                  }}
+                                  title={payload.detail_spec}
+                                >
+                                  SPEC: {payload.detail_spec}
                                 </div>
                               )}
                             </td>
@@ -1421,7 +1530,7 @@ export default function ErpSyncPanel({
                               >
                                 {payload.mbl_no || (
                                   <span style={{ fontWeight: 400, color: "#94a3b8" }}>
-                                    {isKo ? "MBL 미부여" : "No MBL"}
+                                    {isKo ? "B/L 미부여" : "No B/L"}
                                   </span>
                                 )}
                               </div>
@@ -1433,7 +1542,8 @@ export default function ErpSyncPanel({
                                 }}
                               >
                                 {payload.destination_port || "-"} · ETD{" "}
-                                {toDateInputValue(payload.etd) || "-"}
+                                {toDateInputValue(payload.etd) || "-"} / ETA{" "}
+                                {toDateInputValue(payload.eta) || "-"}
                               </div>
                               {payload.vessel && (
                                 <div
@@ -1466,7 +1576,7 @@ export default function ErpSyncPanel({
                                 <div className="erp-sync-diff-wrap">
                                   {Object.entries(raw.diffs).map(([k, v]) => (
                                     <span key={k} className="erp-sync-diff-pill">
-                                      <strong>{k}:</strong>
+                                      <strong>{DIFF_FIELD_LABELS[k] || k}:</strong>
                                       <span className="erp-sync-diff-old">
                                         {v.db ?? "∅"}
                                       </span>
@@ -1782,10 +1892,10 @@ export default function ErpSyncPanel({
                                     </select>
                                   </div>
 
-                                  {/* MBL NO */}
+                                  {/* B/L (MBL) */}
                                   <div>
                                     <label className="erp-sync-field-label">
-                                      Master B/L (MBL)
+                                      B/L (Master B/L)
                                     </label>
                                     <input
                                       type="text"
@@ -1800,7 +1910,7 @@ export default function ErpSyncPanel({
                                   {/* Vessel */}
                                   <div>
                                     <label className="erp-sync-field-label">
-                                      {isKo ? "선박명 (Vessel)" : "Vessel"}
+                                      {isKo ? "선박명 (VESSEL)" : "VESSEL"}
                                     </label>
                                     <input
                                       type="text"
@@ -1815,7 +1925,7 @@ export default function ErpSyncPanel({
                                   {/* Destination Port */}
                                   <div>
                                     <label className="erp-sync-field-label">
-                                      {isKo ? "도착항 (Port)" : "Destination Port"}
+                                      {isKo ? "도착항 (Port)" : "Port"}
                                     </label>
                                     <input
                                       type="text"
@@ -1848,10 +1958,27 @@ export default function ErpSyncPanel({
                                     />
                                   </div>
 
+                                  {/* ETA */}
+                                  <div>
+                                    <label className="erp-sync-field-label">ETA</label>
+                                    <input
+                                      type="date"
+                                      value={toDateInputValue(payload.eta)}
+                                      onChange={(e) =>
+                                        updateRowField(
+                                          uid,
+                                          "eta",
+                                          fromDateInputValue(e.target.value)
+                                        )
+                                      }
+                                      className="erp-sync-drawer-input"
+                                    />
+                                  </div>
+
                                   {/* NC */}
                                   <div>
                                     <label className="erp-sync-field-label">
-                                      {isKo ? "NC 코드" : "NC Code"}
+                                      {isKo ? "NC 코드" : "NC"}
                                     </label>
                                     <input
                                       type="text"
@@ -1867,8 +1994,8 @@ export default function ErpSyncPanel({
                                   <div>
                                     <label className="erp-sync-field-label">
                                       {isKo
-                                        ? "구매가 (FINAL / EUR)"
-                                        : "Buying Price (EUR)"}
+                                        ? "구매가 (BUYING / EUR)"
+                                        : "BUYING (EUR)"}
                                     </label>
                                     <input
                                       type="text"
@@ -1877,6 +2004,28 @@ export default function ErpSyncPanel({
                                         updateRowField(uid, "price", e.target.value)
                                       }
                                       className="erp-sync-drawer-input erp-sync-mono"
+                                    />
+                                  </div>
+
+                                  {/* DETAIL SPEC */}
+                                  <div className="erp-sync-drawer-span-5">
+                                    <label className="erp-sync-field-label">
+                                      {isKo
+                                        ? "상세 사양 (DETAIL SPEC)"
+                                        : "DETAIL SPEC"}
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={payload.detail_spec || ""}
+                                      placeholder={
+                                        isKo
+                                          ? "옵션 및 상세 사양 입력"
+                                          : "Machine options / detailed specification"
+                                      }
+                                      onChange={(e) =>
+                                        updateRowField(uid, "detail_spec", e.target.value)
+                                      }
+                                      className="erp-sync-drawer-input"
                                     />
                                   </div>
                                 </div>

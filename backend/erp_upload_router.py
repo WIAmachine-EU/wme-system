@@ -52,27 +52,50 @@ ALLOWED_SECTIONS: Set[str] = {
     "HWME STOCK ORDER",
 }
 
+# ERP 표준 추출 17개 컬럼 정의 (순서 및 표준 헤더명)
+STANDARD_17_COLUMNS: List[Dict[str, Optional[str]]] = [
+    {"header": "NO", "field": None},
+    {"header": "S/O", "field": "so_no"},
+    {"header": "MODEL", "field": "model"},
+    {"header": "DUAL ITEM", "field": "dual_item"},
+    {"header": "DEALER", "field": "dealer"},
+    {"header": "S/N", "field": "serial_number"},
+    {"header": "P/O", "field": "reference_no"},
+    {"header": "Port", "field": "destination_port"},
+    {"header": "PACKING", "field": "packing"},
+    {"header": "ETD", "field": "etd"},
+    {"header": "ETA", "field": "eta"},
+    {"header": "BUYING", "field": "price"},
+    {"header": "NC", "field": "nc"},
+    {"header": "DETAIL SPEC", "field": "detail_spec"},
+    {"header": "INVOICE(E/C)", "field": "invoice_ec"},
+    {"header": "VESSEL", "field": "vessel"},
+    {"header": "B/L", "field": "mbl_no"},
+]
+
+STANDARD_17_HEADERS: List[str] = [col["header"] for col in STANDARD_17_COLUMNS]
+
 # 본사 엑셀 헤더 표기 변동 방어용 별칭 사전 (정규화: 소문자 + 공백/점/줄바꿈 제거)
 COLUMN_ALIASES: Dict[str, List[str]] = {
-    "reference_no": ["ponumber", "p/o", "pono", "po#", "po", "referenceno"],
+    "reference_no": ["p/o", "ponumber", "pono", "p/ono", "p/onumber", "po#", "po", "referenceno"],
     "so_no": ["s/o", "so", "sono", "s/ono", "hqso", "salesorder"],
     "model": ["model", "modelname", "modelcode", "기종"],
+    "dual_item": ["dualitem", "dualuse", "dual", "전략물자"],
+    "dealer": ["dealer", "orderdealer", "dealername", "customer", "buyer", "딜러", "딜러사", "거래처"],
     "serial_number": ["s/n", "sn", "serial", "serialno", "serialnumber", "호기"],
-    "dealer": ["dealer", "orderdealer", "dealername", "딜러"],
     "destination_port": ["port", "pod", "destport", "destinationport", "도착항"],
     "packing": ["packing", "expectedpacking", "packdate", "포장", "포장일"],
     "etd": ["etd", "hqetd", "etdpol", "b/ldate", "bldate", "출항예정일"],
     "atd": ["atd", "actualdeparture", "실출항일"],
-    "eta": ["eta", "etapod", "도착예정일"],
-    "dual_item": ["dualitem", "dualuse", "전략물자"],
-    "price": ["final", "buying", "buyingprice", "finalprice", "구매가"],
+    "eta": ["eta", "etapod", "etadate", "arrivaldate", "도착예정일", "도착일"],
+    "price": ["buying", "final", "buyingprice", "finalprice", "구매가", "매입가"],
     "sales_price": ["salesprice", "판매가"],
     "nc": ["nc", "nccode", "cnc", "controller"],
     "incoterms": ["incoterms", "incoterm", "인코텀즈"],
-    "detail_spec": ["detailspec", "option", "spec", "옵션", "상세사양"],
-    "invoice_ec": ["invoice(e/c)", "invoice(e/c)면장", "invoiceec", "ecinvoice"],
+    "detail_spec": ["detailspec", "detail", "details", "spec", "specification", "specifications", "option", "options", "optionspec", "상세스펙", "상세사양", "옵션", "사양"],
+    "invoice_ec": ["invoice(e/c)", "invoice(e/c)면장", "invoiceec", "ecinvoice", "e/c"],
     "vessel": ["vessel", "vesselname", "선박명", "선명"],
-    "mbl_no": ["b/lno", "b/l", "blno", "bl#", "bl", "mblno", "mbl", "houseb/l", "선하증권번호"],
+    "mbl_no": ["b/l", "b/lno", "blno", "bl#", "bl", "mblno", "mbl", "masterb/l", "houseb/l", "선하증권", "선하증권번호"],
     "dealer_order_no": ["dealerorderno", "dealerpo", "hwmepo", "법인po"],
     "dealer_order_date": ["orderdate", "podate", "발주일"],
     "delivery_request_date": ["d/l", "dl", "deliveryrequestdate", "납기요청일"],
@@ -570,9 +593,29 @@ def _infer_missing_columns_gemini(
     if not api_key or not missing_fields or not unmapped_headers:
         return {}
 
+    field_hints = {
+        "so_no": "S/O (Sales Order number)",
+        "model": "MODEL (machine model code/name)",
+        "dual_item": "DUAL ITEM (strategic/dual-use item code or flag)",
+        "dealer": "DEALER (dealer or customer company name)",
+        "serial_number": "S/N (machine serial number)",
+        "reference_no": "P/O (PO NUMBER / purchase order reference)",
+        "destination_port": "Port (destination port / POD)",
+        "packing": "PACKING (packing date or status)",
+        "etd": "ETD (estimated time of departure)",
+        "eta": "ETA (estimated time of arrival)",
+        "price": "BUYING (final buying price / FINAL)",
+        "nc": "NC (CNC controller code)",
+        "detail_spec": "DETAIL SPEC (machine option / detailed specifications)",
+        "invoice_ec": "INVOICE(E/C) (export clearance / invoice number)",
+        "vessel": "VESSEL (vessel name / voyage)",
+        "mbl_no": "B/L (Bill of Lading / Master B/L number)",
+    }
+    missing_desc = {f: field_hints.get(f, f) for f in missing_fields}
+
     prompt = (
         "Map each missing ERP field name to the matching Excel source column index.\n"
-        f"Missing fields: {missing_fields}\n"
+        f"Missing fields: {json.dumps(missing_desc, ensure_ascii=False)}\n"
         f"Unmapped headers (index -> title): {json.dumps(unmapped_headers, ensure_ascii=False)}\n"
         f"Sample rows: {json.dumps(sample_rows[:3], ensure_ascii=False, default=str)}\n"
         "Return ONLY valid JSON mapping field_name -> integer column index. Omit uncertain fields."
@@ -677,10 +720,11 @@ def parse_hq_excel_bytes(
             col_map[field_name] = (found_idx, raw_headers[found_idx], method)
             used_idx.add(found_idx)
 
-    # AI 보조 추론 (핵심 필드 누락 + use_ai=True)
+    # AI 보조 추론 (표준 추출 17개 컬럼 중 데이터 16개 필드 누락 + use_ai=True)
     core_fields = [
-        "reference_no", "so_no", "model", "serial_number", "dealer",
-        "destination_port", "etd", "price", "nc", "vessel", "mbl_no",
+        "so_no", "model", "dual_item", "dealer", "serial_number", "reference_no",
+        "destination_port", "packing", "etd", "eta", "price", "nc",
+        "detail_spec", "invoice_ec", "vessel", "mbl_no",
     ]
     missing = [f for f in core_fields if f not in col_map]
     ai_inferred_fields: List[str] = []
@@ -697,7 +741,7 @@ def parse_hq_excel_bytes(
             ai_inferred_fields.append(f_name)
 
     if "reference_no" not in col_map:
-        raise ValueError("필수 기준 컬럼 'PO NUMBER' (또는 'P/O')를 찾을 수 없습니다.")
+        raise ValueError("필수 기준 컬럼 'P/O' (또는 'PO NUMBER')를 찾을 수 없습니다.")
 
     po_idx = col_map["reference_no"][0]
     so_idx = col_map["so_no"][0] if "so_no" in col_map else None
@@ -787,6 +831,7 @@ def parse_hq_excel_bytes(
             k: {"col_idx": v[0], "raw_header": v[1], "method": v[2]}
             for k, v in col_map.items()
         },
+        "standard_columns": STANDARD_17_COLUMNS,
         "ai_enabled": bool(use_ai),
         "ai_key_configured": bool(os.getenv("GEMINI_API_KEY")),
         "ai_inferred_fields": ai_inferred_fields,
@@ -1138,7 +1183,9 @@ def _compute_preview(
                 "reference_no": ref_no,
                 "so_no": row["so_no"],
                 "model_raw": row["model"],
+                "model_resolved": pm_obj.model_code if pm_obj is not None else row["model"],
                 "dealer_raw": row["dealer"],
+                "dealer_resolved": dealer_obj.name if dealer_obj is not None else row["dealer"],
                 "diffs": diffs,
                 "warnings": warnings,
                 "errors": errors,
@@ -1529,10 +1576,18 @@ def _execute_atomic_upsert(req: ApplySyncRequest, db: Session) -> Dict[str, Any]
 # 7. 선택적 검수용 엑셀 Export (DB 대조 결과 다운로드)
 # =============================================================================
 
+def _fmt_iso_date(val: Any) -> str:
+    if not val:
+        return ""
+    if isinstance(val, datetime.datetime):
+        return val.strftime("%Y-%m-%d")
+    return str(val)[:10]
+
+
 def _build_preview_excel(preview_data: Dict[str, Any]) -> bytes:
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = "DB_대조_검수리포트"
+    ws.title = "1_DB_대조_검수리포트"
 
     navy_fill = PatternFill("solid", fgColor="1F3864")
     red_fill = PatternFill("solid", fgColor="FCE4D6")
@@ -1544,8 +1599,10 @@ def _build_preview_excel(preview_data: Dict[str, Any]) -> bytes:
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
 
     headers = [
-        "엑셀행", "액션", "섹션", "P/O (reference_no)", "S/O", "MODEL", "DEALER",
-        "변경항목 (DB → Excel)", "경고", "차단오류", "PACKING(참고)", "DUAL ITEM(참고)", "INVOICE(E/C)(참고)",
+        "엑셀행", "액션", "섹션", "S/O", "MODEL", "DUAL ITEM", "DEALER", "S/N",
+        "P/O", "Port", "PACKING", "ETD", "ETA", "BUYING", "NC", "DETAIL SPEC",
+        "INVOICE(E/C)", "VESSEL", "B/L",
+        "변경항목 (DB → Excel)", "경고", "차단오류",
     ]
     ws.row_dimensions[1].height = 24
     for idx, h in enumerate(headers, 1):
@@ -1554,14 +1611,34 @@ def _build_preview_excel(preview_data: Dict[str, Any]) -> bytes:
         c.alignment = Alignment(horizontal="center", vertical="center")
 
     for r_i, row in enumerate(preview_data["preview_rows"], 2):
+        ap = row.get("apply_payload") or {}
+        extra = row.get("hq_extra") or {}
         diff_txt = " | ".join(f"{k}: {v['db']} → {v['excel']}" for k, v in row["diffs"].items())
         warn_txt = " / ".join(w["message"] for w in row["warnings"])
         err_txt = " / ".join(e["message"] for e in row["errors"])
         vals = [
-            row["excel_row"], row["action"], row["section"], row["reference_no"],
-            row["so_no"], row["model_raw"], row["dealer_raw"],
-            diff_txt, warn_txt, err_txt,
-            row["hq_extra"]["packing"], row["hq_extra"]["dual_item"], row["hq_extra"]["invoice_ec"],
+            row["excel_row"],
+            row["action"],
+            row["section"],
+            ap.get("so_no") or row.get("so_no") or "",
+            row.get("model_resolved") or row.get("model_raw") or "",
+            extra.get("dual_item") or "",
+            row.get("dealer_resolved") or row.get("dealer_raw") or "",
+            ap.get("serial_number") or "",
+            row["reference_no"],
+            ap.get("destination_port") or "",
+            extra.get("packing") or "",
+            _fmt_iso_date(ap.get("etd")),
+            _fmt_iso_date(ap.get("eta")),
+            ap.get("price") or "",
+            ap.get("nc") or "",
+            ap.get("detail_spec") or "",
+            extra.get("invoice_ec") or "",
+            ap.get("vessel") or "",
+            ap.get("mbl_no") or "",
+            diff_txt,
+            warn_txt,
+            err_txt,
         ]
         fill = red_fill if row["action"] == "BLOCKED" else (green_fill if row["action"] == "CREATE" else yellow_fill)
         for c_i, v in enumerate(vals, 1):
@@ -1569,11 +1646,53 @@ def _build_preview_excel(preview_data: Dict[str, Any]) -> bytes:
             cell.font, cell.border = data_font, border
             if c_i == 2:
                 cell.fill = fill
-            cell.alignment = Alignment(horizontal="center" if c_i <= 5 else "left", vertical="center", wrap_text=True)
+            cell.alignment = Alignment(horizontal="center" if c_i in (1, 2, 3, 4, 8, 9, 12, 13, 15) else "left", vertical="center", wrap_text=True)
 
-    for idx, w in enumerate([8, 11, 16, 15, 11, 16, 15, 44, 34, 38, 14, 14, 18], 1):
+    for idx, w in enumerate(
+        [8, 11, 16, 12, 16, 12, 18, 15, 15, 13, 13, 12, 12, 12, 10, 28, 17, 22, 20, 42, 32, 36],
+        1,
+    ):
         ws.column_dimensions[get_column_letter(idx)].width = w
     ws.freeze_panes = "A2"
+
+    # Sheet 2: ERP 표준 추출 17개 컬럼 시트 (NO ~ B/L)
+    ws_std = wb.create_sheet("2_ERP_표준추출_17Cols")
+    ws_std.row_dimensions[1].height = 24
+    for idx, h in enumerate(STANDARD_17_HEADERS, 1):
+        c = ws_std.cell(1, idx, h)
+        c.font, c.fill, c.border = hdr_font, navy_fill, border
+        c.alignment = Alignment(horizontal="center", vertical="center")
+
+    for seq, row in enumerate(preview_data["preview_rows"], 1):
+        ap = row.get("apply_payload") or {}
+        extra = row.get("hq_extra") or {}
+        std_vals = [
+            seq,
+            ap.get("so_no") or row.get("so_no") or "",
+            row.get("model_resolved") or row.get("model_raw") or "",
+            extra.get("dual_item") or "",
+            row.get("dealer_resolved") or row.get("dealer_raw") or "",
+            ap.get("serial_number") or "",
+            row["reference_no"],
+            ap.get("destination_port") or "",
+            extra.get("packing") or "",
+            _fmt_iso_date(ap.get("etd")),
+            _fmt_iso_date(ap.get("eta")),
+            ap.get("price") or "",
+            ap.get("nc") or "",
+            ap.get("detail_spec") or "",
+            extra.get("invoice_ec") or "",
+            ap.get("vessel") or "",
+            ap.get("mbl_no") or "",
+        ]
+        for c_i, v in enumerate(std_vals, 1):
+            cell = ws_std.cell(seq + 1, c_i, v)
+            cell.font, cell.border = data_font, border
+            cell.alignment = Alignment(horizontal="center" if c_i in (1, 2, 6, 7, 10, 11, 13) else "left", vertical="center", wrap_text=True)
+
+    for idx, w in enumerate([7, 12, 16, 12, 18, 16, 15, 14, 14, 13, 13, 12, 10, 30, 18, 22, 20], 1):
+        ws_std.column_dimensions[get_column_letter(idx)].width = w
+    ws_std.freeze_panes = "A2"
 
     buf = io.BytesIO()
     wb.save(buf)
