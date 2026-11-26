@@ -1086,9 +1086,9 @@ export default function AdminInventory({ isMobileView }) {
                   {renderSortHeader('model', t('menu2.header_model'), '12%')}
                   {renderSortHeader('nc', t('menu2.header_nc'), '6%')}
                   {renderSortHeader('sn', t('menu2.header_sn', 'S/N'), '10%')}
-                  {renderSortHeader('price', t('menu2.header_buying'), '8%', 'right')}
+                  {renderSortHeader('price', t('menu2.header_buying'), '9%', 'right')}
                   {renderSortHeader('po', t('menu2.header_po'), '10%')}
-                  {renderSortHeader('detail_spec', t('menu2.header_detailspec'), '13%', 'left')}
+                  {renderSortHeader('detail_spec', t('menu2.header_detailspec'), '12%', 'left')}
                   {renderSortHeader('eta', t('menu2.header_eta'), '9%')}
                   {renderSortHeader('port', t('menu2.header_port'), '7%')}
                   {renderSortHeader('stock_type', t('menu2.header_status_change'), '8%')}
